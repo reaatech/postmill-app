@@ -10,9 +10,9 @@ import {
   SocialProvider,
   SocialAbstract,
   ProviderKernel,
-  DEFAULT_VERSION,
 } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { ProviderNotConfiguredError } from '@gitroom/nestjs-libraries/integrations/provider-not-configured.error';
@@ -29,16 +29,15 @@ export class IntegrationManager {
   constructor(
     private _providerConfigManager: ProviderConfigManager,
     private _orgProviderConfigManager: OrgProviderConfigManager,
-    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
+    private _providerResolutionService: ProviderResolutionService,
   ) {}
 
-  // Raw social provider singletons, sourced from the ProviderKernel registry —
-  // the single source of truth (the legacy in-memory social registry and the
-  // PROVIDER_KERNEL kill switch were removed). The kernel's
-  // `create()` returns a credential-mapping bridge that intentionally does NOT
-  // carry the providers' @Plug/@Rules/@Tool decorator metadata or their custom
-  // tool methods, so enumeration + dynamic dispatch read the raw `legacyProvider`
-  // instance each registered module exposes.
+  // Raw social provider singletons, sourced through ProviderResolutionService so
+  // the org's pinned version is respected. The kernel's `create()` returns a
+  // credential-mapping bridge; enumeration + dynamic dispatch read the underlying
+  // `rawProvider` singleton so decorator metadata (`@Plug`, `@Rules`, `@Tool`)
+  // and custom methods remain accessible.
   getSocialProviders(): Array<SocialAbstract & SocialProvider> {
     const seen = new Set<string>();
     const list: Array<SocialAbstract & SocialProvider> = [];
@@ -46,19 +45,27 @@ export class IntegrationManager {
       if (seen.has(manifest.providerId)) {
         continue;
       }
-      const mod = this._kernel.get(
-        'social',
-        manifest.providerId,
-        manifest.version
-      );
-      const raw = mod?.legacyProvider as
-        | (SocialAbstract & SocialProvider)
-        | undefined;
-      if (!raw) {
-        continue;
+      try {
+        const resolved = this._providerResolutionService.resolveProvider<SocialProvider>(
+          'social',
+          manifest.providerId,
+          { version: manifest.version },
+        );
+        const raw = (resolved.capability as any).rawProvider as
+          | (SocialAbstract & SocialProvider)
+          | undefined;
+        if (!raw) {
+          continue;
+        }
+        seen.add(manifest.providerId);
+        list.push(raw);
+      } catch (err) {
+        // 1.3: enumeration must be resilient — a retired/unknown version must
+        // not abort the whole provider list.
+        this._logger.debug(
+          `Skipping social provider ${manifest.providerId}@${manifest.version}: ${(err as Error).message}`,
+        );
       }
-      seen.add(manifest.providerId);
-      list.push(raw);
     }
     return list;
   }
@@ -232,28 +239,37 @@ export class IntegrationManager {
     integration: string,
     version?: string
   ): SocialProvider | undefined {
-    // Resolve the raw provider singleton from the ProviderKernel registry. The
-    // raw instance (not the kernel's credential-mapping bridge) is returned so
-    // callers can invoke custom tool / internal-plug methods by name — these
-    // live only on the provider class, not on the bridge interface.
-    const mod = version
-      ? this._kernel.get('social', integration, version)
-      : this._kernel.get('social', integration, DEFAULT_VERSION) ??
-        this._kernel.latestActive('social', integration);
+    // Resolve through ProviderResolutionService so the org's pinned version is
+    // used. The raw singleton is exposed via the bridge's `rawProvider` getter
+    // so decorator metadata and custom methods remain accessible.
+    try {
+      const resolved = version
+        ? this._providerResolutionService.resolveProvider<SocialProvider>(
+            'social',
+            integration,
+            { version },
+          )
+        : this._providerResolutionService.resolveProvider<SocialProvider>(
+            'social',
+            integration,
+            {},
+          );
 
-    // 1.3: the Unchecked variant is documented to RETURN undefined for
-    // unknown/unavailable ids so a single bad provider can't abort a cross-org
-    // sweep (channel list, token refresh — callers rely on `if (!provider)
-    // continue`). A retired pinned version must therefore return undefined here,
-    // NOT throw — the throw belonged to the CHECKED getSocialIntegration, which
-    // surfaces the 404/410 for a single user-facing lookup. Version-less listing
-    // paths keep their existing, status-agnostic behaviour. Latent today (all
-    // social providers are v1), so this is behaviour-neutral for real data.
-    if (version && mod?.manifest.status === 'retired') {
+      // 1.3: the Unchecked variant is documented to RETURN undefined for
+      // unknown/unavailable ids so a single bad provider can't abort a cross-org
+      // sweep. A retired pinned version must therefore return undefined here,
+      // NOT throw — the throw belongs to the CHECKED getSocialIntegration, which
+      // surfaces the 404/410 for a single user-facing lookup.
+      if (version && resolved.module.manifest.status === 'retired') {
+        return undefined;
+      }
+
+      return (resolved.capability as any).rawProvider as
+        | SocialProvider
+        | undefined;
+    } catch (err) {
       return undefined;
     }
-
-    return mod?.legacyProvider as SocialProvider | undefined;
   }
 
   // INTERNAL USE ONLY - returns decrypted client credentials.

@@ -412,5 +412,4 @@ export const hashnodeSocialModule: __ProviderModule<any, any> = {
     capabilities: (__CAPS as any)[__adapter.identifier] || {},
   },
   create: (ctx) => new __Bridge(__adapter, ctx),
-  legacyProvider: __adapter,
 };

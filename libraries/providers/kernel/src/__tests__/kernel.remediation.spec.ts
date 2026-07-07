@@ -79,17 +79,37 @@ describe('4.5 manifest validation', () => {
   });
 });
 
-describe('6.3 compareVersions tie-break', () => {
-  it('latestActive is deterministic for same-major suffixed versions regardless of registration order', () => {
+describe('PF-06 semver-aware version ordering', () => {
+  it('latestActive selects stable v2 over v2-beta', () => {
+    const kernel = new ProviderKernel();
+    kernel.register(makeModule({}, { version: 'v2', status: 'active' }));
+    kernel.register(makeModule({}, { version: 'v2-beta', status: 'preview' }));
+    expect(kernel.latestActive('ai', 'openai')?.manifest.version).toBe('v2');
+  });
+
+  it('latestActive is deterministic regardless of registration order', () => {
     const a = new ProviderKernel();
-    a.register(makeModule({}, { version: 'v2' }));
-    a.register(makeModule({}, { version: 'v2-hotfix' }));
+    a.register(makeModule({}, { version: 'v2', status: 'active' }));
+    a.register(makeModule({}, { version: 'v2.0.1', status: 'active' }));
     const b = new ProviderKernel();
-    b.register(makeModule({}, { version: 'v2-hotfix' }));
-    b.register(makeModule({}, { version: 'v2' }));
-    // localeCompare tie-break: 'v2-hotfix' > 'v2'
-    expect(a.latestActive('ai', 'openai')?.manifest.version).toBe('v2-hotfix');
-    expect(b.latestActive('ai', 'openai')?.manifest.version).toBe('v2-hotfix');
+    b.register(makeModule({}, { version: 'v2.0.1', status: 'active' }));
+    b.register(makeModule({}, { version: 'v2', status: 'active' }));
+    expect(a.latestActive('ai', 'openai')?.manifest.version).toBe('v2.0.1');
+    expect(b.latestActive('ai', 'openai')?.manifest.version).toBe('v2.0.1');
+  });
+
+  it('rejects a prerelease version that is not marked preview', () => {
+    const kernel = new ProviderKernel();
+    expect(() =>
+      kernel.register(makeModule({}, { version: 'v2-beta', status: 'active' })),
+    ).toThrow(/preview/);
+  });
+
+  it('allows a prerelease version marked preview', () => {
+    const kernel = new ProviderKernel();
+    expect(() =>
+      kernel.register(makeModule({}, { version: 'v2-beta', status: 'preview' })),
+    ).not.toThrow();
   });
 });
 

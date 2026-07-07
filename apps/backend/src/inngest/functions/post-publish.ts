@@ -12,6 +12,17 @@ import { capitalize, sortBy } from 'lodash';
 
 const MAX_RETRIES = 5;
 
+// Minimal runtime context for the metadata-only bridge used to derive task
+// queues. The bridge only exposes `identifier`/`maxConcurrentJob` getters here,
+// so a stub context is sufficient.
+const taskQueueContext = {
+  credentials: {},
+  encryption: { encrypt: () => '', decrypt: () => '' },
+  fetch: async () => new Response(),
+  logger: { log: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
+  telemetry: { recordCall: () => {} },
+} as any;
+
 /**
  * Temporal enforced a per-provider task queue with `maxConcurrentTaskExecutions`.
  * Inngest's `concurrency.limit` is static per function definition, so we generate
@@ -19,20 +30,21 @@ const MAX_RETRIES = 5;
  * conservative `maxConcurrentJob` when multiple provider variants share a queue
  * (e.g. `instagram` and `instagram-standalone` both map to `instagram`).
  *
- * Sourced at import time from the generated provider modules (the same single
- * source of truth the ProviderKernel registers from) — the kernel itself isn't
- * populated until app bootstrap, after Inngest functions are built.
+ * Sourced from the generated provider modules (the same single source of truth
+ * the ProviderKernel registers from) — the kernel itself isn't populated until
+ * app bootstrap, after Inngest functions are built, so we resolve the metadata
+ * bridge directly from each module's `create()` rather than through the kernel.
  */
 const taskQueueLimits = providerModules.reduce((acc, mod) => {
   if (mod.manifest.domain !== 'social') {
     return acc;
   }
-  const provider = mod.legacyProvider as SocialProvider | undefined;
-  if (!provider) {
+  const capability = mod.create(taskQueueContext) as SocialProvider | undefined;
+  if (!capability) {
     return acc;
   }
-  const base = provider.identifier.split('-')[0].toLowerCase();
-  const limit = provider.maxConcurrentJob ?? 1;
+  const base = capability.identifier.split('-')[0].toLowerCase();
+  const limit = capability.maxConcurrentJob ?? 1;
   const existing = acc.get(base);
   if (existing === undefined || limit < existing) {
     acc.set(base, limit);

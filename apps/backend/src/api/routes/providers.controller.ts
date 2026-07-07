@@ -16,6 +16,7 @@ import { User } from '@prisma/client';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsInt,
   IsString,
   Max,
@@ -29,10 +30,12 @@ import {
   ProviderDomain,
   isProviderDomain,
   isProviderVerified,
+  PROVIDER_DOMAINS,
 } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { FeaturedProviderService } from '@gitroom/nestjs-libraries/database/prisma/featured-providers/featured-provider.service';
 import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
+import { AuthGuard } from '@gitroom/backend/services/auth/auth.guard';
 
 // PROVIDER_REMEDIATION 3.3: `isProviderDomain` + the domain set are now a single
 // source of truth exported from the kernel (`@gitroom/provider-kernel`), shared
@@ -51,6 +54,7 @@ function resolveDomainFilter(domain?: string): ProviderDomain | undefined {
 
 export class FeaturedProviderDto {
   @IsString()
+  @IsIn([...PROVIDER_DOMAINS])
   domain: string;
 
   @IsString()
@@ -100,6 +104,7 @@ export class ProvidersController {
   ) {}
 
   @Get('/catalog')
+  @UseGuards(AuthGuard)
   async catalog(@Query('domain') domain?: string) {
     const domainFilter = resolveDomainFilter(domain);
     const manifests = this._kernel.listManifests(domainFilter);

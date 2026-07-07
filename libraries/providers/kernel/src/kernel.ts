@@ -10,30 +10,10 @@ import {
   ProviderVersionPreviewError,
   ProviderManifestError,
 } from './errors';
+import { compareVersions } from './version';
 
 export interface KernelOptions {
   telemetry?: TelemetryPort;
-}
-
-function versionRank(version: string): number {
-  const match = /^v(\d+)/.exec(version);
-  if (match) {
-    return Number(match[1]);
-  }
-  return Number.NEGATIVE_INFINITY;
-}
-
-function compareVersions(a: string, b: string): number {
-  const rankA = versionRank(a);
-  const rankB = versionRank(b);
-  if (rankA !== Number.NEGATIVE_INFINITY && rankB !== Number.NEGATIVE_INFINITY) {
-    // 6.3: same-major suffixed versions (v2 vs v2-hotfix) rank equally by major;
-    // tie-break lexicographically so latestActive is deterministic, not
-    // registration-order-dependent.
-    if (rankA !== rankB) return rankA - rankB;
-    return a.localeCompare(b);
-  }
-  return a.localeCompare(b);
 }
 
 function freshHealth(): ProviderHealth {
@@ -140,15 +120,10 @@ export class ProviderKernel {
       | undefined;
   }
 
-  // 4.2 — version-ordering INVARIANT: `latestActive` ranks by numeric major
-  // (`versionRank`), tie-breaking same-major suffixed versions lexicographically
-  // (`compareVersions`). That tie-break means a suffixed version like `v2-beta`
-  // would lexicographically BEAT plain `v2` if it were `active`. The invariant
-  // that keeps this correct: **pre-releases must carry status `preview`, never
-  // `active`** — only `active` versions are considered here, so a `preview`
-  // `v2-beta` is excluded and `v2` wins. Suffixes on an `active` version are
-  // reserved for forward hotfixes (`v2-hotfix` intentionally > `v2`). Do not mark
-  // a pre-release `active`, or it will be selected over its stable base.
+  // 4.2 / PF-06 — version-ordering INVARIANT: `latestActive` ranks by full
+  // semver comparison (`compareVersions`). Prerelease suffixes (`v2-beta`) must
+  // carry status `preview`; only `active` versions are considered here, so a
+  // `preview` release is excluded and the stable `v2` wins.
   latestActive<Caps, Capability>(
     domain: ProviderDomain,
     providerId: string,

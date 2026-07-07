@@ -19,6 +19,7 @@ import {
   ProviderVersionRetiredError,
   ProviderVersionDeprecatedForWriteError,
   ProviderVersionPreviewError,
+  ProviderVersionInvalidError,
 } from '@gitroom/provider-kernel';
 import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
 import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
@@ -220,6 +221,13 @@ export class ProviderResolutionService {
     providerId: string,
     options: ResolutionOptions,
   ): ResolvedProvider<C> {
+    // PF-03: an empty-string version is not "no version"; it is invalid data.
+    if (options.version === '') {
+      throw new ProviderVersionInvalidError(
+        { domain, providerId, version: options.version },
+        'Version cannot be empty',
+      );
+    }
     // 1.2: when no version is pinned, resolve the latest ACTIVE version rather
     // than hard-defaulting to v1 — otherwise the moment a provider ships v2 and
     // retires v1 every no-version caller 404/410s a provider that is active.
@@ -396,18 +404,38 @@ export class ProviderResolutionService {
     version?: string,
     opts?: { allowPreview?: boolean; currentVersion?: string },
   ): string {
-    // 1.4: distinguish pinning a NEW version (create, or an explicit version
-    // change) from updating an existing row AT its current pinned version. An
-    // in-place update of a deprecated-pinned row (disable / credential rotation /
-    // rename) must be allowed — only a write that would newly pin a
-    // deprecated/retired/preview version is rejected. `currentVersion` is the
-    // row's already-pinned version on updates.
-    const currentVersion = opts?.currentVersion;
-    const target = version ?? currentVersion;
-    const isInPlaceUpdate =
-      currentVersion !== undefined &&
-      (version === undefined || version === currentVersion);
     try {
+      // 1.4 / PF-03: distinguish pinning a NEW version (create, or an explicit
+      // version change) from updating an existing row AT its current pinned
+      // version. An empty-string version is invalid data, not "no version".
+      if (version === '') {
+        throw new ProviderVersionInvalidError(
+          { domain, providerId, version },
+          'Version cannot be empty',
+        );
+      }
+
+      // 1.4: an in-place update of a deprecated-pinned row (disable / credential
+      // rotation / rename) must be allowed — only a write that would newly pin a
+      // deprecated/retired/preview version is rejected. `currentVersion` is the
+      // row's already-pinned version on updates.
+      let currentVersion = opts?.currentVersion;
+
+      // PF-04: do not trust caller-supplied `currentVersion` for the deprecated
+      // bypass. Verify it resolves to a real registered module before treating
+      // the call as an in-place update. A spoofed or unknown currentVersion
+      // falls back to the stricter new-pin path.
+      if (
+        currentVersion !== undefined &&
+        !this._kernel.get(domain, providerId, currentVersion)
+      ) {
+        currentVersion = undefined;
+      }
+
+      const target = version ?? currentVersion;
+      const isInPlaceUpdate =
+        currentVersion !== undefined &&
+        (version === undefined || version === currentVersion);
       return this._kernel
         .resolveForWrite(domain, providerId, target, {
           allowPreview: opts?.allowPreview,
@@ -421,7 +449,8 @@ export class ProviderResolutionService {
       if (
         err instanceof ProviderVersionDeprecatedForWriteError ||
         err instanceof ProviderVersionPreviewError ||
-        err instanceof ProviderNotFoundError
+        err instanceof ProviderNotFoundError ||
+        err instanceof ProviderVersionInvalidError
       ) {
         throw new BadRequestException(err.message);
       }

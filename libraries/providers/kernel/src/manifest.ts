@@ -1,4 +1,5 @@
 import { ProviderDomain, ProviderKey, keyString, PROVIDER_DOMAINS } from './identity';
+import { versionIsPrerelease } from './version';
 
 export type ProviderVersionStatus = 'preview' | 'active' | 'deprecated' | 'retired';
 
@@ -85,6 +86,13 @@ export function validateManifest<Caps>(manifest: ProviderManifest<Caps>): void {
   const validStatuses: ProviderVersionStatus[] = ['preview', 'active', 'deprecated', 'retired'];
   if (!validStatuses.includes(manifest.status)) {
     throw new Error(`Manifest invalid status: ${manifest.status}`);
+  }
+  // PF-06: a version with a semver prerelease suffix must be registered as
+  // `preview` so `latestActive` never selects a prerelease over its stable base.
+  if (versionIsPrerelease(manifest.version) && manifest.status !== 'preview') {
+    throw new Error(
+      `Prerelease version ${manifest.version} must have status preview, got ${manifest.status}`,
+    );
   }
   if (!Array.isArray(manifest.credentialFields)) {
     throw new Error('Manifest credentialFields must be an array');
