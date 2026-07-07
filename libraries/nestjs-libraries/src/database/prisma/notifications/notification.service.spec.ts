@@ -3,12 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockCreateNotification = vi.fn().mockResolvedValue({ id: 'notif-1' });
 const mockCreateReadRecords = vi.fn().mockResolvedValue(undefined);
 const mockGetTeam = vi.fn().mockResolvedValue({ users: [] });
-const mockEnsureDefaults = vi.fn().mockResolvedValue({
+const defaultPreferenceData = {
   masters: { email: true, push: true, inApp: true },
   categories: {
     announcements: { email: true, push: true, inApp: true },
   },
-});
+};
+const mockEnsureDefaults = vi.fn().mockResolvedValue(defaultPreferenceData);
+const mockEnsureDefaultsForUsers = vi.fn().mockImplementation((ids: string[]) =>
+  Object.fromEntries(ids.map((id) => [id, defaultPreferenceData]))
+);
 const mockGetDigestFrequencies = vi.fn().mockResolvedValue({});
 const mockEnqueueMany = vi.fn().mockResolvedValue(undefined);
 
@@ -46,6 +50,7 @@ vi.mock(
   () => ({
     NotificationPreferenceService: class {
       ensureDefaults = mockEnsureDefaults;
+      ensureDefaultsForUsers = mockEnsureDefaultsForUsers;
       getPreferences = vi.fn();
       updatePreferences = vi.fn();
       getDigestFrequencies = mockGetDigestFrequencies;
@@ -86,6 +91,10 @@ describe('NotificationService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockEnsureDefaults.mockResolvedValue(defaultPreferenceData);
+    mockEnsureDefaultsForUsers.mockImplementation((ids: string[]) =>
+      Object.fromEntries(ids.map((id) => [id, defaultPreferenceData]))
+    );
 
     emailService = new EmailService();
     service = new NotificationService(
@@ -192,10 +201,12 @@ describe('NotificationService', () => {
     mockGetTeam.mockResolvedValue({
       users: [{ user: { id: 'user-1', email: 'a@b.com' } }],
     });
-    mockEnsureDefaults.mockResolvedValue({
-      masters: { email: true, push: true, inApp: true },
-      categories: {
-        announcements: { email: false, push: true, inApp: true },
+    mockEnsureDefaultsForUsers.mockResolvedValue({
+      'user-1': {
+        masters: { email: true, push: true, inApp: true },
+        categories: {
+          announcements: { email: false, push: true, inApp: true },
+        },
       },
     });
 
@@ -281,5 +292,94 @@ describe('NotificationService', () => {
     expect(payload.message).toContain('Best channel: Instagram');
     expect(payload.message).toContain('Top post: "Best post ever"');
     expect(payload.message).toContain('1 analytics alert flagged this week');
+  });
+
+  it('NOTIF-01: escapes user strings in comment digest email HTML', async () => {
+    const notifySpy = vi.spyOn(service, 'notify').mockResolvedValue(undefined);
+
+    await service.notifyCommentDigest('org-1', 10, [
+      {
+        id: 'post-1',
+        content: '<script>alert(1)</script>',
+        integration: { name: '<b>Evil Platform</b>' },
+        socialComments: [{ id: 'c1' }],
+      },
+    ]);
+
+    expect(notifySpy).toHaveBeenCalled();
+    const html = notifySpy.mock.calls[0][0].html as string;
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('&lt;b&gt;Evil Platform&lt;/b&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
+  });
+
+  it('NOTIF-06: skips inactive users and disabled org memberships', async () => {
+    mockGetTeam.mockResolvedValue({
+      users: [
+        { user: { id: 'active-user', email: 'active@b.com' } },
+        { disabled: true, user: { id: 'disabled-member', email: 'disabled@b.com' } },
+        { user: { id: 'inactive-user', email: 'inactive@b.com', activated: false } },
+      ],
+    });
+
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+    });
+
+    expect(mockEnsureDefaultsForUsers).toHaveBeenCalledWith(['active-user']);
+    expect(emailService.sendEmail).toHaveBeenCalledWith(
+      'active@b.com',
+      'Subject',
+      'Message',
+      'top',
+      undefined
+    );
+    expect(emailService.sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('NOTIF-10: batches preference lookup for all active members in one query', async () => {
+    const users = Array.from({ length: 20 }, (_, i) => ({
+      user: { id: `user-${i}`, email: `user-${i}@b.com` },
+    }));
+    mockGetTeam.mockResolvedValue({ users });
+
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+    });
+
+    expect(mockEnsureDefaultsForUsers).toHaveBeenCalledTimes(1);
+    expect(mockEnsureDefaultsForUsers).toHaveBeenCalledWith(
+      users.map((u) => u.user.id)
+    );
+    expect(mockEnsureDefaults).not.toHaveBeenCalled();
+  });
+
+  it('NOTIF-12: skips creating the in-app notification row when inApp is disabled', async () => {
+    mockGetTeam.mockResolvedValue({
+      users: [{ user: { id: 'user-1', email: 'a@b.com' } }],
+    });
+    mockEnsureDefaultsForUsers.mockResolvedValue({
+      'user-1': {
+        masters: { email: true, push: true, inApp: true },
+        categories: {
+          announcements: { email: true, push: true, inApp: false },
+        },
+      },
+    });
+
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+    });
+
+    expect(mockCreateNotification).not.toHaveBeenCalled();
   });
 });
