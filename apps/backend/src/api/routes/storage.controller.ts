@@ -20,6 +20,7 @@ import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storag
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
+import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import {
   CreateStorageConfigDto,
@@ -28,6 +29,7 @@ import {
   SetOrgQuotaDto,
   SetDefaultFolderDto,
 } from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
+import { AuditLogQueryDto } from '@gitroom/nestjs-libraries/dtos/storage/audit-log-query.dto';
 
 @ApiTags('Storage Settings')
 @Controller('/settings/storage')
@@ -207,6 +209,7 @@ export class StorageController {
   }
 
   @Put('/quota/:orgId')
+  @UseGuards(SuperAdminGuard)
   async setOrgQuota(
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
@@ -239,12 +242,11 @@ export class StorageController {
   @RequirePermission('storage-config', 'manage')
   async getAuditLog(
     @GetOrgFromRequest() org: Organization,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string
+    @Query() query: AuditLogQueryDto
   ) {
     const logs = await this._auditService.findByOrg(org.id, {
-      limit: limit ? Math.min(parseInt(limit), 100) : 50,
-      offset: offset ? parseInt(offset) : 0,
+      limit: query.limit ?? 50,
+      offset: query.offset ?? 0,
     });
     const total = await this._auditService.countByOrg(org.id);
     return {

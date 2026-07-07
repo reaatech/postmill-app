@@ -148,12 +148,16 @@ describe('FilesController — storage cleanup on permanent delete', () => {
 
   it('does not remove a file belonging to another org', async () => {
     const { fileRepo, model } = makeRepo();
-    model.file.findUnique.mockResolvedValue({
-      id: 'file-4',
-      organizationId: 'org-2',
-      folderId: null,
-      path: 'https://app.example.com/uploads/foreign.png',
-    });
+    model.file.findUnique.mockImplementation(({ where }: any) =>
+      where.organizationId === 'org-2'
+        ? {
+            id: 'file-4',
+            organizationId: 'org-2',
+            folderId: null,
+            path: 'https://app.example.com/uploads/foreign.png',
+          }
+        : null
+    );
 
     const adapter = {
       type: StorageProviderType.LOCAL,
