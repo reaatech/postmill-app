@@ -66,7 +66,7 @@ export class StorageService {
   }
 
   async #getOrgScopedConfig(id: string, orgId: string): Promise<StorageConfigRow> {
-    const config = await this._storageRepository.findById(id);
+    const config = await this._storageRepository.findById(orgId, id);
     if (!config || config.organizationId !== orgId) {
       throw new Error('Storage config not found');
     }
@@ -270,7 +270,7 @@ export class StorageService {
 
     let updated;
     try {
-      updated = await this._storageRepository.update(id, updateData);
+      updated = await this._storageRepository.update(orgId, id, updateData);
     } catch (err) {
       // Belt-and-suspenders for a TOCTOU race on the fingerprint pre-check.
       if (
@@ -308,7 +308,7 @@ export class StorageService {
     if (config.mounted) {
       throw new Error('Cannot delete a mounted storage provider. Unmount first.');
     }
-    const deleted = await this._storageRepository.delete(id);
+    const deleted = await this._storageRepository.delete(orgId, id);
     this.#audit('delete', orgId, config, userId);
     return deleted;
   }
@@ -423,8 +423,8 @@ export class StorageService {
 
     let config: StorageConfigRow | undefined;
     if (configId) {
-      const byId = await this._storageRepository.findById(configId);
-      if (byId && byId.organizationId === orgId) {
+      const byId = await this._storageRepository.findById(orgId, configId);
+      if (byId) {
         config = byId as StorageConfigRow;
       }
     }
@@ -554,7 +554,7 @@ export class StorageService {
   async mount(id: string, orgId: string) {
     const config = await this.#getOrgScopedConfig(id, orgId);
 
-    await this._storageRepository.update(id, { mounted: true });
+    await this._storageRepository.update(orgId, id, { mounted: true });
 
     // Reuse the existing root folder if this provider was mounted before (#55).
     const existing = await this._storageRepository.findMountFolder(orgId, id);
@@ -577,7 +577,7 @@ export class StorageService {
     // Delete the auto-created root folder when empty, else detach it (#55).
     await this._storageRepository.removeOrDetachMountFolders(id);
 
-    const updated = await this._storageRepository.update(id, { mounted: false });
+    const updated = await this._storageRepository.update(orgId, id, { mounted: false });
     this.#audit('unmount', orgId, updated);
     return this.#sanitize(updated);
   }
@@ -666,8 +666,15 @@ export class StorageService {
     for (const config of configs) {
       if (config.publicUrl) {
         prefixes.push(config.publicUrl.replace(/\/$/, '') + '/');
-      } else if (config.bucket && config.region) {
+      } else if (
+        config.bucket &&
+        config.region &&
+        (config.type === StorageProviderType.S3 ||
+          config.type === StorageProviderType.S3_COMPATIBLE)
+      ) {
         // Default S3 virtual-hosted URL when no custom publicUrl/CDN is set.
+        // Only do this for true S3-compatible provider types; R2/Wasabi/B2/etc.
+        // have their own endpoint shapes and should rely on publicUrl.
         prefixes.push(
           `https://${config.bucket}.s3.${config.region}.amazonaws.com/`
         );
@@ -717,8 +724,11 @@ export class StorageService {
       }
 
       if (folder.storageProviderId) {
-        const config = await this._storageRepository.findById(folder.storageProviderId);
-        if (config && config.organizationId === orgId) {
+        const config = await this._storageRepository.findById(
+          orgId,
+          folder.storageProviderId
+        );
+        if (config) {
           return {
             adapter: this.#buildAdapter(config as StorageConfigRow),
             configId: config.id,
@@ -745,8 +755,8 @@ export class StorageService {
     orgId: string,
     userId?: string
   ) {
-    const config = await this._storageRepository.findById(providerId);
-    if (!config || config.organizationId !== orgId) {
+    const config = await this._storageRepository.findById(orgId, providerId);
+    if (!config) {
       throw new HttpException('Provider not found', 404);
     }
     const updated = await this._storageRepository.setDefaultFolder(providerId, folderId);
