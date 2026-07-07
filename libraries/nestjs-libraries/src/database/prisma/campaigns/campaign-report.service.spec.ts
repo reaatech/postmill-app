@@ -10,6 +10,7 @@ const campaignRow = {
   startDate: new Date('2024-01-01'),
   endDate: new Date('2024-02-01'),
   shareEnabled: true,
+  shareToken: 'secret-token',
   goals: null,
   // Internal-only fields that must NOT leak on the public report.
   client: 'Acme Corp',
@@ -33,17 +34,17 @@ function makeService() {
     listByCampaign: vi.fn().mockResolvedValue([]),
   };
   const resolver = { resolveBatch: vi.fn().mockResolvedValue(new Map()) };
-  const posts = { getCampaignPosts: vi.fn().mockResolvedValue([]) };
+  const postsService = { getCampaignPosts: vi.fn().mockResolvedValue([]) };
   const comments = { countCampaignComments: vi.fn().mockResolvedValue(1) };
 
   const service = new CampaignReportService(
     campaigns as any,
     items as any,
     resolver as any,
-    posts as any,
+    postsService as any,
     comments as any
   );
-  return { service };
+  return { service, postsService };
 }
 
 const analytics = {
@@ -103,5 +104,79 @@ describe('CampaignReportService.toPublicJson (3.4 whitelist)', () => {
       id: 'c1',
       organizationId: 'org1',
     });
+  });
+});
+
+describe('CampaignReportService internal reports', () => {
+  it('buildReport strips shareToken/shareEnabled from the campaign object', async () => {
+    const { service } = makeService();
+    const report: any = await service.buildReport('c1', 'org1');
+    expect(report.campaign).not.toHaveProperty('shareToken');
+    expect(report.campaign).not.toHaveProperty('shareEnabled');
+    expect(report.campaign).toHaveProperty('name', 'Launch');
+  });
+
+  it('toJson inherits the stripped campaign', async () => {
+    const { service } = makeService();
+    const report: any = await service.toJson('c1', 'org1');
+    expect(report.campaign).not.toHaveProperty('shareToken');
+    expect(report.campaign).not.toHaveProperty('shareEnabled');
+  });
+
+  it('reads campaign posts through PostsService, not PostsRepository', async () => {
+    const { service, postsService } = makeService();
+    await service.buildReport('c1', 'org1');
+    expect(postsService.getCampaignPosts).toHaveBeenCalledWith('org1', 'c1');
+  });
+});
+
+describe('CampaignReportService.toCsv', () => {
+  it('sanitizes formula-injection payloads in titles', async () => {
+    const { service } = makeService();
+    const campaigns = {
+      findById: vi.fn().mockResolvedValue(campaignRow),
+      getEngagement: vi.fn().mockResolvedValue({
+        totalViews: 10, totalLikes: 2, totalComments: 1, avgViews: 5, avgLikes: 1, avgComments: 0,
+      }),
+      getPostStateCounts: vi.fn().mockResolvedValue({}),
+      getCampaignClickTotal: vi.fn().mockResolvedValue(0),
+    };
+    const items = {
+      countByCampaignGroupedByType: vi.fn().mockResolvedValue([]),
+      listByCampaign: vi.fn().mockResolvedValue([]),
+    };
+    const resolver = { resolveBatch: vi.fn().mockResolvedValue(new Map()) };
+    const postsService = {
+      getCampaignPosts: vi.fn().mockResolvedValue([
+        {
+          id: 'p1',
+          title: '=HYPERLINK("http://evil","click")',
+          content: '',
+          state: 'PUBLISHED',
+          publishDate: new Date('2024-01-01'),
+          lastViews: 1,
+          lastLikes: 0,
+          lastComments: 0,
+          integration: { name: 'X' },
+        },
+      ]),
+    };
+    const comments = { countCampaignComments: vi.fn().mockResolvedValue(0) };
+    const csvService = new CampaignReportService(
+      campaigns as any,
+      items as any,
+      resolver as any,
+      postsService as any,
+      comments as any
+    );
+
+    const csv = await csvService.toCsv('c1', 'org1');
+    const lines = csv.split('\n');
+    const dataLine = lines.find((l) => l.includes('p1'))!;
+    // The title cell must be quoted and start with a neutralizing single quote.
+    // Because the CSV doubles internal quotes, the escaped literal looks like:
+    // "'=HYPERLINK(""http://evil"",""click"")".
+    expect(dataLine).toContain("'" + '=HYPERLINK(');
+    expect(dataLine).not.toContain('"=HYPERLINK(');
   });
 });

@@ -11,7 +11,10 @@ function makeService(overrides: any = {}) {
       name: 'Launch',
       goals: null,
       createdById: 'u1',
+      shareToken: 'secret-token',
+      shareEnabled: true,
     }),
+    findByOrg: vi.fn().mockResolvedValue([]),
     getEngagement: vi.fn().mockResolvedValue({ totalComments: 0 }),
     getPostStateCounts: vi.fn().mockResolvedValue({}),
     getUpcomingQueuePosts: vi.fn().mockResolvedValue([]),
@@ -28,6 +31,7 @@ function makeService(overrides: any = {}) {
     countByCampaignGroupedByType: vi
       .fn()
       .mockResolvedValue([{ entityType: 'INTEGRATION' }]),
+    copyAllToCampaign: vi.fn().mockResolvedValue(undefined),
     ...overrides.campaignItems,
   };
   const campaignItemResolver = {
@@ -37,13 +41,18 @@ function makeService(overrides: any = {}) {
         new Map([['i3', { id: 'i3', name: 'YouTube', icon: 'youtube', subtitle: 'youtube' }]])
       ),
   };
-  const audit = { findByEntity: vi.fn().mockResolvedValue([]) };
+  const audit = { findByEntity: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue(undefined) };
   const postsService = {
     getCampaignPosts: vi.fn().mockResolvedValue([
       { integration: { id: 'i1', name: 'X', providerIdentifier: 'x', picture: 'p1' } },
       { integration: { id: 'i1', name: 'X', providerIdentifier: 'x', picture: 'p1' } },
       { integration: { id: 'i2', name: 'LI', providerIdentifier: 'linkedin', picture: null } },
     ]),
+    getCampaignDrafts: vi.fn().mockResolvedValue({}),
+    buildCreateDtoFromPost: vi.fn().mockReturnValue({}),
+    createPost: vi.fn().mockResolvedValue([]),
+    setDraftPending: vi.fn().mockResolvedValue(undefined),
+    ...overrides.postsService,
   };
   const usersService = {
     getNamesByIds: vi.fn().mockResolvedValue(new Map()),
@@ -66,7 +75,7 @@ function makeService(overrides: any = {}) {
     socialCommentsService as any,
     fileService as any
   );
-  return { service, campaignsRepository, usersService };
+  return { service, campaignsRepository, campaignItems, postsService, usersService, audit };
 }
 
 describe('CampaignsService', () => {
@@ -82,6 +91,44 @@ describe('CampaignsService', () => {
     expect(campaignsRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({ client: 'Acme', project: 'v4', tags: ['paid', 'launch'] })
     );
+  });
+
+  it('strips shareToken/shareEnabled from single get', async () => {
+    const { service } = makeService();
+    const result = await service.get('c1', 'org1');
+    expect(result).not.toBeNull();
+    expect(result).not.toHaveProperty('shareToken');
+    expect(result).not.toHaveProperty('shareEnabled');
+    expect(result).toHaveProperty('name', 'Launch');
+  });
+
+  it('strips shareToken/shareEnabled from list responses', async () => {
+    const { service, campaignsRepository } = makeService({
+      campaignsRepository: {
+        findByOrg: vi.fn().mockResolvedValue([
+          {
+            id: 'c1',
+            name: 'Launch',
+            shareToken: 'secret',
+            shareEnabled: true,
+            posts: [{ integrationId: 'i1' }],
+          },
+        ]),
+      },
+    });
+    const result = await service.list('org1');
+    expect(result).toHaveLength(1);
+    expect(result[0]).not.toHaveProperty('shareToken');
+    expect(result[0]).not.toHaveProperty('shareEnabled');
+    expect(result[0]).toHaveProperty('integrationIds');
+  });
+
+  it('strips shareToken/shareEnabled from dashboard response', async () => {
+    const { service } = makeService();
+    const dash = await service.getDashboard('c1', 'org1');
+    expect(dash.campaign).not.toHaveProperty('shareToken');
+    expect(dash.campaign).not.toHaveProperty('shareEnabled');
+    expect(dash.campaign).toHaveProperty('createdBy');
   });
 
   it('builds the channel union (post-derived + tagged), deduped with postCount', async () => {
@@ -129,5 +176,81 @@ describe('CampaignsService', () => {
     expect(result[0].postCounts).toEqual({ queue: 1, published: 1, draft: 0, error: 0 });
     expect(result[0].goals).toContainEqual({ metric: 'posts', target: 10, current: 2, pct: 20 });
     expect(result[1].postCounts).toEqual({ queue: 0, published: 0, draft: 0, error: 1 });
+  });
+
+  it('copies utmEnabled, client, project and tags', async () => {
+    const { service, campaignsRepository } = makeService({
+      campaignsRepository: {
+        findById: vi.fn().mockResolvedValue({
+          id: 'src',
+          organizationId: 'org1',
+          name: 'Source',
+          color: '#fff',
+          description: 'desc',
+          startDate: new Date('2024-01-01'),
+          endDate: new Date('2024-02-01'),
+          goals: null,
+          createdById: 'u1',
+          utmEnabled: true,
+          client: 'Acme',
+          project: 'v4',
+          tags: ['paid'],
+        }),
+      },
+    });
+    await service.copy('src', 'org1', 'u2', {});
+    expect(campaignsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        utmEnabled: true,
+        client: 'Acme',
+        project: 'v4',
+        tags: ['paid'],
+      })
+    );
+  });
+
+  it('handles drafts with no publishDate when copying', async () => {
+    const postsService = {
+      getCampaignDrafts: vi.fn().mockResolvedValue({
+        group1: [{ id: 'd1', title: 'Draft without date', publishDate: null }],
+      }),
+      buildCreateDtoFromPost: vi.fn().mockReturnValue({}),
+      createPost: vi.fn().mockResolvedValue([{ postId: 'p1' }]),
+      setDraftPending: vi.fn().mockResolvedValue(undefined),
+    };
+    const { service, postsService: ps } = makeService({ postsService });
+
+    await service.copy('c1', 'org1', 'u2', { shiftDates: true });
+    expect(ps.createPost).toHaveBeenCalled();
+    const dtoArg = ps.createPost.mock.calls[0][1];
+    expect(dtoArg.date).toBeDefined();
+    expect(() => new Date(dtoArg.date)).not.toThrow();
+  });
+
+  it('continues copying when a single draft fails and logs the error', async () => {
+    const postsService = {
+      getCampaignDrafts: vi.fn().mockResolvedValue({
+        group1: [
+          { id: 'd1', title: 'Bad draft', publishDate: new Date('2024-01-01') },
+          { id: 'd2', title: 'Good draft', publishDate: new Date('2024-01-02') },
+        ],
+      }),
+      buildCreateDtoFromPost: vi.fn().mockReturnValue({}),
+      createPost: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('validation failed'))
+        .mockResolvedValueOnce([{ postId: 'p2' }]),
+      setDraftPending: vi.fn().mockResolvedValue(undefined),
+    };
+    const { service, postsService: ps, audit } = makeService({ postsService });
+    const warnSpy = vi.spyOn((service as any).logger, 'warn').mockImplementation(() => {});
+
+    await service.copy('c1', 'org1', 'u2', {});
+
+    expect(ps.createPost).toHaveBeenCalledTimes(2);
+    expect(ps.setDraftPending).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalled();
+    expect(audit.create).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });
