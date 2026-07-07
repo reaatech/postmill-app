@@ -502,7 +502,7 @@ export class PostsService {
             (imagesList || []).map(async (p: any) => {
               if (!p.path && p.id) {
                 imageUpdateNeeded = true;
-                return this._fileService.getFileById(p.id);
+                return this._fileService.getFileById(orgId, p.id);
               }
 
               return p;

@@ -136,8 +136,8 @@ export class DeepgramService {
   // ── internals ──
 
   private async _readFile(orgId: string, fileId: string): Promise<{ buffer: Buffer; mimeType: string }> {
-    const file = await this._fileService.getFileById(fileId);
-    if (!file || file.organizationId !== orgId) {
+    const file = await this._fileService.getFileById(orgId, fileId);
+    if (!file) {
       throw new ForbiddenException('File not found');
     }
     // §6.2: reject oversized sources up front (using the stored size) so we never even

@@ -300,8 +300,8 @@ export class DesignerProxyController {
     let targetUrl: string | undefined;
 
     if (fileId) {
-      const file = await this._fileService.getFileById(fileId);
-      if (!file || file.organizationId !== org.id) {
+      const file = await this._fileService.getFileById(org.id, fileId);
+      if (!file) {
         if (!res) return;
         res.status(404).json({ error: 'File not found' });
         return;

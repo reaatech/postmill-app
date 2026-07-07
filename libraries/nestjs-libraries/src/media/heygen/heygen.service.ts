@@ -350,8 +350,8 @@ export class HeyGenService {
   }
 
   private async _readFileBytes(orgId: string, fileId: string): Promise<{ buffer: Buffer; mime: string }> {
-    const file = await this._fileService.getFileById(fileId);
-    if (!file || file.organizationId !== orgId) throw new ForbiddenException('File not found');
+    const file = await this._fileService.getFileById(orgId, fileId);
+    if (!file) throw new ForbiddenException('File not found');
     const adapter = file.folderId
       ? await this._storage.resolveAdapterForFolder(file.folderId, orgId)
       : await this._storage.getLocalAdapterForOrg(orgId, true);
@@ -415,8 +415,8 @@ export class HeyGenService {
   // Resolve a /files asset to a URL HeyGen can fetch (cloud storage → public URL,
   // local storage → media-directory URL). Mirrors the Replicate runner's resolver.
   private async _resolvePublicUrl(orgId: string, fileId: string): Promise<string> {
-    const file = await this._fileService.getFileById(fileId);
-    if (!file || file.organizationId !== orgId) {
+    const file = await this._fileService.getFileById(orgId, fileId);
+    if (!file) {
       throw new ForbiddenException('File not found');
     }
     if (file.path.startsWith('https://')) return file.path;
