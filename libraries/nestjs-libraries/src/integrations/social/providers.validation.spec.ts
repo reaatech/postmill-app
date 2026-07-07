@@ -65,6 +65,16 @@ import __m33 from '@gitroom/provider-wrapcast';
 import __m34 from '@gitroom/provider-x';
 import __m35 from '@gitroom/provider-youtube';
 
+// Minimal runtime context for creating the social bridge; only metadata getters
+// (`identifier`, `name`, `maxConcurrentJob`, etc.) are exercised here.
+const stubContext = {
+  credentials: {},
+  encryption: { encrypt: () => '', decrypt: () => '' },
+  fetch: async () => new Response(),
+  logger: { log: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
+  telemetry: { recordCall: () => {} },
+} as any;
+
 const socialProviders = [
   __m0, __m1, __m2, __m3, __m4, __m5, __m6, __m7, __m8, __m9,
   __m10, __m11, __m12, __m13, __m14, __m15, __m16, __m17, __m18, __m19,
@@ -73,9 +83,9 @@ const socialProviders = [
 ]
   .flat()
   .filter(
-    (m: any) => m && m.manifest?.domain === 'social' && m.legacyProvider
+    (m: any) => m && m.manifest?.domain === 'social' && typeof m.create === 'function'
   )
-  .map((m: any) => m.legacyProvider);
+  .map((m: any) => m.create(stubContext).rawProvider);
 
 describe('Provider structural validation', () => {
   it('has at least 30 providers', () => {

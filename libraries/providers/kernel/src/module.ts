@@ -32,13 +32,6 @@ export interface ProviderModule<Caps = unknown, Capability = unknown> {
     ctx: ProviderRuntimeContext,
   ): Promise<CredentialValidationResult>;
   health?: ProviderHealth;
-  /**
-   * Raw legacy provider singleton (social domain). Relocated social packages
-   * expose their `SocialAbstract & SocialProvider` instance here so the bootstrap
-   * can populate IntegrationManager's in-memory `socialIntegrationList` without
-   * the kernel knowing about the legacy registry. Optional/unused by other domains.
-   */
-  legacyProvider?: unknown;
 }
 
 /**

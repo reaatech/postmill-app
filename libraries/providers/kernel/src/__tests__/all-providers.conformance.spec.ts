@@ -13,7 +13,7 @@ import { runDomainConformance } from '../testing/conformance';
  * `runDomainConformance` THROWS on failure (it does not register tests), so every
  * call is inside an `it()`. The social bridge re-exposes its legacy methods on the
  * created capability, so asserting on the created capability (what the helper does)
- * correctly covers social too — we never assert on `module.legacyProvider`.
+ * correctly covers social too.
  */
 
 // Required (non-optional) methods per domain — verified against

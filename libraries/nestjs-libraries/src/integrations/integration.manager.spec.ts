@@ -268,8 +268,8 @@ import { PeerTubeProvider } from '@gitroom/nestjs-libraries/integrations/social/
 
 // The raw social provider singletons now live in the ProviderKernel registry.
 // Build a fake kernel over these mock provider instances; IntegrationManager
-// reads them through kernel.listManifests('social') / kernel.get('social', …)
-// (returning each module's `legacyProvider`).
+// resolves them through ProviderResolutionService and reads `rawProvider` from
+// the capability bridge.
 const providerInstances: any[] = [
   XProvider, LinkedinProvider, LinkedinPageProvider, RedditProvider,
   InstagramProvider, InstagramStandaloneProvider, FacebookProvider,
@@ -294,8 +294,7 @@ function moduleFor(id: string) {
   }
   return {
     manifest: { domain: 'social', providerId: id, version: 'v1', capabilities: {} },
-    legacyProvider: provider,
-    create: () => provider,
+    create: () => ({ rawProvider: provider }),
   };
 }
 
@@ -307,6 +306,36 @@ const fakeKernel = {
   get: (_domain: string, id: string, _version?: string) => moduleFor(id),
   latestActive: (_domain: string, id: string) => moduleFor(id),
 } as any;
+
+// Minimal fake for ProviderResolutionService — enough to exercise
+// IntegrationManager's social-provider enumeration/lookup paths without pulling
+// in the full kernel + runtime context factory.
+function fakeResolutionService(kernel: any) {
+  return {
+    resolveProvider: (_domain: string, providerId: string, options: any) => {
+      const version = options?.version;
+      let mod: any;
+      if (version !== undefined) {
+        mod = kernel.get?.('social', providerId, version);
+      } else {
+        mod =
+          kernel.get?.('social', providerId, 'v1') ??
+          kernel.latestActive?.('social', providerId);
+      }
+      if (!mod) {
+        throw new Error(
+          `Provider not found: social/${providerId}@${version ?? 'latest'}`,
+        );
+      }
+      const capability = mod.create ? mod.create() : { rawProvider: undefined };
+      return {
+        module: mod,
+        capability,
+        version: mod.manifest.version,
+      };
+    },
+  } as any;
+}
 
 // ---------------------------------------------------------------------------
 // Helpers to set up metadata on specific mock providers
@@ -354,7 +383,12 @@ describe('IntegrationManager', () => {
       isEnabled: vi.fn(),
       ensureFresh: vi.fn(),
     };
-    manager = new IntegrationManager(mockPcm as any, {} as any, fakeKernel);
+    manager = new IntegrationManager(
+      mockPcm as any,
+      {} as any,
+      fakeKernel,
+      fakeResolutionService(fakeKernel),
+    );
 
     // Clear all Reflect metadata from every provider to prevent test leakage
     for (const p of providerInstances) {
@@ -820,7 +854,12 @@ describe('IntegrationManager', () => {
     it('resolves a provider enabled only via per-org config when orgId is passed', async () => {
       const orgPcm = { isEnabled: vi.fn().mockResolvedValue(true) };
       const globalPcm = { isEnabled: vi.fn().mockResolvedValue(false) };
-      const m = new IntegrationManager(globalPcm as any, orgPcm as any, fakeKernel);
+      const m = new IntegrationManager(
+        globalPcm as any,
+        orgPcm as any,
+        fakeKernel,
+        fakeResolutionService(fakeKernel),
+      );
 
       const provider = await m.getSocialIntegration('x', 'org-1');
 
@@ -831,7 +870,12 @@ describe('IntegrationManager', () => {
     it('throws when the same org-only provider is resolved without an orgId (no global/env)', async () => {
       const orgPcm = { isEnabled: vi.fn().mockResolvedValue(true) };
       const globalPcm = { isEnabled: vi.fn().mockResolvedValue(false) };
-      const m = new IntegrationManager(globalPcm as any, orgPcm as any, fakeKernel);
+      const m = new IntegrationManager(
+        globalPcm as any,
+        orgPcm as any,
+        fakeKernel,
+        fakeResolutionService(fakeKernel),
+      );
 
       await expect(m.getSocialIntegration('x')).rejects.toThrow(NotFoundException);
       expect(orgPcm.isEnabled).not.toHaveBeenCalled();
@@ -849,7 +893,7 @@ describe('IntegrationManager', () => {
         status,
         capabilities: {},
       },
-      legacyProvider: { identifier: 'demo', name },
+      create: () => ({ rawProvider: { identifier: 'demo', name } }),
     });
 
     it('resolves the exact pinned version (a v2-pinned row runs the v2 adapter)', () => {
@@ -860,7 +904,12 @@ describe('IntegrationManager', () => {
         latestActive: () => v1,
         listManifests: () => [],
       } as any;
-      const m = new IntegrationManager({} as any, {} as any, kernel);
+      const m = new IntegrationManager(
+        {} as any,
+        {} as any,
+        kernel,
+        fakeResolutionService(kernel),
+      );
 
       expect(m.getSocialIntegrationUnchecked('demo', 'v2')?.name).toBe('Demo v2');
       expect(m.getSocialIntegrationUnchecked('demo', 'v1')?.name).toBe('Demo v1');
@@ -879,7 +928,12 @@ describe('IntegrationManager', () => {
         latestActive: () => retired,
         listManifests: () => [],
       } as any;
-      const m = new IntegrationManager({} as any, {} as any, kernel);
+      const m = new IntegrationManager(
+        {} as any,
+        {} as any,
+        kernel,
+        fakeResolutionService(kernel),
+      );
 
       expect(m.getSocialIntegrationUnchecked('demo', 'v1')).toBeUndefined();
     });
@@ -891,7 +945,12 @@ describe('IntegrationManager', () => {
         latestActive: () => retired,
         listManifests: () => [],
       } as any;
-      const m = new IntegrationManager({} as any, {} as any, kernel);
+      const m = new IntegrationManager(
+        {} as any,
+        {} as any,
+        kernel,
+        fakeResolutionService(kernel),
+      );
 
       // No version pinned → status-agnostic (existing listing behaviour), no throw.
       expect(m.getSocialIntegrationUnchecked('demo')?.identifier).toBe('demo');

@@ -227,6 +227,15 @@ export class SocialProviderKernelAdapter implements SocialCapability {
     );
   }
 
+  /**
+   * Expose the wrapped legacy provider singleton for callers that need direct
+   * access to decorator metadata (`custom:tool`, `custom:plug`, etc.) or other
+   * provider-class properties that do not pass through the capability bridge.
+   */
+  get rawProvider(): SocialProvider {
+    return this._provider;
+  }
+
   get identifier(): string {
     return this._provider.identifier;
   }

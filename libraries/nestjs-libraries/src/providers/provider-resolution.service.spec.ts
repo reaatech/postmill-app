@@ -5,6 +5,7 @@ import {
   ProviderModule,
   ProviderNotFoundError,
   ProviderVersionRetiredError,
+  ProviderVersionInvalidError,
 } from '@gitroom/provider-kernel';
 import { RuntimeContextFactory } from './runtime-context.factory';
 import { ProviderResolutionService } from './provider-resolution.service';
@@ -229,6 +230,28 @@ describe('ProviderResolutionService', () => {
   });
   it('resolveWriteVersion returns latest-active when unpinned', () => {
     expect(service.resolveWriteVersion('ai', 'openai')).toBe('v2');
+  });
+
+  it('PF-03: empty-string version is invalid on read', () => {
+    expect(() => service.resolveAI('openai', { version: '' })).toThrow(
+      ProviderVersionInvalidError,
+    );
+  });
+
+  it('PF-03: empty-string version is invalid on write', () => {
+    expect(() => service.resolveWriteVersion('ai', 'openai', '')).toThrow(
+      BadRequestException,
+    );
+  });
+
+  it('PF-04: spoofed currentVersion is rejected and deprecated new-pin fails', () => {
+    kernel.register(makeAiModule({}, 'v4', 'deprecated'));
+    // Caller lies and claims currentVersion is the deprecated v4, but the kernel
+    // has no such registered current version for this org's config. The bypass
+    // must not apply, so pinning v4 freshly is rejected.
+    expect(() =>
+      service.resolveWriteVersion('ai', 'openai', 'v4', { currentVersion: 'v4-spoofed' }),
+    ).toThrow(BadRequestException);
   });
 
   it('resolveContentPack returns the versioned content-pack capability', () => {

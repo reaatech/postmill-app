@@ -40,6 +40,13 @@ export class ProviderVersionPreviewError extends Error {
   }
 }
 
+export class ProviderVersionInvalidError extends Error {
+  constructor(public readonly ctx: ProviderErrorContext, message: string) {
+    super(`Provider version invalid (${ctx.domain}/${ctx.providerId}): ${message}`);
+    this.name = 'ProviderVersionInvalidError';
+  }
+}
+
 export class ProviderCredentialError extends Error {
   constructor(
     public readonly ctx: Required<ProviderErrorContext>,

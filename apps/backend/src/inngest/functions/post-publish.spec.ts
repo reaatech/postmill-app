@@ -15,10 +15,10 @@ vi.mock('@gitroom/nestjs-libraries/inngest/inngest.client', () => ({
 // small social subset (plus one non-social module that must be ignored).
 vi.mock('@gitroom/backend/providers.generated', () => ({
   providerModules: [
-    { manifest: { domain: 'social', providerId: 'x', version: 'v1' }, legacyProvider: { identifier: 'x', maxConcurrentJob: 1 } },
-    { manifest: { domain: 'social', providerId: 'instagram', version: 'v1' }, legacyProvider: { identifier: 'instagram', maxConcurrentJob: 400 } },
-    { manifest: { domain: 'social', providerId: 'instagram-standalone', version: 'v1' }, legacyProvider: { identifier: 'instagram-standalone', maxConcurrentJob: 200 } },
-    { manifest: { domain: 'social', providerId: 'mastodon', version: 'v1' }, legacyProvider: { identifier: 'mastodon', maxConcurrentJob: 5 } },
+    { manifest: { domain: 'social', providerId: 'x', version: 'v1' }, create: () => ({ identifier: 'x', maxConcurrentJob: 1 }) },
+    { manifest: { domain: 'social', providerId: 'instagram', version: 'v1' }, create: () => ({ identifier: 'instagram', maxConcurrentJob: 400 }) },
+    { manifest: { domain: 'social', providerId: 'instagram-standalone', version: 'v1' }, create: () => ({ identifier: 'instagram-standalone', maxConcurrentJob: 200 }) },
+    { manifest: { domain: 'social', providerId: 'mastodon', version: 'v1' }, create: () => ({ identifier: 'mastodon', maxConcurrentJob: 5 }) },
     { manifest: { domain: 'ai', providerId: 'openai', version: 'v1' } },
   ],
 }));
@@ -39,8 +39,8 @@ describe('createPostPublishFunctions', () => {
 
     const expectedQueues = new Set(
       providerModules
-        .filter((m: any) => m.manifest.domain === 'social' && m.legacyProvider)
-        .map((m: any) => m.legacyProvider.identifier.split('-')[0].toLowerCase())
+        .filter((m: any) => m.manifest.domain === 'social' && m.create)
+        .map((m: any) => m.create().identifier.split('-')[0].toLowerCase())
     );
 
     expect(inngest.createFunction).toHaveBeenCalledTimes(expectedQueues.size);
