@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { Prisma } from '@prisma/client';
 import { PushNotificationService } from './push-notification.service';
 
 const mockSend = vi.fn().mockResolvedValue('msg-1');
@@ -30,6 +31,9 @@ describe('PushNotificationService', () => {
     pushTokens = {
       model: {
         pushToken: {
+          findUnique: vi.fn().mockResolvedValue(null),
+          create: vi.fn().mockResolvedValue(undefined),
+          update: vi.fn().mockResolvedValue(undefined),
           upsert: vi.fn().mockResolvedValue(undefined),
           findMany: vi.fn().mockResolvedValue([]),
           updateMany: vi.fn().mockResolvedValue(undefined),
@@ -42,12 +46,72 @@ describe('PushNotificationService', () => {
 
   it('registers a token', async () => {
     await service.registerToken('user-1', 'token-1', 'ios', 'Phone');
-    expect(pushTokens.model.pushToken.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { token: 'token-1' },
-        create: expect.objectContaining({ userId: 'user-1', platform: 'ios' }),
-      })
+    expect(pushTokens.model.pushToken.findUnique).toHaveBeenCalledWith({
+      where: { token: 'token-1' },
+    });
+    expect(pushTokens.model.pushToken.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: 'user-1',
+        token: 'token-1',
+        platform: 'ios',
+        deviceName: 'Phone',
+        active: true,
+      }),
+    });
+    expect(pushTokens.model.pushToken.update).not.toHaveBeenCalled();
+  });
+
+  it('does not reassign a token already registered to a different user', async () => {
+    pushTokens.model.pushToken.findUnique.mockResolvedValue({
+      userId: 'user-1',
+      token: 'token-1',
+    });
+
+    await service.registerToken('user-2', 'token-1', 'android', 'Other Phone');
+
+    expect(pushTokens.model.pushToken.findUnique).toHaveBeenCalledWith({
+      where: { token: 'token-1' },
+    });
+    expect(pushTokens.model.pushToken.create).not.toHaveBeenCalled();
+    expect(pushTokens.model.pushToken.update).not.toHaveBeenCalled();
+    expect(pushTokens.model.pushToken.upsert).not.toHaveBeenCalled();
+  });
+
+  it('recovers from a race when the same user wins the create', async () => {
+    const raceError = new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed on the fields: (`token`)',
+      { code: 'P2002', clientVersion: 'x' }
     );
+    pushTokens.model.pushToken.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ userId: 'user-1', token: 'token-1' });
+    pushTokens.model.pushToken.create.mockRejectedValue(raceError);
+
+    await service.registerToken('user-1', 'token-1', 'ios', 'Phone');
+
+    expect(pushTokens.model.pushToken.update).toHaveBeenCalledWith({
+      where: { token: 'token-1' },
+      data: expect.objectContaining({
+        platform: 'ios',
+        active: true,
+      }),
+    });
+  });
+
+  it('does not reassign when a race creates the token for a different user', async () => {
+    const raceError = new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed on the fields: (`token`)',
+      { code: 'P2002', clientVersion: 'x' }
+    );
+    pushTokens.model.pushToken.findUnique
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ userId: 'user-1', token: 'token-1' });
+    pushTokens.model.pushToken.create.mockRejectedValue(raceError);
+
+    await service.registerToken('user-2', 'token-1', 'android', 'Other Phone');
+
+    expect(pushTokens.model.pushToken.update).not.toHaveBeenCalled();
+    expect(pushTokens.model.pushToken.upsert).not.toHaveBeenCalled();
   });
 
   it('skips send when FCM is not configured', async () => {

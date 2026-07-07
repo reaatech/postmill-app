@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import type { App } from 'firebase-admin/app';
 import type { Message, MulticastMessage } from 'firebase-admin/messaging';
@@ -56,24 +57,76 @@ export class PushNotificationService {
     platform: string,
     deviceName?: string
   ): Promise<void> {
-    await this._pushTokens.model.pushToken.upsert({
+    const existing = await this._pushTokens.model.pushToken.findUnique({
       where: { token },
-      create: {
-        userId,
-        token,
-        platform,
-        deviceName: deviceName ?? null,
-        active: true,
-        lastUsedAt: new Date(),
-      },
-      update: {
-        userId,
-        platform,
-        deviceName: deviceName ?? null,
-        active: true,
-        lastUsedAt: new Date(),
-      },
     });
+
+    if (existing && existing.userId !== userId) {
+      this.logger.warn(
+        `Push token already registered to a different user (tokenUserId=${existing.userId}, requestedUserId=${userId}). Skipping reassignment.`
+      );
+      return;
+    }
+
+    if (existing) {
+      await this._pushTokens.model.pushToken.update({
+        where: { token },
+        data: {
+          platform,
+          deviceName: deviceName ?? null,
+          active: true,
+          lastUsedAt: new Date(),
+        },
+      });
+      return;
+    }
+
+    try {
+      await this._pushTokens.model.pushToken.create({
+        data: {
+          userId,
+          token,
+          platform,
+          deviceName: deviceName ?? null,
+          active: true,
+          lastUsedAt: new Date(),
+        },
+      });
+    } catch (err) {
+      // Race: another request inserted the same unique token between our
+      // findUnique and create. Re-read the row and apply the same ownership
+      // rules rather than surfacing a raw unique-constraint error.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        const raced = await this._pushTokens.model.pushToken.findUnique({
+          where: { token },
+        });
+
+        if (raced && raced.userId === userId) {
+          await this._pushTokens.model.pushToken.update({
+            where: { token },
+            data: {
+              platform,
+              deviceName: deviceName ?? null,
+              active: true,
+              lastUsedAt: new Date(),
+            },
+          });
+          return;
+        }
+
+        if (raced && raced.userId !== userId) {
+          this.logger.warn(
+            `Push token already registered to a different user (tokenUserId=${raced.userId}, requestedUserId=${userId}). Skipping reassignment.`
+          );
+        }
+        return;
+      }
+
+      throw err;
+    }
   }
 
   async sendPushNotification(

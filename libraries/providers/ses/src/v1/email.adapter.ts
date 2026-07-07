@@ -16,11 +16,11 @@ import {
 // SES verifies/confirms SNS notifications by fetching the SubscribeURL and the
 // signing certificate. Those outbound calls go through the kernel SafeFetchPort
 // (the production safeFetch) instead of importing nestjs-libraries directly.
-const _consoleLogger: LoggerPort = {
-  log: (m) => console.log(`[SesAdapter] ${m}`),
-  warn: (m) => console.warn(`[SesAdapter] ${m}`),
-  error: (m) => console.error(`[SesAdapter] ${m}`),
-  debug: (m) => console.debug(`[SesAdapter] ${m}`),
+const noopLogger: LoggerPort = {
+  log: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
 };
 
 export class SesAdapter implements EmailCapability {
@@ -39,7 +39,7 @@ export class SesAdapter implements EmailCapability {
     private readonly _fetch: SafeFetchPort,
     logger?: LoggerPort,
   ) {
-    this._logger = logger ?? _consoleLogger;
+    this._logger = logger ?? noopLogger;
   }
 
   private getClient(): SESv2Client {

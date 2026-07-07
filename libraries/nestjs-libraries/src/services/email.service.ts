@@ -131,8 +131,9 @@ export class EmailService {
       replyTo,
     });
 
-    // At-least-once semantics: retry up to 3 times on connection-level errors.
-    // Business-level rejections (e.g. invalid address, rate-limit) are not retried.
+    // NOTIF-08: retry any provider error up to 3 times so transient failures
+    // surface to Inngest for step-level retry. Business-level rejections are
+    // still terminal once the attempts are exhausted.
     let lastErr: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -153,16 +154,11 @@ export class EmailService {
 
         return;
       } catch (err) {
-        const isConnectionError = (err as Error)?.message && (
-          /(ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket|network|connect|timeout)/i.test((err as Error).message)
-        );
-        if (!isConnectionError) {
-          this._logger.warn(`Non-retryable email error on attempt ${attempt + 1}: ${(err as Error).message}`);
-          lastErr = err;
-          break;
-        }
         lastErr = err;
-        this._logger.warn(`Email attempt ${attempt + 1}/3 failed: ${(err as Error).message}`);
+        const errorMsg = (err as Error)?.message || 'Unknown error';
+        this._logger.warn(
+          `Email attempt ${attempt + 1}/3 failed for recipient ${this._redactedId(to)}: ${errorMsg}`,
+        );
         if (attempt < 2) {
           await timer(700);
         }
@@ -170,7 +166,12 @@ export class EmailService {
     }
 
     const errorMsg = (lastErr as Error)?.message || 'Unknown error';
-    this._logger.warn(`Email to ${to} failed after 3 attempts: ${errorMsg}`);
+    this._logger.warn(`Email failed after 3 attempts for recipient ${this._redactedId(to)}: ${errorMsg}`);
     await this._emailLogService.markFailed(log.id, errorMsg);
+    throw lastErr;
+  }
+
+  private _redactedId(to: string): string {
+    return createHash('sha256').update(to).digest('hex').slice(0, 12);
   }
 }

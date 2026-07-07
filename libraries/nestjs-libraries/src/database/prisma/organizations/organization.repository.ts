@@ -426,9 +426,11 @@ export class OrganizationRepository {
       select: {
         users: {
           select: {
+            disabled: true,
             roleId: true,
             user: {
               select: {
+                activated: true,
                 email: true,
                 id: true,
                 profile: {

@@ -119,23 +119,25 @@ export class NotificationService {
     const team = await this._organizationRepository.getTeam(orgId);
     const members = team?.users ?? [];
 
-    // Create the shared org notification row.
-    const notification = await this._notificationRepository.createNotification({
-      organizationId: orgId,
-      type: category,
-      title,
-      content: message,
-      link,
-      metadata,
-    });
+    // NOTIF-06: skip inactive users and disabled org memberships.
+    const activeMembers = members.filter(
+      (m) => !m.disabled && m.user.activated !== false
+    );
+
+    // NOTIF-10: batch preference defaults lookup for all active members.
+    const activeUserIds = activeMembers.map((m) => m.user.id);
+    const prefsMap = await this._preferenceService.ensureDefaultsForUsers(
+      activeUserIds
+    );
 
     const emailRecipients: { userId: string; email: string }[] = [];
     const pushUserIds: string[] = [];
+    const inAppUserIds: string[] = [];
 
-    for (const member of members) {
+    for (const member of activeMembers) {
       const user = member.user;
       if (allowedUserIds && !allowedUserIds.has(user.id)) continue;
-      const prefs = await this._preferenceService.ensureDefaults(user.id);
+      const prefs = prefsMap[user.id];
 
       if (channels.email && this._channelEnabled(prefs, category, 'email', override)) {
         emailRecipients.push({ userId: user.id, email: user.email });
@@ -144,6 +146,23 @@ export class NotificationService {
       if (channels.push && this._channelEnabled(prefs, category, 'push', override)) {
         pushUserIds.push(user.id);
       }
+
+      if (channels.inApp && this._channelEnabled(prefs, category, 'inApp', override)) {
+        inAppUserIds.push(user.id);
+      }
+    }
+
+    // NOTIF-12: only create the shared in-app notification row if recipients exist.
+    let notification: { id: string } | undefined;
+    if (inAppUserIds.length > 0) {
+      notification = await this._notificationRepository.createNotification({
+        organizationId: orgId,
+        type: category,
+        title,
+        content: message,
+        link,
+        metadata,
+      });
     }
 
     // Email channel: respect per-user digest frequency for digest-eligible items.
@@ -445,10 +464,12 @@ export class NotificationService {
 
     const htmlParts: string[] = [];
     for (const post of posts) {
-      const platform = post.integration?.name ?? 'Unknown';
-      const postTitle = post.content
-        ? post.content.substring(0, 120)
-        : `Post #${post.id}`;
+      const platform = this._escapeHtml(post.integration?.name ?? 'Unknown');
+      const postTitle = this._escapeHtml(
+        post.content
+          ? post.content.substring(0, 120)
+          : `Post #${post.id}`
+      );
       htmlParts.push(
         `<div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e5e7eb;">
           <strong style="color:#1f2937;">${platform}</strong>
@@ -498,5 +519,15 @@ export class NotificationService {
 
   hasPushProvider() {
     return this._pushService.hasProvider();
+  }
+
+  // NOTIF-01: escape user-controlled strings before interpolating into email HTML.
+  private _escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }

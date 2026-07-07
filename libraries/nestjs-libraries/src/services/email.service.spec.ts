@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Logger } from '@nestjs/common';
 
 const mockAdapter = {
   name: 'resend',
@@ -218,7 +219,7 @@ describe('EmailService', () => {
       .mockRejectedValueOnce(new Error('ECONNRESET'))
       .mockRejectedValueOnce(new Error('ETIMEDOUT'));
 
-    await service.sendEmailSync('a@b.com', 'S', '<p>H</p>');
+    await expect(service.sendEmailSync('a@b.com', 'S', '<p>H</p>')).rejects.toThrow('ETIMEDOUT');
 
     expect(mockAdapter.send).toHaveBeenCalledTimes(3);
     expect(timer).toHaveBeenCalledTimes(2);
@@ -226,13 +227,13 @@ describe('EmailService', () => {
     expect(mockMarkSent).not.toHaveBeenCalled();
   });
 
-  it('does not retry non-connection errors', async () => {
+  it('retries non-connection errors and throws after terminal failure', async () => {
     vi.mocked(registry.getActiveAdapter).mockReturnValue(mockAdapter);
     mockAdapter.send.mockRejectedValue(new Error('invalid address'));
 
-    await service.sendEmailSync('a@b.com', 'S', '<p>H</p>');
+    await expect(service.sendEmailSync('a@b.com', 'S', '<p>H</p>')).rejects.toThrow('invalid address');
 
-    expect(mockAdapter.send).toHaveBeenCalledTimes(1);
+    expect(mockAdapter.send).toHaveBeenCalledTimes(3);
     expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'invalid address');
     expect(mockMarkSent).not.toHaveBeenCalled();
   });
@@ -241,8 +242,21 @@ describe('EmailService', () => {
     vi.mocked(registry.getActiveAdapter).mockReturnValue(mockAdapter);
     mockAdapter.send.mockRejectedValue(new Error('ECONNREFUSED'));
 
-    await service.sendEmailSync('a@b.com', 'S', '<p>H</p>');
+    await expect(service.sendEmailSync('a@b.com', 'S', '<p>H</p>')).rejects.toThrow('ECONNREFUSED');
 
     expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'ECONNREFUSED');
+  });
+
+  it('redacts the recipient email in failure logs', async () => {
+    const warnSpy = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    vi.mocked(registry.getActiveAdapter).mockReturnValue(mockAdapter);
+    mockAdapter.send.mockRejectedValue(new Error('invalid address'));
+
+    await expect(service.sendEmailSync('a@b.com', 'S', '<p>H</p>')).rejects.toThrow('invalid address');
+
+    const failureLogs = warnSpy.mock.calls.map((call) => String(call[0]));
+    expect(failureLogs.some((msg) => msg.includes('a@b.com'))).toBe(false);
+    expect(failureLogs.some((msg) => msg.includes('recipient'))).toBe(true);
+    warnSpy.mockRestore();
   });
 });
