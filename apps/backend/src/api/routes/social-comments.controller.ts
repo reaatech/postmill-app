@@ -7,6 +7,10 @@ import {
   LikeCommentDto,
   ReplyCommentDto,
 } from '@gitroom/nestjs-libraries/dtos/social-comments/social.comment.dto';
+import { GetInboxDto } from '@gitroom/nestjs-libraries/dtos/social-comments/get-inbox.dto';
+import { BulkMarkReadDto } from '@gitroom/nestjs-libraries/dtos/social-comments/bulk-mark-read.dto';
+import { UpdateCommentStatusDto } from '@gitroom/nestjs-libraries/dtos/social-comments/update-comment-status.dto';
+import { AssignCommentDto } from '@gitroom/nestjs-libraries/dtos/social-comments/assign-comment.dto';
 import { Organization, User } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
@@ -103,39 +107,32 @@ export class SocialCommentsController {
   async getInbox(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Query('status') status: string | undefined,
-    @Query('assigneeId') assigneeId: string | undefined,
-    @Query('cursor') cursor: string | undefined,
-    @Query('unreadOnly') unreadOnly: string | undefined,
-    @Query('campaignId') campaignId: string | undefined,
-    @Query('integrationId') integrationId: string | undefined,
+    @Query() query: GetInboxDto,
   ) {
-    if (status && !(VALID_COMMENT_STATUSES as readonly string[]).includes(status)) {
-      throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`);
+    if (query.status && !(VALID_COMMENT_STATUSES as readonly string[]).includes(query.status)) {
+      throw new BadRequestException(`Invalid status: ${query.status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`);
     }
-    if (assigneeId && !isCuid(assigneeId)) {
+    if (query.assigneeId && !isCuid(query.assigneeId)) {
       throw new BadRequestException('Invalid assigneeId');
     }
     // integrationId/campaignId accept a single id or a comma-separated list (multi-select
     // filter). A lone value stays byte-for-byte compatible (splits to a 1-element array).
-    const campaignIds = campaignId ? campaignId.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const campaignIds = query.campaignId ? query.campaignId.split(',').map((s) => s.trim()).filter(Boolean) : [];
     for (const id of campaignIds) {
       if (!isUUID(id)) throw new BadRequestException('Invalid campaignId');
     }
-    const integrationIds = integrationId ? integrationId.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const integrationIds = query.integrationId ? query.integrationId.split(',').map((s) => s.trim()).filter(Boolean) : [];
     for (const id of integrationIds) {
       if (!isCuid(id)) throw new BadRequestException('Invalid integrationId');
     }
-    if (cursor && !isISO8601(cursor)) {
-      throw new BadRequestException('Invalid cursor: must be a valid ISO 8601 date string');
-    }
     return this._socialCommentsService.getInbox(org.id, user.id, {
-      status,
-      assigneeId,
-      cursor,
-      unreadOnly: unreadOnly === 'true',
+      status: query.status,
+      assigneeId: query.assigneeId,
+      cursor: query.cursor,
+      unreadOnly: query.unreadOnly,
       campaignIds,
       integrationIds,
+      limit: query.limit,
     });
   }
 
@@ -144,12 +141,9 @@ export class SocialCommentsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async bulkMarkRead(
     @GetOrgFromRequest() org: Organization,
-    @Body('commentIds') commentIds: string[],
+    @Body() body: BulkMarkReadDto,
   ) {
-    if (!Array.isArray(commentIds) || commentIds.length > 1000) {
-      throw new BadRequestException('commentIds must be an array with at most 1000 items');
-    }
-    return this._socialCommentsService.bulkMarkRead(commentIds, org.id);
+    return this._socialCommentsService.bulkMarkRead(body.commentIds, org.id);
   }
 
   @Get('/inbox/unread-count')
@@ -246,14 +240,11 @@ export class SocialCommentsController {
   async updateCommentStatus(
     @Param('id', ParseCuidPipe) id: string,
     @Param('commentId', ParseCuidPipe) commentId: string,
-    @Body('status') status: string,
+    @Body() body: UpdateCommentStatusDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
-    if (!(VALID_COMMENT_STATUSES as readonly string[]).includes(status)) {
-      throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`);
-    }
-    return this._socialCommentsService.updateCommentStatus(org.id, user.id, id, commentId, status);
+    return this._socialCommentsService.updateCommentStatus(org.id, user.id, id, commentId, body.status);
   }
 
   @Post('/:id/social-comments/:commentId/assign')
@@ -262,11 +253,11 @@ export class SocialCommentsController {
   async assignComment(
     @Param('id', ParseCuidPipe) id: string,
     @Param('commentId', ParseCuidPipe) commentId: string,
-    @Body('assigneeId') assigneeId: string | null,
+    @Body() body: AssignCommentDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
-    return this._socialCommentsService.assignComment(org.id, user.id, id, commentId, assigneeId);
+    return this._socialCommentsService.assignComment(org.id, user.id, id, commentId, body.assigneeId ?? null);
   }
 
   @Get('/:id/social-comments/unread-count')

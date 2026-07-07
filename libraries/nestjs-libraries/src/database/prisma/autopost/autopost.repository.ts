@@ -37,19 +37,21 @@ export class AutopostRepository {
     });
   }
 
-  getAutopost(id: string) {
+  getAutopost(id: string, organizationId: string) {
     return this._autoPost.model.autoPost.findUnique({
       where: {
         id,
+        organizationId,
         deletedAt: null,
       },
     });
   }
 
-  updateUrl(id: string, url: string) {
+  updateUrl(id: string, organizationId: string, url: string) {
     return this._autoPost.model.autoPost.update({
       where: {
         id,
+        organizationId,
       },
       data: {
         lastUrl: url,

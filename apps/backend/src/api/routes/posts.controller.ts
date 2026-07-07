@@ -36,6 +36,8 @@ import { SeparatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/separate.
 import { ShouldShortlinkDto } from '@gitroom/nestjs-libraries/dtos/posts/should.shortlink.dto';
 import { SetPostColorDto } from '@gitroom/nestjs-libraries/dtos/posts/set.post.color.dto';
 import { ShortlinkActiveDto } from '@gitroom/nestjs-libraries/dtos/posts/shortlink-active.dto';
+import { UpdateReleaseIdDto } from '@gitroom/nestjs-libraries/dtos/posts/update-release-id.dto';
+import { ChangePostDateDto } from '@gitroom/nestjs-libraries/dtos/posts/change-post-date.dto';
 import { Throttle } from '@nestjs/throttler';
 import {
   AuthorizationActions,
@@ -73,10 +75,10 @@ export class PostsController {
   @Put('/:id/release-id')
   async updateReleaseId(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body('releaseId') releaseId: string
+    @Param('id', ParseCuidPipe) id: string,
+    @Body() body: UpdateReleaseIdDto
   ) {
-    return this._postsService.updateReleaseId(org.id, id, releaseId);
+    return this._postsService.updateReleaseId(org.id, id, body.releaseId);
   }
 
   @Post('/:id/retry')
@@ -84,7 +86,7 @@ export class PostsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async retryPost(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
+    @Param('id', ParseCuidPipe) id: string,
   ) {
     return this._postsService.retryPost(org.id, id);
   }
@@ -347,11 +349,15 @@ export class PostsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   changeDate(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body('date') date: string,
-    @Body('action') action: 'schedule' | 'update' = 'schedule'
+    @Param('id', ParseCuidPipe) id: string,
+    @Body() body: ChangePostDateDto
   ) {
-    return this._postsService.changeDate(org.id, id, date, action);
+    return this._postsService.changeDate(
+      org.id,
+      id,
+      body.date,
+      body.action ?? 'schedule'
+    );
   }
 
   @Post('/preflight')

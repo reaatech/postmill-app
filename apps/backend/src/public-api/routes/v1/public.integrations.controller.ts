@@ -82,6 +82,8 @@ import {
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
+import { UpdateReleaseIdDto } from '@gitroom/nestjs-libraries/dtos/posts/update-release-id.dto';
+import { TriggerIntegrationToolDto } from '@gitroom/nestjs-libraries/dtos/integrations/trigger-integration-tool.dto';
 
 @ApiTags('Public API')
 @ApiSecurity('api-key')
@@ -199,6 +201,13 @@ export class PublicIntegrationsController {
     const offset = query.cursor ?? 0;
     const limit = query.limit ?? PUBLIC_POSTS_MAX_LIMIT;
     const posts = all.slice(offset, offset + limit);
+
+    // J2 back-compat: legacy n8n/Zapier clients expect `{ posts }`. Only include
+    // the paging cursor when the caller explicitly requested pagination.
+    if (query.cursor === undefined && query.limit === undefined) {
+      return { posts };
+    }
+
     const nextOffset = offset + limit;
     const cursor = nextOffset < all.length ? nextOffset : null;
 
@@ -665,10 +674,10 @@ export class PublicIntegrationsController {
   async updateReleaseId(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body('releaseId') releaseId: string
+    @Body() body: UpdateReleaseIdDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._postsService.updateReleaseId(org.id, id, releaseId);
+    return this._postsService.updateReleaseId(org.id, id, body.releaseId);
   }
 
   // 6.8: public v2 campaign analytics. Registered BEFORE the single-segment
@@ -786,7 +795,7 @@ export class PublicIntegrationsController {
   async triggerIntegrationTool(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body() body: { methodName: string; data: Record<string, string> }
+    @Body() body: TriggerIntegrationToolDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
     const getIntegration = await this._integrationService.getIntegrationById(
@@ -816,7 +825,7 @@ export class PublicIntegrationsController {
       // @ts-ignore
       !integrationProvider[body.methodName]
     ) {
-      throw new HttpException({ msg: 'Tool not found' }, 404);
+      throw new HttpException({ msg: 'Tool not found' }, 400);
     }
 
     // 4.2c — cap the token-refresh retries. A provider that keeps throwing

@@ -23,7 +23,7 @@ import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { uniq } from 'lodash';
 import utc from 'dayjs/plugin/utc';
-import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
+import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import {
   inngest,
@@ -39,7 +39,8 @@ export class IntegrationService {
 
   constructor(
     private _integrationRepository: IntegrationRepository,
-    private _autopostsRepository: AutopostRepository,
+    @Inject(forwardRef(() => AutopostService))
+    private _autopostsService: AutopostService,
     private _integrationManager: IntegrationManager,
     private _notificationService: NotificationService,
     @Inject(forwardRef(() => RefreshIntegrationService))
@@ -67,17 +68,9 @@ export class IntegrationService {
   }
 
   async changeActiveCron(orgId: string) {
-    const data = await this._autopostsRepository.getAutoposts(orgId);
-
-    for (const item of data.filter((f) => f.active)) {
-      try {
-        await inngest.send({
-          name: 'autopost/cancel',
-          data: { id: item.id },
-        });
-      } catch (err) {}
-    }
-
+    // POSTS-16: IntegrationService must not reach into AutopostRepository.
+    // stopAll(orgId) cancels events for all active autoposts and disables them.
+    await this._autopostsService.stopAll(orgId);
     return true;
   }
 

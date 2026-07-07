@@ -18,8 +18,10 @@ describe('SocialCommentsRepository', () => {
 
     mockSocialComment = {
       findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(null),
       upsert: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
     };
@@ -175,24 +177,80 @@ describe('SocialCommentsRepository', () => {
   });
 
   describe('getCommentById', () => {
-    it('returns a single comment by id', async () => {
-      const comment = { id: 'c1', postId: 'p1', platformCommentId: 'pc1' };
-      mockSocialComment.findUnique.mockResolvedValue(comment);
+    it('returns a single comment by id scoped to the organization', async () => {
+      const comment = { id: 'c1', postId: 'p1', platformCommentId: 'pc1', organizationId: 'org1' };
+      mockSocialComment.findFirst.mockResolvedValue(comment);
 
-      const result = await repository.getCommentById('c1');
+      const result = await repository.getCommentById('c1', 'org1');
 
-      expect(mockSocialComment.findUnique).toHaveBeenCalledWith({
-        where: { id: 'c1' },
+      expect(mockSocialComment.findFirst).toHaveBeenCalledWith({
+        where: { id: 'c1', organizationId: 'org1' },
       });
       expect(result).toEqual(comment);
     });
 
-    it('returns null when comment does not exist', async () => {
-      mockSocialComment.findUnique.mockResolvedValue(null);
+    it('returns null when comment does not exist in the organization', async () => {
+      mockSocialComment.findFirst.mockResolvedValue(null);
 
-      const result = await repository.getCommentById('nonexistent');
+      const result = await repository.getCommentById('nonexistent', 'org1');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('updateCommentStatus', () => {
+    it('updates the status scoped to the organization', async () => {
+      mockSocialComment.update.mockResolvedValue({ id: 'c1', status: 'handled' });
+
+      const result = await repository.updateCommentStatus('c1', 'org1', 'handled');
+
+      expect(mockSocialComment.update).toHaveBeenCalledWith({
+        where: { id: 'c1', organizationId: 'org1' },
+        data: { status: 'handled' },
+      });
+      expect(result.status).toBe('handled');
+    });
+
+    it('rejects cross-org updates', async () => {
+      mockSocialComment.update.mockRejectedValue({ code: 'P2025' });
+
+      await expect(
+        repository.updateCommentStatus('c1', 'org2', 'handled')
+      ).rejects.toBeDefined();
+    });
+  });
+
+  describe('assignComment', () => {
+    it('assigns the comment scoped to the organization', async () => {
+      mockSocialComment.update.mockResolvedValue({ id: 'c1', assigneeId: 'u2' });
+
+      const result = await repository.assignComment('c1', 'org1', 'u2');
+
+      expect(mockSocialComment.update).toHaveBeenCalledWith({
+        where: { id: 'c1', organizationId: 'org1' },
+        data: { assigneeId: 'u2' },
+      });
+      expect(result.assigneeId).toBe('u2');
+    });
+
+    it('clears the assignee scoped to the organization', async () => {
+      mockSocialComment.update.mockResolvedValue({ id: 'c1', assigneeId: null });
+
+      const result = await repository.assignComment('c1', 'org1', null);
+
+      expect(mockSocialComment.update).toHaveBeenCalledWith({
+        where: { id: 'c1', organizationId: 'org1' },
+        data: { assigneeId: null },
+      });
+      expect(result.assigneeId).toBeNull();
+    });
+
+    it('rejects cross-org assignments', async () => {
+      mockSocialComment.update.mockRejectedValue({ code: 'P2025' });
+
+      await expect(
+        repository.assignComment('c1', 'org2', 'u2')
+      ).rejects.toBeDefined();
     });
   });
 

@@ -87,7 +87,7 @@ export class SocialCommentsService {
   }
 
   async replyToComment(orgId: string, userId: string, postId: string, commentId: string, message: string, retried = false): Promise<SocialCommentDTO> {
-    const comment = await this._socialCommentsRepository.getCommentById(commentId);
+    const comment = await this._socialCommentsRepository.getCommentById(commentId, orgId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
     }
@@ -159,7 +159,7 @@ export class SocialCommentsService {
   }
 
   async likeComment(orgId: string, userId: string, postId: string, commentId: string, like: boolean, retried = false): Promise<{ liked: boolean; likeCount?: number }> {
-    const comment = await this._socialCommentsRepository.getCommentById(commentId);
+    const comment = await this._socialCommentsRepository.getCommentById(commentId, orgId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
     }
@@ -253,12 +253,12 @@ export class SocialCommentsService {
     const post = await this._postsService.getPostById(postId, orgId);
     if (!post) throw new BadRequestException('Post not found');
 
-    const comment = await this._socialCommentsRepository.getCommentById(commentId);
+    const comment = await this._socialCommentsRepository.getCommentById(commentId, orgId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
     }
 
-    return this._socialCommentsRepository.updateCommentStatus(commentId, status);
+    return this._socialCommentsRepository.updateCommentStatus(commentId, orgId, status);
   }
 
   async assignComment(
@@ -271,7 +271,7 @@ export class SocialCommentsService {
     const post = await this._postsService.getPostById(postId, orgId);
     if (!post) throw new BadRequestException('Post not found');
 
-    const comment = await this._socialCommentsRepository.getCommentById(commentId);
+    const comment = await this._socialCommentsRepository.getCommentById(commentId, orgId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
     }
@@ -286,7 +286,7 @@ export class SocialCommentsService {
       }
     }
 
-    return this._socialCommentsRepository.assignComment(commentId, assigneeId);
+    return this._socialCommentsRepository.assignComment(commentId, orgId, assigneeId);
   }
 
   async syncComments(orgId: string, post: Post & { integration: Integration }) {

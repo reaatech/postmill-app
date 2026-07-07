@@ -34,9 +34,16 @@ describe('PublicIntegrationsController.getPosts — J2 pagination cap', () => {
   const query = (extra: Record<string, any> = {}) =>
     ({ startDate: 'x', endDate: 'y', ...extra }) as any;
 
-  it('caps the default response at max and returns a next cursor', async () => {
+  it('caps the default response at max without a cursor (legacy back-compat)', async () => {
     const { ctrl } = make(250);
     const res = await ctrl.getPosts(org, query());
+    expect(res.posts).toHaveLength(100);
+    expect(res).not.toHaveProperty('cursor');
+  });
+
+  it('returns a next cursor when paging is explicitly requested', async () => {
+    const { ctrl } = make(250);
+    const res = await ctrl.getPosts(org, query({ limit: 100 }));
     expect(res.posts).toHaveLength(100);
     expect(res.cursor).toBe(100);
   });
@@ -49,11 +56,11 @@ describe('PublicIntegrationsController.getPosts — J2 pagination cap', () => {
     expect(res.cursor).toBeNull();
   });
 
-  it('returns all posts (capped) with null cursor when under the cap', async () => {
+  it('returns all posts with no cursor when under the cap and no paging params', async () => {
     const { ctrl, all } = make(12);
     const res = await ctrl.getPosts(org, query());
     expect(res.posts).toEqual(all);
-    expect(res.cursor).toBeNull();
+    expect(res).not.toHaveProperty('cursor');
   });
 });
 

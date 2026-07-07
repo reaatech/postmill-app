@@ -5,7 +5,7 @@ import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autop
 export class AutopostActivity {
   constructor(private _autoPostService: AutopostService) {}
 
-  async autoPost(id: string) {
-    return this._autoPostService.startAutopost(id)
+  async autoPost(id: string, organizationId: string) {
+    return this._autoPostService.startAutopost(id, organizationId)
   }
 }

@@ -113,9 +113,9 @@ export class SocialCommentsRepository {
     });
   }
 
-  getCommentById(id: string) {
-    return this._socialComment.model.socialComment.findUnique({
-      where: { id },
+  getCommentById(id: string, organizationId: string) {
+    return this._socialComment.model.socialComment.findFirst({
+      where: { id, organizationId },
     });
   }
 
@@ -214,16 +214,16 @@ export class SocialCommentsRepository {
     });
   }
 
-  updateCommentStatus(commentId: string, status: string) {
+  updateCommentStatus(commentId: string, organizationId: string, status: string) {
     return this._socialComment.model.socialComment.update({
-      where: { id: commentId },
+      where: { id: commentId, organizationId },
       data: { status },
     });
   }
 
-  assignComment(commentId: string, assigneeId: string | null) {
+  assignComment(commentId: string, organizationId: string, assigneeId: string | null) {
     return this._socialComment.model.socialComment.update({
-      where: { id: commentId },
+      where: { id: commentId, organizationId },
       data: { assigneeId },
     });
   }

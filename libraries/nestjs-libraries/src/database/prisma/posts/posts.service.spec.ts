@@ -74,6 +74,7 @@ import {
   isInngestEnabled,
 } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { State } from '@prisma/client';
+import dayjs from 'dayjs';
 
 describe('PostsService.enrichPostsWithLatestStats', () => {
   let service: PostsService;
@@ -577,6 +578,7 @@ function makePostsService(overrides: Record<string, any> = {}) {
     changeDate: vi.fn().mockResolvedValue({ date: '2030-01-01' }),
     countPostsFromDay: vi.fn().mockResolvedValue(0),
     getScheduledPostDates: vi.fn().mockResolvedValue([]),
+    getPostsCountsByDates: vi.fn().mockResolvedValue([]),
     retryPost: vi.fn().mockResolvedValue({}),
     ...overrides.postRepository,
   };
@@ -954,5 +956,75 @@ describe('1.2 — retry post', () => {
     });
 
     await expect(service.retryPost('org-1', 'p1')).rejects.toThrow('not in an error state');
+  });
+});
+
+
+describe('POLL-11 — cap draft scheduling loops', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-11T12:00:00.000Z'));
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('findTime terminates with an error when every draft date is in the past', async () => {
+    const { service } = makePostsService({
+      integrationService: {
+        getIntegrationsList: vi.fn().mockResolvedValue([
+          {
+            id: 'int-1',
+            providerIdentifier: 'linkedin',
+            disabled: false,
+          },
+        ]),
+      },
+    });
+
+    await expect(
+      service.generatePostsDraft('org-1', {
+        week: 1,
+        year: 2000,
+        url: 'https://example.com',
+        posts: [{ list: [{ post: 'hello' }] }],
+      } as any)
+    ).rejects.toThrow('Unable to find a future draft time in the selected week');
+  });
+
+  it('findFreeDateTimeRecursive terminates with an error after exhausting the search window', async () => {
+    const { service, postRepository } = makePostsService();
+    postRepository.getPostsCountsByDates.mockResolvedValue([]);
+
+    await expect(
+      (service as any).findFreeDateTimeRecursive(
+        'org-1',
+        [60, 120],
+        dayjs.utc().startOf('day'),
+        0,
+        3
+      )
+    ).rejects.toThrow(
+      'Unable to find a free publishing slot within the configured time window'
+    );
+
+    expect(postRepository.getPostsCountsByDates).toHaveBeenCalledTimes(3);
+  });
+
+  it('findFreeDateTimeRecursive rejects an empty posting-times list immediately', async () => {
+    const { service, postRepository } = makePostsService();
+
+    await expect(
+      (service as any).findFreeDateTimeRecursive(
+        'org-1',
+        [],
+        dayjs.utc().startOf('day')
+      )
+    ).rejects.toThrow('No posting times configured for this organization');
+
+    expect(postRepository.getPostsCountsByDates).not.toHaveBeenCalled();
   });
 });

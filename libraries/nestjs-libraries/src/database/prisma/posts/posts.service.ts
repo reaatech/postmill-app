@@ -1,7 +1,9 @@
 import {
   BadRequestException,
+  forwardRef,
   HttpException,
   HttpStatus,
+  Inject,
   Injectable,
   Logger,
   ValidationPipe,
@@ -34,6 +36,7 @@ import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/in
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
+import isoWeek from 'dayjs/plugin/isoWeek';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
@@ -47,6 +50,7 @@ import { Readable } from 'stream';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(isoWeek);
 import * as Sentry from '@sentry/nestjs';
 import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
 import { inngest, isInngestEnabled } from '@gitroom/nestjs-libraries/inngest/inngest.client';
@@ -76,6 +80,7 @@ export class PostsService {
     // layering: sanctioned leaf-read of AnalyticsRepository (AnalyticsService → PostsService, routing up would cycle)
     private _analyticsRepository: AnalyticsRepository,
     private _integrationManager: IntegrationManager,
+    @Inject(forwardRef(() => IntegrationService))
     private _integrationService: IntegrationService,
     private _fileService: FileService,
     private _shortLinkService: ShortLinkService,
@@ -86,6 +91,7 @@ export class PostsService {
     // layering: sanctioned leaf-read of CampaignsRepository (CampaignsService → PostsService, routing up would cycle)
     private _campaignsRepository: CampaignsRepository,
     private _auditService: AuditService,
+    @Inject(forwardRef(() => SubscriptionService))
     private _subscriptionService: SubscriptionService,
   ) {}
 
@@ -1608,30 +1614,10 @@ export class PostsService {
       return allDates.add(i, 'day').format('YYYY-MM-DD');
     });
 
-    const findTime = (): string => {
-      const totalMinutes = Math.floor(randomInt(144)) * 10;
-
-      // Convert total minutes to hours and minutes
-      const hours = Math.floor(totalMinutes / 60);
-      const minutes = totalMinutes % 60;
-
-      // Format hours and minutes to always be two digits
-      const formattedHours = hours.toString().padStart(2, '0');
-      const formattedMinutes = minutes.toString().padStart(2, '0');
-      const randomDate =
-        shuffle(dates)[0] + 'T' + `${formattedHours}:${formattedMinutes}:00`;
-
-      if (dayjs(randomDate).isBefore(dayjs())) {
-        return findTime();
-      }
-
-      return randomDate;
-    };
-
     for (const integration of getAllIntegrations) {
       for (const toPost of body.posts) {
         const group = makeId(10);
-        const randomDate = findTime();
+        const randomDate = this.findTime(dates);
 
         await this.createPost(
           orgId,
@@ -1714,8 +1700,22 @@ export class PostsService {
   private async findFreeDateTimeRecursive(
     orgId: string,
     times: number[],
-    date: dayjs.Dayjs
+    date: dayjs.Dayjs,
+    depth = 0,
+    maxDepth = 365
   ): Promise<string> {
+    if (!times.length) {
+      throw new BadRequestException(
+        'No posting times configured for this organization'
+      );
+    }
+
+    if (depth >= maxDepth) {
+      throw new BadRequestException(
+        'Unable to find a free publishing slot within the configured time window'
+      );
+    }
+
     const list = await this._postRepository.getPostsCountsByDates(
       orgId,
       times,
@@ -1723,7 +1723,13 @@ export class PostsService {
     );
 
     if (!list.length) {
-      return this.findFreeDateTimeRecursive(orgId, times, date.add(1, 'day'));
+      return this.findFreeDateTimeRecursive(
+        orgId,
+        times,
+        date.add(1, 'day'),
+        depth + 1,
+        maxDepth
+      );
     }
 
     const num = list.reduce<null | number>((prev, curr) => {
@@ -1734,6 +1740,34 @@ export class PostsService {
     }, null) as number;
 
     return date.clone().add(num, 'minutes').format('YYYY-MM-DDTHH:mm:00');
+  }
+
+  /**
+   * Pick a random time slot on one of the supplied draft dates.
+   * Bounded so a week entirely in the past cannot recurse forever.
+   */
+  private findTime(dates: string[], maxAttempts = 1000): string {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const totalMinutes = Math.floor(randomInt(144)) * 10;
+
+      // Convert total minutes to hours and minutes
+      const hours = Math.floor(totalMinutes / 60);
+      const minutes = totalMinutes % 60;
+
+      // Format hours and minutes to always be two digits
+      const formattedHours = hours.toString().padStart(2, '0');
+      const formattedMinutes = minutes.toString().padStart(2, '0');
+      const randomDate =
+        shuffle(dates)[0] + 'T' + `${formattedHours}:${formattedMinutes}:00`;
+
+      if (!dayjs(randomDate).isBefore(dayjs())) {
+        return randomDate;
+      }
+    }
+
+    throw new BadRequestException(
+      'Unable to find a future draft time in the selected week'
+    );
   }
 
   getComments(postId: string) {

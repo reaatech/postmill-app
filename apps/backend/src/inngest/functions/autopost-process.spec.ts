@@ -44,19 +44,19 @@ describe('createAutopostProcess', () => {
 
   it('runs autoPost, sleeps 1h, then re-emits autopost/process WITHOUT a constant idempotency id (0.9)', async () => {
     const step = createMockStep();
-    const event = { data: { id: 'auto-1' } };
+    const event = { data: { id: 'auto-1', organizationId: 'org-1' } };
 
     await getHandler()({ step, event });
 
     expect(step.run).toHaveBeenCalledWith('process', expect.any(Function));
-    expect(autopostActivity.autoPost).toHaveBeenCalledWith('auto-1');
+    expect(autopostActivity.autoPost).toHaveBeenCalledWith('auto-1', 'org-1');
     expect(step.sleep).toHaveBeenCalledWith('wait-1h', '1h');
     // 0.9: the self-send must NOT carry a constant `autopost-${id}` id, or every
     // hourly hop would dedupe against the activation event and recurrence dies
     // after the first run. The memoized step.sendEvent prevents in-run dupes.
     expect(step.sendEvent).toHaveBeenCalledWith('autopost/process', {
       name: 'autopost/process',
-      data: { id: 'auto-1' },
+      data: { id: 'auto-1', organizationId: 'org-1' },
     });
     const [, payload] = step.sendEvent.mock.calls[0];
     expect(payload).not.toHaveProperty('id');

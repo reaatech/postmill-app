@@ -116,7 +116,7 @@ describe('OAuthAppController', () => {
             permissions: ['posts:manage', 'media:manage', 'channels:manage'],
           }),
         };
-        const guard = new OrgRbacGuard(reflector, rolesService, audit);
+        const guard = new OrgRbacGuard(reflector, rolesService as any, audit);
 
         await expect(
           guard.canActivate(
@@ -133,7 +133,7 @@ describe('OAuthAppController', () => {
           permissions: ['oauth_apps:manage'],
         }),
       };
-      const guard = new OrgRbacGuard(reflector, rolesService, audit);
+      const guard = new OrgRbacGuard(reflector, rolesService as any, audit);
 
       await expect(
         guard.canActivate(

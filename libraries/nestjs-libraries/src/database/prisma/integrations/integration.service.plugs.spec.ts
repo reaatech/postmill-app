@@ -101,7 +101,7 @@ describe('IntegrationService — plug credential cache warming (v3.7.1 §4.6)', 
 
     service = new IntegrationService(
       integrationRepository as any,
-      {} as any, // AutopostRepository (unused here)
+      {} as any, // AutopostService (unused here)
       integrationManager as any,
       {} as any, // NotificationService (unused here)
       {} as any, // RefreshIntegrationService (unused here)
