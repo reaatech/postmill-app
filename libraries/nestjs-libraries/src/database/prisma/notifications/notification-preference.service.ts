@@ -97,6 +97,49 @@ export class NotificationPreferenceService {
     return this.toData(created);
   }
 
+  async ensureDefaultsForUsers(
+    userIds: string[]
+  ): Promise<Record<string, NotificationPreferenceData>> {
+    if (userIds.length === 0) {
+      return {};
+    }
+
+    const existingRows = await this._preferences.model.notificationPreference.findMany({
+      where: { userId: { in: userIds } },
+    });
+
+    const result: Record<string, NotificationPreferenceData> = {};
+    const existingIds = new Set<string>();
+
+    for (const row of existingRows) {
+      result[row.userId] = this.toData(row);
+      existingIds.add(row.userId);
+    }
+
+    const missingUserIds = userIds.filter((id) => !existingIds.has(id));
+
+    if (missingUserIds.length > 0) {
+      const defaults = this._defaultData();
+      await this._preferences.model.notificationPreference.createMany({
+        data: missingUserIds.map((userId) => ({
+          userId,
+          masters: defaults.masters as unknown as JsonInput,
+          categories: defaults.categories as unknown as JsonInput,
+          digestFrequency: defaults.digestFrequency,
+        })),
+        skipDuplicates: true,
+      });
+
+      for (const userId of missingUserIds) {
+        // Return a deep copy of the defaults so callers cannot mutate the shared
+        // default object (or its nested category toggles) for other users.
+        result[userId] = this.toData({});
+      }
+    }
+
+    return result;
+  }
+
   async updatePreferences(
     userId: string,
     body: UpdateNotificationPreferenceDto
@@ -193,7 +236,17 @@ export class NotificationPreferenceService {
     Array<{ userId: string; user: { email: string } }>
   > {
     return this._preferences.model.notificationPreference.findMany({
-      where: { digestFrequency: frequency },
+      where: {
+        digestFrequency: frequency,
+        user: {
+          activated: true,
+          organizations: {
+            some: {
+              disabled: false,
+            },
+          },
+        },
+      },
       select: {
         userId: true,
         user: { select: { email: true } },

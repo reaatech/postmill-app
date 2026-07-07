@@ -23,22 +23,36 @@ export class DigestActivity {
 
     for (const row of rows) {
       try {
-        const pending = await this._digestService.getPendingForUser(row.userId);
-        if (pending.length === 0) continue;
+        const organizationIds = await this._digestService.getOrganizationIdsForUser(row.userId);
+        if (organizationIds.length === 0) continue;
 
-        const body = pending
-          .map((item) => item.html || `<p><strong>${item.title}</strong><br/>${item.message}</p>`)
-          .join('');
+        let userSent = false;
 
-        await this._emailService.sendEmail(
-          row.user.email,
-          `[Postmill] ${frequency === 'daily' ? 'Daily' : 'Weekly'} digest`,
-          body,
-          'top'
-        );
+        for (const organizationId of organizationIds) {
+          const pending = await this._digestService.getPendingForUser(
+            row.userId,
+            organizationId
+          );
+          if (pending.length === 0) continue;
 
-        await this._digestService.deleteByIds(pending.map((p) => p.id));
-        sent++;
+          const body = pending
+            .map((item) => item.html || `<p><strong>${item.title}</strong><br/>${item.message}</p>`)
+            .join('');
+
+          await this._emailService.sendEmail(
+            row.user.email,
+            `[Postmill] ${frequency === 'daily' ? 'Daily' : 'Weekly'} digest`,
+            body,
+            'top'
+          );
+
+          await this._digestService.deleteByIds(pending.map((p) => p.id));
+          userSent = true;
+        }
+
+        if (userSent) {
+          sent++;
+        }
       } catch (err) {
         failed++;
       }

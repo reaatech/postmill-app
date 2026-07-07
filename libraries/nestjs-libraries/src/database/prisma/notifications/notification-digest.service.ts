@@ -50,9 +50,9 @@ export class NotificationDigestService {
     });
   }
 
-  async getPendingForUser(userId: string) {
+  async getPendingForUser(userId: string, organizationId: string) {
     return this._digestQueue.model.notificationDigestQueue.findMany({
-      where: { userId },
+      where: { userId, organizationId },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -65,9 +65,18 @@ export class NotificationDigestService {
     });
   }
 
-  async deleteForUser(userId: string): Promise<void> {
-    await this._digestQueue.model.notificationDigestQueue.deleteMany({
+  async getOrganizationIdsForUser(userId: string): Promise<string[]> {
+    const rows = await this._digestQueue.model.notificationDigestQueue.findMany({
       where: { userId },
+      distinct: ['organizationId'],
+      select: { organizationId: true },
+    });
+    return rows.map((row) => row.organizationId);
+  }
+
+  async deleteForUser(userId: string, organizationId: string): Promise<void> {
+    await this._digestQueue.model.notificationDigestQueue.deleteMany({
+      where: { userId, organizationId },
     });
   }
 

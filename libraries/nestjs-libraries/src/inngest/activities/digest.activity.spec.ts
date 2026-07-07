@@ -13,6 +13,7 @@ describe('DigestActivity', () => {
   beforeEach(() => {
     digestService = {
       getPendingForUser: vi.fn(),
+      getOrganizationIdsForUser: vi.fn(),
       deleteByIds: vi.fn().mockResolvedValue(undefined),
     } as unknown as NotificationDigestService;
 
@@ -33,8 +34,12 @@ describe('DigestActivity', () => {
       { userId: 'user-2', user: { email: 'c@d.com' } },
     ]);
 
-    vi.mocked(digestService.getPendingForUser).mockImplementation(async (userId: string) => {
-      if (userId === 'user-1') {
+    vi.mocked(digestService.getOrganizationIdsForUser).mockImplementation(async (userId: string) => {
+      return userId === 'user-1' ? ['org-1'] : [];
+    });
+
+    vi.mocked(digestService.getPendingForUser).mockImplementation(async (userId: string, organizationId: string) => {
+      if (userId === 'user-1' && organizationId === 'org-1') {
         return [
           { id: 'q-1', title: 'T1', message: 'M1', html: null, category: 'comments', createdAt: new Date() },
         ] as any;
@@ -45,6 +50,7 @@ describe('DigestActivity', () => {
     const result = await activity.sendPendingDigests('daily');
 
     expect(result).toEqual({ sent: 1, failed: 0 });
+    expect(digestService.getPendingForUser).toHaveBeenCalledWith('user-1', 'org-1');
     expect(emailService.sendEmail).toHaveBeenCalledWith(
       'a@b.com',
       '[Postmill] Daily digest',
@@ -58,12 +64,14 @@ describe('DigestActivity', () => {
     vi.mocked(preferenceService.getPreferencesByDigestFrequency).mockResolvedValue([
       { userId: 'user-1', user: { email: 'a@b.com' } },
     ]);
+    vi.mocked(digestService.getOrganizationIdsForUser).mockResolvedValue(['org-1']);
     vi.mocked(digestService.getPendingForUser).mockResolvedValue([
       { id: 'q-1', title: 'T1', message: 'M1', html: '<h1>Rich</h1>', category: 'comments', createdAt: new Date() },
     ] as any);
 
     await activity.sendPendingDigests('weekly');
 
+    expect(digestService.getPendingForUser).toHaveBeenCalledWith('user-1', 'org-1');
     expect(emailService.sendEmail).toHaveBeenCalledWith(
       'a@b.com',
       '[Postmill] Weekly digest',
@@ -76,6 +84,7 @@ describe('DigestActivity', () => {
     vi.mocked(preferenceService.getPreferencesByDigestFrequency).mockResolvedValue([
       { userId: 'user-1', user: { email: 'a@b.com' } },
     ]);
+    vi.mocked(digestService.getOrganizationIdsForUser).mockResolvedValue(['org-1']);
     vi.mocked(digestService.getPendingForUser).mockRejectedValue(new Error('db down'));
 
     const result = await activity.sendPendingDigests('daily');
