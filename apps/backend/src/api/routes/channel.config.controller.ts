@@ -30,6 +30,9 @@ import { SaveChannelConfigDto } from '@gitroom/nestjs-libraries/dtos/providers/p
 // structural backstop; each handler also calls `_assertSuperAdmin` (defense in depth).
 @ApiTags('Channel Config')
 @Controller('/admin/channel-configs')
+// AUTH-03: guard ordering invariant — SuperAdminGuard runs FIRST and throws for any
+// non-super-admin, so OrgRbacGuard never reaches its org-resolution / permission check
+// for these platform-global endpoints. NestJS executes guards left-to-right.
 @UseGuards(SuperAdminGuard, OrgRbacGuard)
 export class ChannelConfigController {
   private readonly _logger = new Logger(ChannelConfigController.name);

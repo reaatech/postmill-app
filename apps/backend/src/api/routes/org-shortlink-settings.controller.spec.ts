@@ -1,8 +1,6 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { CHECK_POLICIES_KEY } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 const mockGetActiveProvider = vi.fn();
 const mockGetProviders = vi.fn();
@@ -109,83 +107,6 @@ describe('OrgShortLinkSettingsController', () => {
       new (OrgShortLinkSettingsService as any)(),
       new (ProviderResolutionService as any)(),
     );
-  });
-
-  // ---------------------------------------------------------------------------
-  // Policy guards
-  // ---------------------------------------------------------------------------
-  describe('policy guards', () => {
-    it('listProviders is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.listProviders,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('getConfig is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.getConfig,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('updateConfigById is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.updateConfigById,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('upsertConfig is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.upsertConfig,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('setActive is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.setActive,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('testConnection is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.testConnection,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('deleteConfig is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.deleteConfig,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('getOAuthUrl is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.getOAuthUrl,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
-
-    it('oauthCallback is gated with ADMIN create policy', () => {
-      const policies = Reflect.getMetadata(
-        CHECK_POLICIES_KEY,
-        OrgShortLinkSettingsController.prototype.oauthCallback,
-      );
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
-    });
   });
 
   // ---------------------------------------------------------------------------

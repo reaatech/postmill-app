@@ -19,8 +19,6 @@ import { ApiTags } from '@nestjs/swagger';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import {
@@ -43,14 +41,12 @@ export class StorageController {
 
   @Get('/')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders(@GetOrgFromRequest() org: Organization) {
     return this._storageService.getProviderConfigs(org.id);
   }
 
   @Post('/')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async createProvider(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -87,7 +83,6 @@ export class StorageController {
 
   @Put('/:id')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async updateProvider(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -116,7 +111,6 @@ export class StorageController {
 
   @Delete('/:id')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteProvider(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -128,7 +122,6 @@ export class StorageController {
 
   @Post('/:id/test')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -138,7 +131,6 @@ export class StorageController {
 
   @Post('/:id/mount')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async mountProvider(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -150,7 +142,6 @@ export class StorageController {
 
   @Post('/:id/unmount')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async unmountProvider(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -162,7 +153,6 @@ export class StorageController {
 
   @Get('/:sourceId/migrate-preview')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async migratePreview(
     @GetOrgFromRequest() org: Organization,
     @Param('sourceId') sourceId: string
@@ -172,7 +162,6 @@ export class StorageController {
 
   @Post('/:sourceId/migrate/:targetId')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async migrateStorage(
     @GetOrgFromRequest() org: Organization,
     @Param('sourceId') sourceId: string,
@@ -193,7 +182,6 @@ export class StorageController {
 
   @Get('/usage')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getUsage(@GetOrgFromRequest() org: Organization) {
     const usage = await this._storageService.getUsage(org.id);
     return {
@@ -208,7 +196,6 @@ export class StorageController {
 
   @Get('/quota-status')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getQuotaStatus(@GetOrgFromRequest() org: Organization) {
     const status = await this._storageService.getQuotaStatus(org.id);
     return {
@@ -234,7 +221,6 @@ export class StorageController {
 
   @Get('/usage-breakdown')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getUsageBreakdown(@GetOrgFromRequest() org: Organization) {
     const breakdown = await this._storageService.getUsageBreakdown(org.id);
     return {
@@ -251,7 +237,6 @@ export class StorageController {
 
   @Get('/audit-log')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getAuditLog(
     @GetOrgFromRequest() org: Organization,
     @Query('limit') limit?: string,
@@ -278,7 +263,6 @@ export class StorageController {
 
   @Post('/:id/set-default-folder')
   @RequirePermission('storage-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async setDefaultFolder(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,

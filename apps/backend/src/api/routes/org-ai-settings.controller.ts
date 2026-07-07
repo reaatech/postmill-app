@@ -27,8 +27,6 @@ import { SetDefaultModelDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/d
 import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { ProviderConfigDto } from '@gitroom/nestjs-libraries/types/provider-config.types';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
@@ -126,7 +124,6 @@ export class OrgAiSettingsController {
 
   @Get('/providers')
   @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
     const adapters = this._listAdapters();
     return adapters.map((adapter) => {
@@ -145,7 +142,6 @@ export class OrgAiSettingsController {
 
   @Get('/config')
   @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getConfig(@GetOrgFromRequest() org: Organization): Promise<{
     active: ProviderConfigSummary | null;
     providers: ProviderConfigSummary[];
@@ -165,7 +161,6 @@ export class OrgAiSettingsController {
 
   @Put('/config/:identifier')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -213,7 +208,6 @@ export class OrgAiSettingsController {
 
   @Post('/config/:identifier/set-active')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -235,7 +229,6 @@ export class OrgAiSettingsController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('/config/:identifier/test')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -268,7 +261,6 @@ export class OrgAiSettingsController {
 
   @Delete('/config/:identifier')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -280,7 +272,6 @@ export class OrgAiSettingsController {
 
   @Get('/budget')
   @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getBudget(@GetOrgFromRequest() org: Organization) {
     const budget = await this._orgAiSettings.getBudget(org.id);
     return budget || {};
@@ -288,7 +279,6 @@ export class OrgAiSettingsController {
 
   @Put('/budget')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async updateBudget(
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpdateBudgetDto,
@@ -301,7 +291,6 @@ export class OrgAiSettingsController {
 
   @Get('/defaults')
   @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getModelDefaults(@GetOrgFromRequest() org: Organization) {
     const resolved = await this._defaultsResolution.resolveAll('ai', org.id);
     const stored = await this._defaultsRepository.getAll(org.id, 'ai');
@@ -320,7 +309,6 @@ export class OrgAiSettingsController {
 
   @Put('/defaults/:category')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async setModelDefault(
     @GetOrgFromRequest() org: Organization,
     @Param('category') category: string,
@@ -350,7 +338,6 @@ export class OrgAiSettingsController {
 
   @Delete('/defaults/:category')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async clearModelDefault(
     @GetOrgFromRequest() org: Organization,
     @Param('category') category: string,
@@ -364,7 +351,6 @@ export class OrgAiSettingsController {
 
   @Get('/defaults/catalog')
   @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getModelDefaultsCatalog(
     @GetOrgFromRequest() org: Organization,
     @Query('category') category: string,

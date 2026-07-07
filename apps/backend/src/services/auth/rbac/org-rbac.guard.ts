@@ -65,12 +65,19 @@ export class OrgRbacGuard implements CanActivate {
     // source; other auth paths may set `req.orgId` directly. Accept either.
     const orgId = request?.orgId ?? request?.org?.id;
 
-    if (!userId || !orgId) {
+    if (!userId) {
       throw new ForbiddenException('Not authenticated');
     }
 
+    // AUTH-03: platform super-admins bypass org-scoped RBAC entirely. This must run
+    // before the org-id check so that `/admin/*` routes guarded by
+    // `@UseGuards(SuperAdminGuard, OrgRbacGuard)` can be reached without an org cookie.
     if (request?.user?.isSuperAdmin) {
       return true;
+    }
+
+    if (!orgId) {
+      throw new ForbiddenException('Not authenticated');
     }
 
     const effectivePermissions = await this._resolvePermissions(request, userId, orgId);

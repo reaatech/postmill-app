@@ -19,9 +19,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
@@ -73,7 +71,6 @@ export class MediaProviderController {
   }
 
   @Get('/providers')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async listProviders() {
     const seen = new Set<string>();
@@ -97,7 +94,6 @@ export class MediaProviderController {
   }
 
   @Get('/config')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async getConfig(@GetOrgFromRequest() org: Organization) {
     const allConfigs = await this._orgMediaProviderSettings.getProviders(org.id);
@@ -105,7 +101,6 @@ export class MediaProviderController {
   }
 
   @Put('/config/:identifier')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
@@ -148,7 +143,6 @@ export class MediaProviderController {
   }
 
   @Put('/config/:identifier/storage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async setStorage(
     @GetOrgFromRequest() org: Organization,
@@ -209,7 +203,6 @@ export class MediaProviderController {
   }
 
   @Post('/config/:identifier/set-active')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async setActive(
     @GetOrgFromRequest() org: Organization,
@@ -240,7 +233,6 @@ export class MediaProviderController {
 
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('/config/:identifier/test')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async testConnection(
     @GetOrgFromRequest() org: Organization,
@@ -270,7 +262,6 @@ export class MediaProviderController {
   }
 
   @Delete('/config/:identifier')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,

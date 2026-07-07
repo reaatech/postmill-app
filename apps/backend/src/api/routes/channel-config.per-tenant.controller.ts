@@ -22,8 +22,7 @@ import {
 } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 interface ChannelVpnSelectionBody {
   enabled: boolean;
@@ -107,7 +106,7 @@ export class ChannelConfigPerTenantController {
   // Static provider catalog — used by the "Add channel" picker. Declared before
   // the `/:id` routes so it isn't captured as an id.
   @Get('/providers')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('channels', 'manage')
   async listProviders() {
     return this._integrationManager.getSocialProviders().map((p) => ({
       identifier: p.identifier,
@@ -124,7 +123,7 @@ export class ChannelConfigPerTenantController {
 
   // The org's named credential-config instances (the list rows).
   @Get('/')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('channels', 'manage')
   async listConfigs(@GetOrgFromRequest() org: Organization) {
     const configs = await this._orgProviderConfigService.getConfigs(org.id);
     return configs.map((c) => ({
@@ -134,7 +133,7 @@ export class ChannelConfigPerTenantController {
   }
 
   @Get('/:id')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('channels', 'manage')
   async getConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -150,7 +149,7 @@ export class ChannelConfigPerTenantController {
   }
 
   @Post('/')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('channels', 'manage')
   async createConfig(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -190,7 +189,7 @@ export class ChannelConfigPerTenantController {
   }
 
   @Put('/:id')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('channels', 'manage')
   async saveConfig(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -222,7 +221,7 @@ export class ChannelConfigPerTenantController {
   }
 
   @Delete('/:id')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('channels', 'manage')
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -234,7 +233,7 @@ export class ChannelConfigPerTenantController {
   }
 
   @Post('/:id/test')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('channels', 'manage')
   async testConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string

@@ -15,8 +15,6 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { UpsertVpnConfigDto } from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
@@ -27,14 +25,12 @@ export class OrgVpnSettingsController {
 
   @Get('/providers')
   @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
     return { providers: this._orgVpnConfig.getProviderMetadata() };
   }
 
   @Get('/config')
   @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getConfig(@GetOrgFromRequest() org: Organization) {
     return {
       providers: await this._orgVpnConfig.getProviders(org.id),
@@ -43,7 +39,6 @@ export class OrgVpnSettingsController {
 
   @Put('/config/:identifier')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -63,7 +58,6 @@ export class OrgVpnSettingsController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('/config/:identifier/test')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -80,7 +74,6 @@ export class OrgVpnSettingsController {
 
   @Delete('/config/:identifier')
   @RequirePermission('settings', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,

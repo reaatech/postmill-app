@@ -161,11 +161,6 @@ export class PermissionsService {
         can(action, section);
         continue;
       }
-
-      if (section === Sections.ADMIN) {
-        can(action, section);
-        continue;
-      }
     }
 
     return build({
