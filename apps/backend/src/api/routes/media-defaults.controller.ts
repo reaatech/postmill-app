@@ -22,9 +22,7 @@ import {
   MEDIA_CATEGORY_OPERATION,
 } from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
 import { SetDefaultModelDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/default-model.dto';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
@@ -33,7 +31,6 @@ import { DefaultsSettingsValidator } from '@gitroom/nestjs-libraries/ai/defaults
 
 @ApiTags('Media Defaults')
 @Controller('/settings/content/media-defaults')
-@CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
 @RequirePermission('media-config', 'manage')
 export class MediaDefaultsController {
   constructor(

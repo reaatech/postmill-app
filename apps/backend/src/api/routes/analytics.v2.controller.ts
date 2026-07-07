@@ -507,7 +507,6 @@ export class AnalyticsV2Controller {
   }
 
   @Get('/shortlinks')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getShortLinks(
     @GetOrgFromRequest() org: Organization,
     @Query('from') fromStr?: string,
@@ -536,7 +535,6 @@ export class AnalyticsV2Controller {
   }
 
   @Get('/shortlinks/timeseries')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getShortLinkTimeseries(
     @GetOrgFromRequest() org: Organization,
     @Query('from') fromStr?: string,

@@ -2,11 +2,11 @@ import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common'
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.team.member.dto';
 import { ShortlinkPreferenceDto } from '@gitroom/nestjs-libraries/dtos/settings/shortlink-preference.dto';
 import { ApiTags } from '@nestjs/swagger';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { IsDefined, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
@@ -37,20 +37,14 @@ export class SettingsController {
 
   @Get('/team')
   @RequirePermission('settings', 'read')
-  @CheckPolicies(
-    [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
-    [AuthorizationActions.Create, Sections.ADMIN]
-  )
+  @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   async getTeam(@GetOrgFromRequest() org: Organization) {
     return this._organizationService.getTeam(org.id);
   }
 
   @Post('/team')
   @RequirePermission('settings', 'update')
-  @CheckPolicies(
-    [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
-    [AuthorizationActions.Create, Sections.ADMIN]
-  )
+  @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   async inviteTeamMember(
     @GetOrgFromRequest() org: Organization,
     @Body() body: AddTeamMemberDto
@@ -60,10 +54,7 @@ export class SettingsController {
 
   @Put('/team/:id/role')
   @RequirePermission('settings', 'update')
-  @CheckPolicies(
-    [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
-    [AuthorizationActions.Create, Sections.ADMIN]
-  )
+  @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   changeTeamMemberRole(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -80,10 +71,7 @@ export class SettingsController {
 
   @Post('/team/create-user')
   @RequirePermission('settings', 'update')
-  @CheckPolicies(
-    [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
-    [AuthorizationActions.Create, Sections.ADMIN]
-  )
+  @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   async createTeamUser(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreateTeamUserDto
@@ -99,10 +87,7 @@ export class SettingsController {
 
   @Delete('/team/:id')
   @RequirePermission('settings', 'update')
-  @CheckPolicies(
-    [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
-    [AuthorizationActions.Create, Sections.ADMIN]
-  )
+  @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   deleteTeamMember(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -118,7 +103,6 @@ export class SettingsController {
 
   @Post('/shortlink')
   @RequirePermission('organization', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async updateShortlinkPreference(
     @GetOrgFromRequest() org: Organization,
     @Body() body: ShortlinkPreferenceDto

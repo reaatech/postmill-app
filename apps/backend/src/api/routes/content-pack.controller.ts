@@ -21,8 +21,6 @@ import {
   ContentPackMeta,
   manifestToContentPackMeta,
 } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import {
@@ -41,7 +39,6 @@ export class ContentPackController {
 
   @Get('/providers')
   @RequirePermission('media-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
     return this.#listMeta().map((meta) => ({
       identifier: meta.identifier,
@@ -53,7 +50,6 @@ export class ContentPackController {
 
   @Get('/config')
   @RequirePermission('media-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getConfig(@GetOrgFromRequest() org: Organization) {
     const providers = await this._orgContentPackSettings.getProviders(org.id);
     const active = await this._orgContentPackSettings.getActive(org.id);
@@ -74,7 +70,6 @@ export class ContentPackController {
 
   @Put('/config/:identifier')
   @RequirePermission('media-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -94,7 +89,6 @@ export class ContentPackController {
 
   @Post('/config/:identifier/set-active')
   @RequirePermission('media-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string
@@ -109,7 +103,6 @@ export class ContentPackController {
 
   @Post('/deactivate')
   @RequirePermission('media-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deactivate(@GetOrgFromRequest() org: Organization) {
     await this._orgContentPackSettings.setActive(org.id, null);
     return { isActive: false };
@@ -118,7 +111,6 @@ export class ContentPackController {
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('/config/:identifier/test')
   @RequirePermission('media-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
@@ -151,7 +143,6 @@ export class ContentPackController {
 
   @Delete('/config/:identifier')
   @RequirePermission('media-config', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string

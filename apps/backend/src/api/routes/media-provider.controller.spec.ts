@@ -3,9 +3,10 @@ import 'reflect-metadata';
 import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { MediaProviderController } from './media-provider.controller';
 
-// Every /settings/media route must carry the media-config:manage RBAC gate —
-// the CASL Sections.ADMIN policy is billing-layer only and always allows, so
-// without this metadata any org member could configure media providers.
+// Every /settings/media route must carry the media-config:manage RBAC gate.
+// The legacy CASL Sections.ADMIN billing-policy grant was removed (AUTH-01); the
+// RBAC metadata is the real gate, so without it any org member could configure
+// media providers.
 describe('MediaProviderController RBAC gating', () => {
   const routes = [
     'listProviders',

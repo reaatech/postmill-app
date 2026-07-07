@@ -53,6 +53,8 @@ describe('ProviderConfigManager', () => {
     });
 
     manager = new ProviderConfigManager(mockProviderConfigService as any);
+    // Prevent cross-replica Redis pub/sub from leaking into call-count assertions.
+    vi.spyOn(manager, 'publishInvalidate').mockResolvedValue(undefined);
   });
 
   afterEach(() => {

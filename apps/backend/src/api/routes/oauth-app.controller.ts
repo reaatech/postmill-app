@@ -3,11 +3,7 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import {
-  AuthorizationActions,
-  Sections,
-} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { CreateOAuthAppDto } from '@gitroom/nestjs-libraries/dtos/oauth/create-oauth-app.dto';
 import { UpdateOAuthAppDto } from '@gitroom/nestjs-libraries/dtos/oauth/update-oauth-app.dto';
 
@@ -17,13 +13,13 @@ export class OAuthAppController {
   constructor(private _oauthService: OAuthService) {}
 
   @Get('/')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('oauth_apps', 'manage')
   async getApp(@GetOrgFromRequest() org: Organization) {
     return this._oauthService.getApp(org.id);
   }
 
   @Post('/')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('oauth_apps', 'manage')
   async createApp(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreateOAuthAppDto
@@ -32,7 +28,7 @@ export class OAuthAppController {
   }
 
   @Put('/')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('oauth_apps', 'manage')
   async updateApp(
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpdateOAuthAppDto
@@ -41,13 +37,13 @@ export class OAuthAppController {
   }
 
   @Delete('/')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('oauth_apps', 'manage')
   async deleteApp(@GetOrgFromRequest() org: Organization) {
     return this._oauthService.deleteApp(org.id);
   }
 
   @Post('/rotate-secret')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  @RequirePermission('oauth_apps', 'manage')
   async rotateSecret(@GetOrgFromRequest() org: Organization) {
     return this._oauthService.rotateSecret(org.id);
   }

@@ -23,7 +23,6 @@ import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service
 import { Response, Request } from 'express';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
@@ -41,7 +40,6 @@ import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import crypto from 'crypto';
 
 @ApiTags('User')
@@ -201,7 +199,6 @@ export class UsersController {
   }
 
   @Get('/subscription')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getSubscription(@GetOrgFromRequest() organization: Organization) {
     const subscription =
       await this._subscriptionService.getSubscriptionByOrganizationId(

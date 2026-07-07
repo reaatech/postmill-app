@@ -32,11 +32,6 @@ import {
 } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { FeaturedProviderService } from '@gitroom/nestjs-libraries/database/prisma/featured-providers/featured-provider.service';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import {
-  AuthorizationActions,
-  Sections,
-} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
 
 // PROVIDER_REMEDIATION 3.3: `isProviderDomain` + the domain set are now a single
@@ -155,9 +150,8 @@ export class AdminProvidersController {
     private readonly _featured: FeaturedProviderService,
   ) {}
 
-  // Platform-wide provider admin is super-admin-only. The @CheckPolicies ADMIN gate
-  // is the org billing-admin capability (PoliciesGuard → 402), NOT a super-admin gate,
-  // so each handler must back it with an explicit isSuperAdmin check (the same pattern
+  // Platform-wide provider admin is super-admin-only. SuperAdminGuard is the class-level
+  // structural backstop, and each handler asserts isSuperAdmin explicitly (the same pattern
   // as AnnouncementsController / StorageController / AdminDefaultsController).
   private _assertSuperAdmin(user: User) {
     if (!user.isSuperAdmin) {
@@ -166,7 +160,6 @@ export class AdminProvidersController {
   }
 
   @Get('/health')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   health(@GetUserFromRequest() user: User, @Query('domain') domain?: string) {
     this._assertSuperAdmin(user);
 
@@ -188,28 +181,24 @@ export class AdminProvidersController {
   // ── Featured providers (super-admin curation) ──
 
   @Get('/featured')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   listFeatured(@GetUserFromRequest() user: User, @Query('domain') domain?: string) {
     this._assertSuperAdmin(user);
     return this._featured.list(domain);
   }
 
   @Post('/featured')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   upsertFeatured(@GetUserFromRequest() user: User, @Body() body: FeaturedProviderDto) {
     this._assertSuperAdmin(user);
     return this._featured.upsert(body.domain, body.providerId, body.sortOrder);
   }
 
   @Put('/featured/reorder')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   reorderFeatured(@GetUserFromRequest() user: User, @Body() body: FeaturedReorderDto) {
     this._assertSuperAdmin(user);
     return this._featured.reorder(body.domain, body.entries);
   }
 
   @Delete('/featured')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   removeFeatured(@GetUserFromRequest() user: User, @Body() body: FeaturedProviderRemoveDto) {
     this._assertSuperAdmin(user);
     return this._featured.remove(body.domain, body.providerId);

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Logger, UseGuards } from '@nestjs/common';
 import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 
 // The social provider list now comes from IntegrationManager (kernel-backed);
 // the controller iterates `getSocialProviders()` / looks up a single provider
@@ -505,5 +507,66 @@ describe('super-admin gating (0.2)', () => {
     mockProviderConfigService.getAll.mockResolvedValue([]);
     await expect(controller.listConfigs(adminUser)).resolves.toBeDefined();
     expect(mockProviderConfigService.getAll).toHaveBeenCalled();
+  });
+});
+
+// AUTH-03: guard ordering invariant for the platform-global `/admin/channel-configs`
+// routes. SuperAdminGuard must run first so that non-super-admins are rejected before
+// OrgRbacGuard attempts org resolution.
+describe('guard ordering invariant', () => {
+  it('lists SuperAdminGuard before OrgRbacGuard on the controller', () => {
+    const guards = Reflect.getMetadata(
+      '__guards__',
+      ChannelConfigController,
+    ) as Array<new (...args: any[]) => any>;
+
+    expect(guards).toBeDefined();
+    expect(guards.length).toBeGreaterThanOrEqual(2);
+
+    const first = guards[0].name;
+    const second = guards[1].name;
+    expect(first).toBe(SuperAdminGuard.name);
+    expect(second).toBe(OrgRbacGuard.name);
+  });
+
+  it('SuperAdminGuard allows a super-admin request that carries no org cookie', () => {
+    const guard = new SuperAdminGuard();
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => ({ user: { id: 'super-u', isSuperAdmin: true } }),
+      }),
+    } as any;
+    expect(guard.canActivate(context)).toBe(true);
+  });
+
+  it('SuperAdminGuard rejects a non-super-admin before OrgRbacGuard would run', () => {
+    const guard = new SuperAdminGuard();
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => ({ user: { id: 'regular-u', isSuperAdmin: false } }),
+      }),
+    } as any;
+    expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+  });
+
+  it('OrgRbacGuard short-circuits for a super-admin without org context', async () => {
+    const reflector = { getAllAndOverride: vi.fn(() => ({ resource: 'channels', action: 'manage' })) } as any;
+    const rolesService = { getEffectivePermissions: vi.fn() } as any;
+    const audit = { record: vi.fn() } as any;
+    const guard = new OrgRbacGuard(reflector, rolesService, audit);
+
+    const context = {
+      getHandler: () => ({}),
+      getClass: () => ({}),
+      switchToHttp: () => ({
+        getRequest: () => ({
+          user: { id: 'super-u', isSuperAdmin: true },
+          // deliberately absent org / orgId
+        }),
+      }),
+    } as any;
+
+    await expect(guard.canActivate(context)).resolves.toBe(true);
+    expect(rolesService.getEffectivePermissions).not.toHaveBeenCalled();
   });
 });

@@ -16,8 +16,9 @@ Two Prisma models support the OAuth system:
 
 ## OAuth App management
 
-All endpoints under `/user/oauth-app` require admin-level authorization
-(`@CheckPolicies([Create, Sections.ADMIN])`). Only one app per org is supported.
+All endpoints under `/user/oauth-app` require the `oauth_apps:manage` RBAC
+permission (`@RequirePermission('oauth_apps', 'manage')`). Only one app per org
+is supported.
 
 | Method | Path | Purpose |
 |--------|------|---------|
