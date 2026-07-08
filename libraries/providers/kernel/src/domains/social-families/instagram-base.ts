@@ -1033,7 +1033,7 @@ export class InstagramProvider
 
       return result;
     } catch (err) {
-      console.error('Error fetching Instagram post analytics:', err);
+      this.logger.error(`Error fetching Instagram post analytics: ${(err as Error)?.message || String(err)}`);
       return [];
     }
   }
@@ -1082,7 +1082,7 @@ export class InstagramProvider
 
       return { comments, nextCursor };
     } catch (err) {
-      this.logger.error('Instagram fetchComments error:', err);
+      this.logger.error(`Instagram fetchComments error: ${(err as Error)?.message || String(err)}`);
       return { comments: [] };
     }
   }
@@ -1122,7 +1122,7 @@ export class InstagramProvider
         createdAt: new Date().toISOString(),
       };
     } catch (err) {
-      this.logger.error('Instagram replyToComment error:', err);
+      this.logger.error(`Instagram replyToComment error: ${(err as Error)?.message || String(err)}`);
       return {
         platformCommentId: '',
         parentPlatformCommentId: parentCommentId,
@@ -1162,7 +1162,7 @@ export class InstagramProvider
         return { liked: false };
       }
     } catch (err) {
-      this.logger.error('Instagram likeComment error:', err);
+      this.logger.error(`Instagram likeComment error: ${(err as Error)?.message || String(err)}`);
       throw err;
     }
   }

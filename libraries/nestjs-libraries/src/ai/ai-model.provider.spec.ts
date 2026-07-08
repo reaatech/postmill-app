@@ -756,6 +756,64 @@ describe('AIModelProvider', () => {
     });
   });
 
+  describe('capability checks use the org-pinned version (PV-01)', () => {
+    it('resolveProviderRef returns providerId and version from resolved config', async () => {
+      mockGetActiveProvider.mockResolvedValue({
+        identifier: 'openai',
+        defaultModel: 'gpt-4.1',
+        version: 'v2',
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      const ref = await provider.resolveProviderRef('utility', 'org-123');
+
+      expect(ref.providerId).toBe('openai');
+      expect(ref.version).toBe('v2');
+    });
+
+    it('hasCapability passes version to _resolveAI', () => {
+      (resolution.resolveAI as any).mockClear();
+      provider.hasCapability('openai', 'vision', 'v2');
+      expect(resolution.resolveAI).toHaveBeenCalledWith('openai', {
+        version: 'v2',
+        credentials: {},
+        orgId: undefined,
+      });
+    });
+
+    it('hasCapability does not hard-default to v1 when no version is supplied', () => {
+      (resolution.resolveAI as any).mockClear();
+      provider.hasCapability('openai', 'vision');
+      expect(resolution.resolveAI).toHaveBeenCalledWith('openai', {
+        version: undefined,
+        credentials: {},
+        orgId: undefined,
+      });
+    });
+
+    it('modelHasCapability passes version to _resolveAI', async () => {
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
+        if (id === 'openai') {
+          return {
+            identifier: 'openai',
+            credentialFields: [{ key: 'apiKey' }],
+            listModels: vi.fn().mockResolvedValue([
+              { id: 'gpt-4o', capabilities: { vision: true } },
+            ]),
+          };
+        }
+        return undefined;
+      });
+
+      await provider.modelHasCapability('openai', 'gpt-4o', 'vision', { apiKey: 'k' }, 'v3');
+
+      expect(resolution.resolveAI).toHaveBeenCalledWith('openai', {
+        credentials: { apiKey: 'k' },
+        version: 'v3',
+      });
+    });
+  });
+
   describe('generateTextWithModel / generateObjectWithModel', () => {
     it('passes the explicit model id to createLanguageModel', async () => {
       const createLanguageModel = vi.fn().mockReturnValue(mockLanguageModel);

@@ -755,7 +755,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      console.error('Error fetching TikTok analytics:', err);
+      console.error(
+        'Error fetching TikTok analytics:',
+        (err as Error)?.message || 'unknown'
+      );
       return [];
     }
   }
@@ -789,7 +792,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         url: v.cover_image_url,
       }));
     } catch (err) {
-      console.error('Error fetching TikTok missing content:', err);
+      console.error(
+        'Error fetching TikTok missing content:',
+        (err as Error)?.message || 'unknown'
+      );
       return [];
     }
   }
@@ -886,7 +892,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      console.error('Error fetching TikTok post analytics:', err);
+      console.error(
+        'Error fetching TikTok post analytics:',
+        (err as Error)?.message || 'unknown'
+      );
       return [];
     }
   }

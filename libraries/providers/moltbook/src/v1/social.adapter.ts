@@ -8,7 +8,6 @@ import { makeId } from '@gitroom/provider-kernel';
 import { SocialAbstract } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
-import axios from 'axios';
 
 import { metadata as providerMetadata } from './metadata';
 const MOLTBOOK_API_BASE = 'https://www.moltbook.com/api/v1';
@@ -48,37 +47,53 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
   }
 
   async registerAgent(name: string, description: string) {
-    const response = await axios.post(
+    const response = await this.fetch(
       `${MOLTBOOK_API_BASE}/agents/register`,
-      { name, description },
-      { headers: { 'Content-Type': 'application/json' } }
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description }),
+      },
+      'moltbook-register-agent'
     );
 
-    if (!response.data.success) {
-      throw new Error(response.data.error || 'Registration failed');
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || 'Registration failed');
     }
 
-    return response.data.agent;
+    return data.agent;
   }
 
   async checkAgentStatus(apiKey: string) {
-    const response = await axios.get(`${MOLTBOOK_API_BASE}/agents/status`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    const response = await this.fetch(
+      `${MOLTBOOK_API_BASE}/agents/status`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      },
+      'moltbook-agent-status'
+    );
 
-    return response.data;
+    return response.json();
   }
 
   async getAgentProfile(apiKey: string) {
-    const response = await axios.get(`${MOLTBOOK_API_BASE}/agents/me`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
+    const response = await this.fetch(
+      `${MOLTBOOK_API_BASE}/agents/me`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      },
+      'moltbook-agent-profile'
+    );
 
-    if (!response.data.success) {
-      throw new Error(response.data.error || 'Failed to get profile');
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(data.error || 'Failed to get profile');
     }
 
-    return response.data.agent;
+    return data.agent;
   }
 
   async authenticate(params: {
@@ -121,22 +136,26 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
         content: post.message,
       };
 
-      const response = await axios.post(
+      const response = await this.fetch(
         `${MOLTBOOK_API_BASE}/posts`,
-        postData,
         {
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
-        }
+          body: JSON.stringify(postData),
+        },
+        'moltbook-post'
       );
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to create post');
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create post');
       }
 
-      const postId = response.data.post.id;
+      const postId = data.post.id;
       results.push({
         id: post.id,
         postId: String(postId),
@@ -167,22 +186,26 @@ export class MoltbookProvider extends SocialAbstract implements SocialProvider {
         commentData.parent_id = lastCommentId;
       }
 
-      const response = await axios.post(
+      const response = await this.fetch(
         `${MOLTBOOK_API_BASE}/posts/${postId}/comments`,
-        commentData,
         {
+          method: 'POST',
           headers: {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
-        }
+          body: JSON.stringify(commentData),
+        },
+        'moltbook-comment'
       );
 
-      if (!response.data.success) {
-        throw new Error(response.data.error || 'Failed to create comment');
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create comment');
       }
 
-      const commentId = response.data.comment.id;
+      const commentId = data.comment.id;
       results.push({
         id: post.id,
         postId: String(commentId),

@@ -70,7 +70,10 @@ async function reduceImageBySize(url: string, maxSizeKB = 976) {
 
     return { width, height, buffer: imageBuffer };
   } catch (error) {
-    console.error('Error processing image:', error);
+    console.error(
+      'Error processing image:',
+      (error as Error)?.message || 'unknown'
+    );
     throw error;
   }
 }
@@ -555,7 +558,9 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
 
       return { comments };
     } catch (err) {
-      this.logger.error('Bluesky fetchComments error:', err);
+      this.logger.error(
+        `Bluesky fetchComments error: ${(err as Error)?.message || 'unknown'}`
+      );
       return { comments: [] };
     }
   }
@@ -615,7 +620,9 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
         createdAt: new Date().toISOString(),
       };
     } catch (err) {
-      this.logger.error('Bluesky replyToComment error:', err);
+      this.logger.error(
+        `Bluesky replyToComment error: ${(err as Error)?.message || 'unknown'}`
+      );
       return {
         platformCommentId: '',
         parentPlatformCommentId: parentCommentId,
@@ -686,7 +693,9 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
         return { liked: false };
       }
     } catch (err) {
-      this.logger.error('Bluesky likeComment error:', err);
+      this.logger.error(
+        `Bluesky likeComment error: ${(err as Error)?.message || 'unknown'}`
+      );
       throw err;
     }
   }

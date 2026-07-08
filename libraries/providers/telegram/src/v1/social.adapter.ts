@@ -487,7 +487,10 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
       return false;
     } catch (error) {
-      console.error('Error checking bot privileges:', error);
+      console.error(
+        'Error checking bot privileges:',
+        (error as Error)?.message || 'unknown'
+      );
       return false;
     }
   }

@@ -398,7 +398,10 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
         subscriberCount: channel.statistics?.subscriberCount || '0',
       }));
     } catch (error) {
-      console.error('Failed to fetch YouTube channels:', error);
+      console.error(
+        'Failed to fetch YouTube channels:',
+        (error as Error)?.message || 'unknown'
+      );
       return [];
     }
   }
@@ -428,7 +431,10 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
         username: channel.snippet?.customUrl || '',
       };
     } catch (error) {
-      console.error('Failed to fetch YouTube channel information:', error);
+      console.error(
+        'Failed to fetch YouTube channel information:',
+        (error as Error)?.message || 'unknown'
+      );
       throw error;
     }
   }
@@ -678,7 +684,10 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      console.error('Error fetching YouTube post analytics:', err);
+      console.error(
+        'Error fetching YouTube post analytics:',
+        (err as Error)?.message || 'unknown'
+      );
       return [];
     }
   }
@@ -730,7 +739,9 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
 
       return { comments, nextCursor };
     } catch (err) {
-      this.logger.error('YouTube fetchComments error:', err);
+      this.logger.error(
+        `YouTube fetchComments error: ${(err as Error)?.message || 'unknown'}`
+      );
       return { comments: [] };
     }
   }
@@ -771,7 +782,9 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
         createdAt: response.data.snippet?.publishedAt || '',
       };
     } catch (err) {
-      this.logger.error('YouTube replyToComment error:', err);
+      this.logger.error(
+        `YouTube replyToComment error: ${(err as Error)?.message || 'unknown'}`
+      );
       throw err;
     }
   }

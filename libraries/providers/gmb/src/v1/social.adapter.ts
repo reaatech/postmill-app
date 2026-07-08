@@ -359,7 +359,7 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
         // Continue with other accounts if one fails
         console.error(
           `Failed to fetch locations for account ${accountName}:`,
-          error
+          (error as Error)?.message || 'unknown'
         );
       }
     }
@@ -656,7 +656,10 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
 
       return analytics;
     } catch (error) {
-      console.error('Error fetching GMB analytics:', error);
+      console.error(
+        'Error fetching GMB analytics:',
+        (error as Error)?.message || 'unknown'
+      );
       return [];
     }
   }

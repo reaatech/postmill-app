@@ -625,7 +625,10 @@ export class PinterestProvider
 
       return result;
     } catch (err) {
-      console.error('Error fetching Pinterest post analytics:', err);
+      console.error(
+        'Error fetching Pinterest post analytics:',
+        (err as Error)?.message || 'unknown'
+      );
       return [];
     }
   }
