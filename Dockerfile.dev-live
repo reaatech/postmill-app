@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-RUN npm --no-update-notifier --no-fund --global install pnpm@10.6.1
+RUN npm --no-update-notifier --no-fund --global install pnpm@10.34.4
 
 WORKDIR /app
 # Modest default heap for one-off node (prisma generate/db push). The entrypoint
