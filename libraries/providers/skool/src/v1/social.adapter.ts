@@ -233,14 +233,14 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
         }, 'create file record')
       ).json();
 
-      await fetch(createFileResponse.write_url, {
+      await this.fetch(createFileResponse.write_url, {
         method: 'PUT',
         headers: {
           'Content-Type': createFileResponse.content_type,
           'x-amz-acl': createFileResponse.acl,
         },
         body: fileBuffer,
-      });
+      }, 'upload file to storage');
 
       fileIds.push(createFileResponse.file.id);
     }

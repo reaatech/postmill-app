@@ -21,6 +21,7 @@ export const VideoOrImage: FC<{
     );
   }
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- shared wrapper for arbitrary media URLs
     <img
       className={clsx(
         isContain ? 'object-contain' : 'object-cover',
@@ -28,6 +29,7 @@ export const VideoOrImage: FC<{
         imageClassName
       )}
       src={src}
+      alt="Media preview"
     />
   );
 };

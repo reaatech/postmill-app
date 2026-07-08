@@ -1,2 +1,3 @@
 import { lumaMediaModule } from './v1';
-export default [lumaMediaModule];
+const lumaProviderModules = [lumaMediaModule];
+export default lumaProviderModules;

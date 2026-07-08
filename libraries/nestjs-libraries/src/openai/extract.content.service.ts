@@ -20,7 +20,9 @@ export class ExtractContentService {
     const dom = new JSDOM(load);
 
     // only element that has a title
-    const allTitles = Array.from(dom.window.document.querySelectorAll('*'))
+    const allTitles: Element[] = Array.from<Element>(
+      dom.window.document.querySelectorAll('*')
+    )
       .filter((f) => {
         return (
           f.querySelector('h1') ||

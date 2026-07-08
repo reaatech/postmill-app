@@ -218,6 +218,7 @@ export default function OAuthAuthorizePage() {
         <div className="bg-[#1A1919] rounded-[16px] p-[32px] flex flex-col gap-[24px]">
           <div className="flex flex-col items-center gap-[16px]">
             {appInfo.app.picture?.path ? (
+              // eslint-disable-next-line @next/next/no-img-element -- external OAuth app logo
               <img
                 src={appInfo.app.picture.path}
                 alt={appInfo.app.name}

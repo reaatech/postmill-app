@@ -1,2 +1,3 @@
 import { protonvpnVpnModule } from './v1';
-export default [protonvpnVpnModule];
+const protonvpnProviderModules = [protonvpnVpnModule];
+export default protonvpnProviderModules;

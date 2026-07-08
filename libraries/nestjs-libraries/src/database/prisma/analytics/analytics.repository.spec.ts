@@ -194,21 +194,7 @@ describe('AnalyticsRepository — org-scoped integration lookup (ANALYTICS-01)',
     });
   });
 
-  it('omits organizationId filter when not provided', async () => {
-    const integration = {
-      id: 'i1',
-      organizationId: 'org1',
-      providerIdentifier: 'x',
-    };
-    const findFirst = vi.fn().mockResolvedValue(integration);
-    const repo = makeRepo(findFirst);
 
-    await repo.findIntegrationByIdRaw('i1');
-
-    expect(findFirst).toHaveBeenCalledWith({
-      where: { id: 'i1' },
-    });
-  });
 });
 
 describe('AnalyticsRepository — batch snapshot upserts (ANALYTICS-04 / ANALYTICS-05)', () => {

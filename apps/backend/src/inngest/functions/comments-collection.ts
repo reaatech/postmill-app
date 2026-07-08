@@ -1,6 +1,6 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { CommentsActivity } from '@gitroom/nestjs-libraries/inngest/activities/comments.activity';
-import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
 import { trackRun } from './track-run';
 
 // The cron only fans out one `comments/sync-org` event per org; the per-org work runs in
@@ -10,7 +10,7 @@ import { trackRun } from './track-run';
 // retry/resume never re-fires the non-idempotent webhook/notification a second time.
 export const createCommentsCollection = (
   commentsActivity: CommentsActivity,
-  runRepo: InngestRunRepository
+  runRepo: InngestRunService
 ) =>
   inngest.createFunction(
     { id: 'comments-collection', concurrency: 1 },
@@ -60,9 +60,17 @@ export const createCommentsSyncOrg = (commentsActivity: CommentsActivity) =>
     async ({ step, event }) => {
       const { organizationId, daysBack } = event.data;
 
-      await step.run('sync-comments', () =>
-        commentsActivity.syncPostComments(organizationId, daysBack)
-      );
+      // I-04: checkpoint each comment-sync page in its own durable step so a
+      // retry/resume resumes from the last completed page instead of restarting
+      // the entire org sweep.
+      let cursor: string | undefined;
+      do {
+        const result = await step.run(
+          `sync-comments-page-${cursor ?? 'start'}`,
+          () => commentsActivity.syncPostCommentsPage(organizationId, daysBack, cursor)
+        );
+        cursor = result.nextCursor;
+      } while (cursor);
       await step
         .run('dispatch-webhook', () =>
           commentsActivity.dispatchWebhookForComments(organizationId, daysBack)

@@ -1,2 +1,3 @@
 import { linodeStorageModule } from './v1';
-export default [linodeStorageModule];
+const linodeProviderModules = [linodeStorageModule];
+export default linodeProviderModules;

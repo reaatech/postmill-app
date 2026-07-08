@@ -5,7 +5,7 @@ import { LoginUserDto } from '@gitroom/nestjs-libraries/dtos/auth/login.user.dto
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { AuthService as AuthChecker } from '@gitroom/helpers/auth/auth.service';
-import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
+import { ProvidersManager } from '@gitroom/backend/services/auth/providers/providers.manager';
 import dayjs from 'dayjs';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
@@ -19,7 +19,7 @@ export class AuthService {
     private _userService: UsersService,
     private _organizationService: OrganizationService,
     private _notificationService: NotificationService,
-    private _providerManager: AuthProviderManager
+    private _providerManager: ProvidersManager
   ) {}
 
   private generateRefreshToken(): string {

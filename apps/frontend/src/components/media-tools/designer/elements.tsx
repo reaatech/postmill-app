@@ -326,7 +326,6 @@ const ImageNode: FC<ImageNodeProps> = ({ element, onSelect, onContextMenu }) => 
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const [filterKey, setFilterKey] = useState(0);
   const [isTransforming, setIsTransforming] = useState(false);
-  const wasTransformingRef = useRef(false);
 
   let crop: { x: number; y: number; width: number; height: number } | undefined;
   if (element.crop) {
@@ -391,13 +390,6 @@ const ImageNode: FC<ImageNodeProps> = ({ element, onSelect, onContextMenu }) => 
     // cache) re-triggers the cache pass — otherwise the node was cached empty and
     // stays permanently blank.
   }, [element.filters, element.width, element.height, isTransforming, image]);
-
-  useEffect(() => {
-    if (wasTransformingRef.current && !isTransforming) {
-      setFilterKey((k) => k + 1);
-    }
-    wasTransformingRef.current = isTransforming;
-  }, [isTransforming]);
 
   useEffect(() => {
     const node = imageRef.current;
@@ -511,7 +503,11 @@ const ImageNode: FC<ImageNodeProps> = ({ element, onSelect, onContextMenu }) => 
         onContextMenu?.(element.id, e.evt.clientX, e.evt.clientY);
       }}
       onTransformStart={() => setIsTransforming(true)}
-      onTransformEnd={() => setIsTransforming(false)}
+      onTransformEnd={() => {
+        setIsTransforming(false);
+        // Re-cache filters immediately after a transform finishes.
+        setFilterKey((k) => k + 1);
+      }}
     >
       <KonvaImage
         ref={imageRef}

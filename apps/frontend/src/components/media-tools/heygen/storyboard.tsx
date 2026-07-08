@@ -181,6 +181,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               >
                 <div className="w-[40px] h-[40px] rounded-[6px] bg-newBgColor overflow-hidden flex items-center justify-center shrink-0">
                   {scene.avatar?.previewImageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external provider asset
                     <img src={scene.avatar.previewImageUrl} alt={scene.avatar.name} className="w-full h-full object-cover" />
                   ) : (
                     <span className="text-newTextColor/40 text-[18px]">＋</span>

@@ -435,6 +435,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   className="group relative aspect-square rounded-lg overflow-hidden border border-designerAccent bg-newBgColorInner"
                 >
                   {file ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external media file
                     <img
                       src={file.path}
                       alt={file.name}
@@ -478,6 +479,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                       : 'border-studioBorder hover:border-designerAccent'
                   }`}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
                   <img
                     src={file.path}
                     alt={file.name}

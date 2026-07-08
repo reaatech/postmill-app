@@ -1,2 +1,3 @@
 import { windscribeVpnModule } from './v1';
-export default [windscribeVpnModule];
+const windscribeProviderModules = [windscribeVpnModule];
+export default windscribeProviderModules;

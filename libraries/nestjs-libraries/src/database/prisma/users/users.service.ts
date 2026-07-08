@@ -2,14 +2,14 @@ import { Injectable, HttpException } from '@nestjs/common';
 import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users/users.repository';
 import { Provider } from '@prisma/client';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
-import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     private _usersRepository: UsersRepository,
-    private _organizationRepository: OrganizationRepository
+    private _organizationService: OrganizationService
   ) {}
 
   getUserByEmail(email: string) {
@@ -28,8 +28,11 @@ export class UsersService {
     return this._usersRepository.getPublicProfilesByIds(ids);
   }
 
+  // layering: route through OrganizationService because there is no DI cycle
+  // (OrganizationService does not depend on UsersService), keeping the repository
+  // boundary inside the organizations domain.
   getImpersonateUser(name: string) {
-    return this._organizationRepository.getImpersonateUser(name);
+    return this._organizationService.getImpersonateUser(name);
   }
 
   getUserByProvider(providerId: string, provider: Provider) {

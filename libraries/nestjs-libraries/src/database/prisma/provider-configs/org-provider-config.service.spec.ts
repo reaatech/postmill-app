@@ -14,6 +14,7 @@ describe('OrgProviderConfigService audit (F2c)', () => {
     repository = {
       create: vi.fn(),
       getById: vi.fn(),
+      getByOrg: vi.fn(),
       updateById: vi.fn(),
     };
     const encryption = { encrypt: (v: string) => `enc:${v}`, decrypt: (v: string) => v } as any;
@@ -170,6 +171,69 @@ describe('OrgProviderConfigService audit (F2c)', () => {
       repository.getById.mockResolvedValue(baseRow({ clientId: null }));
       const result = await service.testConnection('o1', 'cfg1');
       expect(result).toEqual({ success: false, error: 'Client ID not configured' });
+    });
+  });
+
+  describe('getDecryptedConfigs', () => {
+    it('returns every org config with decrypted secrets and normalized fields', async () => {
+      repository.getByOrg.mockResolvedValue([
+        baseRow({
+          id: 'cfg1',
+          identifier: 'twitter',
+          name: 'Twitter App',
+          version: 'v2',
+          enabled: true,
+          clientId: 'client-id',
+          clientSecret: 'client-secret',
+          additionalConfig: '{"botToken":"token"}',
+          redirectUri: 'https://example.com/cb',
+          scopes: 'read,write',
+          setupNotes: 'notes',
+          vpnSelection: JSON.stringify({ enabled: true, identifier: 'nord', regionId: 'us' }),
+        }),
+        baseRow({
+          id: 'cfg2',
+          identifier: 'linkedin',
+          name: 'LinkedIn App',
+          version: null,
+          enabled: false,
+          clientId: null,
+          clientSecret: null,
+          additionalConfig: null,
+          redirectUri: null,
+          scopes: null,
+          setupNotes: null,
+          vpnSelection: null,
+        }),
+      ]);
+
+      const result = await service.getDecryptedConfigs('o1');
+
+      expect(repository.getByOrg).toHaveBeenCalledWith('o1');
+      expect(result).toHaveLength(2);
+
+      const [first, second] = result;
+      expect(first.id).toBe('cfg1');
+      expect(first.identifier).toBe('twitter');
+      expect(first.version).toBe('v2');
+      expect(first.enabled).toBe(true);
+      expect(first.clientId).toBe('client-id');
+      expect(first.clientSecret).toBe('client-secret');
+      expect(first.additionalConfig).toBe('{"botToken":"token"}');
+      expect(first.redirectUri).toBe('https://example.com/cb');
+      expect(first.scopes).toBe('read,write');
+      expect(first.setupNotes).toBe('notes');
+      expect(first.vpnSelection).toEqual({ enabled: true, identifier: 'nord', regionId: 'us' });
+
+      expect(second.id).toBe('cfg2');
+      expect(second.version).toBe('v1');
+      expect(second.enabled).toBe(false);
+      expect(second.clientId).toBeUndefined();
+      expect(second.clientSecret).toBeUndefined();
+      expect(second.redirectUri).toBeUndefined();
+      expect(second.scopes).toBeUndefined();
+      expect(second.setupNotes).toBeUndefined();
+      expect(second.vpnSelection).toBeNull();
     });
   });
 });

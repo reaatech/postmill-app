@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useMemo, useState } from 'react';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { ReactTags } from 'react-tag-autocomplete';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -17,7 +17,9 @@ export const MediumTags: FC<{
 }> = (props) => {
   const { onChange, name, label } = props;
   const { getValues } = useSettings();
-  const [tagValue, setTagValue] = useState<any[]>([]);
+  const [tagValue, setTagValue] = useState<any[]>(
+    () => getValues()[props.name] || []
+  );
   const [suggestions, setSuggestions] = useState<string>('');
   const t = useT();
 
@@ -50,12 +52,7 @@ export const MediumTags: FC<{
     },
     [tagValue]
   );
-  useEffect(() => {
-    const settings = getValues()[props.name];
-    if (settings) {
-      setTagValue(settings);
-    }
-  }, []);
+
   const suggestionsArray = useMemo(() => {
     return [
       ...tagValue,

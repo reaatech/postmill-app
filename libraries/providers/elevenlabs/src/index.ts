@@ -1,2 +1,3 @@
 import { elevenlabsMediaModule } from './v1';
-export default [elevenlabsMediaModule];
+const elevenlabsProviderModules = [elevenlabsMediaModule];
+export default elevenlabsProviderModules;

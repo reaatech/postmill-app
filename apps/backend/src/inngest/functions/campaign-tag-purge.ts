@@ -1,6 +1,6 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { CampaignActivity } from '@gitroom/nestjs-libraries/inngest/activities/campaign.activity';
-import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
 import { trackRun } from './track-run';
 
 function getPurgeDays(): number {
@@ -12,7 +12,7 @@ function getPurgeDays(): number {
 
 export const createCampaignTagPurge = (
   campaignActivity: CampaignActivity,
-  runRepo: InngestRunRepository
+  runRepo: InngestRunService
 ) =>
   inngest.createFunction(
     { id: 'campaign-tag-purge' },

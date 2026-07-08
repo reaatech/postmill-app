@@ -6,9 +6,9 @@ import { Select } from '@gitroom/react/form/select';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
-export const WhopExperienceSelect: FC<{
+const WhopExperienceSelectInner: FC<{
   name: string;
-  companyId: string | undefined;
+  companyId: string;
   onChange: (event: {
     target: {
       value: string;
@@ -23,7 +23,7 @@ export const WhopExperienceSelect: FC<{
   const { getValues } = useSettings();
   const [currentExperience, setCurrentExperience] = useState<
     string | undefined
-  >();
+  >(() => getValues()[name]);
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -34,22 +34,11 @@ export const WhopExperienceSelect: FC<{
     onChange(event);
   };
   useEffect(() => {
-    if (!companyId) {
-      setExperiences([]);
-      setCurrentExperience(undefined);
-      return;
-    }
     customFunc
       .get('experiences', { id: companyId })
       .then((data) => setExperiences(data));
-  }, [companyId]);
-  useEffect(() => {
-    const settings = getValues()[name];
-    if (settings) {
-      setCurrentExperience(settings);
-    }
-  }, []);
-  if (!companyId || !experiences.length) {
+  }, [companyId, customFunc]);
+  if (!experiences.length) {
     return null;
   }
   return (
@@ -66,5 +55,29 @@ export const WhopExperienceSelect: FC<{
         </option>
       ))}
     </Select>
+  );
+};
+
+export const WhopExperienceSelect: FC<{
+  name: string;
+  companyId: string | undefined;
+  onChange: (event: {
+    target: {
+      value: string;
+      name: string;
+    };
+  }) => void;
+}> = (props) => {
+  // Remount the inner selector whenever the parent company changes so the
+  // experience list and current value reset without effect-derived setState.
+  if (!props.companyId) {
+    return null;
+  }
+  return (
+    <WhopExperienceSelectInner
+      key={props.companyId}
+      {...props}
+      companyId={props.companyId}
+    />
   );
 };

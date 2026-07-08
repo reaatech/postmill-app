@@ -96,8 +96,6 @@ tags:
     description: Reusable channel/setting sets.
   - name: Notifications
     description: In-app notifications.
-  - name: Third Party
-    description: Non-social third-party integrations (media generators, etc.).
   - name: OAuth
     description: OAuth2 authorization-code provider (authorize / approve / token).
   - name: OAuth App
@@ -2653,82 +2651,6 @@ paths:
       operationId: notificationsList
       responses: { '200': { description: Notifications } }
 
-  # ===================================================================== THIRD PARTY
-  /third-party/list:
-    get:
-      tags: [Third Party]
-      summary: List available third-party integrations
-      operationId: getThirdPartyList
-      responses: { '200': { description: Catalog } }
-
-  /third-party:
-    get:
-      tags: [Third Party]
-      summary: List saved third-party integrations
-      operationId: getSavedThirdParty
-      responses: { '200': { description: Saved integrations } }
-
-  /third-party/{id}:
-    delete:
-      tags: [Third Party]
-      summary: Delete a saved third-party integration
-      operationId: deleteThirdParty
-      parameters: [{ $ref: '#/components/parameters/PathId' }]
-      responses: { '200': { description: Deleted } }
-
-  /third-party/{id}/submit:
-    post:
-      tags: [Third Party]
-      summary: Generate media via a third-party integration
-      operationId: thirdPartySubmit
-      parameters: [{ $ref: '#/components/parameters/PathId' }]
-      requestBody:
-        content: { application/json: { schema: { type: object, additionalProperties: true } } }
-      responses:
-        '200': { description: Saved media }
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  /third-party/{id}/import:
-    post:
-      tags: [Third Party]
-      summary: Import media from a third-party integration
-      operationId: thirdPartyImport
-      parameters: [{ $ref: '#/components/parameters/PathId' }]
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ImportMediaDto' } } }
-      responses:
-        '200': { description: Imported media list }
-        '400': { description: Import not supported }
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  /third-party/function/{id}/{functionName}:
-    post:
-      tags: [Third Party]
-      summary: Call a third-party integration function
-      operationId: thirdPartyFunction
-      parameters:
-        - { $ref: '#/components/parameters/PathId' }
-        - { name: functionName, in: path, required: true, schema: { type: string } }
-      requestBody:
-        content: { application/json: { schema: { type: object, additionalProperties: true } } }
-      responses:
-        '200': { description: Function result }
-        '404': { $ref: '#/components/responses/NotFound' }
-
-  /third-party/{identifier}:
-    post:
-      tags: [Third Party]
-      summary: Connect a third-party integration via API key
-      operationId: addThirdPartyApiKey
-      parameters: [{ $ref: '#/components/parameters/PathIdentifier' }]
-      requestBody:
-        required: true
-        content: { application/json: { schema: { type: object, properties: { api: { type: string } } } } }
-      responses:
-        '200': { description: Connected, content: { application/json: { schema: { type: object, properties: { id: { type: string } } } } } }
-        '400': { description: Invalid identifier / API key / already exists }
-
   # ===================================================================== OAUTH (provider)
   /oauth/authorize:
     get:
@@ -4078,21 +4000,6 @@ components:
       properties:
         content: { type: string }
         autoAdd: { type: boolean }
-
-    # ---------- Third party ----------
-    ImportMediaDto:
-      type: object
-      required: [items]
-      properties:
-        items:
-          type: array
-          minItems: 1
-          items:
-            type: object
-            required: [url, name]
-            properties:
-              url: { type: string, format: uri, description: SSRF-validated }
-              name: { type: string }
 
     # ---------- OAuth ----------
     ApproveOAuthDto:

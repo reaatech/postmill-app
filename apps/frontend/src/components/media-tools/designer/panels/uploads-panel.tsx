@@ -416,6 +416,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
               className="group rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
             >
               <div className="aspect-[4/3] relative overflow-hidden bg-studioBorder/10">
+                {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
                 <img
                   src={file.path}
                   alt={file.name}
@@ -458,6 +459,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
                 onClick={() => addStickerClip(file)}
                 className="group aspect-square rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
                 <img
                   src={file.path}
                   alt={file.name}

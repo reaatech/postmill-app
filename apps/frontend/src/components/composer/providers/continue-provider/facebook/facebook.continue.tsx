@@ -39,6 +39,7 @@ export const FacebookContinue = withContinueProvider<FacebookItem, string>({
   renderItem: (item) => (
     <>
       <div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- external social profile picture */}
         <img className="w-full" src={item.picture.data.url} alt="profile" />
       </div>
       <div>{item.name}</div>

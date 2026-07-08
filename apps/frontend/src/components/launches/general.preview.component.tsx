@@ -63,6 +63,7 @@ export const GeneralPreviewComponent: FC<{
           >
             <div className="min-w-[40px] h-[40px] min-h-[40px] w-[40px] flex flex-col items-center">
               <div className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
                 <img
                   src={
                     current === 'global'

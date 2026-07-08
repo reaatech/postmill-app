@@ -50,6 +50,7 @@ export const AvatarPicker: FC<AvatarPickerProps> = ({ avatars, selectedId, onSel
             >
               <div className="aspect-[3/4] bg-newBgColorInner overflow-hidden">
                 {a.previewImageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external provider asset
                   <img src={a.previewImageUrl} alt={a.name} className="w-full h-full object-cover" loading="lazy" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-newTextColor/30 text-[24px]">

@@ -116,6 +116,7 @@ const rootPost = (over: any = {}) => ({
   organizationId: 'org-1',
   state: 'QUEUE',
   publishDate: new Date(Date.now() - 1000).toISOString(),
+  createdAt: new Date('2026-07-01T00:00:00.000Z'),
   settings: JSON.stringify({}),
   intervalInDays: null,
   integration: {
@@ -383,9 +384,10 @@ describe('runPostPublish handler', () => {
   });
 
   it('4.4f — repeat-post uses a deterministic id and carries repeat:true', async () => {
+    const post = rootPost({ intervalInDays: 1 });
     const activity = makeActivity({
-      getPost: vi.fn(async () => rootPost({ intervalInDays: 1 })),
-      getPostsList: vi.fn(async () => [rootPost({ intervalInDays: 1 })]),
+      getPost: vi.fn(async () => post),
+      getPostsList: vi.fn(async () => [post]),
     });
     const handler = getHandler(activity);
     const step = makeStep();
@@ -398,7 +400,32 @@ describe('runPostPublish handler', () => {
       any
     ];
     expect(payload.id).toMatch(/^post_post-1_repeat_0_\d+$/);
+    expect(payload.id).toBe(`post_post-1_repeat_0_${post.createdAt.getTime()}`);
     expect(payload.data.repeat).toBe(true);
     expect(payload.data.postNow).toBe(true);
+  });
+
+  it('4.4f — repeat-post id is stable across re-executions', async () => {
+    const post = rootPost({ intervalInDays: 1 });
+    const activity = makeActivity({
+      getPost: vi.fn(async () => post),
+      getPostsList: vi.fn(async () => [post]),
+    });
+    const handler = getHandler(activity);
+    const event = runEvent();
+
+    const run = async () => {
+      const step = makeStep();
+      await handler({ step, event });
+      const [, payload] = step.sendEvent.mock.calls[0] as unknown as [
+        unknown,
+        any
+      ];
+      return payload.id;
+    };
+
+    const firstId = await run();
+    const secondId = await run();
+    expect(firstId).toBe(secondId);
   });
 });

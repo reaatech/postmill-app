@@ -73,7 +73,6 @@ const SaveSetModal: FC<{
           disableForm
           onChange={(e) => setName(e.target.value)}
           placeholder="Enter a name for this set"
-          autoFocus
         />
       </div>
       <div className="flex gap-2 justify-end">
@@ -259,6 +258,7 @@ export const Sets: FC = () => {
                 {media.length > 0 ? (
                   <div className="flex items-center -space-x-[10px] shrink-0">
                     {media.slice(0, 3).map((m, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element -- external media thumbnail
                       <img
                         key={m.id || i}
                         src={m.thumbnail || m.path}
@@ -291,6 +291,7 @@ export const Sets: FC = () => {
                       <div className="flex items-center -space-x-[6px]">
                         {channels.slice(0, 6).map((c: any) => (
                           c?.picture ? (
+                            // eslint-disable-next-line @next/next/no-img-element -- external channel avatar
                             <img
                               key={c.id}
                               src={c.picture}

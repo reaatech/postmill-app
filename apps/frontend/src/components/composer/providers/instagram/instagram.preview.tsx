@@ -46,12 +46,13 @@ export const InstagramPreview: FC<{
       }) +
       `</mark>`;
 
-    return { text: finalValue, images: p.image };
+    return { text: finalValue, images: p.image, id: p.id };
   });
   return (
     <div className="py-[10px] flex flex-col px-[15px] w-full gap-[10px] bg-bgInstagram rounded-[12px]">
       <div className="flex gap-[10px] items-center">
         <div className="w-[36px] h-[36px]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
             alt="social"
@@ -65,9 +66,9 @@ export const InstagramPreview: FC<{
       {!!renderContent?.[0]?.images?.length ? (
         <SliderComponent
           className="h-[585px] rounded-[8px] overflow-hidden"
-          list={renderContent?.[0]?.images.map((image, index) => (
+          list={renderContent?.[0]?.images.map((image) => (
             <a
-              key={`image_${index}`}
+              key={image.id}
               className="flex-1"
               href={mediaDir.set(image.path)}
               target="_blank"
@@ -167,10 +168,11 @@ export const InstagramPreview: FC<{
       </div>
       {renderContent.length > 1 && (
         <>
-          {renderContent.slice(1).map((value, index) => (
-            <div key={index} className="flex flex-col gap-[12px]">
+          {renderContent.slice(1).map((value) => (
+            <div key={value.id ?? value.text} className="flex flex-col gap-[12px]">
               <div className="flex gap-[10px] leading-[17px]">
                 <div className="h-[34px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
                   <img
                     src={integration?.picture || '/no-picture.jpg'}
                     alt="social"

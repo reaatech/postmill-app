@@ -4,6 +4,7 @@ import { Integrations } from '@gitroom/frontend/components/launches/calendar.con
 import { useMoveToIntegrationListener } from '@gitroom/frontend/components/launches/helpers/use.move.to.integration';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import clsx from 'clsx';
+import Image from 'next/image';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
 import { PickPlatformCopilotBridge } from '@gitroom/frontend/components/launches/copilot-bridges';
@@ -242,11 +243,13 @@ export const PickPlatforms: FC<{
                           height={32}
                         />
                         {integration.identifier === 'youtube' ? (
-                          <img
+                          <Image
                             alt="YouTube"
                             src="/icons/platforms/youtube.svg"
                             className="absolute z-10 bottom-0 -end-[5px]"
                             width={20}
+                            height={20}
+                            unoptimized
                           />
                         ) : (
                           <SafeImage
@@ -274,6 +277,7 @@ export const PickPlatforms: FC<{
                       >
                         <div className="flex items-center justify-center gap-[10px]">
                           <div className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
                             <img
                               src={integration.picture || '/no-picture.jpg'}
                               className="rounded-full"

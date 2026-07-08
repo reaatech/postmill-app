@@ -155,8 +155,9 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-newTextColor/70">Size:</label>
+          <label htmlFor="mask-brush-size" className="text-xs text-newTextColor/70">Size:</label>
           <input
+            id="mask-brush-size"
             type="range"
             min="5"
             max="100"

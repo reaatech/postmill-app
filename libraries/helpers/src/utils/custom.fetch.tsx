@@ -5,7 +5,6 @@ import {
   FC,
   ReactNode,
   useContext,
-  useRef,
   useState,
 } from 'react';
 import { customFetch, Params } from './custom.fetch.func';
@@ -29,13 +28,16 @@ export const FetchWrapperComponent: FC<Params & { children: ReactNode }> = (
 ) => {
   const { children, ...params } = props;
   const { isSecured } = useVariables();
+  // Build once per mount; params/isSecured are expected to be stable across
+  // renders for this provider. useState with an initializer avoids recreating
+  // the fetch function and avoids reading a ref value during render.
   // @ts-ignore
-  const fetchData = useRef(
+  const [fetchData] = useState(() =>
     customFetch(params, undefined, undefined, isSecured)
   );
   return (
     // @ts-ignore
-    <FetchProvider.Provider value={fetchData.current}>
+    <FetchProvider.Provider value={fetchData}>
       {children}
     </FetchProvider.Provider>
   );

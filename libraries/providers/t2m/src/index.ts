@@ -1,2 +1,3 @@
 import { t2mShortlinkModule } from './v1';
-export default [t2mShortlinkModule];
+const t2mProviderModules = [t2mShortlinkModule];
+export default t2mProviderModules;

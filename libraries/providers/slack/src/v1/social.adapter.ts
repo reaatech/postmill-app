@@ -95,7 +95,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
     this.checkScopes(this.scopes, scope.split(','));
 
     const { user } = await (
-      await fetch(`https://slack.com/api/users.info?user=${bot_user_id}`, {
+      await this.fetch(`https://slack.com/api/users.info?user=${bot_user_id}`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${access_token}`,
@@ -120,7 +120,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
   })
   async channels(accessToken: string, params: any, id: string) {
     const list = await (
-      await fetch(
+      await this.fetch(
         `https://slack.com/api/conversations.list?types=public_channel,private_channel`,
         {
           method: 'GET',
@@ -147,7 +147,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
     const channel = firstPost.settings.channel;
 
     // Join the channel first
-    await fetch(`https://slack.com/api/conversations.join`, {
+    await this.fetch(`https://slack.com/api/conversations.join`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -160,7 +160,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
 
     // Post the main message
     const { ts, channel: responseChannel } = await (
-      await fetch(`https://slack.com/api/chat.postMessage`, {
+      await this.fetch(`https://slack.com/api/chat.postMessage`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -192,7 +192,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
 
     // Get permalink for the message
     const { permalink } = await (
-      await fetch(
+      await this.fetch(
         `https://slack.com/api/chat.getPermalink?channel=${responseChannel}&message_ts=${ts}`,
         {
           method: 'GET',
@@ -227,7 +227,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
 
     // Post the threaded reply
     const { ts, channel: responseChannel } = await (
-      await fetch(`https://slack.com/api/chat.postMessage`, {
+      await this.fetch(`https://slack.com/api/chat.postMessage`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -260,7 +260,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
 
     // Get permalink for the comment
     const { permalink } = await (
-      await fetch(
+      await this.fetch(
         `https://slack.com/api/chat.getPermalink?channel=${responseChannel}&message_ts=${ts}`,
         {
           method: 'GET',
@@ -299,7 +299,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
         url += `&cursor=${cursor}`;
       }
 
-      const response = await fetch(url, {
+      const response = await this.fetch(url, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -340,7 +340,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
   ): Promise<SocialCommentDTO> {
     try {
       const channel = id;
-      const response = await fetch(`https://slack.com/api/chat.postMessage`, {
+      const response = await this.fetch(`https://slack.com/api/chat.postMessage`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,

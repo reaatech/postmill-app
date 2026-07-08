@@ -14,59 +14,29 @@ const makeAdapter = (
 });
 
 describe('EmailAdapterRegistry', () => {
-  let registry: EmailAdapterRegistry;
+  // 4.9: getActiveAdapter resolves through ProviderResolutionService.resolveEmail
+  // (kernel + telemetry proxy). Build a minimal fake resolution that maps
+  // provider ids to the supplied adapters and throws on unknown ids (as the real
+  // resolveForRead does for a missing provider).
+  const makeResolution = (adapters: Record<string, EmailAdapter>) => ({
+    resolveEmail: vi.fn((id: string) => {
+      if (!adapters[id]) throw new Error(`not found: ${id}`);
+      return adapters[id];
+    }),
+  });
+
+  const buildRegistry = (adapters: Record<string, EmailAdapter>) =>
+    new EmailAdapterRegistry(makeResolution(adapters) as any);
 
   beforeEach(() => {
     delete process.env.EMAIL_PROVIDER;
-    registry = new EmailAdapterRegistry();
   });
 
   afterEach(() => {
     delete process.env.EMAIL_PROVIDER;
   });
 
-  describe('register', () => {
-    it('adds an adapter to the map', () => {
-      const adapter = makeAdapter('mailgun');
-
-      registry.register(adapter);
-
-      expect(registry.getAdapter('mailgun')).toBe(adapter);
-    });
-  });
-
-  describe('getAdapter', () => {
-    it('returns the registered adapter by name', () => {
-      const adapter = makeAdapter('mailgun');
-      registry.register(adapter);
-
-      const result = registry.getAdapter('mailgun');
-
-      expect(result).toBe(adapter);
-    });
-
-    it('returns undefined for unknown name', () => {
-      const result = registry.getAdapter('nonexistent');
-
-      expect(result).toBeUndefined();
-    });
-  });
-
   describe('getActiveAdapter', () => {
-    // 4.9: getActiveAdapter resolves through ProviderResolutionService.resolveEmail
-    // (kernel + telemetry proxy). Build a minimal fake resolution that maps
-    // provider ids to the supplied adapters and throws on unknown ids (as the real
-    // resolveForRead does for a missing provider).
-    const makeResolution = (adapters: Record<string, EmailAdapter>) => ({
-      resolveEmail: vi.fn((id: string) => {
-        if (!adapters[id]) throw new Error(`not found: ${id}`);
-        return adapters[id];
-      }),
-    });
-
-    const buildRegistry = (adapters: Record<string, EmailAdapter>) =>
-      new EmailAdapterRegistry(makeResolution(adapters) as any);
-
     it('resolves email through ProviderResolutionService.resolveEmail (telemetry-wrapped)', () => {
       const mailgun = makeAdapter('mailgun');
       const empty = makeAdapter('empty');
@@ -130,21 +100,6 @@ describe('EmailAdapterRegistry', () => {
       const result = reg.getActiveAdapter();
 
       expect(result).toBe(empty);
-    });
-  });
-
-  describe('list', () => {
-    it('returns all registered adapters', () => {
-      const mailgun = makeAdapter('mailgun');
-      const empty = makeAdapter('empty');
-      registry.register(mailgun);
-      registry.register(empty);
-
-      const result = registry.list();
-
-      expect(result).toHaveLength(2);
-      expect(result).toContain(mailgun);
-      expect(result).toContain(empty);
     });
   });
 });

@@ -1,2 +1,3 @@
 import { groqAiModule, groqMediaModule } from './v1';
-export default [groqAiModule, groqMediaModule];
+const groqProviderModules = [groqAiModule, groqMediaModule];
+export default groqProviderModules;

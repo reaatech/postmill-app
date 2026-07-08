@@ -1,2 +1,3 @@
 import { emptyEmailModule } from './v1';
-export default [emptyEmailModule];
+const emptyProviderModules = [emptyEmailModule];
+export default emptyProviderModules;

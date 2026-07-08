@@ -1,2 +1,3 @@
 import { didMediaModule } from './v1';
-export default [didMediaModule];
+const didProviderModules = [didMediaModule];
+export default didProviderModules;

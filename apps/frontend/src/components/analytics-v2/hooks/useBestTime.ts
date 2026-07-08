@@ -61,14 +61,16 @@ export const useBestTime = (integrations?: string[], integration?: string) => {
     params.set('integrations', integrations.join(','));
   }
 
+  const paramsKey = params.toString();
+
   const load = useCallback(async () => {
-    const res = await fetch(`/analytics/v2/best-time?${params.toString()}`);
+    const res = await fetch(`/analytics/v2/best-time?${paramsKey}`);
     if (!res.ok) throw new Error('Failed to load best time data');
     return res.json();
-  }, [fetch, params.toString()]);
+  }, [fetch, paramsKey]);
 
   const { data, error, isLoading } = useSWR<BestTimeResponse>(
-    `best-time-${params.toString()}`,
+    `best-time-${paramsKey}`,
     load,
     { revalidateOnFocus: false, revalidateOnReconnect: false }
   );

@@ -76,7 +76,6 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { normalizeMetric } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
 import { timer } from '@gitroom/helpers/utils/timer';
 import type { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
-import type { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
 import type { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import type { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 
@@ -126,6 +125,7 @@ describe('AnalyticsActivity', () => {
       listAnomalies: vi.fn().mockResolvedValue([]),
       getEnabledAlertRules: vi.fn().mockResolvedValue([]),
       updateAlertRule: vi.fn().mockResolvedValue({ count: 1 }),
+      updateAlertRulesLastFiredAt: vi.fn().mockResolvedValue({ count: 1 }),
     };
 
     integrationManager = {
@@ -172,9 +172,6 @@ describe('AnalyticsActivity', () => {
       {
         getActiveProvider: vi.fn().mockResolvedValue(null),
       } as unknown as OrgShortLinkSettingsService,
-      {
-        getByOrg: vi.fn().mockResolvedValue([]),
-      } as unknown as OrgShortLinkSettingsRepository,
       {
         resolveShortLink: vi.fn().mockReturnValue(null),
       } as unknown as ProviderResolutionService,
@@ -273,7 +270,23 @@ describe('AnalyticsActivity', () => {
 
       expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledTimes(1);
       expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith(
-        'facebook'
+        'facebook',
+        undefined
+      );
+    });
+
+    it('threads the pinned providerVersion into getSocialIntegrationUnchecked (I-03)', async () => {
+      const integrations = [
+        buildIntegration({ providerVersion: 'v2' }),
+      ];
+      (integrationService.getIntegrationsList as any).mockResolvedValue(integrations);
+      (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(stubProvider());
+
+      await activity.collectChannelSnapshots(orgId, daysBack);
+
+      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith(
+        'facebook',
+        'v2'
       );
     });
 
@@ -787,8 +800,32 @@ describe('AnalyticsActivity', () => {
       await activity.collectPostSnapshots(orgId, daysBack);
 
       expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledTimes(2);
-      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('instagram');
-      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('tiktok');
+      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('instagram', undefined);
+      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('tiktok', undefined);
+    });
+
+    it('threads the pinned providerVersion into getSocialIntegrationUnchecked (I-03)', async () => {
+      const posts = [
+        buildPost({
+          integration: {
+            providerIdentifier: 'instagram',
+            providerVersion: 'v2',
+            tokenExpiration: null,
+          },
+        }),
+      ];
+      const provider = stubProvider();
+      provider.postAnalytics.mockResolvedValue([]);
+
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
+      (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
+
+      await activity.collectPostSnapshots(orgId, daysBack);
+
+      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith(
+        'instagram',
+        'v2'
+      );
     });
 
     it('skips providers without postAnalytics method', async () => {
@@ -1023,6 +1060,7 @@ describe('AnalyticsActivity', () => {
   // ---------------------------------------------------------------------------
   describe('backfillIntegration', () => {
     const integrationId = 'int-1';
+    const organizationId = 'org-1';
 
     const buildIntegration = (overrides: Record<string, any> = {}): Record<string, any> => ({
       id: integrationId,
@@ -1051,7 +1089,7 @@ describe('AnalyticsActivity', () => {
     it('calls ensureFresh on ProviderConfigManager for the integration org', async () => {
       (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(buildIntegration());
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       // Per-tenant refresh needs the org id, so it runs after the integration
       // is loaded — and is skipped entirely when the integration is absent.
@@ -1062,17 +1100,18 @@ describe('AnalyticsActivity', () => {
     it('fetches integration by ID', async () => {
       (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(null);
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(analyticsRepository.findIntegrationByIdRaw).toHaveBeenCalledWith(
-        integrationId
+        integrationId,
+        organizationId
       );
     });
 
     it('returns early when integration is not found', async () => {
       (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(null);
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
       expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
@@ -1081,9 +1120,25 @@ describe('AnalyticsActivity', () => {
     it('returns early when integration type is not social', async () => {
       (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(buildIntegration({ type: 'article' }));
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
+    });
+
+    it('threads the pinned providerVersion into getSocialIntegrationUnchecked (I-03)', async () => {
+      const integration = buildIntegration({ providerVersion: 'v2' });
+      const provider = stubProvider();
+      provider.analytics.mockResolvedValue([]);
+
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
+      (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
+
+      await activity.backfillIntegration({ integrationId, organizationId });
+
+      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith(
+        'facebook',
+        'v2'
+      );
     });
 
     it('returns early when provider has no analytics method', async () => {
@@ -1092,7 +1147,7 @@ describe('AnalyticsActivity', () => {
         stubProvider({ analytics: undefined })
       );
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
@@ -1101,7 +1156,7 @@ describe('AnalyticsActivity', () => {
       (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(buildIntegration());
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(null);
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
@@ -1114,7 +1169,7 @@ describe('AnalyticsActivity', () => {
       (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'fb-token', 90, expect.anything());
     });
@@ -1131,7 +1186,7 @@ describe('AnalyticsActivity', () => {
         accessToken: 'refreshed-backfill',
       });
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(refreshIntegrationService.refresh).toHaveBeenCalledWith(integration);
       expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'refreshed-backfill', 90, expect.anything());
@@ -1146,7 +1201,7 @@ describe('AnalyticsActivity', () => {
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (refreshIntegrationService.refresh as any).mockResolvedValue(null);
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(provider.analytics).not.toHaveBeenCalled();
     });
@@ -1163,7 +1218,7 @@ describe('AnalyticsActivity', () => {
         accessToken: 'refreshed-backfill',
       });
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(timer).toHaveBeenCalledWith(10000);
     });
@@ -1183,7 +1238,7 @@ describe('AnalyticsActivity', () => {
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (normalizeMetric as any).mockReturnValue('impressions');
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledWith([
         expect.objectContaining({
@@ -1212,7 +1267,7 @@ describe('AnalyticsActivity', () => {
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (normalizeMetric as any).mockReturnValue('impressions');
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledTimes(1);
       expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledWith([
@@ -1230,7 +1285,7 @@ describe('AnalyticsActivity', () => {
         new RefreshToken('fb-page-1', '{}', 'body', 'Token expired')
       );
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(Logger.prototype.error).not.toHaveBeenCalled();
       expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
@@ -1244,7 +1299,7 @@ describe('AnalyticsActivity', () => {
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       provider.analytics.mockRejectedValue(new Error('Backfill API error'));
 
-      await activity.backfillIntegration(integrationId);
+      await activity.backfillIntegration({ integrationId, organizationId });
 
       expect(Logger.prototype.error).toHaveBeenCalledWith(
         expect.stringContaining('Error backfilling int-1'),
@@ -1643,11 +1698,9 @@ describe('AnalyticsActivity', () => {
       expect(ruleRow.integrationId).toBe('i1');
       expect(ruleRow.metric).toBe('followers');
       expect(ruleRow.direction).toBe('spike');
-      expect(analyticsRepository.updateAlertRule).toHaveBeenCalledWith(
-        'org-1',
-        'rule-1',
-        { lastFiredAt: expect.any(Date) },
-      );
+      expect(
+        analyticsRepository.updateAlertRulesLastFiredAt
+      ).toHaveBeenCalledWith('org-1', ['rule-1'], expect.any(Date));
       expect(notificationService.notifyAnalyticsAnomaly).toHaveBeenCalledTimes(1);
     });
 
@@ -1729,11 +1782,9 @@ describe('AnalyticsActivity', () => {
       // exactly one notification
       expect(notificationService.notifyAnalyticsAnomaly).toHaveBeenCalledTimes(1);
       // the rule still stamps lastFiredAt
-      expect(analyticsRepository.updateAlertRule).toHaveBeenCalledWith(
-        'org-1',
-        'rule-42',
-        { lastFiredAt: expect.any(Date) }
-      );
+      expect(
+        analyticsRepository.updateAlertRulesLastFiredAt
+      ).toHaveBeenCalledWith('org-1', ['rule-42'], expect.any(Date));
     });
   });
 

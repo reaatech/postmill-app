@@ -1,3 +1,4 @@
 export * from './v1';
 import { tumblrSocialModule } from './v1';
-export default [tumblrSocialModule];
+const tumblrProviderModules = [tumblrSocialModule];
+export default tumblrProviderModules;

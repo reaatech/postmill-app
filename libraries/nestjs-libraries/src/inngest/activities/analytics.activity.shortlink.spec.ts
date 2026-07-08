@@ -39,27 +39,16 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/emails/email-log.service', ()
 }));
 
 const mockGetActiveProvider = vi.fn();
+const mockGetLinksForOrg = vi.fn();
+const mockUpsertSnapshotsBatch = vi.fn();
+const mockPruneSnapshots = vi.fn();
 
 vi.mock(
   '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service',
   () => ({
     OrgShortLinkSettingsService: class {
       getActiveProvider = mockGetActiveProvider;
-    },
-  }),
-);
-
-const mockGetLinksForOrg = vi.fn();
-const mockUpsertSnapshotFull = vi.fn();
-const mockUpsertSnapshotsBatch = vi.fn();
-const mockPruneSnapshots = vi.fn();
-
-vi.mock(
-  '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository',
-  () => ({
-    OrgShortLinkSettingsRepository: class {
       getLinksForOrg = mockGetLinksForOrg;
-      upsertSnapshotFull = mockUpsertSnapshotFull;
       upsertSnapshotsBatch = mockUpsertSnapshotsBatch;
       pruneSnapshots = mockPruneSnapshots;
     },
@@ -109,10 +98,9 @@ function stubAdapter(overrides: Record<string, any> = {}) {
 
 describe('AnalyticsActivity — short-link snapshots', () => {
   let activity: AnalyticsActivity;
-  let shortLinkSettingsService: { getActiveProvider: ReturnType<typeof vi.fn> };
-  let shortLinkSettingsRepository: {
+  let shortLinkSettingsService: {
+    getActiveProvider: ReturnType<typeof vi.fn>;
     getLinksForOrg: ReturnType<typeof vi.fn>;
-    upsertSnapshotFull: ReturnType<typeof vi.fn>;
     upsertSnapshotsBatch: ReturnType<typeof vi.fn>;
     pruneSnapshots: ReturnType<typeof vi.fn>;
   };
@@ -122,17 +110,16 @@ describe('AnalyticsActivity — short-link snapshots', () => {
     vi.resetAllMocks();
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
 
-    shortLinkSettingsService = { getActiveProvider: mockGetActiveProvider };
-    shortLinkSettingsRepository = {
+    shortLinkSettingsService = {
+      getActiveProvider: mockGetActiveProvider,
       getLinksForOrg: mockGetLinksForOrg,
-      upsertSnapshotFull: mockUpsertSnapshotFull,
       upsertSnapshotsBatch: mockUpsertSnapshotsBatch,
       pruneSnapshots: mockPruneSnapshots,
     };
     resolution = { resolveShortLink: mockResolveShortLink };
 
     activity = new AnalyticsActivity(
-      {} as any, // _prisma
+      {} as any, // _analyticsRepository
       {} as any, // _integrationManager
       {} as any, // _orgProviderConfigManager
       {} as any, // _organizationService
@@ -141,7 +128,6 @@ describe('AnalyticsActivity — short-link snapshots', () => {
       {} as any, // _webhooksService
       {} as any, // _watchlistService
       shortLinkSettingsService as any,
-      shortLinkSettingsRepository as any,
       resolution as any,
       {} as any, // _emailLogService
     );

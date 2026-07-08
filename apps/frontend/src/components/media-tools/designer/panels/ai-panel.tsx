@@ -223,6 +223,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
               className="relative group rounded-[6px] overflow-hidden border border-studioBorder hover:border-designerAccent transition-all"
               title="Click to add to canvas"
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
               <img
                 src={item.path}
                 alt={item.name}

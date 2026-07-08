@@ -428,6 +428,13 @@ export const CouponInput: FC<{ autoApplyCoupon?: string }> = ({
   const [isApplying, setIsApplying] = useState(false);
   const [appliedCode, setAppliedCode] = useState<string | null>(null);
   const [showInput, setShowInput] = useState(false);
+  const couponInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showInput) {
+      couponInputRef.current?.focus();
+    }
+  }, [showInput]);
 
   const { checkout } =
     checkoutState.type === 'success' ? checkoutState : { checkout: null };
@@ -468,17 +475,18 @@ export const CouponInput: FC<{ autoApplyCoupon?: string }> = ({
     [checkout, couponCode, toaster, t]
   );
 
-  // Auto-apply coupon from backend when checkout is ready
+  // Auto-apply coupon from backend when checkout is ready. We call Stripe's
+  // applyPromotionCode directly so no React setState runs inside this effect;
+  // the resulting checkout state update surfaces through the pre-applied code.
   useEffect(() => {
     if (!autoApplyCoupon || autoAppliedRef.current || !checkout) {
       return;
     }
     autoAppliedRef.current = true;
-    // Intentionally trigger the coupon application once when checkout becomes
-    // ready; the state updates live inside the shared handler.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    handleApplyCoupon(autoApplyCoupon);
-  }, [autoApplyCoupon, checkout, handleApplyCoupon]);
+    void checkout.applyPromotionCode(autoApplyCoupon).catch(() => {
+      // Failures are non-fatal; the user can still enter a coupon manually.
+    });
+  }, [autoApplyCoupon, checkout]);
 
   // Check if a coupon is already pre-applied (e.g., auto-apply coupon from backend)
   const preAppliedCode = checkout?.discountAmounts?.[0]?.promotionCode;
@@ -562,12 +570,12 @@ export const CouponInput: FC<{ autoApplyCoupon?: string }> = ({
       </div>
       <div className="flex gap-[12px]">
         <input
+          ref={couponInputRef}
           type="text"
           value={couponCode}
           onChange={(e) => setCouponCode(e.target.value)}
           placeholder={t('billing_enter_coupon_code', 'Enter coupon code')}
           disabled={isApplying}
-          autoFocus
           className="flex-1 h-[44px] px-[16px] rounded-[8px] border border-newColColor bg-newBgColor text-textColor placeholder:text-textColor/50 focus:outline-none focus:border-boxFocused disabled:opacity-50"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {

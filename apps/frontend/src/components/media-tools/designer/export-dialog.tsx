@@ -1412,6 +1412,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   key={p.idx}
                   className="w-[100px] h-[100px] rounded-[6px] border border-studioBorder overflow-hidden bg-newBgColorInner"
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
                   <img
                     src={p.dataUrl}
                     alt={`Output ${p.idx + 1}`}
@@ -1468,6 +1469,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     key={p.idx}
                     className="w-[80px] h-[80px] rounded-[4px] border border-studioBorder overflow-hidden bg-newBgColorInner"
                   >
+                    {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
                     <img
                       src={p.dataUrl}
                       alt={`Output ${p.idx + 1}`}
@@ -1541,6 +1543,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
                     <div className="w-[36px] h-[36px] rounded-[4px] overflow-hidden flex-shrink-0 bg-newBgColor border border-studioBorder/50">
                       {previews[row.outputIdx]?.dataUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- data URL preview
                         <img
                           src={previews[row.outputIdx].dataUrl}
                           alt=""
@@ -1827,6 +1830,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                           setPosterUrl(renderedPosterUrl);
                         }}
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
                         <img
                           src={renderedPosterUrl}
                           alt="Rendered poster"

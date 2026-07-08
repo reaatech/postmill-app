@@ -63,12 +63,12 @@ export const initializeSentryBasic = (environment: string, dsn: string, extensio
                   try {
                     mod.showReportDialog({ eventId: event.event_id });
                   } catch (err) {
-                    // eslint-disable-next-line no-console
+                     
                     console.error('Sentry.showReportDialog failed:', err);
                   }
                 })
                 .catch((importErr) => {
-                  // eslint-disable-next-line no-console
+                   
                   console.error('Failed to import @sentry/react for report dialog:', importErr);
                 });
             }
@@ -80,7 +80,7 @@ export const initializeSentryBasic = (environment: string, dsn: string, extensio
     });
   } catch (err) {
     // Log initialization errors
-    // eslint-disable-next-line no-console
+     
     console.error('Sentry.init failed:', err);
   }
 };

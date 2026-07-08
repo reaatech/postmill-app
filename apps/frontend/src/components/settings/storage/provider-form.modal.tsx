@@ -196,10 +196,10 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
 
         <div className="flex flex-col gap-[16px]">
           <div>
-            <label className="text-[12px] text-newTableText mb-[6px] block">
+            <label htmlFor="provider-type-group" className="text-[12px] text-newTableText mb-[6px] block">
               Provider Type
             </label>
-            <div className="grid grid-cols-3 gap-[8px]">
+            <div id="provider-type-group" role="radiogroup" className="grid grid-cols-3 gap-[8px]">
               {(editProvider
                 ? allProviderTypes.filter((t) => t.value === editProvider.type)
                 : allProviderTypes

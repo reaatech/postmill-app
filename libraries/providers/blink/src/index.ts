@@ -1,2 +1,3 @@
 import { blinkShortlinkModule } from './v1';
-export default [blinkShortlinkModule];
+const blinkProviderModules = [blinkShortlinkModule];
+export default blinkProviderModules;

@@ -30,6 +30,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
   }, [open]);
 
   useEffect(() => {
+    if (open) {
+      inputRef.current?.focus();
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (!open) return;
     const el = containerRef.current;
     if (!el) return;
@@ -120,7 +126,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
       >
         <input
           ref={inputRef}
-          autoFocus
           className="w-full px-4 py-3 bg-transparent text-white text-lg outline-none border-b border-[#2a2a4a] placeholder-gray-500"
           placeholder="Type a command..."
           value={query}

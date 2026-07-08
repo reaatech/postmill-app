@@ -1,2 +1,3 @@
 import { googleaiMediaModule } from './v1';
-export default [googleaiMediaModule];
+const googleaiProviderModules = [googleaiMediaModule];
+export default googleaiProviderModules;

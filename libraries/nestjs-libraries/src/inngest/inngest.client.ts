@@ -8,4 +8,5 @@ export const inngest = new Inngest({
   // automatically by the SDK. Explicitly passing them is optional.
 });
 
-export const isInngestEnabled = () => process.env.USE_INNGEST === 'true';
+export const isInngestEnabled = () =>
+  process.env.USE_INNGEST === 'true' || process.env.USE_INNGEST === '1';

@@ -1,2 +1,3 @@
 import { adobestockContentPackModule } from './v1';
-export default [adobestockContentPackModule];
+const adobestockProviderModules = [adobestockContentPackModule];
+export default adobestockProviderModules;

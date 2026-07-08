@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useEffect, useState } from 'react';
+import { FC, useCallback, useState } from 'react';
 import { ChannelDetailResponse, SeriesPoint } from '../utils';
 import { AreaChart } from '../charts/area.chart';
 import { useChannelMetric } from '../hooks/useChannelMetric';
@@ -45,20 +45,22 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
     compare,
   });
 
+  // Close always resets the inner drill so the next open starts at the KPI list.
+  const handleClose = useCallback(() => {
+    setDrillMetric(null);
+    onClose();
+  }, [onClose]);
+
   // Esc closes the inner metric drill first, then the whole drawer.
   const handleEscape = useCallback(() => {
     if (drillMetric) setDrillMetric(null);
-    else onClose();
-  }, [drillMetric, onClose]);
-
-  useEffect(() => {
-    if (!open) setDrillMetric(null);
-  }, [open]);
+    else handleClose();
+  }, [drillMetric, handleClose]);
 
   return (
     <Drawer
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       onEscape={handleEscape}
       ariaLabel={channel.name}
     >

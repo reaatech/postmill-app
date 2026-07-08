@@ -210,6 +210,7 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
                 className="group text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
               >
                 <div className="aspect-square relative overflow-hidden bg-transparent">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external stock thumbnail */}
                   <img
                     src={sticker.thumbUrl}
                     alt={sticker.description || ''}

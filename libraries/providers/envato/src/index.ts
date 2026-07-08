@@ -1,2 +1,3 @@
 import { envatoContentPackModule } from './v1';
-export default [envatoContentPackModule];
+const envatoProviderModules = [envatoContentPackModule];
+export default envatoProviderModules;

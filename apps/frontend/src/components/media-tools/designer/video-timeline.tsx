@@ -131,7 +131,6 @@ function useWaveform(
   const [peaks, setPeaks] = useState<number[] | null>(null);
   useEffect(() => {
     if (!src) {
-      setPeaks(null);
       return;
     }
     let cancelled = false;
@@ -143,8 +142,9 @@ function useWaveform(
     };
   }, [src, fetchFn]);
   // Resample the cached high-res peaks to the current bar count in memory — no
-  // re-fetch, no re-decode.
-  return useMemo(() => (peaks ? resamplePeaks(peaks, barCount) : null), [peaks, barCount]);
+  // re-fetch, no re-decode. Guard against a missing src so stale peaks from a
+  // previous clip are not rendered while the component is still mounted.
+  return useMemo(() => (!src || !peaks ? null : resamplePeaks(peaks, barCount)), [src, peaks, barCount]);
 }
 
 const WaveformBars: FC<{ src: string | undefined; width: number }> = ({ src, width }) => {

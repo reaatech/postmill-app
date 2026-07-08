@@ -1,2 +1,3 @@
 import { bitdeerAiModule } from './v1';
-export default [bitdeerAiModule];
+const bitdeerProviderModules = [bitdeerAiModule];
+export default bitdeerProviderModules;

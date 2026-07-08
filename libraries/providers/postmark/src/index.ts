@@ -1,2 +1,3 @@
 import { postmarkEmailModule } from './v1';
-export default [postmarkEmailModule];
+const postmarkProviderModules = [postmarkEmailModule];
+export default postmarkProviderModules;

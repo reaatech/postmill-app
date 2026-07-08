@@ -160,10 +160,11 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
             </div>
 
             <div className="mb-[20px]">
-              <label className="text-[12px] text-newTableText mb-[6px] block">
+              <label htmlFor="migration-target-provider" className="text-[12px] text-newTableText mb-[6px] block">
                 Target Provider
               </label>
               <select
+                id="migration-target-provider"
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
                 disabled={running}

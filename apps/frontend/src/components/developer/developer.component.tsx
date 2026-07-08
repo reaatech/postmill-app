@@ -21,7 +21,7 @@ const useOAuthApp = () => {
       return null;
     }
     return JSON.parse(text);
-  }, []);
+  }, [fetch]);
   return useSWR('oauth-app', load, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
@@ -169,7 +169,7 @@ export const DeveloperComponent: FC = () => {
     } catch {
       toaster.show('Failed to create app', 'warning');
     }
-  }, [name, description, redirectUrl, pictureId]);
+  }, [name, description, redirectUrl, pictureId, fetch, mutate, toaster]);
 
   const updateApp = useCallback(async () => {
     try {
@@ -188,7 +188,7 @@ export const DeveloperComponent: FC = () => {
     } catch {
       toaster.show('Failed to update app', 'warning');
     }
-  }, [name, description, redirectUrl, pictureId]);
+  }, [name, description, redirectUrl, pictureId, fetch, mutate, toaster]);
 
   const rotateSecret = useCallback(async () => {
     const approved = await decision.open({
@@ -214,7 +214,7 @@ export const DeveloperComponent: FC = () => {
     } catch {
       toaster.show('Failed to rotate secret', 'warning');
     }
-  }, [decision]);
+  }, [decision, fetch, mutate, toaster]);
 
   const deleteApp = useCallback(async () => {
     const approved = await decision.open({
@@ -233,7 +233,7 @@ export const DeveloperComponent: FC = () => {
     } catch {
       toaster.show('Failed to delete app', 'warning');
     }
-  }, [decision]);
+  }, [decision, fetch, mutate, toaster]);
 
   if (app === undefined) {
     return null;
@@ -269,7 +269,7 @@ export const DeveloperComponent: FC = () => {
             </div>
             <div className="flex gap-[6px] shrink-0 pt-[2px]">
               <a
-                className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+                className="cursor-pointer px-[16px] h-[36px] bg-btnPrimary hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
                 href="https://docs.postmill.com/public-api/oauth"
                 target="_blank"
               >
@@ -282,7 +282,7 @@ export const DeveloperComponent: FC = () => {
             <button
               type="button"
               onClick={() => setCreating(true)}
-              className="cursor-pointer px-[20px] h-[44px] bg-[#2B5CD3] hover:bg-[#5520CB] transition-colors text-white rounded-[8px] text-[15px] font-[600]"
+              className="cursor-pointer px-[20px] h-[44px] bg-btnPrimary hover:bg-[#5520CB] transition-colors text-white rounded-[8px] text-[15px] font-[600]"
             >
               {t('create_oauth_app', 'Create OAuth App')}
             </button>
@@ -350,6 +350,7 @@ export const DeveloperComponent: FC = () => {
               </label>
               <div className="flex items-center gap-[12px]">
                 {picturePath ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external OAuth app logo
                   <img
                     src={picturePath}
                     alt="App logo"
@@ -387,7 +388,7 @@ export const DeveloperComponent: FC = () => {
               <button
                 type="button"
                 onClick={createApp}
-                className="cursor-pointer px-[20px] h-[44px] bg-[#2B5CD3] hover:bg-[#5520CB] transition-colors text-white rounded-[8px] text-[15px] font-[600]"
+                className="cursor-pointer px-[20px] h-[44px] bg-btnPrimary hover:bg-[#5520CB] transition-colors text-white rounded-[8px] text-[15px] font-[600]"
               >
                 {t('create', 'Create')}
               </button>
@@ -435,7 +436,7 @@ export const DeveloperComponent: FC = () => {
           </div>
           <div className="flex gap-[6px] shrink-0 pt-[2px]">
             <a
-              className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+              className="cursor-pointer px-[16px] h-[36px] bg-btnPrimary hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
               href="https://docs.postmill.com/public-api/oauth"
               target="_blank"
             >
@@ -477,6 +478,7 @@ export const DeveloperComponent: FC = () => {
               </label>
               <div className="flex items-center gap-[12px]">
                 {picturePath ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external OAuth app logo
                   <img
                     src={picturePath}
                     alt="App logo"
@@ -514,7 +516,7 @@ export const DeveloperComponent: FC = () => {
               <button
                 type="button"
                 onClick={updateApp}
-                className="cursor-pointer px-[20px] h-[44px] bg-[#2B5CD3] hover:bg-[#5520CB] transition-colors text-white rounded-[8px] text-[15px] font-[600]"
+                className="cursor-pointer px-[20px] h-[44px] bg-btnPrimary hover:bg-[#5520CB] transition-colors text-white rounded-[8px] text-[15px] font-[600]"
               >
                 {t('save', 'Save')}
               </button>
@@ -531,6 +533,7 @@ export const DeveloperComponent: FC = () => {
           <div className="p-[20px] flex flex-col gap-[16px]">
             <div className="flex items-center gap-[12px]">
               {app.picture?.path ? (
+                // eslint-disable-next-line @next/next/no-img-element -- external OAuth app logo
                 <img
                   src={app.picture.path}
                   alt={app.name}

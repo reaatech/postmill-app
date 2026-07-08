@@ -1,2 +1,3 @@
 import { dubShortlinkModule } from './v1';
-export default [dubShortlinkModule];
+const dubProviderModules = [dubShortlinkModule];
+export default dubProviderModules;

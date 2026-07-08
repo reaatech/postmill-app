@@ -77,6 +77,7 @@ const ChannelAvatar: FC<{ channel?: Channel; size?: number }> = ({
     );
   }
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- external channel avatar
     <img
       src={channel.picture}
       alt={channel.name}
@@ -217,6 +218,7 @@ const AddOrEditSignature: FC<{
         </label>
         {picture ? (
           <div className="flex items-center gap-[12px]">
+            {/* eslint-disable-next-line @next/next/no-img-element -- external signature logo */}
             <img
               src={picture.path}
               alt="logo"
@@ -292,7 +294,7 @@ const AddOrEditSignature: FC<{
       </div>
 
       {/* Auto add */}
-      <label className="flex items-center gap-[10px] cursor-pointer select-none">
+      <div className="flex items-center gap-[10px] cursor-pointer select-none">
         <button
           type="button"
           role="switch"
@@ -318,7 +320,7 @@ const AddOrEditSignature: FC<{
             {t('auto_add_hint', 'Automatically appended (with its logo) to posts on matching channels')}
           </span>
         </span>
-      </label>
+      </div>
 
       <Button onClick={save} disabled={saving || !content.trim()}>
         {saving ? t('saving', 'Saving...') : t('save', 'Save')}
@@ -497,6 +499,7 @@ export const SignaturesComponent: FC<{
               >
                 {/* Logo */}
                 {sig.picture?.path ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- external signature logo
                   <img
                     src={sig.picture.path}
                     alt=""

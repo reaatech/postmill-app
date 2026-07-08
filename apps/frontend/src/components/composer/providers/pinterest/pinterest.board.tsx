@@ -20,7 +20,9 @@ export const PinterestBoard: FC<{
   const customFunc = useCustomProviderFunction();
   const [orgs, setOrgs] = useState<undefined | any[]>();
   const { getValues } = useSettings();
-  const [currentMedia, setCurrentMedia] = useState<string | undefined>();
+  const [currentMedia, setCurrentMedia] = useState<string | undefined>(
+    () => getValues()[props.name]
+  );
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -32,10 +34,6 @@ export const PinterestBoard: FC<{
   };
   useEffect(() => {
     customFunc.get('boards').then((data) => setOrgs(data));
-    const settings = getValues()[props.name];
-    if (settings) {
-      setCurrentMedia(settings);
-    }
   }, []);
   if (!orgs) {
     return null;

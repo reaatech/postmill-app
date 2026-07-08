@@ -1,2 +1,3 @@
 import { resendEmailModule } from './v1';
-export default [resendEmailModule];
+const resendProviderModules = [resendEmailModule];
+export default resendProviderModules;

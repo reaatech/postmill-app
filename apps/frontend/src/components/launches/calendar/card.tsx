@@ -2,6 +2,7 @@
 
 import React, { FC, memo, useCallback } from 'react';
 import clsx from 'clsx';
+import Image from 'next/image';
 import { useDrag } from 'react-dnd';
 import { Post, State, Tags, Integration } from '@prisma/client';
 import type { Integrations } from './context';
@@ -204,15 +205,18 @@ export const CalendarItem: FC<{
         )}
       >
         <div className={clsx('relative min-w-[20px]')}>
+          {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             alt=""
             className="w-[20px] h-[20px] rounded-[8px]"
             src={post.integration.picture! || '/no-picture.jpg'}
           />
-          <img
+          <Image
             alt=""
             className="w-[12px] h-[12px] rounded-[8px] absolute z-10 top-[10px] end-0 border border-newTableBorder"
             src={`/icons/platforms/${post.integration?.providerIdentifier}.png`}
+            width={12}
+            height={12}
           />
         </div>
         <div className="w-full flex-1 flex flex-col min-h-[40px] gap-[2px]">

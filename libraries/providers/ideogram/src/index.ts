@@ -1,2 +1,3 @@
 import { ideogramMediaModule } from './v1';
-export default [ideogramMediaModule];
+const ideogramProviderModules = [ideogramMediaModule];
+export default ideogramProviderModules;

@@ -1,2 +1,3 @@
 import { lightningAiModule } from './v1';
-export default [lightningAiModule];
+const lightningProviderModules = [lightningAiModule];
+export default lightningProviderModules;

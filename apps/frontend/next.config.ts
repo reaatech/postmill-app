@@ -1,10 +1,11 @@
 import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 import { redirects } from './src/redirects.config';
+import withBundleAnalyzer from '@next/bundle-analyzer';
 
-const withBundleAnalyzer =
+const withBundleAnalyzerFn =
   process.env.ANALYZE === 'true'
-    ? require('@next/bundle-analyzer')({ enabled: true })
+    ? withBundleAnalyzer({ enabled: true })
     : (config: NextConfig) => config;
 
 // The browser fetches the backend directly (NEXT_PUBLIC_BACKEND_URL). When the
@@ -161,4 +162,4 @@ const finalConfig = sentryEnabled
   ? withSentryConfig(nextConfig, sentryConfig)
   : nextConfig;
 
-export default withBundleAnalyzer(finalConfig);
+export default withBundleAnalyzerFn(finalConfig);

@@ -1,2 +1,3 @@
 import { anthropicAiModule } from './v1';
-export default [anthropicAiModule];
+const anthropicProviderModules = [anthropicAiModule];
+export default anthropicProviderModules;

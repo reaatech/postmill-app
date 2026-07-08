@@ -19,7 +19,7 @@ import {
   ValidityMedia,
 } from '@gitroom/provider-kernel';
 import { lookup } from 'mime-types';
-import axios from 'axios';
+import { safeFetch } from '@gitroom/provider-kernel';
 import WebSocket from 'ws';
 import { Logger } from '@nestjs/common';
 import { Tool } from '@gitroom/provider-kernel';
@@ -190,9 +190,8 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
       )
     ).json();
 
-    const { data } = await axios.get(path, {
-      responseType: 'arraybuffer',
-    });
+    const mediaResponse = await safeFetch(path);
+    const data = Buffer.from(await mediaResponse.arrayBuffer());
 
     const upload = (fields as { name: string; value: string }[]).reduce(
       (acc, value) => {
@@ -202,12 +201,9 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
       new FormData()
     );
 
-    upload.append(
-      'file',
-      new Blob([Buffer.from(data)], { type: mimeType as string })
-    );
+    upload.append('file', new Blob([data], { type: mimeType as string }));
 
-    const d = await fetch('https:' + action, {
+    const d = await safeFetch('https:' + action, {
       method: 'POST',
       body: upload,
     });
@@ -490,7 +486,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
       )
     ).json();
 
-    // eslint-disable-next-line no-async-promise-executor
+     
     const newData = await new Promise<{ id: string; name: string }[]>(
       async (res) => {
         try {

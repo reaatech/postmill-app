@@ -1,2 +1,3 @@
 import { storjStorageModule } from './v1';
-export default [storjStorageModule];
+const storjProviderModules = [storjStorageModule];
+export default storjProviderModules;

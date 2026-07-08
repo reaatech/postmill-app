@@ -99,7 +99,7 @@ const runPostPublish = (postActivity: PostActivity) =>
     const { repeat = false } = event.data;
     if (!repeat) {
       const claimed = await step.run('claim-publish', () =>
-        postActivity.claimForPublish(postId)
+        postActivity.claimForPublish(postId, organizationId)
       );
       if (!claimed) {
         return;
@@ -507,7 +507,9 @@ const runPostPublish = (postActivity: PostActivity) =>
             repeat: true,
           },
           // 4.4f — deterministic id so an executor retry can't emit a second event.
-          id: `post_${post.id}_repeat_${currentIndex}_${startTime.getTime()}`,
+          // Uses the post creation timestamp rather than startTime so the id is
+          // stable across retries and Inngest memoization boundaries.
+          id: `post_${post.id}_repeat_${currentIndex}_${post.createdAt.getTime()}`,
         });
       }
     }

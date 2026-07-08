@@ -1,2 +1,3 @@
 import { perplexityAiModule } from './v1';
-export default [perplexityAiModule];
+const perplexityProviderModules = [perplexityAiModule];
+export default perplexityProviderModules;

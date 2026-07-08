@@ -20,6 +20,7 @@ import { DefaultsResolutionService } from './defaults/defaults-resolution.servic
 import { DefaultsSeedService } from './defaults/defaults-seed.service';
 import { AiDefaultsService } from './defaults/ai-defaults.service';
 import { DefaultsSettingsValidator } from './defaults/defaults-settings.validator';
+import { MediaDefaultsService } from './defaults/media-defaults.service';
 import { SlideService } from '@gitroom/nestjs-libraries/media/slide/slide.service';
 import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.service';
 
@@ -46,6 +47,7 @@ import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.
     DefaultsResolutionService,
     DefaultsSeedService,
     AiDefaultsService,
+    MediaDefaultsService,
     DefaultsSettingsValidator,
     SlideService,
     CaptionService,
@@ -70,6 +72,7 @@ import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.
     DefaultsResolutionService,
     DefaultsSeedService,
     AiDefaultsService,
+    MediaDefaultsService,
     DefaultsSettingsValidator,
     SlideService,
     CaptionService,

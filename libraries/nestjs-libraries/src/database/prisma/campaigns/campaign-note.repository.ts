@@ -84,7 +84,21 @@ export class CampaignNoteRepository {
   }
 
   // Toggle a reaction: remove if it already exists, else create.
-  async toggleReaction(noteId: string, userId: string, emoji: string) {
+  // D7: defense-in-depth org check — the note must belong to the caller's org.
+  async toggleReaction(
+    noteId: string,
+    userId: string,
+    emoji: string,
+    organizationId: string
+  ) {
+    const note = await this._prisma.campaignNote.findFirst({
+      where: { id: noteId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!note) {
+      throw new Error('Note not found');
+    }
+
     const existing = await this._prisma.campaignNoteReaction.findUnique({
       where: { noteId_userId_emoji: { noteId, userId, emoji } },
     });

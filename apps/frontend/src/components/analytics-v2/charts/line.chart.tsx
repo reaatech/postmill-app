@@ -136,7 +136,7 @@ export const LineChart: FC<LineChartProps> = ({
           if (!xScale || !area) return;
           const ctx2 = chart.ctx;
           bands.forEach((band) => {
-            let startIdx = labels.findIndex((l) => l >= band.from);
+            const startIdx = labels.findIndex((l) => l >= band.from);
             if (startIdx === -1) return; // starts after the visible range
             let endIdx = -1;
             for (let j = labels.length - 1; j >= 0; j--) {

@@ -255,7 +255,7 @@ const McpSection = ({
         </div>
         <div className="flex gap-[6px] shrink-0 pt-[2px]">
           <a
-            className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+            className="cursor-pointer px-[16px] h-[36px] bg-btnPrimary hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
             href="https://docs.postmill.com/mcp/introduction"
             target="_blank"
           >
@@ -277,7 +277,7 @@ const McpSection = ({
                 className={clsx(
                   'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
                   method === m
-                    ? 'bg-[#2B5CD3] text-white'
+                    ? 'bg-btnPrimary text-white'
                     : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
                 )}
                 onClick={() => setMethod(m)}
@@ -302,7 +302,7 @@ const McpSection = ({
                   className={clsx(
                     'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
                     activeClient === client
-                      ? 'bg-[#2B5CD3] text-white'
+                      ? 'bg-btnPrimary text-white'
                       : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
                   )}
                   onClick={() => setActiveClient(client)}
@@ -460,7 +460,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
         </div>
         <div className="flex gap-[6px] shrink-0 pt-[2px]">
           <a
-            className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
+            className="cursor-pointer px-[16px] h-[36px] bg-btnPrimary hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
             href="https://docs.postmill.com/cli/introduction"
             target="_blank"
           >
@@ -478,7 +478,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
               className={clsx(
                 'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
                 mode === m
-                  ? 'bg-[#2B5CD3] text-white'
+                  ? 'bg-btnPrimary text-white'
                   : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
               )}
               onClick={() => setMode(m)}
@@ -599,7 +599,7 @@ export const PublicComponent = () => {
             className={clsx(
               'cursor-pointer px-[20px] h-[44px] text-[15px] font-[600] rounded-[8px] transition-colors',
               subTab === tab
-                ? 'bg-[#2B5CD3] text-white'
+                ? 'bg-btnPrimary text-white'
                 : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
             )}
             onClick={() => setSubTab(tab)}

@@ -1,3 +1,4 @@
 export * from './v1';
 import { pixelfedSocialModule } from './v1';
-export default [pixelfedSocialModule];
+const pixelfedProviderModules = [pixelfedSocialModule];
+export default pixelfedProviderModules;

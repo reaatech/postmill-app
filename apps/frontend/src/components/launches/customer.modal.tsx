@@ -28,9 +28,6 @@ export const CustomerModal: FC<{
   const loadCustomers = useCallback(async () => {
     return (await fetch('/integrations/customers')).json();
   }, []);
-  const removeFromCustomer = useCallback(async () => {
-    saveCustomer(true);
-  }, []);
   const saveCustomer = useCallback(
     async (removeCustomer?: boolean) => {
       if (!customer) {
@@ -45,8 +42,11 @@ export const CustomerModal: FC<{
       modal.closeAll();
       onClose();
     },
-    [customer]
+    [customer, fetch, integration.id, modal, onClose]
   );
+  const removeFromCustomer = useCallback(async () => {
+    saveCustomer(true);
+  }, [saveCustomer]);
   const { data } = useSWR('/customers', loadCustomers);
   return (
     <div className="relative w-full">

@@ -1,2 +1,3 @@
 import { vertexAiModule, vertexMediaModule } from './v1';
-export default [vertexAiModule, vertexMediaModule];
+const vertexProviderModules = [vertexAiModule, vertexMediaModule];
+export default vertexProviderModules;

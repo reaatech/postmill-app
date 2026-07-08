@@ -767,10 +767,11 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] text-textColor/50">
+          <label htmlFor="image-photo-in-text" className="text-[11px] text-textColor/50">
             Photo in text
           </label>
           <input
+            id="image-photo-in-text"
             type="text"
             value={
               element.mask?.type === 'text' ? element.mask.text || '' : ''
@@ -820,8 +821,9 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] text-textColor/50">Alt text</label>
+        <label htmlFor="image-alt-text" className="text-[11px] text-textColor/50">Alt text</label>
         <input
+          id="image-alt-text"
           type="text"
           value={element.alt || ''}
           onChange={(e) =>
@@ -953,6 +955,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                   onPointerUp={handleMaskPointerUp}
                   onPointerLeave={handleMaskPointerUp}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
                   <img
                     ref={previewImgRef}
                     src={element.src}

@@ -1,2 +1,3 @@
 import { blackforestlabsMediaModule } from './v1';
-export default [blackforestlabsMediaModule];
+const blackforestlabsProviderModules = [blackforestlabsMediaModule];
+export default blackforestlabsProviderModules;

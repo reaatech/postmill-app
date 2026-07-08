@@ -62,22 +62,21 @@ export class OrgProviderConfigManager {
     const newEnabled = new Set<string>();
     const newCredentials = new Map<string, CredentialEntry>();
 
-    const allConfigs = await this._orgProviderConfigService['_repository'].getByOrg(orgId);
+    const allConfigs = await this._orgProviderConfigService.getDecryptedConfigs(orgId);
 
     for (const config of allConfigs) {
-      const decrypted = this._orgProviderConfigService.decryptRow(config);
       const entry: DecryptedConfig = {
         id: config.id,
         identifier: config.identifier,
         name: config.name,
         enabled: config.enabled,
-        version: config.version ?? undefined,
-        clientId: decrypted.clientId,
-        clientSecret: decrypted.clientSecret,
-        redirectUri: config.redirectUri || undefined,
-        scopes: config.scopes || undefined,
-        additionalConfig: decrypted.additionalConfig,
-        setupNotes: config.setupNotes || undefined,
+        version: config.version,
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+        redirectUri: config.redirectUri,
+        scopes: config.scopes,
+        additionalConfig: config.additionalConfig,
+        setupNotes: config.setupNotes,
       };
       newById.set(config.id, entry);
 
@@ -87,7 +86,7 @@ export class OrgProviderConfigManager {
         newByIdentifier.set(config.identifier, entry);
       }
 
-      if (config.enabled && (decrypted.clientId || decrypted.clientSecret)) {
+      if (config.enabled && (config.clientId || config.clientSecret)) {
         newEnabled.add(config.identifier);
       }
     }

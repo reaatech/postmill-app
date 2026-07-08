@@ -12,11 +12,11 @@ describe('PostsRepository', () => {
       const repository = Object.create(PostsRepository.prototype) as PostsRepository;
       (repository as any)._post = { model: { post: { updateMany } } };
 
-      const count = await repository.claimForPublish('post-1');
+      const count = await repository.claimForPublish('post-1', 'org-1');
 
       expect(count).toBe(1);
       expect(updateMany).toHaveBeenCalledWith({
-        where: { id: 'post-1', state: 'QUEUE', deletedAt: null },
+        where: { id: 'post-1', organizationId: 'org-1', state: 'QUEUE', deletedAt: null },
         data: { state: 'PUBLISHING' },
       });
     });
@@ -26,7 +26,20 @@ describe('PostsRepository', () => {
       const repository = Object.create(PostsRepository.prototype) as PostsRepository;
       (repository as any)._post = { model: { post: { updateMany } } };
 
-      expect(await repository.claimForPublish('post-1')).toBe(0);
+      expect(await repository.claimForPublish('post-1', 'org-1')).toBe(0);
+    });
+
+    it('does not claim a post from a different org', async () => {
+      const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+      const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+      (repository as any)._post = { model: { post: { updateMany } } };
+
+      await repository.claimForPublish('post-1', 'org-a');
+
+      expect(updateMany).toHaveBeenCalledWith({
+        where: { id: 'post-1', organizationId: 'org-a', state: 'QUEUE', deletedAt: null },
+        data: { state: 'PUBLISHING' },
+      });
     });
   });
 

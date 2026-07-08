@@ -19,7 +19,9 @@ export const SkoolGroupSelect: FC<{
   const customFunc = useCustomProviderFunction();
   const [groups, setGroups] = useState([]);
   const { getValues } = useSettings();
-  const [currentGroup, setCurrentGroup] = useState<string | undefined>();
+  const [currentGroup, setCurrentGroup] = useState<string | undefined>(
+    () => getValues()[props.name]
+  );
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -31,10 +33,6 @@ export const SkoolGroupSelect: FC<{
   };
   useEffect(() => {
     customFunc.get('groups').then((data) => setGroups(data));
-    const settings = getValues()[props.name];
-    if (settings) {
-      setCurrentGroup(settings);
-    }
   }, []);
   if (!groups.length) {
     return null;

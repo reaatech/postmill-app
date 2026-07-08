@@ -19,7 +19,9 @@ export const DevtoTags: FC<{
   const customFunc = useCustomProviderFunction();
   const [tags, setTags] = useState<any[]>([]);
   const { getValues } = useSettings();
-  const [tagValue, setTagValue] = useState<any[]>([]);
+  const [tagValue, setTagValue] = useState<any[]>(
+    () => getValues()[props.name] || []
+  );
   const onDelete = useCallback(
     (tagIndex: number) => {
       const modify = tagValue.filter((_, i) => i !== tagIndex);
@@ -41,10 +43,6 @@ export const DevtoTags: FC<{
   );
   useEffect(() => {
     customFunc.get('tags').then((data) => setTags(data));
-    const settings = getValues()[props.name];
-    if (settings) {
-      setTagValue(settings);
-    }
   }, []);
   if (!tags.length) {
     return null;

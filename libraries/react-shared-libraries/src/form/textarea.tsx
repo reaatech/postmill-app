@@ -1,6 +1,6 @@
 'use client';
 
-import { DetailedHTMLProps, FC, InputHTMLAttributes, useMemo } from 'react';
+import { DetailedHTMLProps, FC, InputHTMLAttributes } from 'react';
 import clsx from 'clsx';
 import { useFormContext } from 'react-hook-form';
 import { TranslatedLabel } from '../translation/translated-label';
@@ -28,11 +28,11 @@ export const Textarea: FC<
     ...rest
   } = props;
   const form = useFormContext();
-  const err = useMemo(() => {
-    if (error) return error;
-    if (!form || !form.formState.errors[props?.name!]) return;
-    return form?.formState?.errors?.[props?.name!]?.message! as string;
-  }, [form?.formState?.errors?.[props?.name!]?.message, error]);
+  const err =
+    error ||
+    (form && form.formState.errors[props?.name!]
+      ? (form?.formState?.errors?.[props?.name!]?.message as string)
+      : undefined);
   return (
     <div
       className={clsx(

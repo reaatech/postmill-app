@@ -248,7 +248,7 @@ export class DevToProvider extends SocialAbstract implements SocialProvider {
     const fullDetails = await Promise.all(
       allOrgs.map(async (org: string) => {
         return (
-          await fetch(`https://dev.to/api/organizations/${org}`, {
+          await this.fetch(`https://dev.to/api/organizations/${encodeURIComponent(org)}`, {
             headers: {
               'api-key': token,
             },

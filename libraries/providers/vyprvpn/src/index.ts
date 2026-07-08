@@ -1,2 +1,3 @@
 import { vyprvpnVpnModule } from './v1';
-export default [vyprvpnVpnModule];
+const vyprvpnProviderModules = [vyprvpnVpnModule];
+export default vyprvpnProviderModules;

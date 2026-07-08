@@ -9,7 +9,6 @@ import {
 import i18next from 'i18next';
 import useCookie from 'react-use-cookie';
 import ReactCountryFlag from 'react-country-flag';
-import { List, Box, Group, Text } from '@mantine/core';
 import React, { useCallback } from 'react';
 import countries from 'i18n-iso-countries';
 
@@ -112,9 +111,14 @@ export const ChangeLanguageComponent = () => {
               }}
               title={language}
             />
-            <Text weight={language === currentLanguage ? 'bold' : 'normal'}>
+            <span
+              className={clsx(
+                'text-[13px]',
+                language === currentLanguage ? 'font-bold' : 'font-normal'
+              )}
+            >
               {getLanguageName(language)}
-            </Text>
+            </span>
           </div>
         ))}
       </div>

@@ -1,2 +1,3 @@
 import { mailgunEmailModule } from './v1';
-export default [mailgunEmailModule];
+const mailgunProviderModules = [mailgunEmailModule];
+export default mailgunProviderModules;

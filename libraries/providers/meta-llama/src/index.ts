@@ -1,2 +1,3 @@
 import { metallamaAiModule } from './v1';
-export default [metallamaAiModule];
+const metallamaProviderModules = [metallamaAiModule];
+export default metallamaProviderModules;

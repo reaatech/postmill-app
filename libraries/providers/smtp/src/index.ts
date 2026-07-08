@@ -1,2 +1,3 @@
 import { smtpEmailModule } from './v1';
-export default [smtpEmailModule];
+const smtpProviderModules = [smtpEmailModule];
+export default smtpProviderModules;

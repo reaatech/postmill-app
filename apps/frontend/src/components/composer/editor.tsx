@@ -2,6 +2,7 @@
 
 import React, {
   FC,
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -187,16 +188,7 @@ export const EditorWrapper: FC<{
   );
 
   const existingData = useExistingData();
-  const [loaded, setLoaded] = useState(true);
-
-  useEffect(() => {
-    if (loaded && loadedState) {
-      return;
-    }
-
-    setLoadedState(true);
-    setLoaded(true);
-  }, [loaded, loadedState]);
+  const [mountKey, setMountKey] = useState(0);
 
   const canEdit = useMemo(() => {
     return current === 'global' || !!internal;
@@ -228,7 +220,7 @@ export const EditorWrapper: FC<{
 
       return setGlobalValue(newValue);
     },
-    [internal, items]
+    [internal, items, current, setInternalValue, setGlobalValue]
   );
 
   // CopilotKit context is only mounted when an AI provider is configured; the
@@ -243,7 +235,7 @@ export const EditorWrapper: FC<{
 
       return setGlobalValueText(index, value);
     },
-    [current, global, internal]
+    [current, internal, setInternalValueText, setGlobalValueText]
   );
 
   const changeImages = useCallback(
@@ -254,7 +246,7 @@ export const EditorWrapper: FC<{
 
       return setGlobalValueMedia(index, value);
     },
-    [current, global, internal]
+    [current, internal, setInternalValueMedia, setGlobalValueMedia]
   );
 
   const appendImages = useCallback(
@@ -265,20 +257,19 @@ export const EditorWrapper: FC<{
 
       return appendGlobalValueMedia(index, value);
     },
-    [current, global, internal]
+    [current, internal, appendInternalValueMedia, appendGlobalValueMedia]
   );
 
   const changeOrder = useCallback(
     (index: number) => (direction: 'up' | 'down') => {
       if (internal) {
         changeOrderInternal(current, index, direction);
-        return setLoaded(false);
+      } else {
+        changeOrderGlobal(index, direction);
       }
-
-      changeOrderGlobal(index, direction);
-      setLoaded(false);
+      setMountKey((k) => k + 1);
     },
-    [changeOrderInternal, changeOrderGlobal, current, global, internal]
+    [changeOrderInternal, changeOrderGlobal, current, internal]
   );
 
   const goBackToGlobal = useCallback(async () => {
@@ -291,7 +282,7 @@ export const EditorWrapper: FC<{
         t('yes_go_back_to_global_mode', 'Yes, go back to global mode')
       )
     ) {
-      setLoaded(false);
+      setMountKey((k) => k + 1);
       addRemoveInternal(current);
     }
   }, [addRemoveInternal, current, t]);
@@ -323,7 +314,7 @@ export const EditorWrapper: FC<{
         },
       ]);
     },
-    [current, global, internal]
+    [current, internal, addInternalValue, addGlobalValue]
   );
 
   const deletePost = useCallback(
@@ -342,28 +333,28 @@ export const EditorWrapper: FC<{
 
       if (internal) {
         deleteInternalValue(current, index);
-        return setLoaded(false);
+      } else {
+        deleteGlobalValue(index);
       }
-
-      deleteGlobalValue(index);
-      setLoaded(false);
+      setMountKey((k) => k + 1);
     },
-    [current, global, internal, t]
+    [current, internal, t, deleteInternalValue, deleteGlobalValue]
   );
 
-  if (!loaded || !loadedState) {
+  if (!loadedState) {
     return null;
   }
 
   return (
-    <div
-      className={clsx(
-        'relative flex-col gap-[20px] flex-1',
-        (items.length === 1 || !canEdit || !comments) && 'flex',
-        ((!canEdit && !isCreateSet) || !comments) &&
-          'bg-newSettings rounded-[12px]'
-      )}
-    >
+    <Fragment key={mountKey}>
+      <div
+        className={clsx(
+          'relative flex-col gap-[20px] flex-1',
+          (items.length === 1 || !canEdit || !comments) && 'flex',
+          ((!canEdit && !isCreateSet) || !comments) &&
+            'bg-newSettings rounded-[12px]'
+        )}
+      >
       {aiActive && <EditorCopilotBridge items={items} setValue={setValue} />}
       {isCreateSet && current !== 'global' && (
         <>
@@ -388,7 +379,7 @@ export const EditorWrapper: FC<{
         <>
           <div
             onClick={() => {
-              setLoaded(false);
+              setMountKey((k) => k + 1);
               addRemoveInternal(current);
             }}
             className="text-center absolute w-full h-full p-[20px] left-0 top-0 items-center justify-center flex z-[101] flex-col gap-[16px]"
@@ -520,7 +511,8 @@ export const EditorWrapper: FC<{
           </div>
         </div>
       ))}
-    </div>
+      </div>
+    </Fragment>
   );
 };
 
@@ -598,7 +590,13 @@ export const Editor: FC<{
   }, [emojiPickerOpen]);
   const t = useT();
   const toaster = useToaster();
-  const editorRef = useRef<undefined | { editor: any }>(undefined);
+  const [editorInstance, setEditorInstance] = useState<any>(null);
+  const editorRef = useCallback(
+    (instance: { editor: any } | null) => {
+      setEditorInstance(instance?.editor ?? null);
+    },
+    []
+  );
   const [loading, setLoading] = useState(false);
 
   const uppy = useUppyUploader({
@@ -701,45 +699,22 @@ export const Editor: FC<{
 
   const addText = useCallback(
     (emoji: string) => {
-      editorRef?.current?.editor?.commands?.insertContent(emoji);
-      editorRef?.current?.editor?.commands?.focus();
+      editorInstance?.commands?.insertContent(emoji);
+      editorInstance?.commands?.focus();
     },
-    [props.value, id]
+    [editorInstance]
   );
 
-  const [loadedEditor, setLoadedEditor] = useState(editorType);
-  const [showEditor, setShowEditor] = useState(true);
-  useEffect(() => {
-    if (editorType === loadedEditor) {
-      return;
-    }
-    setLoadedEditor(editorType);
-    setShowEditor(false);
-  }, [editorType, loadedEditor, setLoadedEditor, setShowEditor]);
-
-  useEffect(() => {
-    if (showEditor) {
-      return;
-    }
-    const timeout = setTimeout(() => {
-      setShowEditor(true);
-    }, 20);
-    return () => clearTimeout(timeout);
-  }, [showEditor]);
-
-  if (!showEditor) {
-    return null;
-  }
-
   return (
-    <div className="flex flex-col gap-[20px] flex-1">
-      <div
-        className={clsx(
-          'relative flex-1 px-[12px] pt-[12px] pb-[12px] flex flex-col',
-          num > 0 && '!rounded-bs-[0]'
-        )}
-        id={id}
-      >
+    <Fragment key={editorType}>
+      <div className="flex flex-col gap-[20px] flex-1">
+        <div
+          className={clsx(
+            'relative flex-1 px-[12px] pt-[12px] pb-[12px] flex flex-col',
+            num > 0 && '!rounded-bs-[0]'
+          )}
+          id={id}
+        >
         <div className="relative cursor-text flex flex-1 flex-col">
           <div {...getRootProps()} className="flex flex-1 flex-col">
             <div
@@ -762,10 +737,10 @@ export const Editor: FC<{
             <div
               className="bg-newBgColorInner flex-1"
               onClick={() => {
-                if (editorRef?.current?.editor?.isFocused) {
+                if (editorInstance?.isFocused) {
                   return;
                 }
-                editorRef?.current?.editor?.commands?.focus('end');
+                editorInstance?.commands?.focus('end');
               }}
             />
             <div className="w-full pointer-events-none">
@@ -786,10 +761,10 @@ export const Editor: FC<{
             <div
               className="w-full h-[46px] bg-newBgColorInner cursor-text"
               onClick={() => {
-                if (editorRef?.current?.editor?.isFocused) {
+                if (editorInstance?.isFocused) {
                   return;
                 }
-                editorRef?.current?.editor?.commands?.focus('end');
+                editorInstance?.commands?.focus('end');
               }}
             />
             <div className="flex bg-newBgColorInner rounded-b-[6px] cursor-default">
@@ -815,7 +790,7 @@ export const Editor: FC<{
                   toolBar={
                     <div className="flex gap-[5px] items-center">
                       <SignatureBox
-                        editor={editorRef?.current?.editor}
+                        editor={editorInstance}
                         appendImages={appendImages}
                       />
                       {editorType !== 'none' && (
@@ -825,13 +800,13 @@ export const Editor: FC<{
                         >
                           <MenuItem label={t('underline', 'Underline')}>
                             <UText
-                              editor={editorRef?.current?.editor}
+                              editor={editorInstance}
                               currentValue={props.value!}
                             />
                           </MenuItem>
                           <MenuItem label={t('bold', 'Bold')}>
                             <BoldText
-                              editor={editorRef?.current?.editor}
+                              editor={editorInstance}
                               currentValue={props.value!}
                             />
                           </MenuItem>
@@ -841,19 +816,19 @@ export const Editor: FC<{
                               <>
                                 <MenuItem label={t('link', 'Link')}>
                                   <AComponent
-                                    editor={editorRef?.current?.editor}
+                                    editor={editorInstance}
                                     currentValue={props.value!}
                                   />
                                 </MenuItem>
                                 <MenuItem label={t('bullets', 'Bullets')}>
                                   <Bullets
-                                    editor={editorRef?.current?.editor}
+                                    editor={editorInstance}
                                     currentValue={props.value!}
                                   />
                                 </MenuItem>
                                 <MenuItem label={t('heading', 'Heading')}>
                                   <HeadingComponent
-                                    editor={editorRef?.current?.editor}
+                                    editor={editorInstance}
                                     currentValue={props.value!}
                                   />
                                 </MenuItem>
@@ -913,6 +888,7 @@ export const Editor: FC<{
         </div>
       </div>
     </div>
+    </Fragment>
   );
 };
 

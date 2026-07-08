@@ -1,2 +1,3 @@
 import { localStorageModule, localAuthModule } from './v1';
-export default [localStorageModule, localAuthModule];
+const localProviderModules = [localStorageModule, localAuthModule];
+export default localProviderModules;

@@ -1,2 +1,3 @@
 import { fireworksAiModule, fireworksMediaModule } from './v1';
-export default [fireworksAiModule, fireworksMediaModule];
+const fireworksProviderModules = [fireworksAiModule, fireworksMediaModule];
+export default fireworksProviderModules;

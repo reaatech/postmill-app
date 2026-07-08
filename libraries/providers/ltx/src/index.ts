@@ -1,2 +1,3 @@
 import { ltxMediaModule } from './v1';
-export default [ltxMediaModule];
+const ltxProviderModules = [ltxMediaModule];
+export default ltxProviderModules;

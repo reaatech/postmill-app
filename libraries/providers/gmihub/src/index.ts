@@ -1,2 +1,3 @@
 import { gmihubAiModule } from './v1';
-export default [gmihubAiModule];
+const gmihubProviderModules = [gmihubAiModule];
+export default gmihubProviderModules;

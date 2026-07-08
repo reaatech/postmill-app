@@ -1475,9 +1475,16 @@ describe('reddit deep', () => {
   });
 
   it('post with media and image upload', async () => {
+    const mediaResp = {
+      status: 200,
+      ok: true,
+      arrayBuffer: vi.fn().mockResolvedValue(Buffer.from('image-bytes')),
+      blob: vi.fn().mockResolvedValue(new Blob(['image-bytes'])),
+    };
     const xmlResp = { status: 200, ok: true, json: vi.fn().mockResolvedValue({}), text: vi.fn().mockResolvedValue('<Location>https://reddit.com/media/uploaded.jpg</Location>'), headers: new Map() };
     globalThis.fetch = vi.fn()
       .mockImplementationOnce(() => Promise.resolve(resp({ args: { action: '//s3.amazonaws.com/bucket', fields: [{ name: 'key', value: 'val' }] } })))
+      .mockImplementationOnce(() => Promise.resolve(mediaResp))
       .mockImplementationOnce(() => Promise.resolve(xmlResp))
       .mockImplementationOnce(() => Promise.resolve(resp({ json: { data: { id: 'post-456', name: 't3_post-456', url: 'https://reddit.com/r/test/...' } } })));
     const r = await provider.post('user123', 'tok', [{ id: 'p1', message: 'Media post', media: [{ type: 'image', path: 'https://ex.com/img.jpg' }], settings: { subreddit: [{ value: { type: 'media', title: 'Media', subreddit: '/r/test' } }] } }]);

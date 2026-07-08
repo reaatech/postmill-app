@@ -1,12 +1,12 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { AgentDigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/agent-digest.activity';
-import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 
 export const createAgentDigest = (
   // The cron fan-out only reads org ids; the activity is threaded in solely to
   // keep this factory's arity aligned with its sibling and the shared caller.
   _agentDigestActivity: AgentDigestActivity,
-  organizationRepository: OrganizationRepository
+  organizationService: OrganizationService
 ) =>
   inngest.createFunction(
     { id: 'agent-digest', concurrency: 1 },
@@ -17,7 +17,7 @@ export const createAgentDigest = (
       }
 
       const orgIds = await step.run('get-org-ids', () =>
-        organizationRepository.getAllIds().then((rows) => rows.map((r) => r.id))
+        organizationService.getAllIds().then((rows) => rows.map((r) => r.id))
       );
 
       if (orgIds.length > 0) {

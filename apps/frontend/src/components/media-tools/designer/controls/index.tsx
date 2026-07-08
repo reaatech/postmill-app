@@ -438,12 +438,14 @@ export interface SegmentedControlProps {
   value: string;
   options: SegmentedOption[];
   onChange: (v: string) => void;
+  id?: string;
 }
 
 export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   value,
   options,
   onChange,
+  id,
 }) => {
   const move = (dir: 1 | -1) => {
     const idx = options.findIndex((o) => o.value === value);
@@ -453,6 +455,7 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
 
   return (
     <div
+      id={id}
       role="radiogroup"
       className="inline-flex p-[3px] rounded-[8px] bg-newBgColor border border-studioBorder gap-[3px]"
     >

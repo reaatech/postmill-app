@@ -125,7 +125,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     clientId?: string
   ): Promise<{ id: string; name: string; username: string; picture?: string }> {
-    const userResponse = await fetch('https://api.twitch.tv/helix/users', {
+    const userResponse = await this.fetch('https://api.twitch.tv/helix/users', {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -151,7 +151,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     clientId: string,
     color: string = 'primary'
   ): Promise<{ success: boolean }> {
-    await fetch(
+    await this.fetch(
       `https://api.twitch.tv/helix/chat/announcements?broadcaster_id=${broadcasterId}&moderator_id=${broadcasterId}`,
       {
         method: 'POST',

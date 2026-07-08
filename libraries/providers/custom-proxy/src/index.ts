@@ -1,2 +1,3 @@
 import { customproxyVpnModule } from './v1';
-export default [customproxyVpnModule];
+const customproxyProviderModules = [customproxyVpnModule];
+export default customproxyProviderModules;

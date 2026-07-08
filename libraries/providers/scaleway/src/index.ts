@@ -1,2 +1,3 @@
 import { scalewayStorageModule } from './v1';
-export default [scalewayStorageModule];
+const scalewayProviderModules = [scalewayStorageModule];
+export default scalewayProviderModules;

@@ -65,6 +65,7 @@ export const MyDesignsPanel: FC<MyDesignsPanelProps> = ({ onOpen, onClose }) => 
               className="group relative border border-[#2a2a4a] rounded-lg overflow-hidden hover:border-designerAccent/50 transition-colors cursor-pointer bg-newBgColorInner"
             >
               {d.previewDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- data URL preview
                 <img
                   src={d.previewDataUrl}
                   alt={d.name}

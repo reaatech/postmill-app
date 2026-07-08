@@ -179,6 +179,10 @@ export class OrganizationService {
     );
   }
 
+  getImpersonateUser(name: string) {
+    return this._organizationRepository.getImpersonateUser(name);
+  }
+
   async completeSetup(orgId: string) {
     const activeProvider = await this._orgAiSettingsService.getActiveProvider(orgId);
     if (!activeProvider) {

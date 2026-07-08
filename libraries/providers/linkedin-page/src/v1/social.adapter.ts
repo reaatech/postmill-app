@@ -313,7 +313,7 @@ export class LinkedinPageProvider
     // missing permissions — default all three so a partial failure degrades to
     // empty data instead of throwing (matches the facebook provider pattern).
     const { elements = [] }: { elements: Root[]; paging: any } = await (
-      await fetch(
+      await this.fetch(
         `https://api.linkedin.com/v2/organizationPageStatistics?q=organization&organization=${encodeURIComponent(
           `urn:li:organization:${id}`
         )}&timeIntervals=(timeRange:(start:${startDate},end:${endDate}),timeGranularityType:DAY)`,
@@ -328,7 +328,7 @@ export class LinkedinPageProvider
     ).json();
 
     const { elements: elements2 = [] }: { elements: Root[]; paging: any } = await (
-      await fetch(
+      await this.fetch(
         `https://api.linkedin.com/v2/organizationalEntityFollowerStatistics?q=organizationalEntity&organizationalEntity=${encodeURIComponent(
           `urn:li:organization:${id}`
         )}&timeIntervals=(timeRange:(start:${startDate},end:${endDate}),timeGranularityType:DAY)`,
@@ -343,7 +343,7 @@ export class LinkedinPageProvider
     ).json();
 
     const { elements: elements3 = [] }: { elements: Root[]; paging: any } = await (
-      await fetch(
+      await this.fetch(
         `https://api.linkedin.com/v2/organizationalEntityShareStatistics?q=organizationalEntity&organizationalEntity=${encodeURIComponent(
           `urn:li:organization:${id}`
         )}&timeIntervals=(timeRange:(start:${startDate},end:${endDate}),timeGranularityType:DAY)`,

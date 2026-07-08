@@ -23,55 +23,10 @@ import {
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
-
-interface ChannelVpnSelectionBody {
-  enabled: boolean;
-  identifier?: string;
-  regionId?: string;
-  vpnVersion?: string;
-}
-
-interface ChannelConfigBody {
-  name?: string;
-  enabled?: boolean;
-  clientId?: string;
-  clientSecret?: string;
-  redirectUri?: string;
-  scopes?: string;
-  additionalConfig?: string;
-  setupNotes?: string;
-  vpnSelection?: ChannelVpnSelectionBody | null;
-  version?: string;
-}
-
-function validateBody(body: ChannelConfigBody) {
-  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
-    throw new BadRequestException('enabled must be a boolean');
-  }
-  for (const key of ['name', 'clientId', 'clientSecret', 'redirectUri', 'scopes', 'setupNotes', 'additionalConfig', 'version'] as const) {
-    if (body[key] !== undefined && typeof body[key] !== 'string') {
-      throw new BadRequestException(`${key} must be a string`);
-    }
-  }
-  if (body.additionalConfig) {
-    try {
-      JSON.parse(body.additionalConfig);
-    } catch {
-      throw new BadRequestException('additionalConfig must be valid JSON');
-    }
-  }
-  if (body.vpnSelection !== undefined && body.vpnSelection !== null) {
-    const v = body.vpnSelection;
-    if (typeof v !== 'object' || typeof v.enabled !== 'boolean') {
-      throw new BadRequestException('vpnSelection.enabled must be a boolean');
-    }
-    for (const key of ['identifier', 'regionId', 'vpnVersion'] as const) {
-      if (v[key] !== undefined && typeof v[key] !== 'string') {
-        throw new BadRequestException(`vpnSelection.${key} must be a string`);
-      }
-    }
-  }
-}
+import {
+  CreateChannelConfigDto,
+  UpdateChannelConfigDto,
+} from './channel-config.per-tenant.dto';
 
 @ApiTags('Channel Config')
 @Controller('/channels/config')
@@ -153,17 +108,10 @@ export class ChannelConfigPerTenantController {
   async createConfig(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Body() body: ChannelConfigBody & { identifier?: string }
+    @Body() body: CreateChannelConfigDto
   ) {
-    validateBody(body);
-    if (!body.identifier || typeof body.identifier !== 'string') {
-      throw new BadRequestException('identifier is required');
-    }
     if (!this._integrationManager.getSocialIntegrationUnchecked(body.identifier)) {
       throw new BadRequestException('Unknown provider');
-    }
-    if (!body.name?.trim()) {
-      throw new BadRequestException('A channel name is required');
     }
 
     const result = await this._orgProviderConfigService.createConfig(
@@ -194,10 +142,8 @@ export class ChannelConfigPerTenantController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body() body: ChannelConfigBody
+    @Body() body: UpdateChannelConfigDto
   ) {
-    validateBody(body);
-
     const result = await this._orgProviderConfigService.updateConfig(
       org.id,
       id,

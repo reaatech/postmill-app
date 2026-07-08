@@ -38,10 +38,11 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
       <h3 className="text-[14px] font-medium text-textColor">Generate AI voiceover</h3>
 
       <div>
-        <label className="block text-[12px] text-newTextColor/70 mb-[6px]">
+        <label htmlFor="voiceover-script" className="block text-[12px] text-newTextColor/70 mb-[6px]">
           Script <span className="text-amber-600">*</span>
         </label>
         <textarea
+          id="voiceover-script"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Type the voiceover text…"
@@ -51,7 +52,7 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
       </div>
 
       <div>
-        <label className="block text-[12px] text-newTextColor/70 mb-[6px]">
+        <label htmlFor="voiceover-voice" className="block text-[12px] text-newTextColor/70 mb-[6px]">
           Voice <span className="text-amber-600">*</span>
         </label>
         {isLoading && (
@@ -64,6 +65,7 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
         )}
         {!isLoading && !error && (
           <select
+            id="voiceover-voice"
             value={selectedVoice}
             onChange={(e) => setSelectedVoice(e.target.value)}
             className={inputClass}

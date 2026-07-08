@@ -224,9 +224,10 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
 
       {/* Source */}
       <div className="flex flex-col gap-[8px]">
-        <label className="text-[12px] font-[600] text-textColor">Source</label>
+        <label htmlFor="deepgram-source" className="text-[12px] font-[600] text-textColor">Source</label>
         <div className="flex items-center gap-[10px] flex-wrap">
           <button
+            id="deepgram-source"
             type="button"
             onClick={() => setPickerOpen(true)}
             className="px-[14px] py-[9px] rounded-[8px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
@@ -244,8 +245,9 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
       {/* Options */}
       <div className="flex gap-[14px] flex-wrap">
         <div className="flex flex-col gap-[6px]">
-          <label className="text-[12px] font-[600] text-textColor">Model</label>
+          <label htmlFor="deepgram-model" className="text-[12px] font-[600] text-textColor">Model</label>
           <select
+            id="deepgram-model"
             value={model}
             onChange={(e) => setModel(e.target.value)}
             className="h-[38px] px-[10px] rounded-[8px] border border-studioBorder bg-newBgColorInner text-[13px] text-textColor"
@@ -258,8 +260,9 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
           </select>
         </div>
         <div className="flex flex-col gap-[6px]">
-          <label className="text-[12px] font-[600] text-textColor">Language</label>
+          <label htmlFor="deepgram-language" className="text-[12px] font-[600] text-textColor">Language</label>
           <input
+            id="deepgram-language"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
             placeholder="auto-detect"
@@ -281,8 +284,9 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
       {result && (
         <div className="flex flex-col gap-[14px] border-t border-studioBorder pt-[18px]">
           <div className="flex flex-col gap-[8px]">
-            <label className="text-[12px] font-[600] text-textColor">Transcript</label>
+            <label htmlFor="deepgram-transcript" className="text-[12px] font-[600] text-textColor">Transcript</label>
             <textarea
+              id="deepgram-transcript"
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
               rows={6}

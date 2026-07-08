@@ -1,2 +1,3 @@
 import { higgsfieldMediaModule } from './v1';
-export default [higgsfieldMediaModule];
+const higgsfieldProviderModules = [higgsfieldMediaModule];
+export default higgsfieldProviderModules;

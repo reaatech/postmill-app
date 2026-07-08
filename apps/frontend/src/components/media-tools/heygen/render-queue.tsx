@@ -76,10 +76,14 @@ export const RenderQueue: FC<{ jobs: HeyGenJob[] | undefined; isLoading: boolean
         return (
           <div key={job.id} className="rounded-[10px] border border-studioBorder bg-newBgColorInner overflow-hidden">
             {job.status === 'completed' && previewUrl && !isAudio && (
-              <video src={previewUrl} className="w-full aspect-video object-cover bg-black" controls preload="metadata" />
+              <video src={previewUrl} className="w-full aspect-video object-cover bg-black" controls preload="metadata" aria-label="Generated video preview">
+                <track kind="captions" srcLang="en" label="English" />
+              </video>
             )}
             {job.status === 'completed' && previewUrl && isAudio && (
-              <audio src={previewUrl} className="w-full" controls preload="metadata" />
+              <audio src={previewUrl} className="w-full" controls preload="metadata" aria-label="Generated audio preview">
+                <track kind="captions" srcLang="en" label="English" />
+              </audio>
             )}
             <div className="flex items-center justify-between gap-[8px] px-[10px] py-[8px]">
               <div className="min-w-0">

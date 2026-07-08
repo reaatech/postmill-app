@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Fragment, useEffect, useMemo, useState } from 'react';
+import React, { Fragment, useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { useCalendar } from './context';
 import { CalendarItem } from './card';
@@ -48,10 +48,8 @@ export const ListView = () => {
   const DAYS_PER_PAGE = 7;
   const [page, setPage] = useState(0);
   const totalPages = Math.max(1, Math.ceil(groupedPosts.length / DAYS_PER_PAGE));
-  // Reset to the first page whenever the underlying set changes (window/filters).
-  useEffect(() => {
-    setPage(0);
-  }, [groupedPosts]);
+  // Clamp the page in case the underlying set shrinks (window/filters); no
+  // effect-derived reset is needed because `safePage` is derived from state.
   const safePage = Math.min(page, totalPages - 1);
   const pageGroups = groupedPosts.slice(
     safePage * DAYS_PER_PAGE,

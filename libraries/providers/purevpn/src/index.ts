@@ -1,2 +1,3 @@
 import { purevpnVpnModule } from './v1';
-export default [purevpnVpnModule];
+const purevpnProviderModules = [purevpnVpnModule];
+export default purevpnProviderModules;

@@ -1,3 +1,4 @@
 export * from './v1';
 import { skoolSocialModule } from './v1';
-export default [skoolSocialModule];
+const skoolProviderModules = [skoolSocialModule];
+export default skoolProviderModules;

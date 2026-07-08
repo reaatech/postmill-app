@@ -1,2 +1,3 @@
 import { sesEmailModule } from './v1';
-export default [sesEmailModule];
+const sesProviderModules = [sesEmailModule];
+export default sesProviderModules;

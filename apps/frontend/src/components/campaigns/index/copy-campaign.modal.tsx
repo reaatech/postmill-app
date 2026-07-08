@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -23,6 +23,11 @@ export const CopyCampaignModal: FC<{ campaignId: string; name: string; onDone: (
   const [shiftDates, setShiftDates] = useState(false);
   const [resetSchedule, setResetSchedule] = useState(false);
   const [loading, setLoading] = useState(false);
+  const copyNameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    copyNameInputRef.current?.focus();
+  }, []);
 
   const copy = useCallback(async () => {
     setLoading(true);
@@ -56,12 +61,12 @@ export const CopyCampaignModal: FC<{ campaignId: string; name: string; onDone: (
           {t('copy_name', 'Copy name')}
         </label>
         <input
+          ref={copyNameInputRef}
           type="text"
           value={copyName}
           onChange={(e) => setCopyName(e.target.value)}
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
           placeholder={t('campaign_name_placeholder', 'Campaign name')}
-          autoFocus
         />
       </div>
 

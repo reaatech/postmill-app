@@ -636,10 +636,14 @@ export class AnalyticsRepository {
   }
 
   updatePostCounters(
+    orgId: string,
     postId: string,
     data: { lastViews?: number; lastLikes?: number; lastComments?: number },
   ) {
-    return this._post.model.post.update({ where: { id: postId }, data });
+    return this._post.model.post.update({
+      where: { id: postId, organizationId: orgId },
+      data,
+    });
   }
 
   deletePostSnapshotsBefore(orgId: string, cutoff: Date) {
@@ -733,14 +737,14 @@ export class AnalyticsRepository {
     ]);
   }
 
-  findIntegrationByIdRaw(integrationId: string, organizationId?: string) {
+  findIntegrationByIdRaw(integrationId: string, organizationId: string) {
     // ANALYTICS-01: Integration has `id @id` and a separate @@unique on
     // (organizationId, internalId), but no unique index on (id, organizationId).
     // `findUnique` with both fields would throw at runtime, so we use `findFirst`.
     return this._integration.model.integration.findFirst({
       where: {
         id: integrationId,
-        ...(organizationId ? { organizationId } : {}),
+        organizationId,
       },
     });
   }
@@ -875,6 +879,14 @@ export class AnalyticsRepository {
     return this._prisma.analyticsAlertRule.updateMany({
       where: { id, organizationId: orgId },
       data,
+    });
+  }
+
+  // P2: batch stamp lastFiredAt on every rule that fired this run.
+  updateAlertRulesLastFiredAt(orgId: string, ids: string[], lastFiredAt: Date) {
+    return this._prisma.analyticsAlertRule.updateMany({
+      where: { id: { in: ids }, organizationId: orgId },
+      data: { lastFiredAt },
     });
   }
 

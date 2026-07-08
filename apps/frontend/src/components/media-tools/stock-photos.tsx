@@ -121,14 +121,14 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Search photos..."
-            className="w-full h-[44px] pl-[38px] pr-[34px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
+            className="w-full h-[44px] pl-[38px] pr-[34px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-btnPrimary text-textColor"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
               aria-label="Clear search"
-              className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/40 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
+              className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/40 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
             >
               ✕
             </button>
@@ -157,9 +157,9 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
           type="button"
           onClick={() => setColor('')}
           aria-pressed={color === ''}
-          className={`h-[30px] px-[12px] rounded-full border text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] ${
+          className={`h-[30px] px-[12px] rounded-full border text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary ${
             color === ''
-              ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-[#2B5CD3] font-[500]'
+              ? 'border-btnPrimary bg-btnPrimary/15 text-btnPrimary font-[500]'
               : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
           }`}
         >
@@ -173,8 +173,8 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
             aria-pressed={color === c.value}
             aria-label={`Color: ${c.label}`}
             title={c.label}
-            className={`relative w-[30px] h-[30px] rounded-full border transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] hover:scale-110 ${
-              color === c.value ? 'border-[#2B5CD3] ring-2 ring-[#2B5CD3]/40' : 'border-newColColor'
+            className={`relative w-[30px] h-[30px] rounded-full border transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary hover:scale-110 ${
+              color === c.value ? 'border-btnPrimary ring-2 ring-btnPrimary/40' : 'border-newColColor'
             }`}
           >
             <span
@@ -202,7 +202,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
           <button
             type="button"
             onClick={() => mutate()}
-            className="mt-[6px] px-[16px] h-[36px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] hover:bg-[#1e4ab5] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
+            className="mt-[6px] px-[16px] h-[36px] rounded-[8px] bg-btnPrimary text-white text-[13px] hover:bg-[#1e4ab5] focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
           >
             Try again
           </button>
@@ -240,7 +240,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
                 key={s}
                 type="button"
                 onClick={() => setQuery(s)}
-                className="h-[30px] px-[14px] rounded-full border border-newColColor text-[12px] text-newTextColor/70 hover:text-[#2B5CD3] hover:border-[#2B5CD3] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
+                className="h-[30px] px-[14px] rounded-full border border-newColColor text-[12px] text-newTextColor/70 hover:text-btnPrimary hover:border-btnPrimary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
               >
                 {s}
               </button>
@@ -285,12 +285,13 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
                     activate();
                   }
                 }}
-                className="group block w-full mb-[12px] break-inside-avoid text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
+                className="group block w-full mb-[12px] break-inside-avoid text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
               >
                 <div
                   className="relative overflow-hidden"
                   style={{ aspectRatio: photo.width && photo.height ? `${photo.width} / ${photo.height}` : '4 / 3' }}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external stock thumbnail */}
                   <img
                     src={photo.thumbUrl}
                     alt={photo.description || ''}
@@ -314,7 +315,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={e => e.stopPropagation()}
-                      className="text-[#2B5CD3] hover:underline"
+                      className="text-btnPrimary hover:underline"
                     >
                       {photo.author}
                     </a>

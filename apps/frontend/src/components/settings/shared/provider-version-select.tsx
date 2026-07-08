@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   CatalogCredentialField,
   ProviderCatalogEntry,
@@ -38,21 +38,16 @@ export function useProviderVersionSelection(
     );
   }, [versions, initialVersion]);
 
-  const [selected, setSelected] = useState<string | undefined>(defaultVersion);
-
-  // Adopt the resolved default once the catalog loads (only while untouched).
   const [touched, setTouched] = useState(false);
-  useEffect(() => {
-    if (!touched) {
-      // Sync selected version to the catalog default before the user touches it.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSelected(defaultVersion);
-    }
-  }, [defaultVersion, touched]);
+  const [userSelected, setUserSelected] = useState<string | undefined>(undefined);
+
+  // The user selection wins once they touch the control; otherwise track the
+  // resolved default as the catalog loads.
+  const selected = touched ? userSelected : defaultVersion;
 
   const selectVersion = (v: string) => {
     setTouched(true);
-    setSelected(v);
+    setUserSelected(v);
   };
 
   const selectedEntry = versions.find((v) => v.version === selected);

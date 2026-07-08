@@ -31,6 +31,7 @@ function mockResponse() {
 function makeController(overrides: {
   authService?: Partial<AuthService>;
   emailService?: any;
+  authProviderManager?: any;
 } = {}) {
   const authService = {
     getOrgFromCookie: vi.fn().mockReturnValue(false),
@@ -45,20 +46,18 @@ function makeController(overrides: {
     ...overrides.emailService,
   };
 
-  const authProviderRepository = { list: vi.fn().mockResolvedValue([]) };
-  const kernel = {
-    latestActive: vi.fn().mockReturnValue(undefined),
-    versions: vi.fn().mockReturnValue([]),
+  const authProviderManager = {
+    getProviders: vi.fn().mockResolvedValue({ providers: [] }),
+    ...overrides.authProviderManager,
   };
 
   const controller = new AuthController(
     authService,
     emailService as any,
-    authProviderRepository as any,
-    kernel as any
+    authProviderManager as any
   );
 
-  return { controller, authService, emailService };
+  return { controller, authService, emailService, authProviderManager };
 }
 
 const ORIGINAL_ENV = { ...process.env };
@@ -182,6 +181,25 @@ describe('AuthController — F1 behavioural tests', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.send).toHaveBeenCalledWith('Invalid credentials');
       expect(res.cookie).not.toHaveBeenCalledWith('auth', expect.anything(), expect.anything());
+    });
+  });
+
+  describe('GET /providers', () => {
+    it('delegates provider-list composition to AuthProviderManager', async () => {
+      const { controller, authProviderManager } = makeController({
+        authProviderManager: {
+          getProviders: vi.fn().mockResolvedValue({
+            providers: [{ provider: 'LOCAL', displayName: 'Email', version: 'v1', status: 'active' }],
+          }),
+        },
+      });
+
+      const result = await controller.getProviders();
+
+      expect(authProviderManager.getProviders).toHaveBeenCalled();
+      expect(result).toEqual({
+        providers: [{ provider: 'LOCAL', displayName: 'Email', version: 'v1', status: 'active' }],
+      });
     });
   });
 

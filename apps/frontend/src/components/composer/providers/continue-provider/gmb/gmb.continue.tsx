@@ -51,6 +51,7 @@ export const GmbContinue = withContinueProvider<GmbItem, GmbSelection>({
     <>
       <div className="flex justify-center">
         {item.picture?.data?.url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external social profile picture
           <img
             className="w-[80px] h-[80px] object-cover rounded-[8px]"
             src={item.picture.data.url}

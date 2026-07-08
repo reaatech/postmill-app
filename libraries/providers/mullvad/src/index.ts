@@ -1,2 +1,3 @@
 import { mullvadVpnModule } from './v1';
-export default [mullvadVpnModule];
+const mullvadProviderModules = [mullvadVpnModule];
+export default mullvadProviderModules;

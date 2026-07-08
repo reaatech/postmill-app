@@ -1,11 +1,11 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { MediaJobsActivity } from '@gitroom/nestjs-libraries/inngest/activities/media-jobs.activity';
-import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
 import { trackRun } from './track-run';
 
 export const createMediaJobsPoll = (
   mediaJobsActivity: MediaJobsActivity,
-  runRepo: InngestRunRepository
+  runRepo: InngestRunService
 ) =>
   inngest.createFunction(
     { id: 'media-jobs-poll', concurrency: 1 },

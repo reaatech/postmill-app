@@ -40,7 +40,7 @@ export const LifetimeDeal = () => {
       toast.show('Code already claimed or invalid code', 'warning');
     }
     setCode('');
-  }, [code]);
+  }, [code, fetch, fireEvents, mutate, toast]);
   const nextPackage = useMemo(() => {
     if (user?.tier?.current === 'STANDARD') {
       return 'PRO';

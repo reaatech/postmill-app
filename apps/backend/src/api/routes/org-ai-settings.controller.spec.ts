@@ -2,9 +2,7 @@ import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OrgAiSettingsController } from './org-ai-settings.controller';
 import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
-import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
-import { DefaultsSettingsValidator } from '@gitroom/nestjs-libraries/ai/defaults/defaults-settings.validator';
-import { OrgDefaultModelRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-default-model.repository';
+import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 
 const mockRedisKeys = vi.fn();
 const mockRedisDel = vi.fn();
@@ -16,18 +14,6 @@ vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
     del: (...args: any[]) => mockRedisDel(...args),
     keys: (...args: any[]) => mockRedisKeys(...args),
   },
-}));
-
-const mockResolveAI = vi.fn();
-vi.mock('@gitroom/nestjs-libraries/providers/provider-resolution.service', () => ({
-  ProviderResolutionService: class {
-    resolveAI = mockResolveAI;
-  },
-}));
-
-const mockKernelListManifests = vi.fn().mockReturnValue([]);
-vi.mock('@gitroom/nestjs-libraries/providers/providers.module', () => ({
-  PROVIDER_KERNEL: 'PROVIDER_KERNEL',
 }));
 
 const mockOrgAiUpsert = vi.fn();
@@ -49,36 +35,27 @@ vi.mock(
   }),
 );
 
-const mockDefaultsResolve = vi.fn();
-const mockDefaultsCandidates = vi.fn();
+const mockDefaultsServiceListProviders = vi.fn();
+const mockDefaultsServiceGetProviderConfigSummary = vi.fn();
+const mockDefaultsServiceResolveAdapter = vi.fn();
+const mockDefaultsServiceBustCache = vi.fn();
+const mockDefaultsServiceGetModelDefaults = vi.fn();
+const mockDefaultsServiceSetModelDefault = vi.fn();
+const mockDefaultsServiceClearModelDefault = vi.fn();
+const mockDefaultsServiceGetModelDefaultsCatalog = vi.fn();
 
-vi.mock(
-  '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service',
-  () => ({
-    DefaultsResolutionService: class {
-      resolve = mockDefaultsResolve;
-      resolveAll = vi.fn();
-      candidates = mockDefaultsCandidates;
-    },
-  }),
-);
-
-const mockRepositoryGet = vi.fn();
-const mockRepositoryUpsert = vi.fn();
-const mockRepositoryGetAll = vi.fn();
-const mockRepositoryRemove = vi.fn();
-
-vi.mock(
-  '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-default-model.repository',
-  () => ({
-    OrgDefaultModelRepository: class {
-      get = mockRepositoryGet;
-      upsert = mockRepositoryUpsert;
-      getAll = mockRepositoryGetAll;
-      remove = mockRepositoryRemove;
-    },
-  }),
-);
+function makeDefaultsService(seedService?: DefaultsSeedService): AiDefaultsService {
+  return {
+    listProviders: mockDefaultsServiceListProviders,
+    getProviderConfigSummary: mockDefaultsServiceGetProviderConfigSummary,
+    resolveAdapter: mockDefaultsServiceResolveAdapter,
+    bustDefaultsCatalogCache: mockDefaultsServiceBustCache,
+    getModelDefaults: mockDefaultsServiceGetModelDefaults,
+    setModelDefault: mockDefaultsServiceSetModelDefault,
+    clearModelDefault: mockDefaultsServiceClearModelDefault,
+    getModelDefaultsCatalog: mockDefaultsServiceGetModelDefaultsCatalog,
+  } as unknown as AiDefaultsService;
+}
 
 const mockOrganizationGetAllIds = vi.fn();
 vi.mock(
@@ -106,84 +83,72 @@ function stubAdapter(identifier = 'openai') {
 function makeController(seedService?: DefaultsSeedService) {
   return new OrgAiSettingsController(
     new (OrgAiSettingsService as any)(),
+    makeDefaultsService(seedService),
     seedService ?? (new (DefaultsSeedService as any)() as DefaultsSeedService),
-    new (DefaultsResolutionService as any)(),
-    new (OrgDefaultModelRepository as any)(),
-    new (ProviderResolutionService as any)(),
-    { validate: (_domain: any, _category: any, settings: any) => settings } as any,
-    {
-      listManifests: mockKernelListManifests,
-    } as any,
   );
 }
 
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
-import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
-describe('OrgAiSettingsController — seed + cache invalidation', () => {
+describe('OrgAiSettingsController — provider config + cache invalidation', () => {
   let controller: OrgAiSettingsController;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockResolveAI.mockReturnValue(stubAdapter());
+    mockDefaultsServiceResolveAdapter.mockReturnValue(stubAdapter());
     mockOrgAiUpsert.mockResolvedValue({ identifier: 'openai' });
     mockOrgAiSetActive.mockResolvedValue({ isActive: true });
     mockRedisKeys.mockResolvedValue([]);
     mockRedisDel.mockResolvedValue(0);
   });
 
-  it('enabling a provider seeds unset OrgDefaultModel rows and leaves existing rows untouched', async () => {
-    const storedRows: Record<string, any> = {
-      'ai:low-reasoning': {
-        providerId: 'openai',
-        version: 'v1',
-        model: 'existing-model',
-        settings: null,
-      },
-    };
+  it('listProviders delegates to AiDefaultsService', async () => {
+    mockDefaultsServiceListProviders.mockResolvedValue([{ identifier: 'openai' }]);
+    controller = makeController();
+    const result = await controller.listProviders();
+    expect(mockDefaultsServiceListProviders).toHaveBeenCalled();
+    expect(result).toEqual([{ identifier: 'openai' }]);
+  });
 
-    mockRepositoryGet.mockImplementation(
-      (_orgId: string, domain: string, category: string) => {
-        const key = `${domain}:${category}`;
-        return Promise.resolve(storedRows[key] ?? null);
-      },
-    );
-
-    mockDefaultsResolve.mockResolvedValue({
-      providerId: 'openai',
-      version: 'v1',
-      model: 'gpt-4.1',
-      source: 'auto',
+  it('getConfig delegates to AiDefaultsService', async () => {
+    mockDefaultsServiceGetProviderConfigSummary.mockResolvedValue({
+      active: null,
+      providers: [],
     });
+    controller = makeController();
+    const result = await controller.getConfig(org);
+    expect(mockDefaultsServiceGetProviderConfigSummary).toHaveBeenCalledWith('org-1');
+    expect(result).toEqual({ active: null, providers: [] });
+  });
 
-    const seedService = new DefaultsSeedService(
-      new (OrgDefaultModelRepository as any)() as OrgDefaultModelRepository,
-      new (DefaultsResolutionService as any)() as DefaultsResolutionService,
-      { getAllIds: mockOrganizationGetAllIds } as any,
-    );
-    const seedSpy = vi.spyOn(seedService, 'seedUnset');
-
-    controller = makeController(seedService);
+  it('upsertConfig validates provider and busts catalog cache', async () => {
+    controller = makeController();
     const result = await controller.upsertConfig(org, 'openai', {
       credentials: { apiKey: 'sk-test' },
     });
 
     expect(result).toEqual({ identifier: 'openai', success: true });
+    expect(mockDefaultsServiceResolveAdapter).toHaveBeenCalledWith('openai', undefined);
+    expect(mockOrgAiUpsert).toHaveBeenCalled();
+    expect(mockDefaultsServiceBustCache).toHaveBeenCalledWith('org-1');
+  });
 
-    // The controller fires seeding asynchronously; await it before asserting.
-    await seedSpy.mock.results[0].value;
+  it('setActive busts catalog cache', async () => {
+    controller = makeController();
+    const result = await controller.setActive(org, 'openai');
 
-    // The existing low-reasoning row must not be overwritten.
-    const upsertCalls = mockRepositoryUpsert.mock.calls.map(
-      (c: any) => `${c[1]}:${c[2]}`,
-    );
-    expect(upsertCalls).not.toContain('ai:low-reasoning');
+    expect(result).toEqual({ identifier: 'openai', isActive: true });
+    expect(mockOrgAiSetActive).toHaveBeenCalledWith('org-1', 'openai', undefined);
+    expect(mockDefaultsServiceBustCache).toHaveBeenCalledWith('org-1');
+  });
 
-    // Other AI categories should have been seeded.
-    expect(upsertCalls.length).toBeGreaterThan(0);
-    expect(upsertCalls).toContain('ai:high-reasoning');
-    expect(upsertCalls).toContain('ai:workflow');
-    expect(upsertCalls).toContain('ai:vision');
+  it('deleteConfig busts catalog cache', async () => {
+    controller = makeController();
+    const result = await controller.deleteConfig(org, 'openai');
+
+    expect(result).toEqual({ success: true });
+    expect(mockOrgAiDelete).toHaveBeenCalledWith('org-1', 'openai');
+    expect(mockDefaultsServiceBustCache).toHaveBeenCalledWith('org-1');
   });
 
   it('keeps the config call successful even if seeding throws', async () => {
@@ -200,108 +165,62 @@ describe('OrgAiSettingsController — seed + cache invalidation', () => {
     expect(result).toEqual({ identifier: 'openai', success: true });
     expect(seedService.seedUnset).toHaveBeenCalledWith('org-1');
   });
-
-  it('busts both AI and media defaults catalog caches on provider change', async () => {
-    mockRedisKeys
-      .mockResolvedValueOnce([
-        'settings:ai:defaults:catalog:org-1:low-reasoning',
-      ])
-      .mockResolvedValueOnce([
-        'settings:content:media-defaults:catalog:org-1:text-to-image',
-      ]);
-
-    controller = makeController();
-    await controller.upsertConfig(org, 'openai', {
-      credentials: { apiKey: 'sk-test' },
-    });
-
-    expect(mockRedisKeys).toHaveBeenCalledWith(
-      'settings:ai:defaults:catalog:org-1:*',
-    );
-    expect(mockRedisKeys).toHaveBeenCalledWith(
-      'settings:content:media-defaults:catalog:org-1:*',
-    );
-    expect(mockRedisDel).toHaveBeenCalledWith(
-      'settings:ai:defaults:catalog:org-1:low-reasoning',
-    );
-    expect(mockRedisDel).toHaveBeenCalledWith(
-      'settings:content:media-defaults:catalog:org-1:text-to-image',
-    );
-  });
-
-  it('busts both caches on set-active and delete', async () => {
-    mockRedisKeys.mockResolvedValue([]);
-
-    controller = makeController();
-    await controller.setActive(org, 'openai');
-    expect(mockRedisKeys).toHaveBeenCalledWith(
-      'settings:ai:defaults:catalog:org-1:*',
-    );
-    expect(mockRedisKeys).toHaveBeenCalledWith(
-      'settings:content:media-defaults:catalog:org-1:*',
-    );
-
-    vi.clearAllMocks();
-    mockRedisKeys.mockResolvedValue([]);
-    await controller.deleteConfig(org, 'openai');
-    expect(mockRedisKeys).toHaveBeenCalledWith(
-      'settings:ai:defaults:catalog:org-1:*',
-    );
-    expect(mockRedisKeys).toHaveBeenCalledWith(
-      'settings:content:media-defaults:catalog:org-1:*',
-    );
-  });
 });
 
-describe('OrgAiSettingsController — model defaults validation', () => {
-  const validator = new (DefaultsSettingsValidator as any)({} as any);
-
-  function makeControllerWithValidator() {
-    return new OrgAiSettingsController(
-      new (OrgAiSettingsService as any)(),
-      { seedUnset: vi.fn() } as any,
-      new (DefaultsResolutionService as any)(),
-      new (OrgDefaultModelRepository as any)(),
-      new (ProviderResolutionService as any)(),
-      validator,
-      { listManifests: vi.fn().mockReturnValue([]) } as any,
-    );
-  }
-
+describe('OrgAiSettingsController — model defaults delegation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRepositoryUpsert.mockResolvedValue(undefined);
-    mockRedisKeys.mockResolvedValue([]);
-    mockRedisDel.mockResolvedValue(0);
   });
 
-  it('PUT /settings/ai/defaults/:category strips prompt and persists cleaned settings', async () => {
-    const controller = makeControllerWithValidator();
-    await controller.setModelDefault(org, 'low-reasoning', {
-      providerId: 'openai',
-      version: 'v1',
-      model: 'gpt-4.1',
-      settings: { prompt: 'ignored', temperature: 0.7 },
-    } as any);
+  it('GET /settings/ai/defaults delegates to AiDefaultsService', async () => {
+    mockDefaultsServiceGetModelDefaults.mockResolvedValue({ categories: [] });
+    const controller = makeController();
+    const result = await controller.getModelDefaults(org);
+    expect(mockDefaultsServiceGetModelDefaults).toHaveBeenCalledWith('org-1');
+    expect(result).toEqual({ categories: [] });
+  });
 
-    expect(mockRepositoryUpsert).toHaveBeenCalledWith(
+  it('PUT /settings/ai/defaults/:category delegates to AiDefaultsService', async () => {
+    mockDefaultsServiceSetModelDefault.mockResolvedValue({
+      category: 'low-reasoning',
+      success: true,
+    });
+    const controller = makeController();
+    const body = { providerId: 'openai', version: 'v1', model: 'gpt-4.1' } as any;
+    const result = await controller.setModelDefault(org, 'low-reasoning', body);
+    expect(mockDefaultsServiceSetModelDefault).toHaveBeenCalledWith(
       'org-1',
-      'ai',
       'low-reasoning',
-      expect.objectContaining({
-        settings: { temperature: 0.7 },
-      }),
+      body,
     );
+    expect(result).toEqual({ category: 'low-reasoning', success: true });
   });
 
-  it('PUT rejects unknown AI settings keys', async () => {
-    const controller = makeControllerWithValidator();
-    await expect(
-      controller.setModelDefault(org, 'low-reasoning', {
-        providerId: 'openai',
-        version: 'v1',
-        settings: { unknownKey: 'x' },
-      } as any),
-    ).rejects.toMatchObject({ status: 400 });
+  it('DELETE /settings/ai/defaults/:category delegates to AiDefaultsService', async () => {
+    mockDefaultsServiceClearModelDefault.mockResolvedValue({
+      category: 'low-reasoning',
+      success: true,
+    });
+    const controller = makeController();
+    const result = await controller.clearModelDefault(org, 'low-reasoning');
+    expect(mockDefaultsServiceClearModelDefault).toHaveBeenCalledWith(
+      'org-1',
+      'low-reasoning',
+    );
+    expect(result).toEqual({ category: 'low-reasoning', success: true });
+  });
+
+  it('GET /settings/ai/defaults/catalog delegates to AiDefaultsService', async () => {
+    mockDefaultsServiceGetModelDefaultsCatalog.mockResolvedValue({
+      category: 'low-reasoning',
+      options: [],
+    });
+    const controller = makeController();
+    const result = await controller.getModelDefaultsCatalog(org, 'low-reasoning');
+    expect(mockDefaultsServiceGetModelDefaultsCatalog).toHaveBeenCalledWith(
+      'org-1',
+      'low-reasoning',
+    );
+    expect(result).toEqual({ category: 'low-reasoning', options: [] });
   });
 });

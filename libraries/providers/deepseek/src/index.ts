@@ -1,2 +1,3 @@
 import { deepseekAiModule } from './v1';
-export default [deepseekAiModule];
+const deepseekProviderModules = [deepseekAiModule];
+export default deepseekProviderModules;

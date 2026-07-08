@@ -36,6 +36,17 @@ export class StripeService {
     return stripe.webhooks.constructEvent(rawBody, signature, endpointSecret);
   }
 
+  // Idempotency (C1): Stripe redelivers events; check whether we've already processed
+  // this event.id before running the subscription transition again.
+  async isEventProcessed(id: string): Promise<boolean> {
+    return this._stripeEventRepository.exists(id);
+  }
+
+  // Record a successfully processed Stripe event so redeliveries are ignored.
+  async recordEvent(id: string, type: string): Promise<void> {
+    return this._stripeEventRepository.record(id, type);
+  }
+
   // F2(b): record a subscription state transition as a non-fatal audit event. Resolves
   // the org from the Stripe customer id; metadata carries only the new status (no secret).
   private async _auditSubscriptionChanged(customerId: string, status: string) {

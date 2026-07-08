@@ -73,7 +73,7 @@ export const AiErrorDisplay: FC<AiErrorDisplayProps> = ({ error, onDismiss }) =>
         <button
           type="button"
           onClick={onDismiss}
-          className="shrink-0 text-yellow-300/60 hover:text-yellow-100 transition-colors"
+          className="shrink-0 text-amber-600 hover:text-amber-700 transition-colors"
           aria-label={t('dismiss', 'Dismiss')}
         >
           <svg

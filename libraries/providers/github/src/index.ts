@@ -1,2 +1,3 @@
 import { githubAuthModule } from './v1';
-export default [githubAuthModule];
+const githubProviderModules = [githubAuthModule];
+export default githubProviderModules;

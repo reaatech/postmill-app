@@ -1,2 +1,3 @@
 import { bedrockAiModule, bedrockMediaModule } from './v1';
-export default [bedrockAiModule, bedrockMediaModule];
+const bedrockProviderModules = [bedrockAiModule, bedrockMediaModule];
+export default bedrockProviderModules;

@@ -434,6 +434,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
                   className="flex items-center gap-2 px-2 py-1 rounded bg-newBgColorInner border border-newColColor shrink-0"
                 >
                   {item.thumbnail || item.source === 'stock' ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external media thumbnail
                     <img
                       src={item.thumbnail || item.url}
                       alt=""

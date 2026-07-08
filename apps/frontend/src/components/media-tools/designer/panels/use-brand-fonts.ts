@@ -56,7 +56,7 @@ export const useCustomFonts = (): {
     if (typeof document === 'undefined' || !('fonts' in document)) return;
     for (const f of fonts) {
       try {
-        const existing = Array.from(document.fonts.values()).find(
+        const existing = Array.from((document.fonts as any).values()).find(
           (ff: any) => ff.family === f.family
         );
         if (existing) continue;
@@ -64,7 +64,7 @@ export const useCustomFonts = (): {
           weight: f.weights.map(String).join(', ') || '400',
         });
         fontFace.load().then((loaded) => {
-          document.fonts.add(loaded);
+          (document.fonts as any).add(loaded);
         }).catch(() => {});
       } catch {}
     }

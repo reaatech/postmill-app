@@ -103,6 +103,7 @@ export const FacebookPreview: FC<{
     <div className="py-[15px] flex flex-col px-[15px] w-full gap-[20px] bg-bgFacebook rounded-[12px]">
       <div className="flex gap-[8px]">
         <div className="w-[36px] h-[36px]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
             alt="social"
@@ -246,6 +247,7 @@ export const FacebookPreview: FC<{
             <div key={index} className="flex flex-col gap-[12px]">
               <div className="flex gap-[6px] leading-[17px]">
                 <div className="h-[34px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
                   <img
                     src={integration?.picture || '/no-picture.jpg'}
                     alt="social"

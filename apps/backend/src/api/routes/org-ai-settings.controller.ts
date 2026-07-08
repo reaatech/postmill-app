@@ -6,8 +6,6 @@ import {
   Get,
   HttpException,
   HttpStatus,
-  Inject,
-  Optional,
   Param,
   Post,
   Put,
@@ -19,19 +17,10 @@ import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
-import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
-import { DefaultsSettingsValidator } from '@gitroom/nestjs-libraries/ai/defaults/defaults-settings.validator';
-import { OrgDefaultModelRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-default-model.repository';
-import { AI_MODEL_CATEGORIES } from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
+import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { SetDefaultModelDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/default-model.dto';
-import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
-import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
-import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { ProviderConfigDto } from '@gitroom/nestjs-libraries/types/provider-config.types';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
-import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
-import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
 import {
   UpsertOrgAiConfigDto,
   UpdateBudgetDto,
@@ -39,124 +28,25 @@ import {
   ProviderTestConnectionDto,
 } from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
-export type ProviderConfigSummary = Pick<
-  ProviderConfigDto,
-  'identifier' | 'name' | 'enabled' | 'isActive' | 'version'
->;
-
 @ApiTags('Org AI Settings')
 @Controller('/settings/ai')
 export class OrgAiSettingsController {
   constructor(
     private _orgAiSettings: OrgAiSettingsService,
+    private _defaultsService: AiDefaultsService,
     private _defaultsSeed: DefaultsSeedService,
-    private _defaultsResolution: DefaultsResolutionService,
-    private _defaultsRepository: OrgDefaultModelRepository,
-    private _resolution: ProviderResolutionService,
-    private _settingsValidator: DefaultsSettingsValidator,
-    @Optional()
-    @Inject(PROVIDER_KERNEL)
-    private _kernel?: ProviderKernel,
   ) {}
-
-  private _bustDefaultsCatalogCache(orgId: string): void {
-    // Best-effort cache invalidation; never fail the request if Redis is down.
-    // AI provider changes affect both AI and media candidates (media union includes
-    // AI providers), so both catalog keyspaces must be cleared.
-    try {
-      const prefixes = [
-        `settings:ai:defaults:catalog:${orgId}:`,
-        `settings:content:media-defaults:catalog:${orgId}:`,
-      ];
-      for (const prefix of prefixes) {
-        ioRedis
-          .keys(`${prefix}*`)
-          .then((keys) => {
-            if (keys.length) ioRedis.del(...keys);
-          })
-          .catch(() => undefined);
-      }
-    } catch {}
-  }
-
-  // Resolve a single AI adapter through the ProviderKernel; undefined for an
-  // unknown/unregistered provider (mirrors the old registry.getAdapter).
-  private _resolveAdapter(identifier: string, version?: string): AIProviderAdapter | undefined {
-    try {
-      return this._resolution.resolveAI(identifier, version ? { version } : {});
-    } catch {
-      return undefined;
-    }
-  }
-
-  // Enumerate the registered AI adapters (one per provider id) — replaces the
-  // legacy in-memory registry enumeration.
-  private _listAdapters(): AIProviderAdapter[] {
-    const seen = new Set<string>();
-    const out: AIProviderAdapter[] = [];
-    for (const manifest of this._kernel?.listManifests('ai') ?? []) {
-      if (seen.has(manifest.providerId)) continue;
-      seen.add(manifest.providerId);
-      const adapter = this._resolveAdapter(manifest.providerId, manifest.version);
-      if (adapter) out.push(adapter);
-    }
-    return out;
-  }
-
-  private _providerLabel(candidate: { providerId: string; metadata: { uiName?: string } }): string {
-    return candidate.metadata.uiName
-      ? `${candidate.providerId}-${candidate.metadata.uiName}`
-      : candidate.providerId;
-  }
-
-  private _aiVersionMeta(identifier: string) {
-    const manifests = this._kernel?.versions('ai', identifier) ?? [];
-    const latestActive = this._kernel?.latestActive('ai', identifier)?.manifest;
-    const version = latestActive?.version ?? manifests[0]?.version ?? DEFAULT_VERSION;
-    const status = latestActive?.status ?? manifests[0]?.status ?? 'active';
-    const availableVersions = manifests.map((m) => ({
-      version: m.version,
-      status: m.status,
-      credentialFields: m.credentialFields,
-    }));
-    return { version, status, availableVersions, credentialFields: latestActive?.credentialFields ?? manifests[0]?.credentialFields };
-  }
 
   @Get('/providers')
   @RequirePermission('settings', 'read')
   async listProviders() {
-    const adapters = this._listAdapters();
-    return adapters.map((adapter) => {
-      const meta = this._aiVersionMeta(adapter.identifier);
-      return {
-        identifier: adapter.identifier,
-        name: adapter.name,
-        type: adapter.type,
-        capabilities: adapter.capabilities,
-        privacy: adapter.privacy,
-        credentialFields: meta.credentialFields ?? adapter.credentialFields,
-        ...meta,
-      };
-    });
+    return this._defaultsService.listProviders();
   }
 
   @Get('/config')
   @RequirePermission('settings', 'read')
-  async getConfig(@GetOrgFromRequest() org: Organization): Promise<{
-    active: ProviderConfigSummary | null;
-    providers: ProviderConfigSummary[];
-  }> {
-    const active = await this._orgAiSettings.getActiveProvider(org.id);
-    const allConfigs = await this._orgAiSettings.getProviders(org.id);
-    // Never ship decrypted provider credentials to the client (#53). The active
-    // provider's credentials stay server-side for model resolution only.
-    const safeActive = active
-      ? (({ credentials, ...rest }) => ({ ...rest, ...this._aiVersionMeta(rest.identifier) }))(active as any)
-      : null;
-    return {
-      active: safeActive,
-      providers: allConfigs.map((p: any) => ({ ...p, ...this._aiVersionMeta(p.identifier) })),
-    };
+  async getConfig(@GetOrgFromRequest() org: Organization) {
+    return this._defaultsService.getProviderConfigSummary(org.id);
   }
 
   @Put('/config/:identifier')
@@ -166,7 +56,7 @@ export class OrgAiSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: UpsertOrgAiConfigDto,
   ) {
-    const adapter = this._resolveAdapter(identifier, body.version);
+    const adapter = this._defaultsService.resolveAdapter(identifier, body.version);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     // 3.2: validate a custom Base URL at CONFIG WRITE. The read primitive
@@ -201,7 +91,7 @@ export class OrgAiSettingsController {
     // Intentionally detached + non-fatal: seeding must never delay or fail the provider
     // config response (the .catch swallows errors, which the seed service also logs).
     this._defaultsSeed.seedUnset(org.id).catch(() => undefined);
-    this._bustDefaultsCatalogCache(org.id);
+    this._defaultsService.bustDefaultsCatalogCache(org.id);
 
     return { identifier, success: true };
   }
@@ -218,7 +108,7 @@ export class OrgAiSettingsController {
 
       // Eagerly seed any unset model/media defaults now that the active provider changed.
       this._defaultsSeed.seedUnset(org.id).catch(() => undefined);
-      this._bustDefaultsCatalogCache(org.id);
+      this._defaultsService.bustDefaultsCatalogCache(org.id);
 
       return { identifier, isActive: result.isActive };
     } catch (err) {
@@ -234,7 +124,7 @@ export class OrgAiSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: ProviderTestConnectionDto,
   ) {
-    const adapter = this._resolveAdapter(identifier);
+    const adapter = this._defaultsService.resolveAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     if (body.credentials) {
@@ -266,7 +156,7 @@ export class OrgAiSettingsController {
     @Param('identifier') identifier: string,
   ) {
     await this._orgAiSettings.delete(org.id, identifier);
-    this._bustDefaultsCatalogCache(org.id);
+    this._defaultsService.bustDefaultsCatalogCache(org.id);
     return { success: true };
   }
 
@@ -292,19 +182,7 @@ export class OrgAiSettingsController {
   @Get('/defaults')
   @RequirePermission('settings', 'read')
   async getModelDefaults(@GetOrgFromRequest() org: Organization) {
-    const resolved = await this._defaultsResolution.resolveAll('ai', org.id);
-    const stored = await this._defaultsRepository.getAll(org.id, 'ai');
-    return {
-      categories: AI_MODEL_CATEGORIES.map((category) => {
-        const r = resolved[category];
-        const s = stored.find((row) => row.category === category);
-        return {
-          category,
-          ...(r || {}),
-          source: s ? 'stored' : (r ? 'auto' : null),
-        };
-      }),
-    };
+    return this._defaultsService.getModelDefaults(org.id);
   }
 
   @Put('/defaults/:category')
@@ -314,26 +192,7 @@ export class OrgAiSettingsController {
     @Param('category') category: string,
     @Body() body: SetDefaultModelDto,
   ) {
-    if (!AI_MODEL_CATEGORIES.includes(category as any)) {
-      throw new BadRequestException(`Invalid model category: ${category}`);
-    }
-    const cleaned = this._sanitizeSettings('ai', category, body);
-    await this._defaultsRepository.upsert(org.id, 'ai', category, cleaned);
-    this._bustDefaultsCatalogCache(org.id);
-    return { category, success: true };
-  }
-
-  private _sanitizeSettings(
-    domain: 'ai' | 'media',
-    category: string,
-    body: SetDefaultModelDto,
-  ): SetDefaultModelDto {
-    if (!body.settings || typeof body.settings !== 'object') return body;
-    const cleaned = this._settingsValidator.validate(domain, category, body.settings, {
-      providerId: body.providerId,
-      model: body.model,
-    });
-    return { ...body, settings: cleaned };
+    return this._defaultsService.setModelDefault(org.id, category, body);
   }
 
   @Delete('/defaults/:category')
@@ -342,11 +201,7 @@ export class OrgAiSettingsController {
     @GetOrgFromRequest() org: Organization,
     @Param('category') category: string,
   ) {
-    if (!AI_MODEL_CATEGORIES.includes(category as any)) {
-      throw new BadRequestException(`Invalid model category: ${category}`);
-    }
-    await this._defaultsRepository.remove(org.id, 'ai', category);
-    return { category, success: true };
+    return this._defaultsService.clearModelDefault(org.id, category);
   }
 
   @Get('/defaults/catalog')
@@ -355,88 +210,6 @@ export class OrgAiSettingsController {
     @GetOrgFromRequest() org: Organization,
     @Query('category') category: string,
   ) {
-    if (!AI_MODEL_CATEGORIES.includes(category as any)) {
-      throw new BadRequestException(`Invalid model category: ${category}`);
-    }
-    const cacheKey = `settings:ai:defaults:catalog:${org.id}:${category}`;
-    const cached = await ioRedis.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
-    const candidates = await this._defaultsResolution.candidates('ai', category, org.id);
-    const options: { providerId: string; version: string; model?: string; label: string }[] = [];
-    for (const c of candidates) {
-      const providerLabel = this._providerLabel(c);
-      if (!c.metadata.hasModelList || c.metadata.kind === 'action') {
-        options.push({
-          providerId: c.providerId,
-          version: c.version,
-          label: providerLabel,
-        });
-      } else {
-        const models = await this._listModelsForCandidate(c, category, org.id);
-        if (models.length === 0) {
-          // Configured model-list provider whose catalog couldn't be enumerated
-          // (transient API failure / empty list). Still offer a provider-level option
-          // (no model) so a working provider stays selectable — mirrors the resolver's
-          // undefined-model auto-pick. Without this, removing free-text entry would make
-          // the default un-settable. After this fix, "catalog empty" ⇔ "no candidate".
-          options.push({
-            providerId: c.providerId,
-            version: c.version,
-            label: providerLabel,
-          });
-        }
-        for (const m of models) {
-          options.push({
-            providerId: c.providerId,
-            version: c.version,
-            model: m.id,
-            label: `${providerLabel}: ${m.label || m.id}`,
-          });
-        }
-      }
-    }
-    const result = { category, options };
-    await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', 60);
-    return result;
-  }
-
-  private async _listModelsForCandidate(
-    candidate: { providerId: string; version: string; metadata: any },
-    category: string,
-    orgId: string,
-  ) {
-    try {
-      const config = await this._orgAiSettings.getByIdentifier(orgId, candidate.providerId, candidate.version);
-      const credentials = config?.credentials ?? {};
-      const mod = this._kernel?.get('ai', candidate.providerId, candidate.version);
-      const capability: any = mod?.create({
-        credentials,
-        encryption: {} as any,
-        fetch: {} as any,
-        logger: {} as any,
-        telemetry: {} as any,
-      });
-      if (!capability?.listModels) return [];
-      const models = await capability.listModels(credentials);
-      return this._filterModelsByCategory(models || [], category);
-    } catch {
-      return [];
-    }
-  }
-
-  private _filterModelsByCategory(models: any[], category: string): any[] {
-    switch (category) {
-      case 'vision':
-        return models.filter((m) => m.capabilities?.vision);
-      case 'high-reasoning':
-        return models.filter((m) => m.reasoning || m.capabilities?.text);
-      case 'workflow':
-      case 'low-reasoning':
-      default:
-        return models.filter((m) => m.capabilities?.text);
-    }
+    return this._defaultsService.getModelDefaultsCatalog(org.id, category);
   }
 }

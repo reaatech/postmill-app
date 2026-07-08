@@ -60,6 +60,7 @@ export const AvatarCell: FC<{
   return (
     <div className="flex items-center gap-[8px]">
       {src ? (
+        // eslint-disable-next-line @next/next/no-img-element -- external avatar
         <img src={src} alt="" className="rounded-full object-cover" style={{ width: size, height: size }} />
       ) : (
         <div

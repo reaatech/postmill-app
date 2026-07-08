@@ -289,6 +289,21 @@ export class OrgShortLinkSettingsService {
     return this._repository.getLinksForOrg(orgId);
   }
 
+  upsertSnapshotsBatch(
+    rows: {
+      shortLinkId: string;
+      organizationId: string;
+      date: Date;
+      clicks: number;
+    }[],
+  ) {
+    return this._repository.upsertSnapshotsBatch(rows);
+  }
+
+  pruneSnapshots(orgId: string, before: Date) {
+    return this._repository.pruneSnapshots(orgId, before);
+  }
+
   getAggregatedClicks(orgId: string, from: Date, to: Date) {
     return this._repository.getAggregatedClicks(orgId, from, to);
   }

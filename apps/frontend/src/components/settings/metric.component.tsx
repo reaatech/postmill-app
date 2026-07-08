@@ -3,18 +3,21 @@
 import { Select } from '@gitroom/react/form/select';
 import React, { useState } from 'react';
 import { isUSCitizen } from '@gitroom/frontend/components/launches/helpers/isuscitizen.utils';
+import rawTimezonesList from 'timezones-list';
+
+const timezonesList =
+  (rawTimezonesList as any).default || (rawTimezonesList as any);
 
 const getTimezones = (): { name: string; tzCode: string; label: string }[] => {
-  try {
-    return require('timezones-list').default || require('timezones-list');
-  } catch {
-    const tzs = (Intl as any).supportedValuesOf?.('timeZone') || [];
-    return tzs.map((tz: string) => ({
-      name: tz,
-      tzCode: tz,
-      label: tz.replace(/_/g, ' '),
-    }));
+  if (Array.isArray(timezonesList)) {
+    return timezonesList;
   }
+  const tzs = (Intl as any).supportedValuesOf?.('timeZone') || [];
+  return tzs.map((tz: string) => ({
+    name: tz,
+    tzCode: tz,
+    label: tz.replace(/_/g, ' '),
+  }));
 };
 const dateMetrics = [
   { label: 'AM:PM', value: 'US' },

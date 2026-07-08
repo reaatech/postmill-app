@@ -23,7 +23,7 @@ vi.mock('@gitroom/nestjs-libraries/services/email.service', () => ({
   EmailService: class {},
 }));
 vi.mock('@gitroom/backend/services/auth/providers/providers.manager', () => ({
-  AuthProviderManager: class {},
+  ProvidersManager: class {},
 }));
 
 const newsletterRegister = vi.fn().mockResolvedValue(undefined);

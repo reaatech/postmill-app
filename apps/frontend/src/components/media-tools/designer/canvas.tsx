@@ -130,7 +130,6 @@ export const DesignerCanvas: FC<CanvasProps> = ({
   useEffect(() => {
     const src = output?.bg?.type === 'image' ? output.bg.src : undefined;
     if (!src) {
-      setBgImage(null);
       return;
     }
     let cancelled = false;
@@ -535,7 +534,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
   );
 
   const handleStageDblClick = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (e: Konva.KonvaEventObject<any>) => {
       const target = e.target;
       const id = target.id() || target.getParent()?.id();

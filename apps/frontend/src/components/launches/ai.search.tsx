@@ -72,7 +72,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
       )}
 
       {error && !isLoading && (
-        <div className="text-[12px] text-yellow-400 p-[12px] bg-yellow-400/10 rounded-[6px] border border-yellow-400/30">
+        <div className="text-[12px] text-amber-600 p-[12px] bg-yellow-400/10 rounded-[6px] border border-yellow-400/30">
           {t(
             'semantic_search_unavailable',
             'Semantic search is not available. The RAG pipeline may not be configured.'

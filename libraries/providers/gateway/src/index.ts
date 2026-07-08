@@ -1,2 +1,3 @@
 import { gatewayAiModule, gatewayMediaModule } from './v1';
-export default [gatewayAiModule, gatewayMediaModule];
+const gatewayProviderModules = [gatewayAiModule, gatewayMediaModule];
+export default gatewayProviderModules;

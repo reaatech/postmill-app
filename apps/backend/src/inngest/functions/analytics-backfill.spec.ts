@@ -38,11 +38,14 @@ describe('createAnalyticsBackfill', () => {
 
   it('calls step.run to backfill the given integration', async () => {
     const step = createMockStep();
-    const event = { data: { integrationId: 'int-1' } };
+    const event = { data: { integrationId: 'int-1', organizationId: 'org-1' } };
 
     await getHandler()({ step, event });
 
     expect(step.run).toHaveBeenCalledWith('backfill', expect.any(Function));
-    expect(analyticsActivity.backfillIntegration).toHaveBeenCalledWith('int-1');
+    expect(analyticsActivity.backfillIntegration).toHaveBeenCalledWith({
+      integrationId: 'int-1',
+      organizationId: 'org-1',
+    });
   });
 });

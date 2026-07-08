@@ -177,42 +177,51 @@ describe('StorageRepository', () => {
   });
 
   describe('removeOrDetachMountFolders', () => {
-    it('deletes empty mount folders', async () => {
+    it('deletes empty mount folders in one batch', async () => {
       mockModel.fileFolder.findMany.mockResolvedValue([
         {
           id: 'folder-1',
           storageProviderId: 'provider-1',
           _count: { files: 0, children: 0 },
         },
+        {
+          id: 'folder-2',
+          storageProviderId: 'provider-1',
+          _count: { files: 0, children: 0 },
+        },
       ]);
-      mockModel.fileFolder.delete.mockResolvedValue({ id: 'folder-1' });
+      mockModel.fileFolder.deleteMany = vi.fn().mockResolvedValue({ count: 2 });
       const repo = makeRepo();
 
       await repo.removeOrDetachMountFolders('provider-1');
 
-      expect(mockModel.fileFolder.delete).toHaveBeenCalledWith({
-        where: { id: 'folder-1' },
+      expect(mockModel.fileFolder.deleteMany).toHaveBeenCalledWith({
+        where: { id: { in: ['folder-1', 'folder-2'] } },
       });
     });
 
-    it('detaches non-empty folders instead of deleting', async () => {
+    it('detaches non-empty folders in one batch instead of deleting', async () => {
       mockModel.fileFolder.findMany.mockResolvedValue([
         {
           id: 'folder-1',
           storageProviderId: 'provider-1',
           _count: { files: 5, children: 0 },
         },
+        {
+          id: 'folder-2',
+          storageProviderId: 'provider-1',
+          _count: { files: 0, children: 1 },
+        },
       ]);
-      mockModel.fileFolder.update.mockResolvedValue({
-        id: 'folder-1',
-        storageProviderId: null,
-      });
+      mockModel.fileFolder.updateMany = vi
+        .fn()
+        .mockResolvedValue({ count: 2 });
       const repo = makeRepo();
 
       await repo.removeOrDetachMountFolders('provider-1');
 
-      expect(mockModel.fileFolder.update).toHaveBeenCalledWith({
-        where: { id: 'folder-1' },
+      expect(mockModel.fileFolder.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['folder-1', 'folder-2'] } },
         data: { storageProviderId: null },
       });
     });

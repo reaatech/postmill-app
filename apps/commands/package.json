@@ -7,6 +7,11 @@
     "build": "cross-env NODE_ENV=production nest build",
     "start": "node ./dist/apps/command/src/main.js"
   },
+  "devDependencies": {
+    "@nestjs/cli": "^10.4.0",
+    "cross-env": "^10.0.0",
+    "dotenv-cli": "^8.0.0"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC"

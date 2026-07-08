@@ -77,6 +77,7 @@ export const BotPicture: FC<{
         <form onSubmit={submitForm} className="gap-[50px] flex flex-col">
           {props.canChangeProfilePicture && (
             <div className="flex items-center gap-[20px]">
+              {/* eslint-disable-next-line @next/next/no-img-element -- external bot avatar */}
               <img
                 src={picture}
                 alt="Bot avatar"

@@ -1,2 +1,3 @@
 import { bitlyShortlinkModule } from './v1';
-export default [bitlyShortlinkModule];
+const bitlyProviderModules = [bitlyShortlinkModule];
+export default bitlyProviderModules;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
+import React, { FC, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Group, Image as KonvaImage, Text as KonvaText } from 'react-konva';
 import type { VideoClip, VideoOutput } from './designer.store';
 import { composeClipsAtPlayhead, sourceTimeForPlayhead } from './video-preview';
@@ -13,6 +13,41 @@ interface VideoCanvasOverlayProps {
 
 const videoElements = new Map<string, HTMLVideoElement>();
 const imageElements = new Map<string, HTMLImageElement>();
+const filterCanvasCache = new Map<string, HTMLCanvasElement>();
+const captionCanvasCache = new Map<string, HTMLCanvasElement>();
+let canvasIdCounter = 0;
+const getNextCanvasId = () => String(++canvasIdCounter);
+
+// Minimal external store used to notify React after an imperative canvas has
+// been drawn into. Using useSyncExternalStore avoids calling setState directly
+// inside an effect, which the React Compiler rules disallow.
+type CanvasStore = {
+  subscribe: (cb: () => void) => () => void;
+  emit: () => void;
+  getVersion: () => number;
+};
+const canvasStores = new Map<string, CanvasStore>();
+const getCanvasStore = (canvasId: string): CanvasStore => {
+  let store = canvasStores.get(canvasId);
+  if (!store) {
+    const listeners = new Set<() => void>();
+    let version = 0;
+    store = {
+      subscribe: (cb) => {
+        listeners.add(cb);
+        return () => listeners.delete(cb);
+      },
+      emit: () => {
+        version += 1;
+        listeners.forEach((cb) => cb());
+      },
+      getVersion: () => version,
+    };
+    canvasStores.set(canvasId, store);
+  }
+  return store;
+};
+const deleteCanvasStore = (canvasId: string) => canvasStores.delete(canvasId);
 
 const getOrCreateVideo = (clip: VideoClip): HTMLVideoElement | null => {
   if (!clip.src) return null;
@@ -118,8 +153,13 @@ interface FilteredClipImageProps {
 }
 
 const FilteredClipImage: FC<FilteredClipImageProps> = ({ clip, width, height, tick, playheadMs }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [imageVersion, setImageVersion] = useState(0);
+  const [canvasId] = useState(() => getNextCanvasId());
+  const canvas = filterCanvasCache.get(canvasId) ?? null;
+  const store = useMemo(() => getCanvasStore(canvasId), [canvasId]);
+  const imageVersion = useSyncExternalStore(
+    store.subscribe,
+    store.getVersion
+  );
 
   const isVideoClip = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(clip.src || '') && !clip.frames;
   const isSticker = !!clip.frames;
@@ -132,26 +172,30 @@ const FilteredClipImage: FC<FilteredClipImageProps> = ({ clip, width, height, ti
 
   useEffect(() => {
     if (!source || !filterString) return;
-    if (!canvasRef.current) {
-      canvasRef.current = document.createElement('canvas');
-      canvasRef.current.width = Math.max(1, Math.round(width));
-      canvasRef.current.height = Math.max(1, Math.round(height));
+    let c = filterCanvasCache.get(canvasId);
+    if (!c) {
+      c = document.createElement('canvas');
+      filterCanvasCache.set(canvasId, c);
     }
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    c.width = Math.max(1, Math.round(width));
+    c.height = Math.max(1, Math.round(height));
+
+    const ctx = c.getContext('2d');
     if (!ctx) return;
 
-    if (canvas.width !== Math.round(width) || canvas.height !== Math.round(height)) {
-      canvas.width = Math.max(1, Math.round(width));
-      canvas.height = Math.max(1, Math.round(height));
-    }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, c.width, c.height);
     ctx.filter = filterString;
-    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(source, 0, 0, c.width, c.height);
     ctx.filter = 'none';
-    setImageVersion((v) => v + 1);
-  }, [source, filterString, width, height, tick]);
+    store.emit();
+  }, [source, filterString, width, height, tick, canvasId, store]);
+
+  useEffect(() => {
+    return () => {
+      filterCanvasCache.delete(canvasId);
+      deleteCanvasStore(canvasId);
+    };
+  }, [canvasId]);
 
   if (!source) return null;
   if (!filterString) {
@@ -167,7 +211,7 @@ const FilteredClipImage: FC<FilteredClipImageProps> = ({ clip, width, height, ti
 
   return (
     <KonvaImage
-      image={canvasRef.current || undefined}
+      image={canvas || undefined}
       width={width}
       height={height}
       listening={false}
@@ -185,25 +229,38 @@ const CaptionClip: FC<{ clip: VideoClip; width: number; height: number; playhead
   height,
   playheadMs,
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [version, setVersion] = useState(0);
+  // Canvas is held in a module-level cache because Konva reads it imperatively
+  // and the 2D context is mutated during rendering; keeping it out of hook state
+  // avoids React Compiler immutability-rule violations.
+  const [canvasId] = useState(() => getNextCanvasId());
+  const canvas = captionCanvasCache.get(canvasId) ?? null;
+  const store = useMemo(() => getCanvasStore(canvasId), [canvasId]);
+  const imageVersion = useSyncExternalStore(
+    store.subscribe,
+    store.getVersion
+  );
   const relativeMs = Math.max(0, playheadMs - clip.startMs);
-  const words = clip.words || [];
+  const words = useMemo(() => clip.words || [], [clip.words]);
   const activeIndex = words.findIndex((w) => relativeMs >= w.startMs && relativeMs <= w.endMs);
 
+  // A stable key drives re-renders when the caption content changes; imageVersion
+  // additionally re-renders Konva after the canvas has been drawn into.
+  const renderKey = useMemo(
+    () => `${clip.id}-${width}-${height}-${activeIndex}-${imageVersion}`,
+    [clip.id, width, height, activeIndex, imageVersion]
+  );
+
   useEffect(() => {
-    if (!canvasRef.current) {
-      canvasRef.current = document.createElement('canvas');
-      canvasRef.current.width = Math.max(1, Math.round(width));
-      canvasRef.current.height = Math.max(1, Math.round(height));
+    let c = captionCanvasCache.get(canvasId);
+    if (!c) {
+      c = document.createElement('canvas');
+      captionCanvasCache.set(canvasId, c);
     }
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    c.width = Math.max(1, Math.round(width));
+    c.height = Math.max(1, Math.round(height));
+
+    const ctx = c.getContext('2d');
     if (!ctx) return;
-    if (canvas.width !== Math.round(width) || canvas.height !== Math.round(height)) {
-      canvas.width = Math.max(1, Math.round(width));
-      canvas.height = Math.max(1, Math.round(height));
-    }
 
     ctx.clearRect(0, 0, width, height);
     const fontSize = clip.fontSize || 28;
@@ -226,16 +283,23 @@ const CaptionClip: FC<{ clip: VideoClip; width: number; height: number; playhead
       ctx.fillText(w.word, x, y);
       x += wordWidth + spaceWidth;
     }
-    setVersion((v) => v + 1);
-  }, [clip, width, height, activeIndex]);
+    store.emit();
+  }, [clip, words, width, height, activeIndex, canvasId, store]);
+
+  useEffect(() => {
+    return () => {
+      captionCanvasCache.delete(canvasId);
+      deleteCanvasStore(canvasId);
+    };
+  }, [canvasId]);
 
   return (
     <KonvaImage
-      image={canvasRef.current || undefined}
+      image={canvas || undefined}
       width={width}
       height={height}
       listening={false}
-      key={version}
+      key={renderKey}
     />
   );
 };

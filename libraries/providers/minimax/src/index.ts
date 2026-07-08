@@ -1,2 +1,3 @@
 import { minimaxAiModule, minimaxMediaModule } from './v1';
-export default [minimaxAiModule, minimaxMediaModule];
+const minimaxProviderModules = [minimaxAiModule, minimaxMediaModule];
+export default minimaxProviderModules;

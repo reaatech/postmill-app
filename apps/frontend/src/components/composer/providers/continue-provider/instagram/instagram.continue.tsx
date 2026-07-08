@@ -48,6 +48,7 @@ export const InstagramContinue = withContinueProvider<
   renderItem: (item) => (
     <>
       <div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- external social profile picture */}
         <img
           className="w-full max-w-[156px]"
           src={item.picture.data.url}

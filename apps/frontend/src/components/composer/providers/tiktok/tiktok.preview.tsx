@@ -83,6 +83,7 @@ export const TiktokPreview: FC<{
       </div>
       <div className="flex flex-col justify-end gap-[10px] ml-[18px]">
         <div className="relative">
+          {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
             alt="social"
@@ -173,6 +174,7 @@ export const TiktokPreview: FC<{
           }
         />
         <div>
+          {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
             alt="social"

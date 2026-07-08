@@ -1,2 +1,3 @@
 import { openaiAiModule, openaiMediaModule } from './v1';
-export default [openaiAiModule, openaiMediaModule];
+const openaiProviderModules = [openaiAiModule, openaiMediaModule];
+export default openaiProviderModules;

@@ -1,2 +1,3 @@
 import { replugShortlinkModule } from './v1';
-export default [replugShortlinkModule];
+const replugProviderModules = [replugShortlinkModule];
+export default replugProviderModules;

@@ -77,7 +77,6 @@ export const Input = ({
         <AutoResizingTextarea
           ref={textareaRef}
           placeholder={context.labels.placeholder}
-          autoFocus={false}
           maxRows={MAX_NEWLINES}
           value={text}
           onChange={(event) => {

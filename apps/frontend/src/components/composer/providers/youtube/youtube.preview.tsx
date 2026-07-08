@@ -65,6 +65,7 @@ export const YoutubePreview: FC<{
       <div className="flex items-center">
         <div className="flex flex-1 gap-[17px] items-center">
           <div>
+            {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
             <img
               src={integration?.picture || '/no-picture.jpg'}
               alt="social"

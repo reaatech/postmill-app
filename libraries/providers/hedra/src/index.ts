@@ -1,2 +1,3 @@
 import { hedraMediaModule } from './v1';
-export default [hedraMediaModule];
+const hedraProviderModules = [hedraMediaModule];
+export default hedraProviderModules;

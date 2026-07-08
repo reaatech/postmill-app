@@ -1,6 +1,6 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { AnalyticsActivity } from '@gitroom/nestjs-libraries/inngest/activities/analytics.activity';
-import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
 import { trackRun } from './track-run';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -13,7 +13,7 @@ dayjs.extend(utc);
 // per-org operation keeps its own memoized step.run so a retry/resume stays idempotent.
 export const createAnalyticsCollection = (
   analyticsActivity: AnalyticsActivity,
-  runRepo: InngestRunRepository
+  runRepo: InngestRunService
 ) =>
   inngest.createFunction(
     { id: 'analytics-collection', concurrency: 1 },
@@ -56,9 +56,17 @@ export const createAnalyticsSyncOrg = (analyticsActivity: AnalyticsActivity) =>
       await step.run('collect-channel', () =>
         analyticsActivity.collectChannelSnapshots(organizationId, 7)
       );
-      await step.run('collect-post', () =>
-        analyticsActivity.collectPostSnapshots(organizationId, 30)
-      );
+      // I-04: checkpoint each post-snapshot page in its own durable step so a
+      // retry/resume resumes from the last completed page instead of restarting
+      // the entire org sweep.
+      let cursor: string | undefined;
+      do {
+        const result = await step.run(
+          `collect-post-page-${cursor ?? 'start'}`,
+          () => analyticsActivity.collectPostSnapshotsPage(organizationId, 30, cursor)
+        );
+        cursor = result.nextCursor;
+      } while (cursor);
       // Detect anomalies on the fresh channel snapshots, BEFORE prune so the
       // latest day is present. Durable + idempotent (unique key), and the
       // activity swallows its own errors — never fail the sweep.

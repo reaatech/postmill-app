@@ -9,7 +9,6 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { User, Organization } from '@prisma/client';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
-import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { BroadcastNotificationDto } from '@gitroom/nestjs-libraries/dtos/notifications/notification-preference.dto';
@@ -23,10 +22,7 @@ import { BroadcastNotificationDto } from '@gitroom/nestjs-libraries/dtos/notific
 @Controller('/admin/notifications')
 @UseGuards(OrgRbacGuard)
 export class AdminNotificationsController {
-  constructor(
-    private _notificationService: NotificationService,
-    private _organizationRepository: OrganizationRepository
-  ) {}
+  constructor(private _notificationService: NotificationService) {}
 
   @Post('/broadcast')
   @RequirePermission('notifications', 'manage')
@@ -35,43 +31,6 @@ export class AdminNotificationsController {
     @GetOrgFromRequest() organization: Organization,
     @Body() body: BroadcastNotificationDto
   ) {
-    const team = await this._organizationRepository.getTeam(organization.id);
-    const members = team?.users ?? [];
-
-    const allMemberIds = new Set(members.map((m) => m.user.id));
-
-    let targetUserIds = allMemberIds;
-
-    if (body.targetUserIds && body.targetUserIds.length > 0) {
-      targetUserIds = new Set(
-        Array.from(targetUserIds).filter((id) => body.targetUserIds!.includes(id))
-      );
-    }
-
-    if (body.targetRoles && body.targetRoles.length > 0) {
-      const roleKeys = new Set(body.targetRoles);
-      targetUserIds = new Set(
-        members
-          .filter(
-            (m) =>
-              targetUserIds.has(m.user.id) &&
-              m.roleRef &&
-              roleKeys.has(m.roleRef.key)
-          )
-          .map((m) => m.user.id)
-      );
-    }
-
-    await this._notificationService.notify({
-      orgId: organization.id,
-      category: 'announcements',
-      title: body.title,
-      message: body.message,
-      channels: body.channels ?? { email: true, push: false, inApp: true },
-      override: true,
-      targetUserIds: Array.from(targetUserIds),
-    });
-
-    return { success: true, sentTo: targetUserIds.size };
+    return this._notificationService.broadcast(organization.id, body);
   }
 }

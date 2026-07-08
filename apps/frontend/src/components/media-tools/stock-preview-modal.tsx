@@ -239,7 +239,10 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
           poster={(item as StockVideoItem).thumbUrl}
           controls
           className="w-full rounded-[8px] max-h-[60vh]"
-        />
+          aria-label="Stock video preview"
+        >
+          <track kind="captions" srcLang="en" label="English" />
+        </video>
       );
     }
     if (type === 'icon') {
@@ -266,6 +269,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       );
     }
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- external stock preview
       <img
         src={item.url}
         alt={item.description || ''}
@@ -403,6 +407,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
                 className="w-[120px] shrink-0 cursor-pointer rounded-[6px] overflow-hidden border border-newBorder hover:border-[#2B5CD3] transition-all"
               >
                 <div className="aspect-square">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external stock thumbnail */}
                   <img
                     src={rel.thumbUrl}
                     alt={rel.description || ''}

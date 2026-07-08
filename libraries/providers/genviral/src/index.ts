@@ -1,2 +1,3 @@
 import { genviralMediaModule } from './v1';
-export default [genviralMediaModule];
+const genviralProviderModules = [genviralMediaModule];
+export default genviralProviderModules;

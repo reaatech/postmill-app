@@ -1,2 +1,3 @@
 import { ipvanishVpnModule } from './v1';
-export default [ipvanishVpnModule];
+const ipvanishProviderModules = [ipvanishVpnModule];
+export default ipvanishProviderModules;

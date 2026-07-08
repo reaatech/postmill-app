@@ -18,7 +18,6 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { decryptIntegrationTokens, decryptPostIntegrationTokens } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration-token.utils';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
-import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
@@ -32,6 +31,7 @@ import { getRetentionDays } from '@gitroom/nestjs-libraries/analytics/analytics-
 dayjs.extend(isoWeek);
 
 const CHANNEL_DAYS_BACK = 7;
+const POST_SNAPSHOT_BATCH_SIZE = 500;
 
 // 6.9: structured "your week in numbers" summary returned by buildWeeklySummary.
 export interface WeeklyAnalyticsSummary {
@@ -94,7 +94,6 @@ export class AnalyticsActivity {
     private readonly _webhooksService: WebhooksService,
     private readonly _watchlistService: WatchlistService,
     private readonly _shortLinkSettingsService: OrgShortLinkSettingsService,
-    private readonly _shortLinkSettingsRepository: OrgShortLinkSettingsRepository,
     private readonly _resolution: ProviderResolutionService,
     private readonly _emailLogService: EmailLogService,
     private readonly _notificationService: NotificationService,
@@ -120,7 +119,8 @@ export class AnalyticsActivity {
 
     for (const integration of socialIntegrations) {
       const provider = this._integrationManager.getSocialIntegrationUnchecked(
-        integration.providerIdentifier
+        integration.providerIdentifier,
+        integration.providerVersion ?? undefined
       );
       if (!provider?.analytics) continue;
 
@@ -197,147 +197,162 @@ export class AnalyticsActivity {
     }
   }
 
-  async collectPostSnapshots(orgId: string, daysBack: number): Promise<void> {
+  // Process one keyset page of posts for snapshot collection. Durable callers
+  // (the Inngest sync-org function) loop over this with a per-page step.run so
+  // the cursor is checkpointed across retries; the all-pages wrapper below stays
+  // available for callers that don't need durability.
+  async collectPostSnapshotsPage(
+    orgId: string,
+    daysBack: number,
+    cursor?: string
+  ): Promise<{ nextCursor?: string; processed: number }> {
     await this._orgProviderConfigManager.ensureFresh(orgId);
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
-    // Keyset-paginate through eligible posts in bounded batches (ordered by id) so a busy org
-    // never loads its entire post history into memory in a single unbounded findMany.
-    const BATCH_SIZE = 500;
-    let cursor: string | undefined;
+    const posts = (
+      await this._analyticsRepository.findPostsForSnapshots(
+        orgId,
+        since,
+        POST_SNAPSHOT_BATCH_SIZE,
+        cursor
+      )
+    ).map(decryptPostIntegrationTokens);
 
-    let hasMore = true;
-    while (hasMore) {
-      const posts = (
-        await this._analyticsRepository.findPostsForSnapshots(
-          orgId,
-          since,
-          BATCH_SIZE,
-          cursor
-        )
-      ).map(decryptPostIntegrationTokens);
+    for (const post of posts) {
+      if (!post.releaseId || post.releaseId === 'missing') continue;
 
-      if (posts.length === 0) break;
+      const postRows: {
+        organizationId: string;
+        postId: string;
+        integrationId: string;
+        metric: string;
+        value: number;
+        date: Date;
+      }[] = [];
 
-      for (const post of posts) {
-        if (!post.releaseId || post.releaseId === 'missing') continue;
+      try {
+        const provider = this._integrationManager.getSocialIntegrationUnchecked(
+          post.integration.providerIdentifier,
+          post.integration.providerVersion ?? undefined
+        );
+        if (!provider?.postAnalytics) continue;
 
-        const postRows: {
-          organizationId: string;
-          postId: string;
-          integrationId: string;
-          metric: string;
-          value: number;
-          date: Date;
-        }[] = [];
-
-        try {
-          const provider = this._integrationManager.getSocialIntegrationUnchecked(
-            post.integration.providerIdentifier
+        let token = post.integration.token;
+        if (
+          post.integration.tokenExpiration &&
+          dayjs(post.integration.tokenExpiration).isBefore(dayjs())
+        ) {
+          const refreshed = await this._refreshIntegrationService.refresh(
+            post.integration
           );
-          if (!provider?.postAnalytics) continue;
-
-          let token = post.integration.token;
-          if (
-            post.integration.tokenExpiration &&
-            dayjs(post.integration.tokenExpiration).isBefore(dayjs())
-          ) {
-            const refreshed = await this._refreshIntegrationService.refresh(
-              post.integration
-            );
-            if (!refreshed || !refreshed.accessToken) continue;
-            token = refreshed.accessToken;
-            if (provider.refreshWait) {
-              await timer(10000);
-            }
+          if (!refreshed || !refreshed.accessToken) continue;
+          token = refreshed.accessToken;
+          if (provider.refreshWait) {
+            await timer(10000);
           }
+        }
 
-          const clientInformation = await this._integrationManager.requireClientInformation(
+        const clientInformation = await this._integrationManager.requireClientInformation(
+          post.integration.providerIdentifier,
+          post.integration.organizationId,
+          post.integration.providerConfigId
+        ).catch(() => undefined);
+
+        const data = await provider.postAnalytics(
+          post.integration.internalId,
+          token,
+          post.releaseId,
+          2,
+          clientInformation
+        );
+
+        for (const entry of data) {
+          const canonical = normalizeMetric(
             post.integration.providerIdentifier,
-            post.integration.organizationId,
-            post.integration.providerConfigId
-          ).catch(() => undefined);
-
-          const data = await provider.postAnalytics(
-            post.integration.internalId,
-            token,
-            post.releaseId,
-            2,
-            clientInformation
+            entry.label
           );
+          if (!canonical) continue;
 
-          for (const entry of data) {
-            const canonical = normalizeMetric(
-              post.integration.providerIdentifier,
-              entry.label
-            );
-            if (!canonical) continue;
+          for (const point of entry.data) {
+            const val = parseFloat(String(point.total));
+            if (isNaN(val)) continue;
 
-            for (const point of entry.data) {
-              const val = parseFloat(String(point.total));
-              if (isNaN(val)) continue;
-
-              postRows.push({
-                organizationId: orgId,
-                postId: post.id,
-                integrationId: post.integrationId,
-                metric: canonical,
-                value: val,
-                date: dayjs(point.date).startOf('day').toDate(),
-              });
-            }
+            postRows.push({
+              organizationId: orgId,
+              postId: post.id,
+              integrationId: post.integrationId,
+              metric: canonical,
+              value: val,
+              date: dayjs(point.date).startOf('day').toDate(),
+            });
           }
+        }
 
-          if (postRows.length > 0) {
-            await this._analyticsRepository.upsertPostSnapshots(postRows);
+        if (postRows.length > 0) {
+          await this._analyticsRepository.upsertPostSnapshots(postRows);
+        }
+
+        // Update denormalized counters on the Post record
+        const latestSnapshots =
+          await this._analyticsRepository.getLatestPostSnapshots(orgId, [post.id], [
+            'views',
+            'likes',
+            'comments',
+            'impressions',
+            'reactions',
+            'replies',
+          ]);
+
+        const latestByMetric: Record<string, number> = {};
+        for (const snap of latestSnapshots) {
+          if (!(snap.metric in latestByMetric)) {
+            latestByMetric[snap.metric] = snap.value;
           }
+        }
 
-          // Update denormalized counters on the Post record
-          const latestSnapshots =
-            await this._analyticsRepository.getLatestPostSnapshots(orgId, [post.id], [
-              'views',
-              'likes',
-              'comments',
-              'impressions',
-              'reactions',
-              'replies',
-            ]);
+        const updateData: Record<string, number> = {};
+        const views = latestByMetric['views'] || latestByMetric['impressions'];
+        const likes = latestByMetric['likes'] || latestByMetric['reactions'];
+        const comments = latestByMetric['comments'] || latestByMetric['replies'];
+        if (views !== undefined) updateData.lastViews = views;
+        if (likes !== undefined) updateData.lastLikes = likes;
+        if (comments !== undefined) updateData.lastComments = comments;
 
-          const latestByMetric: Record<string, number> = {};
-          for (const snap of latestSnapshots) {
-            if (!(snap.metric in latestByMetric)) {
-              latestByMetric[snap.metric] = snap.value;
-            }
-          }
-
-          const updateData: Record<string, number> = {};
-          const views = latestByMetric['views'] || latestByMetric['impressions'];
-          const likes = latestByMetric['likes'] || latestByMetric['reactions'];
-          const comments = latestByMetric['comments'] || latestByMetric['replies'];
-          if (views !== undefined) updateData.lastViews = views;
-          if (likes !== undefined) updateData.lastLikes = likes;
-          if (comments !== undefined) updateData.lastComments = comments;
-
-          if (Object.keys(updateData).length > 0) {
-            await this._analyticsRepository.updatePostCounters(
-              post.id,
-              updateData
-            );
-          }
-        } catch (err: any) {
-          if (err instanceof RefreshToken) {
-            continue;
-          }
-          this.logger.error(
-            `AnalyticsActivity: Error collecting post analytics for ${post.id}:`,
-            { postId: post.id, integrationId: post.integrationId, providerId: post.integration?.providerIdentifier, error: err?.message }
+        if (Object.keys(updateData).length > 0) {
+          await this._analyticsRepository.updatePostCounters(
+            orgId,
+            post.id,
+            updateData
           );
         }
+      } catch (err: any) {
+        if (err instanceof RefreshToken) {
+          continue;
+        }
+        this.logger.error(
+          `AnalyticsActivity: Error collecting post analytics for ${post.id}:`,
+          { postId: post.id, integrationId: post.integrationId, providerId: post.integration?.providerIdentifier, error: err?.message }
+        );
       }
-
-      cursor = posts[posts.length - 1].id;
-      hasMore = posts.length === BATCH_SIZE;
     }
+
+    return {
+      nextCursor:
+        posts.length === POST_SNAPSHOT_BATCH_SIZE
+          ? posts[posts.length - 1].id
+          : undefined,
+      processed: posts.length,
+    };
+  }
+
+  // Non-durable all-pages wrapper. Keeps the original contract for callers and
+  // tests that don't need per-page checkpointing.
+  async collectPostSnapshots(orgId: string, daysBack: number): Promise<void> {
+    let cursor: string | undefined;
+    do {
+      const result = await this.collectPostSnapshotsPage(orgId, daysBack, cursor);
+      cursor = result.nextCursor;
+    } while (cursor);
   }
 
   async pruneAndRollupSnapshots(orgId: string): Promise<void> {
@@ -695,6 +710,11 @@ export class AnalyticsActivity {
             // root-cause is best-effort; never block an anomaly on it
           }
         } else {
+          // P-03: the batched `getDayPostSnapshotsForGroups` path above is the
+          // production default (single OR-ed query). This per-group fallback is
+          // retained only for older repository mocks/test fixtures that do not
+          // implement the batch method; it is best-effort and never blocks the
+          // anomaly detection pipeline.
           for (const fg of fired) {
             try {
               const dayStart = dayjs(fg.candidateDate).startOf('day').toDate();
@@ -846,19 +866,19 @@ export class AnalyticsActivity {
       await this._analyticsRepository.createAnomalies(pending.map((p) => p.row));
 
       // 7.3: stamp lastFiredAt on rules that fired this run so the cooldown gate
-      // above suppresses a daily re-fire. Non-fatal per rule.
+      // above suppresses a daily re-fire. P2: batch into a single updateMany.
       if (firedRuleIds.size > 0) {
-        for (const ruleId of firedRuleIds) {
-          try {
-            await this._analyticsRepository.updateAlertRule(orgId, ruleId, {
-              lastFiredAt: now,
-            });
-          } catch (err) {
-            this.logger.warn('alert-rule lastFiredAt update failed', {
-              error: (err as Error)?.message,
-              ruleId,
-            });
-          }
+        try {
+          await this._analyticsRepository.updateAlertRulesLastFiredAt(
+            orgId,
+            Array.from(firedRuleIds),
+            now
+          );
+        } catch (err) {
+          this.logger.warn('alert-rule lastFiredAt batch update failed', {
+            error: (err as Error)?.message,
+            ruleIds: Array.from(firedRuleIds),
+          });
         }
       }
 
@@ -1166,28 +1186,25 @@ export class AnalyticsActivity {
     }
   }
 
-  async backfillIntegration(
-    payload: string | { integrationId: string; organizationId: string }
-  ): Promise<void> {
-    const integrationId =
-      typeof payload === 'string' ? payload : payload.integrationId;
-    const organizationId =
-      typeof payload === 'string' ? undefined : payload.organizationId;
+  async backfillIntegration(payload: {
+    integrationId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const { integrationId, organizationId } = payload;
 
     const integration = decryptIntegrationTokens(
-      organizationId
-        ? await this._analyticsRepository.findIntegrationByIdRaw(
-            integrationId,
-            organizationId
-          )
-        : await this._analyticsRepository.findIntegrationByIdRaw(integrationId)
+      await this._analyticsRepository.findIntegrationByIdRaw(
+        integrationId,
+        organizationId
+      )
     );
     if (!integration || integration.type !== 'social') return;
 
     await this._orgProviderConfigManager.ensureFresh(integration.organizationId);
 
     const provider = this._integrationManager.getSocialIntegrationUnchecked(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.providerVersion ?? undefined
     );
     if (!provider?.analytics) return;
 
@@ -1318,7 +1335,7 @@ export class AnalyticsActivity {
     if (!adapter.capabilities.statistics) return;
     if (!adapter.linkStatistics) return;
 
-    const links = await this._shortLinkSettingsRepository.getLinksForOrg(orgId);
+    const links = await this._shortLinkSettingsService.getLinksForOrg(orgId);
     if (links.length === 0) return;
 
     const batchSize = 20;
@@ -1357,7 +1374,7 @@ export class AnalyticsActivity {
           }
 
           // N6: one transaction per batch instead of one upsert per link.
-          await this._shortLinkSettingsRepository.upsertSnapshotsBatch(rows);
+          await this._shortLinkSettingsService.upsertSnapshotsBatch(rows);
         } catch (err) {
           this.logger.warn(
             `AnalyticsActivity: short-link snapshot batch failed for org ${orgId}, provider ${active.identifier}: ${(err as Error).message}`,
@@ -1375,7 +1392,7 @@ export class AnalyticsActivity {
     const retentionDays = getRetentionDays('ANALYTICS_POST_RETENTION_DAYS', 90);
 
     const before = dayjs().subtract(retentionDays, 'day').startOf('day').toDate();
-    await this._shortLinkSettingsRepository.pruneSnapshots(orgId, before);
+    await this._shortLinkSettingsService.pruneSnapshots(orgId, before);
   }
 
   async pruneEmailLogs(): Promise<void> {

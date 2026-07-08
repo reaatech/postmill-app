@@ -1,3 +1,4 @@
 export * from './v1';
 import { slackSocialModule } from './v1';
-export default [slackSocialModule];
+const slackProviderModules = [slackSocialModule];
+export default slackProviderModules;
