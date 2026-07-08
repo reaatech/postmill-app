@@ -40,6 +40,18 @@ interface CommentThreadProps {
 
 type LikeOverride = { likedByMe: boolean; likeCount: number };
 
+const statusColors: Record<string, string> = {
+  needs_reply: 'bg-yellow-500',
+  handled: 'bg-green-500',
+  ignored: 'bg-gray-400',
+};
+
+const statusCycle: Record<string, string> = {
+  needs_reply: 'handled',
+  handled: 'ignored',
+  ignored: 'needs_reply',
+};
+
 const useSocialComments = (postId: string) => {
   const fetch = useFetch();
   const loadComments = useCallback(async () => {
@@ -80,18 +92,6 @@ const CommentItem: FC<{
   const [replying, setReplying] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignInput, setAssignInput] = useState('');
-
-  const statusColors: Record<string, string> = {
-    needs_reply: 'bg-yellow-500',
-    handled: 'bg-green-500',
-    ignored: 'bg-gray-400',
-  };
-
-  const statusCycle: Record<string, string> = {
-    needs_reply: 'handled',
-    handled: 'ignored',
-    ignored: 'needs_reply',
-  };
 
   const currentStatus = comment.status || 'needs_reply';
 
@@ -501,7 +501,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
             <div>
               <div className="text-[12px] font-[600] mb-[4px]">{t('key_points', 'Key Points')}</div>
               <ul className="list-disc list-inside text-[12px] text-newTableText flex flex-col gap-[2px]">
-                {summary.keyPoints.map((kp, i) => <li key={i}>{kp}</li>)}
+                {summary.keyPoints.map((kp) => <li key={kp.slice(0, 80)}>{kp}</li>)}
               </ul>
             </div>
           )}
@@ -509,7 +509,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
             <div>
               <div className="text-[12px] font-[600] mb-[4px]">{t('action_items', 'Action Items')}</div>
               <ul className="list-disc list-inside text-[12px] text-newTableText flex flex-col gap-[2px]">
-                {summary.actionItems.map((ai, i) => <li key={i}>{ai}</li>)}
+                {summary.actionItems.map((ai) => <li key={ai.slice(0, 80)}>{ai}</li>)}
               </ul>
             </div>
           )}

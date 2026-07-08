@@ -36,7 +36,7 @@ const debounce = <T extends any[]>(
   };
 };
 
-const MentionList = forwardRef<any, any>((props, ref) => {
+const MentionList = forwardRef<any, any>(function MentionList(props, ref) {
   const [selectedOffset, setSelectedOffset] = useState(0);
 
   // Derive the index from the offset so the selection stays valid when the

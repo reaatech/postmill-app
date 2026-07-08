@@ -1089,3 +1089,4 @@ export const OnlyEditor = forwardRef<
 
   return <EditorContent editor={editor} />;
 });
+OnlyEditor.displayName = 'OnlyEditor';

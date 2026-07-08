@@ -156,7 +156,8 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
     <div className="flex flex-col gap-[16px]">
       <div className="flex gap-[4px] bg-newBgColor rounded-[8px] p-[4px]">
         {tabs.map((tab) => (
-          <div
+          <button
+            type="button"
             key={tab}
             onClick={() => {
               setActiveTab(tab);
@@ -164,14 +165,14 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
               setError(null);
             }}
             className={clsx(
-              'cursor-pointer rounded-[6px] px-[12px] h-[32px] flex items-center text-[12px] font-[500] transition-all',
+              'm-0 p-0 border-0 bg-transparent cursor-pointer rounded-[6px] px-[12px] h-[32px] flex items-center text-[12px] font-[500] transition-all',
               activeTab === tab
                 ? 'bg-[#2B5CD3] text-white'
                 : 'text-newTextColor/60 hover:text-newTextColor'
             )}
           >
             {tab}
-          </div>
+          </button>
         ))}
       </div>
 
@@ -193,18 +194,19 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
           <div className="text-[14px]">{t('platforms', 'Platforms')}</div>
           <div className="flex flex-wrap gap-[8px]">
             {platforms.map((p) => (
-              <div
+              <button
+                type="button"
                 key={p}
                 onClick={() => togglePlatform(p)}
                 className={clsx(
-                  'cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
+                  'm-0 p-0 border-0 bg-transparent cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
                   selectedPlatforms.includes(p)
                     ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                     : 'bg-newColColor border-newBgLineColor'
                 )}
               >
                 {p}
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -215,18 +217,19 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
           <div className="text-[14px]">{t('locales', 'Locales')}</div>
           <div className="flex flex-wrap gap-[8px]">
             {locales.map((l) => (
-              <div
+              <button
+                type="button"
                 key={l.key}
                 onClick={() => toggleLocale(l.key)}
                 className={clsx(
-                  'cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
+                  'm-0 p-0 border-0 bg-transparent cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
                   selectedLocales.includes(l.key)
                     ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                     : 'bg-newColColor border-newBgLineColor'
                 )}
               >
                 {l.label}
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -239,18 +242,19 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
           </div>
           <div className="flex gap-[8px]">
             {[1, 2, 3, 4, 5].map((n) => (
-              <div
+              <button
+                type="button"
                 key={n}
                 onClick={() => setVariantCount(n)}
                 className={clsx(
-                  'cursor-pointer rounded-[4px] w-[36px] h-[30px] flex items-center justify-center text-[12px] border',
+                  'm-0 p-0 border-0 bg-transparent cursor-pointer rounded-[4px] w-[36px] h-[30px] flex items-center justify-center text-[12px] border',
                   variantCount === n
                     ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                     : 'bg-newColColor border-newBgLineColor'
                 )}
               >
                 {n}
-              </div>
+              </button>
             ))}
           </div>
         </div>
@@ -287,9 +291,9 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
         <div className="flex flex-col gap-[8px] max-h-[400px] overflow-y-auto">
           {activeTab === 'Repurpose' &&
             results.platforms &&
-            results.platforms.map((p: any, idx: number) => (
+            results.platforms.map((p: any) => (
               <div
-                key={idx}
+                key={p.platform}
                 className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
               >
                 <div className="flex justify-between items-center mb-[6px]">
@@ -316,9 +320,9 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
 
           {activeTab === 'Translate' &&
             results.translations &&
-            results.translations.map((tr: any, idx: number) => (
+            results.translations.map((tr: any) => (
               <div
-                key={idx}
+                key={tr.locale}
                 className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
               >
                 <div className="flex justify-between items-center mb-[6px]">
@@ -340,9 +344,9 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
 
           {activeTab === 'A/B Variants' &&
             results.variants &&
-            results.variants.map((v: any, idx: number) => (
+            results.variants.map((v: any) => (
               <div
-                key={idx}
+                key={`${v.tone}-${(v.content || '').slice(0, 40)}`}
                 className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
               >
                 <div className="flex justify-between items-center mb-[6px]">
@@ -380,10 +384,11 @@ export const AiContentTools: FC = () => {
 
   return (
     <div className="relative">
-      <div
+      <button
+        type="button"
         onClick={openModal}
         className={clsx(
-          'cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
+          'm-0 p-0 border-0 bg-transparent cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
         )}
       >
         <div className="flex gap-[5px] items-center">
@@ -414,7 +419,7 @@ export const AiContentTools: FC = () => {
             {t('content_tools', 'Content Tools')}
           </div>
         </div>
-      </div>
+      </button>
     </div>
   );
 };

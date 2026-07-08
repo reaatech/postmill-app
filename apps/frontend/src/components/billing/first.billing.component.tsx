@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { FC, useCallback, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
@@ -46,11 +46,82 @@ const EmbeddedBilling = dynamic(
   }
 );
 
+const JoinOver: FC<{ onShowYouTube: () => void }> = ({ onShowYouTube }) => {
+  const t = useT();
+  const user = useUser();
+  return (
+    <>
+      <div className="text-[46px] font-[600] leading-[110%] tablet:text-[36px] mobile:!text-[30px] whitespace-pre-line text-balance">
+        {t('billing_join_over', 'Join Over')}{' '}
+        <span className="text-[#1d9bf0]">
+          {t('billing_entrepreneurs_count', '20,000+ Entrepreneurs')}
+        </span>{' '}
+        {t('billing_who_use', 'who use')}{' '}
+        {t(
+          'billing_postiz_grow_social',
+          'Postmill To Grow Their Social Presence'
+        )}
+      </div>
+
+      <div className="flex">
+        <button
+          type="button"
+          onClick={onShowYouTube}
+          className="tablet:mb-[32px] mt-[32px] flex gap-[10px] items-center underline hover:font-[700] m-0 p-0 border-0 bg-transparent text-left"
+        >
+          <div>
+            <SafeImage
+              className="text-[12px]"
+              src="/icons/platforms/youtube.svg"
+              width={22.5}
+              height={16}
+              alt="YouTube"
+            />
+          </div>
+          <div>See the power of Postmill (click here)</div>
+        </button>
+      </div>
+
+      {!!user?.allowTrial && (
+        <div className="flex mt-[32px] mb-[10px] gap-[15px] tablet:mt-[32px] tablet:mb-[32px] text-[16px] font-[500] mobile:flex-col">
+          <div className="flex gap-[8px]">
+            <div>
+              <CheckIconComponent />
+            </div>
+            <div>{t('billing_no_risk_trial', '100% No-Risk Free Trial')}</div>
+          </div>
+          <div className="flex-1 flex gap-[8px] justify-center mobile:justify-start">
+            <div>
+              <CheckIconComponent />
+            </div>
+            <div>
+              {t(
+                'billing_pay_nothing_7_days',
+                'Pay NOTHING for the first 7-days'
+              )}
+            </div>
+          </div>
+          <div className="flex gap-[8px]">
+            <div>
+              <CheckIconComponent />
+            </div>
+            <div>
+              {t('billing_cancel_anytime', 'Cancel anytime, from settings')}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 export const FirstBillingComponent = () => {
   const { stripeClient } = useVariables();
   const user = useUser();
   const dub = useDubClickId();
-  const [stripe, setStripe] = useState<null | Promise<Stripe>>(null);
+  const [stripe] = useState<Promise<Stripe | null> | null>(() =>
+    stripeClient ? loadStripe(stripeClient) : null
+  );
   const [tier, setTier] = useState('STANDARD');
   const [period, setPeriod] = useState('MONTHLY');
   const fetch = useFetch();
@@ -59,9 +130,7 @@ export const FirstBillingComponent = () => {
   const [datafast_visitor_id] = useCookie('datafast_visitor_id', '');
   const [datafast_session_id] = useCookie('datafast_session_id', '');
 
-  useEffect(() => {
-    setStripe(loadStripe(stripeClient));
-  }, [stripeClient]);
+
 
   const loadCheckout = useCallback(async () => {
     return (
@@ -111,69 +180,6 @@ export const FirstBillingComponent = () => {
     []
   );
 
-  const JoinOver = () => {
-    return (
-      <>
-        <div className="text-[46px] font-[600] leading-[110%] tablet:text-[36px] mobile:!text-[30px] whitespace-pre-line text-balance">
-          {t('billing_join_over', 'Join Over')}{' '}
-          <span className="text-[#1d9bf0]">
-            {t('billing_entrepreneurs_count', '20,000+ Entrepreneurs')}
-          </span>{' '}
-          {t('billing_who_use', 'who use')}{' '}
-          {t(
-            'billing_postiz_grow_social',
-            'Postmill To Grow Their Social Presence'
-          )}
-        </div>
-
-        <div className="flex" onClick={showYouTube}>
-          <div className="tablet:mb-[32px] cursor-pointer mt-[32px] flex gap-[10px] items-center underline hover:font-[700]">
-            <div>
-              <SafeImage
-                className="text-[12px]"
-                src="/icons/platforms/youtube.svg"
-                width={22.5}
-                height={16}
-                alt="YouTube"
-              />
-            </div>
-            <div>See the power of Postmill (click here)</div>
-          </div>
-        </div>
-
-        {!!user?.allowTrial && (
-          <div className="flex mt-[32px] mb-[10px] gap-[15px] tablet:mt-[32px] tablet:mb-[32px] text-[16px] font-[500] mobile:flex-col">
-            <div className="flex gap-[8px]">
-              <div>
-                <CheckIconComponent />
-              </div>
-              <div>{t('billing_no_risk_trial', '100% No-Risk Free Trial')}</div>
-            </div>
-            <div className="flex-1 flex gap-[8px] justify-center mobile:justify-start">
-              <div>
-                <CheckIconComponent />
-              </div>
-              <div>
-                {t(
-                  'billing_pay_nothing_7_days',
-                  'Pay NOTHING for the first 7-days'
-                )}
-              </div>
-            </div>
-            <div className="flex gap-[8px]">
-              <div>
-                <CheckIconComponent />
-              </div>
-              <div>
-                {t('billing_cancel_anytime', 'Cancel anytime, from settings')}
-              </div>
-            </div>
-          </div>
-        )}
-      </>
-    );
-  };
-
   return (
     <div className="blurMe flex flex-1 flex-col bg-newBgColorInner pb-[60px] mobile:pb-[100px]">
       <div className="h-[92px] px-[80px] tablet:px-[32px] mobile:!px-[16px] py-[20px] flex border-b border-newColColor">
@@ -203,7 +209,7 @@ export const FirstBillingComponent = () => {
       <div className="flex px-[80px] tablet:px-[32px] mobile:!px-[16px] flex-1 flex-row tablet:flex-none tablet:flex-col-reverse">
         <div className="flex-1 py-[40px] tablet:pt-[80px] flex flex-col pe-[40px] tablet:pe-0">
           <div className="block tablet:hidden">
-            <JoinOver />
+            <JoinOver onShowYouTube={showYouTube} />
           </div>
           {!isLoading && data && stripe ? (
             <EmbeddedBilling
@@ -219,16 +225,17 @@ export const FirstBillingComponent = () => {
         <div className="flex flex-col ps-[40px] tablet:!ps-[0] border-l border-newColColor py-[40px] mobile:!pt-[24px] tablet:border-none tablet:pb-0">
           <div className="top-[20px] sticky">
             <div className="hidden tablet:block">
-              <JoinOver />
+              <JoinOver onShowYouTube={showYouTube} />
             </div>
             <div className="flex mb-[24px] mobile:flex-col">
               <div className="flex-1 text-[24px] font-[700]">
                 {t('billing_choose_plan', 'Choose a Plan')}
               </div>
               <div className="h-[44px] px-[6px] mobile:px-0 flex items-center justify-center mobile:justify-start gap-[12px] border border-newColColor rounded-[12px] select-none">
-                <div
+                <button
+                  type="button"
                   className={clsx(
-                    'h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
+                    'm-0 p-0 border-0 bg-transparent h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
                     period === 'MONTHLY'
                       ? 'bg-boxFocused text-textItemFocused'
                       : 'cursor-pointer'
@@ -236,10 +243,11 @@ export const FirstBillingComponent = () => {
                   onClick={() => setPeriod('MONTHLY')}
                 >
                   {t('billing_monthly', 'Monthly')}
-                </div>
-                <div
+                </button>
+                <button
+                  type="button"
                   className={clsx(
-                    'gap-[10px] h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
+                    'm-0 p-0 border-0 bg-transparent gap-[10px] h-[32px] mobile:flex-1 rounded-[6px] text-[16px] px-[12px] flex justify-center items-center',
                     period === 'YEARLY'
                       ? 'bg-boxFocused text-textItemFocused'
                       : 'cursor-pointer'
@@ -250,17 +258,18 @@ export const FirstBillingComponent = () => {
                   <div className="bg-[#AA0FA4] text-[white] px-[8px] rounded-[4px] mobile:hidden">
                     {t('billing_20_percent_off', '20% Off')}
                   </div>
-                </div>
+                </button>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-[8px] mobile:!grid-cols-2 tablet:grid-cols-4">
               {price.map(
                 ([key, value]) => (
-                  <div
+                  <button
+                    type="button"
                     onClick={() => setTier(key)}
                     key={key}
                     className={clsx(
-                      'cursor-pointer select-none w-[266px] h-[138px] tablet:w-full tablet:h-[124px] p-[24px] tablet:p-[15px] rounded-[20px] flex flex-col',
+                      'm-0 p-0 border-0 bg-transparent text-left cursor-pointer select-none w-[266px] h-[138px] tablet:w-full tablet:h-[124px] p-[24px] tablet:p-[15px] rounded-[20px] flex flex-col',
                       key === tier
                         ? 'border-[1.5px] border-[#618DFF]'
                         : 'border-[1.5px] border-newColColor'
@@ -282,7 +291,7 @@ export const FirstBillingComponent = () => {
                         ? t('billing_per_month', '/ month')
                         : t('billing_per_year', '/ year')}
                     </div>
-                  </div>
+                  </button>
                 ),
                 []
               )}

@@ -109,7 +109,7 @@ export const Component: FC<{
   zIndex: number;
   isLast: boolean;
   modal: { id: string } & OpenModalInterface;
-}> = memo(({ isLast, modal, closeModal, zIndex }) => {
+}> = memo(function Component({ isLast, modal, closeModal, zIndex }) {
   const decision = useDecisionModal();
   const closeModalFunction = useCallback(async () => {
     if (modal.askClose) {

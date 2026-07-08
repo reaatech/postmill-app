@@ -59,7 +59,7 @@ export const withProvider = function <T extends object>(params: {
     maximumCharacters,
   } = params;
 
-  const Wrapped = forwardRef((props: { id: string }, ref) => {
+  const Wrapped = forwardRef(function Wrapped(props: { id: string }, ref) {
     const t = useT();
     const fetch = useFetch();
     const {

@@ -75,5 +75,6 @@ const AutoResizingTextarea = forwardRef<HTMLTextAreaElement, AutoResizingTextare
     );
   },
 );
+AutoResizingTextarea.displayName = 'AutoResizingTextarea';
 
 export default AutoResizingTextarea;

@@ -97,8 +97,8 @@ export const AICompliance: FC<{ content?: string; platform?: string }> = ({
 
           {result.violations.length > 0 && (
             <ul className="mt-[8px] flex flex-col gap-[6px]">
-              {result.violations.map((v, i) => (
-                <li key={i} className="text-[13px] flex items-start gap-[6px]">
+              {result.violations.map((v) => (
+                <li key={`${v.type}-${v.description}`} className="text-[13px] flex items-start gap-[6px]">
                   <span className={`${severityColor(v.severity)} font-medium shrink-0`}>
                     [{v.severity}]
                   </span>
@@ -114,8 +114,8 @@ export const AICompliance: FC<{ content?: string; platform?: string }> = ({
                 {t('suggestions', 'Suggestions')}
               </div>
               <ul className="flex flex-col gap-[4px]">
-                {result.suggestions.map((s, i) => (
-                  <li key={i} className="text-[12px] text-newTableText">
+                {result.suggestions.map((s) => (
+                  <li key={s.slice(0, 60)} className="text-[12px] text-newTableText">
                     - {s}
                   </li>
                 ))}
