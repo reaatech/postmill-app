@@ -34,6 +34,8 @@ import { GenerateMusicDto } from '@gitroom/nestjs-libraries/dtos/ai/generate-mus
 import { VideoToVideoDto } from '@gitroom/nestjs-libraries/dtos/ai/video-to-video.dto';
 import { GenerateAvatarDto } from '@gitroom/nestjs-libraries/dtos/ai/generate-avatar.dto';
 import { GenerateSlideDto } from '@gitroom/nestjs-libraries/dtos/ai/generate-slide.dto';
+import { GenerateVideoDto } from '@gitroom/backend/dtos/media/generate-video.dto';
+import { VideoFunctionDto } from '@gitroom/backend/dtos/media/video-function.dto';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BadRequestException } from '@nestjs/common';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
@@ -110,7 +112,7 @@ export class MediaController {
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   async generateVideo(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { prompt?: string; imageUrl?: string; type?: string; output?: string }
+    @Body() body: GenerateVideoDto
   ) {
     await this._assertBudget(org.id);
     const total = await this._subscriptionService.checkCredits(org);
@@ -143,7 +145,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
   ) {
-    const job = await this._aiMediaService.getJob(id);
+    const job = await this._aiMediaService.getJob(id, org.id);
     if (!job || job.organizationId !== org.id) {
       throw new HttpException('Job not found', HttpStatus.NOT_FOUND);
     }
@@ -187,7 +189,7 @@ export class MediaController {
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   async videoFunction(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { identifier?: string; functionName?: string; params?: any }
+    @Body() body: VideoFunctionDto
   ) {
     if (body.functionName !== 'loadVoices') {
       throw new BadRequestException('Only loadVoices is supported');

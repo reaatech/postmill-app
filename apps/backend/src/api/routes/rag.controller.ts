@@ -22,6 +22,7 @@ import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/p
 import { RagService, RagSettings } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
+import { RagSearchDto } from '@gitroom/backend/dtos/rag/rag-search.dto';
 
 // 'pgvector' = built-in Postmill default; the rest are remote stores.
 const VECTOR_STORES = ['pgvector', 'pgvector-remote', 'qdrant', 'pinecone'];
@@ -134,12 +135,8 @@ export class RagController {
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async search(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { query: string; limit?: number },
+    @Body() body: RagSearchDto,
   ) {
-    if (!body.query || !body.query.trim()) {
-      throw new BadRequestException('query is required');
-    }
-
     try {
       const results = await this._ragService.search({
         organizationId: org.id,
