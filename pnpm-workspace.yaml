@@ -65,6 +65,15 @@ overrides:
   # happy-dom <20.0.0: critical VM-context-escape RCE (GHSA-96g7-g7g9-jxw8), pulled transitively
   # via vitest's optional peer. Bump vulnerable <20 to patched 20.x (same DOM API).
   'happy-dom@<20.0.0': '>=20.0.0 <21'
+  # glob >=10.2.0 <10.5.0: high command injection via -c/--cmd (GHSA-5j98-mcp5-4vw2),
+  # pulled by @nestjs/cli. Bump to patched 10.5.x.
+  'glob@>=10.2.0 <10.5.0': '>=10.5.0'
+  # picomatch >=4.0.0 <4.0.4: high ReDoS via extglob quantifiers (GHSA-c2c7-rcm5-vvqj),
+  # pulled by @angular-devkit/core. Bump to patched 4.0.x.
+  'picomatch@>=4.0.0 <4.0.4': '>=4.0.4'
+  # tmp <0.2.6: high path traversal via unsanitized prefix/postfix (GHSA-ph9p-34f9-6g65),
+  # pulled by external-editor via inquirer. Bump to patched 0.2.x.
+  'tmp@<0.2.6': '>=0.2.6'
 
 onlyBuiltDependencies:
   - bcrypt
