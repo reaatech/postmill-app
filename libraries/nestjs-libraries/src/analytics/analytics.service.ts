@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { Organization } from '@prisma/client';
+import dayjs from 'dayjs';
 import {
   AnalyticsMetricDetailResponse,
   AnalyticsOverviewResponse,
@@ -302,6 +303,49 @@ export class AnalyticsService {
 
   async getAggregatedClicks(orgId: string, from: Date, to: Date) {
     return this._orgShortLinkSettingsService.getAggregatedClicks(orgId, from, to);
+  }
+
+  // ── Short-link aggregation (A-03) ──
+
+  async getShortLinks(orgId: string, from: Date, to: Date) {
+    const [links, snapshots] = await Promise.all([
+      this._orgShortLinkSettingsService.getLinksForOrg(orgId),
+      this._orgShortLinkSettingsService.getAggregatedClicks(orgId, from, to),
+    ]);
+
+    const clickMap = new Map<string, number>();
+    for (const snap of snapshots) {
+      const current = clickMap.get(snap.shortLinkId) || 0;
+      clickMap.set(snap.shortLinkId, current + snap.clicks);
+    }
+
+    return links.map((link) => ({
+      id: link.id,
+      shortUrl: link.shortUrl,
+      originalUrl: link.originalUrl,
+      provider: link.provider,
+      clicks: clickMap.get(link.id) || 0,
+      createdAt: link.createdAt,
+    }));
+  }
+
+  async getShortLinkTimeseries(orgId: string, from: Date, to: Date) {
+    const snapshots = await this._orgShortLinkSettingsService.getAggregatedClicks(
+      orgId,
+      from,
+      to
+    );
+
+    const dateMap = new Map<string, number>();
+    for (const snap of snapshots) {
+      const dateKey = dayjs(snap.date).format('YYYY-MM-DD');
+      const current = dateMap.get(dateKey) || 0;
+      dateMap.set(dateKey, current + snap.clicks);
+    }
+
+    return Array.from(dateMap.entries())
+      .map(([date, clicks]) => ({ date, clicks }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   // ── Anomaly alerts (4.8) — thin pass-through to the ledger ──

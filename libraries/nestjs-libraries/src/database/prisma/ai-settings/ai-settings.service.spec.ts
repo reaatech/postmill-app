@@ -45,6 +45,16 @@ const mockRepo = {
   upsertContentIndex: vi.fn(),
 };
 
+const mockKernel = {
+  listManifests: vi.fn(),
+  versions: vi.fn(),
+  latestActive: vi.fn(),
+};
+
+const mockResolution = {
+  resolveAI: vi.fn(),
+};
+
 vi.mock('./ai-settings.repository', () => ({
   AiSettingsRepository: vi.fn(() => mockRepo),
 }));
@@ -70,7 +80,12 @@ describe('AiSettingsService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new AiSettingsService(mockRepo as any, mockEncryption as any);
+    service = new AiSettingsService(
+      mockRepo as any,
+      mockEncryption as any,
+      mockKernel as any,
+      mockResolution as any,
+    );
   });
 
   // ── AIProviderConfig ──
@@ -232,6 +247,158 @@ describe('AiSettingsService', () => {
 
       expect(service.getEnabledProviderConfigs()).toBe(configs);
       expect(mockRepo.getEnabledProviderConfigs).toHaveBeenCalledOnce();
+    });
+  });
+
+  // ── Provider catalog helpers (A-07) ──
+
+  describe('getProviderVersionMeta', () => {
+    it('returns the latest active manifest by default', () => {
+      mockKernel.versions.mockReturnValue([
+        { version: 'v1', status: 'active', credentialFields: [{ key: 'apiKey' }] },
+        { version: 'v2', status: 'active', credentialFields: [{ key: 'apiKey' }] },
+      ]);
+      mockKernel.latestActive.mockReturnValue({
+        manifest: { version: 'v2', status: 'active', credentialFields: [{ key: 'apiKey' }] },
+      });
+
+      const result = service.getProviderVersionMeta('openai');
+
+      expect(result.version).toBe('v2');
+      expect(result.availableVersions).toHaveLength(2);
+    });
+
+    it('falls back to the first manifest when no latest active is found', () => {
+      mockKernel.versions.mockReturnValue([
+        { version: 'v1', status: 'active', credentialFields: [{ key: 'apiKey' }] },
+      ]);
+      mockKernel.latestActive.mockReturnValue(undefined);
+
+      const result = service.getProviderVersionMeta('openai');
+
+      expect(result.version).toBe('v1');
+    });
+  });
+
+  describe('isProviderConfigured', () => {
+    it('returns true when all required credential fields are present', () => {
+      const adapter = {
+        identifier: 'bedrock',
+        credentialFields: [
+          { key: 'accessKeyId', required: true },
+          { key: 'secretAccessKey', required: true },
+          { key: 'region', required: true },
+        ],
+      } as any;
+      const encryptedCreds = AuthService.fixedEncryption(
+        JSON.stringify({
+          accessKeyId: 'AKIA...',
+          secretAccessKey: 'secret',
+          region: 'us-east-1',
+        }),
+      );
+
+      const result = service.isProviderConfigured(adapter, {
+        credentials: encryptedCreds,
+      });
+
+      expect(result).toBe(true);
+    });
+
+    it('returns false when a required credential field is missing', () => {
+      const adapter = {
+        identifier: 'bedrock',
+        credentialFields: [
+          { key: 'accessKeyId', required: true },
+          { key: 'secretAccessKey', required: true },
+          { key: 'region', required: true },
+        ],
+      } as any;
+      const encryptedCreds = AuthService.fixedEncryption(
+        JSON.stringify({ accessKeyId: 'AKIA...', secretAccessKey: 'secret' }),
+      );
+
+      const result = service.isProviderConfigured(adapter, {
+        credentials: encryptedCreds,
+      });
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('redactSensitive', () => {
+    it('masks sensitive keys recursively', () => {
+      const result = service.redactSensitive({
+        baseURL: 'https://api.example.test/v1',
+        apiKey: 'sk-leak',
+        nested: { accessToken: 'tok-leak', region: 'us-east-1' },
+      });
+
+      expect(result).toEqual({
+        baseURL: 'https://api.example.test/v1',
+        apiKey: '[REDACTED]',
+        nested: { accessToken: '[REDACTED]', region: 'us-east-1' },
+      });
+    });
+  });
+
+  describe('safeJson', () => {
+    it('parses and redacts a JSON string', () => {
+      const result = service.safeJson(JSON.stringify({ apiKey: 'sk-secret' }));
+      expect(result).toEqual({ apiKey: '[REDACTED]' });
+    });
+
+    it('returns null for falsy input', () => {
+      expect(service.safeJson(null)).toBeNull();
+      expect(service.safeJson('')).toBeNull();
+    });
+
+    it('returns a redacted object for non-string input', () => {
+      const result = service.safeJson({ apiKey: 'sk-secret' });
+      expect(result).toEqual({ apiKey: '[REDACTED]' });
+    });
+
+    it('returns a placeholder for unparseable strings', () => {
+      const result = service.safeJson('{invalid');
+      expect(result).toBe('[REDACTED_UNPARSEABLE_CONFIG]');
+    });
+  });
+
+  describe('listProviderCatalog', () => {
+    it('returns mapped provider entries from the kernel', async () => {
+      const adapter = {
+        identifier: 'openai',
+        name: 'OpenAI',
+        type: 'direct',
+        capabilities: { text: true },
+        privacy: {},
+        credentialFields: [{ key: 'apiKey', required: true }],
+      } as any;
+      mockKernel.listManifests.mockReturnValue([{ providerId: 'openai', version: 'v1' }]);
+      mockResolution.resolveAI.mockReturnValue(adapter);
+      mockRepo.getProviderConfigs.mockResolvedValue([
+        {
+          identifier: 'openai',
+          enabled: true,
+          credentials: AuthService.fixedEncryption(JSON.stringify({ apiKey: 'sk-test' })),
+        },
+      ]);
+      mockKernel.versions.mockReturnValue([
+        { version: 'v1', status: 'active', credentialFields: [{ key: 'apiKey' }] },
+      ]);
+      mockKernel.latestActive.mockReturnValue({
+        manifest: { version: 'v1', status: 'active', credentialFields: [{ key: 'apiKey' }] },
+      });
+
+      const result = await service.listProviderCatalog();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        identifier: 'openai',
+        name: 'OpenAI',
+        enabled: true,
+        isConfigured: true,
+      });
     });
   });
 
@@ -409,6 +576,39 @@ describe('AiSettingsService', () => {
 
       expect(mockRepo.getSpendSummary).toHaveBeenCalledWith('org1', undefined);
       expect(result).toBe(summary);
+    });
+  });
+
+  describe('getUsageSummary', () => {
+    it('aggregates total/monthly/daily spend and derives remaining budget', async () => {
+      mockRepo.getSpendSummary
+        .mockResolvedValueOnce([{ _sum: { costUsd: 5 }, scope: 'generator' }])
+        .mockResolvedValueOnce([{ _sum: { costUsd: 2 }, scope: 'generator' }])
+        .mockResolvedValueOnce([{ _sum: { costUsd: 0.5 }, scope: 'generator' }]);
+      mockRepo.getSystemSettings.mockResolvedValue({
+        budgetSettings: JSON.stringify({ monthlyCap: 10, dailyCap: 1 }),
+      });
+
+      const result = await service.getUsageSummary('org1');
+
+      expect(result.totalSpendUsd).toBe(5);
+      expect(result.monthlySpendUsd).toBe(2);
+      expect(result.dailySpendUsd).toBe(0.5);
+      expect(result.budget).toEqual({
+        monthlyCap: 10,
+        dailyCap: 1,
+        remainingMonthly: 8,
+        remainingDaily: 0.5,
+      });
+    });
+
+    it('returns null budget when no settings exist', async () => {
+      mockRepo.getSpendSummary.mockResolvedValue([]);
+      mockRepo.getSystemSettings.mockResolvedValue(null);
+
+      const result = await service.getUsageSummary('org1');
+
+      expect(result.budget).toBeNull();
     });
   });
 

@@ -40,6 +40,8 @@ const mockProviderConfigService = {
   upsert: vi.fn(),
   delete: vi.fn(),
   decryptConfig: vi.fn(),
+  getProviderCatalog: vi.fn(),
+  getProviderCatalogEntry: vi.fn(),
 };
 
 const mockProviderConfigManager = {
@@ -121,134 +123,50 @@ beforeEach(() => {
   });
 
   describe('listConfigs', () => {
-  it('should return all integrations with config data merged in', async () => {
-    const dbConfigs = [
-      createDbConfig({ identifier: 'x', enabled: true, scopes: null, setupInstructions: 'Setup X' }),
-      createDbConfig({ identifier: 'facebook', enabled: false, clientId: 'fb-id', clientSecret: undefined, scopes: null }),
+  it('delegates catalog assembly to ProviderConfigService.getProviderCatalog', async () => {
+    const catalog = [
+      {
+        identifier: 'x',
+        name: 'X',
+        description: 'X social',
+        enabled: true,
+        isConfigured: true,
+        setupInstructions: 'Setup X',
+        additionalConfig: '',
+        isExternal: false,
+        isWeb3: false,
+        isChromeExtension: false,
+        customFields: false,
+        scopes: 'tweet.read, tweet.write',
+      },
+      {
+        identifier: 'telegram',
+        name: 'Telegram',
+        description: 'Telegram messenger',
+        enabled: false,
+        isConfigured: false,
+        setupInstructions: '',
+        additionalConfig: '',
+        isExternal: true,
+        isWeb3: false,
+        isChromeExtension: false,
+        customFields: false,
+        scopes: '',
+      },
     ];
-    mockProviderConfigService.getAll.mockResolvedValue(dbConfigs);
-    mockProviderConfigService.decryptConfig.mockImplementation((config: any) => ({
-      clientId: config.clientId || undefined,
-      clientSecret: config.clientSecret || undefined,
-    }));
+    mockProviderConfigService.getProviderCatalog.mockResolvedValue(catalog);
 
     const result = await controller.listConfigs(adminUser);
 
-    expect(mockProviderConfigService.getAll).toHaveBeenCalledTimes(1);
-    expect(result).toHaveLength(fakeProviders.length);
-
-    const xConfig = result.find((r: any) => r.identifier === 'x');
-    expect(xConfig).toMatchObject({
-      identifier: 'x',
-      name: 'X',
-      description: 'X social',
-      enabled: true,
-      isConfigured: true,
-      setupInstructions: 'Setup X',
-      isExternal: false,
-      isWeb3: false,
-      isChromeExtension: false,
-      customFields: false,
-      scopes: 'tweet.read, tweet.write',
-    });
-
-    const fbConfig = result.find((r: any) => r.identifier === 'facebook');
-    expect(fbConfig).toMatchObject({
-      identifier: 'facebook',
-      enabled: false,
-      isConfigured: true,
-      scopes: 'pages_manage_posts',
-    });
-
-    const tgConfig = result.find((r: any) => r.identifier === 'telegram');
-    expect(tgConfig).toMatchObject({
-      identifier: 'telegram',
-      enabled: false,
-      isConfigured: false,
-      isExternal: true,
-      scopes: '',
-    });
-
-    const web3Config = result.find((r: any) => r.identifier === 'web3-test');
-    expect(web3Config).toMatchObject({ isWeb3: true });
-
-    const extConfig = result.find((r: any) => r.identifier === 'ext-test');
-    expect(extConfig).toMatchObject({ isChromeExtension: true, customFields: true, scopes: 'ext_scope' });
-  });
-
-  it('should set isConfigured to false when decrypt returns no credentials', async () => {
-    const dbConfigs = [
-      createDbConfig({ identifier: 'x', clientId: null, clientSecret: null }),
-    ];
-    mockProviderConfigService.getAll.mockResolvedValue(dbConfigs);
-    mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: undefined, clientSecret: undefined });
-
-    const result = await controller.listConfigs(adminUser);
-    const xConfig = result.find((r: any) => r.identifier === 'x');
-
-    expect(xConfig.isConfigured).toBe(false);
-  });
-
-  it('should handle decrypt failure gracefully per-provider', async () => {
-    const warnSpy = vi
-      .spyOn(Logger.prototype, 'warn')
-      .mockImplementation(() => {});
-    const dbConfigs = [
-      createDbConfig({ identifier: 'x', clientId: 'enc-id', clientSecret: 'enc-secret' }),
-      createDbConfig({ identifier: 'facebook', clientId: 'fb-id', clientSecret: 'fb-secret' }),
-    ];
-    mockProviderConfigService.getAll.mockResolvedValue(dbConfigs);
-    mockProviderConfigService.decryptConfig.mockImplementation((config: any) => {
-      if (config.identifier === 'x') {
-        throw new Error('decrypt failed');
-      }
-      return { clientId: 'decrypted-fb', clientSecret: 'decrypted-fb-secret' };
-    });
-
-    const result = await controller.listConfigs(adminUser);
-
-    const xConfig = result.find((r: any) => r.identifier === 'x');
-    expect(xConfig.isConfigured).toBe(false);
-
-    const fbConfig = result.find((r: any) => r.identifier === 'facebook');
-    expect(fbConfig.isConfigured).toBe(true);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to decrypt config for x, treating as unconfigured'),
-    );
-    warnSpy.mockRestore();
-  });
-
-  it('should handle empty DB configs gracefully', async () => {
-    mockProviderConfigService.getAll.mockResolvedValue([]);
-
-    const result = await controller.listConfigs(adminUser);
-
-    for (const item of result) {
-      expect(item.enabled).toBe(false);
-      expect(item.isConfigured).toBe(false);
-      expect(item.setupInstructions).toBe('');
-    }
-  });
-
-  it('should fall back to empty description when provider has no toolTip', async () => {
-    mockProviderConfigService.getAll.mockResolvedValue([]);
-    const result = await controller.listConfigs(adminUser);
-    const web3 = result.find((r: any) => r.identifier === 'web3-test');
-    expect(web3.description).toBe('');
+    expect(mockProviderConfigService.getProviderCatalog).toHaveBeenCalledTimes(1);
+    expect(mockProviderConfigService.getProviderCatalog).toHaveBeenCalledWith(fakeProviders);
+    expect(result).toBe(catalog);
   });
 });
 
 describe('getConfig', () => {
-  it('should return config for an existing provider', async () => {
-    const config = createDbConfig({ scopes: 'custom_scope' });
-    mockProviderConfigService.getByIdentifier.mockResolvedValue(config);
-    mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: 'decrypted-id', clientSecret: 'decrypted-secret' });
-
-    const result = await controller.getConfig(adminUser, 'x');
-
-    expect(mockProviderConfigService.getByIdentifier).toHaveBeenCalledWith('x');
-    expect(result).toMatchObject({
+  it('delegates catalog entry lookup to ProviderConfigService.getProviderCatalogEntry', async () => {
+    const entry = {
       identifier: 'x',
       name: 'X',
       enabled: true,
@@ -256,64 +174,18 @@ describe('getConfig', () => {
       scopes: 'custom_scope',
       setupInstructions: 'Setup steps',
       isConfigured: true,
+      additionalConfig: '',
       isExternal: false,
       isWeb3: false,
       isChromeExtension: false,
       customFields: false,
-    });
-  });
-
-  it('should use provider scopes when DB config has no scopes', async () => {
-    const config = createDbConfig({ scopes: null });
-    mockProviderConfigService.getByIdentifier.mockResolvedValue(config);
-    mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: 'id', clientSecret: 'secret' });
+    };
+    mockProviderConfigService.getProviderCatalogEntry.mockResolvedValue(entry);
 
     const result = await controller.getConfig(adminUser, 'x');
 
-    expect(result.scopes).toBe('tweet.read, tweet.write');
-  });
-
-  it('should fall back to identifier as name when provider not in list', async () => {
-    const config = createDbConfig({ identifier: 'unknown-provider', scopes: null });
-    mockProviderConfigService.getByIdentifier.mockResolvedValue(config);
-    mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: 'id', clientSecret: 'secret' });
-
-    const result = await controller.getConfig(adminUser, 'unknown-provider');
-
-    expect(result.name).toBe('unknown-provider');
-    expect(result.scopes).toBe('');
-  });
-
-  it('should return isConfigured false when no config exists', async () => {
-    mockProviderConfigService.getByIdentifier.mockResolvedValue(null);
-
-    const result = await controller.getConfig(adminUser, 'x');
-
-    expect(result.isConfigured).toBe(false);
-    expect(result.enabled).toBe(false);
-    expect(result.redirectUri).toBe('');
-    expect(result.name).toBe('X');
-    expect(result.scopes).toBe('tweet.read, tweet.write');
-  });
-
-  it('should return isConfigured false when decrypt returns empty', async () => {
-    const config = createDbConfig({ clientId: 'enc-id', clientSecret: 'enc-secret' });
-    mockProviderConfigService.getByIdentifier.mockResolvedValue(config);
-    mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: undefined, clientSecret: undefined });
-
-    const result = await controller.getConfig(adminUser, 'x');
-
-    expect(result.isConfigured).toBe(false);
-  });
-
-  it('should return isConfigured true when only clientId is present', async () => {
-    const config = createDbConfig({ clientId: 'enc-id', clientSecret: null });
-    mockProviderConfigService.getByIdentifier.mockResolvedValue(config);
-    mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: 'decrypted-id', clientSecret: undefined });
-
-    const result = await controller.getConfig(adminUser, 'x');
-
-    expect(result.isConfigured).toBe(true);
+    expect(mockProviderConfigService.getProviderCatalogEntry).toHaveBeenCalledWith('x', fakeProviders);
+    expect(result).toBe(entry);
   });
 });
 
@@ -504,9 +376,9 @@ describe('super-admin gating (0.2)', () => {
   });
 
   it('allows a super-admin through to the service', async () => {
-    mockProviderConfigService.getAll.mockResolvedValue([]);
+    mockProviderConfigService.getProviderCatalog.mockResolvedValue([]);
     await expect(controller.listConfigs(adminUser)).resolves.toBeDefined();
-    expect(mockProviderConfigService.getAll).toHaveBeenCalled();
+    expect(mockProviderConfigService.getProviderCatalog).toHaveBeenCalled();
   });
 });
 

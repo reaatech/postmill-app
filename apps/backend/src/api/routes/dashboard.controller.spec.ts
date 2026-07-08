@@ -56,15 +56,6 @@ describe('DashboardController', () => {
   let permissionsService: {
     getPackageOptions: ReturnType<typeof vi.fn>;
   };
-  let postsService: {
-    countPostsFromDay: ReturnType<typeof vi.fn>;
-  };
-  let integrationService: {
-    getIntegrationsList: ReturnType<typeof vi.fn>;
-  };
-  let organizationService: {
-    getTeam: ReturnType<typeof vi.fn>;
-  };
   let rolesService: {
     getEffectivePermissions: ReturnType<typeof vi.fn>;
   };
@@ -77,6 +68,28 @@ describe('DashboardController', () => {
       getCampaignSummaries: vi.fn().mockResolvedValue([]),
       getMediaJobs: vi.fn().mockResolvedValue({ jobs: [], counts: {} }),
       getAttention: vi.fn().mockResolvedValue({ items: [] }),
+      buildUsage: vi.fn().mockResolvedValue({
+        billingEnabled: true,
+        tier: 'PRO',
+        limits: {
+          postsPerMonth: 1000,
+          channels: -10,
+          teamMembers: 5,
+        },
+        usage: {
+          postsThisCycle: 12,
+          channels: 1,
+          teamMembers: 2,
+        },
+      }),
+      buildPlanUsage: vi.fn().mockResolvedValue({
+        postsThisCycle: 12,
+        postsLimit: 1000,
+        channels: 1,
+        channelsLimit: -10,
+        teamMembers: 2,
+        teamLimit: 5,
+      }),
     };
     briefService = {
       getCachedBrief: vi.fn().mockResolvedValue({ cached: false }),
@@ -88,15 +101,6 @@ describe('DashboardController', () => {
         options: { posts_per_month: 1000, channel: -10, team_members: 5 },
       }),
     };
-    postsService = {
-      countPostsFromDay: vi.fn().mockResolvedValue(12),
-    };
-    integrationService = {
-      getIntegrationsList: vi.fn().mockResolvedValue([{ id: 'i1', refreshNeeded: false }]),
-    };
-    organizationService = {
-      getTeam: vi.fn().mockResolvedValue({ users: [{}, {}] }),
-    };
     rolesService = {
       getEffectivePermissions: vi.fn().mockResolvedValue({
         role: 'owner',
@@ -107,9 +111,6 @@ describe('DashboardController', () => {
     controller = new DashboardController(
       dashboardService as unknown as DashboardService,
       permissionsService as any,
-      postsService as any,
-      integrationService as any,
-      organizationService as any,
       rolesService as any,
       briefService as unknown as DashboardBriefService,
     );
@@ -143,6 +144,11 @@ describe('DashboardController', () => {
     expect(result.usage.postsThisCycle).toBe(12);
     expect(result.usage.channels).toBe(1);
     expect(result.usage.teamMembers).toBe(2);
+    expect(dashboardService.buildUsage).toHaveBeenCalledWith(
+      org,
+      expect.objectContaining({ subscriptionTier: 'PRO' }),
+      expect.objectContaining({ posts_per_month: 1000 }),
+    );
     delete process.env.STRIPE_PUBLISHABLE_KEY;
   });
 
@@ -150,6 +156,7 @@ describe('DashboardController', () => {
     delete process.env.STRIPE_PUBLISHABLE_KEY;
     const result = await controller.getUsage(org);
     expect(result).toEqual({ billingEnabled: false });
+    expect(dashboardService.buildUsage).not.toHaveBeenCalled();
   });
 
   it('filters attention kinds by effective permissions', async () => {

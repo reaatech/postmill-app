@@ -9,6 +9,7 @@ import { ProvidersManager } from '@gitroom/backend/services/auth/providers/provi
 import dayjs from 'dayjs';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
+import { OAuthLinkQueryDto } from '@gitroom/nestjs-libraries/dtos/auth/oauth-link-query.dto';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import crypto from 'crypto';
@@ -355,7 +356,7 @@ export class AuthService {
     return true;
   }
 
-  oauthLink(provider: string, query?: any) {
+  oauthLink(provider: string, query?: OAuthLinkQueryDto) {
     const providerInstance = this._providerManager.getProvider(provider);
     return providerInstance.generateLink(query);
   }
@@ -388,7 +389,10 @@ export class AuthService {
       const rotatedSession =
         await this._userService.findSessionByPreviousTokenHash(tokenHash);
       if (rotatedSession && !rotatedSession.revokedAt) {
-        await this._userService.revokeSession(rotatedSession.id);
+        await this._userService.revokeSession(
+          rotatedSession.userId,
+          rotatedSession.id
+        );
         throw new Error('Refresh token reuse detected — session revoked');
       }
       throw new Error('Invalid refresh token');
@@ -399,7 +403,7 @@ export class AuthService {
     }
 
     if (session.expiresAt < new Date()) {
-      await this._userService.revokeSession(session.id);
+      await this._userService.revokeSession(session.userId, session.id);
       throw new Error('Refresh token has expired');
     }
 
@@ -408,6 +412,7 @@ export class AuthService {
     const newTokenHash = this.hashToken(newRefreshToken);
 
     await this._userService.rotateSessionToken(
+      session.userId,
       session.id,
       newTokenHash,
       session.tokenHash,
@@ -433,7 +438,7 @@ export class AuthService {
     if (!session || session.userId !== userId) {
       throw new Error('Session not found');
     }
-    await this._userService.revokeSession(sessionId);
+    await this._userService.revokeSession(userId, sessionId);
   }
 
   async revokeAllSessions(userId: string, currentTokenHash?: string) {

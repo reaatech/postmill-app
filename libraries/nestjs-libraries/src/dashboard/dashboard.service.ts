@@ -114,7 +114,7 @@ export interface DashboardAttentionResponse {
 
 export interface PlanUsageSnapshot {
   postsThisCycle: number;
-  postsLimit: number;
+  postsLimit: number | boolean;
   channels: number;
   channelsLimit: number | boolean;
   teamMembers: number;
@@ -275,6 +275,72 @@ export class DashboardService {
         createdAt: j.createdAt,
       })),
       counts,
+    };
+  }
+
+  // ── Usage aggregation (A-04) ──
+
+  async buildUsage(
+    org: Organization,
+    subscription: { subscriptionTier?: string; createdAt?: Date } | null | undefined,
+    options: {
+      posts_per_month: number | boolean;
+      channel: number | boolean;
+      team_members: number | boolean;
+    }
+  ) {
+    const createdAt = subscription?.createdAt || org.createdAt;
+    const totalMonthPast = Math.abs(dayjs(createdAt).diff(dayjs(), 'month'));
+    const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
+
+    const [postsThisCycle, integrations, team] = await Promise.all([
+      this._postsService.countPostsFromDay(org.id, checkFrom.toDate()),
+      this._integrationService.getIntegrationsList(org.id),
+      this._organizationService.getTeam(org.id),
+    ]);
+
+    return {
+      billingEnabled: true,
+      tier: subscription?.subscriptionTier || 'FREE',
+      limits: {
+        postsPerMonth: options.posts_per_month,
+        channels: options.channel,
+        teamMembers: options.team_members,
+      },
+      usage: {
+        postsThisCycle,
+        channels: integrations.filter((i) => !i.refreshNeeded).length,
+        teamMembers: team?.users?.length ?? 0,
+      },
+    };
+  }
+
+  async buildPlanUsage(
+    org: Organization,
+    subscription: { subscriptionTier?: string; createdAt?: Date } | null | undefined,
+    options: {
+      posts_per_month: number | boolean;
+      channel: number | boolean;
+      team_members: number | boolean;
+    }
+  ): Promise<PlanUsageSnapshot> {
+    const createdAt = subscription?.createdAt || org.createdAt;
+    const totalMonthPast = Math.abs(dayjs(createdAt).diff(dayjs(), 'month'));
+    const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
+
+    const [postsThisCycle, integrations, team] = await Promise.all([
+      this._postsService.countPostsFromDay(org.id, checkFrom.toDate()),
+      this._integrationService.getIntegrationsList(org.id),
+      this._organizationService.getTeam(org.id),
+    ]);
+
+    return {
+      postsThisCycle,
+      postsLimit: options.posts_per_month,
+      channels: integrations.filter((i) => !i.refreshNeeded).length,
+      channelsLimit: options.channel,
+      teamMembers: team?.users?.length ?? 0,
+      teamLimit: options.team_members,
     };
   }
 
@@ -441,9 +507,10 @@ export class DashboardService {
           items.push(aiAlert);
         }
         if (planUsage) {
-          const planPct = planUsage.postsLimit
-            ? planUsage.postsThisCycle / planUsage.postsLimit
-            : 0;
+          const planPct =
+            typeof planUsage.postsLimit === 'number'
+              ? planUsage.postsThisCycle / planUsage.postsLimit
+              : 0;
           if (planPct >= 0.8) {
             items.push({
               id: 'plan-usage',

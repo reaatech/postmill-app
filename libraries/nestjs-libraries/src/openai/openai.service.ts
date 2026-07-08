@@ -191,8 +191,11 @@ export class OpenaiService {
 
   async generateAltText(imageUrlOrB64: string, orgId?: string) {
     try {
-      const providerId = await this._aiModelProvider.resolveProviderId('utility', orgId);
-      const hasVision = this._aiModelProvider.hasCapability(providerId, 'vision');
+      const { providerId, version } = await this._aiModelProvider.resolveProviderRef(
+        'utility',
+        orgId,
+      );
+      const hasVision = this._aiModelProvider.hasCapability(providerId, 'vision', version);
 
       if (hasVision) {
         const model = await this._aiModelProvider.languageModel('utility', orgId);

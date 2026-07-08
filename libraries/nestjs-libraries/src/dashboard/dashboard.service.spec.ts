@@ -34,6 +34,7 @@ function buildService(overrides: {
     getFailedPostCount: vi.fn().mockResolvedValue(0),
     getPendingApprovalPostCount: vi.fn().mockResolvedValue(0),
     getSchedule: vi.fn().mockResolvedValue({ days: [], gaps: [] }),
+    countPostsFromDay: vi.fn().mockResolvedValue(12),
     ...overrides.posts,
   } as unknown as PostsService;
 
@@ -344,6 +345,59 @@ describe('DashboardService.getMediaJobs', () => {
     expect(result.jobs).toHaveLength(1);
     expect(result.jobs[0].provider).toBe('runway');
     expect(result.counts.failed7d).toBe(1);
+  });
+});
+
+describe('DashboardService.buildUsage', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-11T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('assembles usage payload from domain services', async () => {
+    const { service } = buildService();
+    const result = await service.buildUsage(
+      org,
+      { subscriptionTier: 'PRO', createdAt: new Date('2024-01-01') },
+      { posts_per_month: 1000, channel: -10, team_members: 5 },
+    );
+
+    expect(result.billingEnabled).toBe(true);
+    expect(result.tier).toBe('PRO');
+    expect(result.usage.postsThisCycle).toBe(12);
+    expect(result.usage.channels).toBe(2);
+    expect(result.usage.teamMembers).toBe(3);
+  });
+});
+
+describe('DashboardService.buildPlanUsage', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-11T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('assembles plan usage snapshot from domain services', async () => {
+    const { service } = buildService();
+    const result = await service.buildPlanUsage(
+      org,
+      { subscriptionTier: 'PRO', createdAt: new Date('2024-01-01') },
+      { posts_per_month: 1000, channel: -10, team_members: 5 },
+    );
+
+    expect(result.postsThisCycle).toBe(12);
+    expect(result.postsLimit).toBe(1000);
+    expect(result.channels).toBe(2);
+    expect(result.channelsLimit).toBe(-10);
+    expect(result.teamMembers).toBe(3);
+    expect(result.teamLimit).toBe(5);
   });
 });
 

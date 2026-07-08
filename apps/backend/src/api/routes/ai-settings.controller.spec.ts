@@ -42,8 +42,14 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
     createAuditLog = vi.fn().mockResolvedValue({});
     createSpendLog = vi.fn().mockResolvedValue({});
     getSpendSummary = vi.fn().mockResolvedValue([]);
+    getUsageSummary = vi.fn().mockResolvedValue({});
     getAuditLogs = vi.fn().mockResolvedValue([]);
     decryptProviderConfig = vi.fn().mockReturnValue({ credentials: { apiKey: 'sk-test' } });
+    listProviderCatalog = vi.fn().mockResolvedValue([]);
+    getProviderVersionMeta = vi.fn().mockReturnValue({ version: 'v1', status: 'active', availableVersions: [], credentialFields: [{ key: 'apiKey', required: true }] });
+    isProviderConfigured = vi.fn().mockReturnValue(true);
+    redactSensitive = vi.fn().mockImplementation((v: any) => v);
+    safeJson = vi.fn().mockReturnValue(null);
   },
 }));
 
@@ -138,15 +144,19 @@ describe('AiSettingsController', () => {
   });
 
   describe('listProviders', () => {
-    it('returns a list of providers with metadata', async () => {
+    it('returns the provider catalog from the service', async () => {
+      (aiSettings as any).listProviderCatalog.mockResolvedValue([
+        { identifier: 'openai', name: 'OpenAI', capabilities: {}, isConfigured: true },
+      ]);
+
       const result = await controller.listProviders(superAdmin);
+
       expect(Array.isArray(result)).toBe(true);
-      if (result.length > 0) {
-        expect(result[0]).toHaveProperty('identifier');
-        expect(result[0]).toHaveProperty('name');
-        expect(result[0]).toHaveProperty('capabilities');
-        expect(result[0]).toHaveProperty('isConfigured');
-      }
+      expect(result[0]).toHaveProperty('identifier');
+      expect(result[0]).toHaveProperty('name');
+      expect(result[0]).toHaveProperty('capabilities');
+      expect(result[0]).toHaveProperty('isConfigured');
+      expect(aiSettings.listProviderCatalog).toHaveBeenCalled();
     });
 
     it('is gated with RequirePermission decorator', () => {
@@ -155,34 +165,6 @@ describe('AiSettingsController', () => {
         controller.listProviders,
       );
       expect(metadata).toEqual({ resource: 'ai-config', action: 'manage' });
-    });
-
-    it('marks providers configured when all required credential fields are present, not only apiKey', async () => {
-      const regionAdapter = {
-        ...mockAdapter,
-        identifier: 'bedrock',
-        credentialFields: [
-          { key: 'accessKeyId', label: 'Access Key ID', type: 'password', required: true },
-          { key: 'secretAccessKey', label: 'Secret Access Key', type: 'password', required: true },
-          { key: 'region', label: 'Region', type: 'string', required: true },
-        ],
-      };
-      mockKernel.listManifests.mockReturnValue([{ providerId: 'bedrock', version: 'v1' }]);
-      mockResolveAI.mockReturnValue(regionAdapter);
-      (aiSettings as any).getProviderConfigs.mockResolvedValue([
-        { identifier: 'bedrock', enabled: true, credentials: 'encrypted' },
-      ]);
-      (aiSettings as any).decryptProviderConfig.mockReturnValue({
-        credentials: {
-          accessKeyId: 'AKIA...',
-          secretAccessKey: 'secret',
-          region: 'us-east-1',
-        },
-      });
-
-      const result = await controller.listProviders(superAdmin);
-
-      expect(result[0].isConfigured).toBe(true);
     });
   });
 
@@ -194,22 +176,29 @@ describe('AiSettingsController', () => {
       expect(result.models[0].id).toBe('gpt-4.1');
     });
 
-    it('redacts sensitive nested extraConfig fields', async () => {
+    it('delegates extraConfig redaction to the service', async () => {
+      const rawExtraConfig = JSON.stringify({
+        baseURL: 'https://api.example.test/v1',
+        apiKey: 'sk-leak',
+        nested: { accessToken: 'tok-leak', region: 'us-east-1' },
+      });
       (aiSettings as any).getProviderConfigByIdentifier.mockResolvedValue({
         identifier: 'openai',
         enabled: true,
         credentials: 'encrypted',
         defaultModel: 'gpt-4.1',
         imageModel: null,
-        extraConfig: JSON.stringify({
-          baseURL: 'https://api.example.test/v1',
-          apiKey: 'sk-leak',
-          nested: { accessToken: 'tok-leak', region: 'us-east-1' },
-        }),
+        extraConfig: rawExtraConfig,
+      });
+      (aiSettings as any).safeJson.mockReturnValue({
+        baseURL: 'https://api.example.test/v1',
+        apiKey: '[REDACTED]',
+        nested: { accessToken: '[REDACTED]', region: 'us-east-1' },
       });
 
       const result = await controller.getProvider(superAdmin, 'openai');
 
+      expect(aiSettings.safeJson).toHaveBeenCalledWith(rawExtraConfig);
       expect(result.extraConfig).toEqual({
         baseURL: 'https://api.example.test/v1',
         apiKey: '[REDACTED]',
@@ -380,7 +369,8 @@ describe('AiSettingsController', () => {
   });
 
   describe('listOrgProviderConfigs', () => {
-    it('redacts sensitive extraConfig values for org provider configs', async () => {
+    it('delegates extraConfig redaction to the service', async () => {
+      const rawExtraConfig = JSON.stringify({ webhookSecret: 'secret', label: 'prod' });
       (aiSettings as any).getOrgProviderConfigs = vi.fn().mockResolvedValue([
         {
           id: 'cfg-1',
@@ -389,14 +379,19 @@ describe('AiSettingsController', () => {
           enabled: true,
           defaultModel: 'gpt-4.1',
           imageModel: null,
-          extraConfig: JSON.stringify({ webhookSecret: 'secret', label: 'prod' }),
+          extraConfig: rawExtraConfig,
           createdAt: new Date('2026-01-01T00:00:00Z'),
           updatedAt: new Date('2026-01-01T00:00:00Z'),
         },
       ]);
+      (aiSettings as any).safeJson.mockReturnValue({
+        webhookSecret: '[REDACTED]',
+        label: 'prod',
+      });
 
       const result = await controller.listOrgProviderConfigs(superAdmin, 'org-1');
 
+      expect(aiSettings.safeJson).toHaveBeenCalledWith(rawExtraConfig);
       expect(result[0].extraConfig).toEqual({
         webhookSecret: '[REDACTED]',
         label: 'prod',

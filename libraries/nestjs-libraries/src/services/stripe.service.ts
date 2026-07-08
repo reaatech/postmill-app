@@ -11,6 +11,9 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
+// layering: sanctioned leaf-read — StripeEventRepository lives in the subscriptions
+// domain, but SubscriptionService does not depend on StripeService, and these are
+// narrow Stripe-webhook idempotency/grace reads with no service-level cycle.
 import { StripeEventRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/stripe-event.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
@@ -28,6 +31,7 @@ export class StripeService {
     private _organizationService: OrganizationService,
     private _userService: UsersService,
     private _trackService: TrackService,
+    // layering: sanctioned leaf-read — see import comment above.
     private _stripeEventRepository: StripeEventRepository,
     private _notificationService: NotificationService,
     private _audit: AuditService

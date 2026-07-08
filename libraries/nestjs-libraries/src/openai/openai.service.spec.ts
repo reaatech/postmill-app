@@ -23,7 +23,7 @@ function mockAIModelProvider() {
     generateText: vi.fn().mockResolvedValue('Generated text response'),
     generateObject: vi.fn().mockResolvedValue({}),
     languageModel: vi.fn().mockResolvedValue(mockLanguageModel),
-    resolveProviderId: vi.fn().mockResolvedValue('openai'),
+    resolveProviderRef: vi.fn().mockResolvedValue({ providerId: 'openai', version: 'v1' }),
     hasCapability: vi.fn().mockReturnValue(true),
   };
 
@@ -326,19 +326,19 @@ describe('OpenaiService', () => {
     const imageUrl = 'https://example.com/photo.jpg';
 
     it('calls languageModel with scope "utility" when vision is supported', async () => {
-      mocks.provider.resolveProviderId.mockResolvedValue('openai');
+      mocks.provider.resolveProviderRef.mockResolvedValue({ providerId: 'openai', version: 'v1' });
       mocks.provider.hasCapability.mockReturnValue(true);
 
       const result = await service.generateAltText(imageUrl, 'org-5');
 
-      expect(aiModelProvider.resolveProviderId).toHaveBeenCalledWith('utility', 'org-5');
-      expect(aiModelProvider.hasCapability).toHaveBeenCalledWith('openai', 'vision');
+      expect(aiModelProvider.resolveProviderRef).toHaveBeenCalledWith('utility', 'org-5');
+      expect(aiModelProvider.hasCapability).toHaveBeenCalledWith('openai', 'vision', 'v1');
       expect(aiModelProvider.languageModel).toHaveBeenCalledWith('utility', 'org-5');
       expect(result).toBe('Alt-text description of the image');
     });
 
     it('falls back to generateText when vision is not supported', async () => {
-      mocks.provider.resolveProviderId.mockResolvedValue('openai');
+      mocks.provider.resolveProviderRef.mockResolvedValue({ providerId: 'openai', version: 'v1' });
       mocks.provider.hasCapability.mockReturnValue(false);
 
       const result = await service.generateAltText(imageUrl, 'org-6');
@@ -356,7 +356,7 @@ describe('OpenaiService', () => {
     });
 
     it('returns empty string on error', async () => {
-      mocks.provider.resolveProviderId.mockResolvedValue('openai');
+      mocks.provider.resolveProviderRef.mockResolvedValue({ providerId: 'openai', version: 'v1' });
       mocks.provider.hasCapability.mockReturnValue(true);
       mocks.provider.languageModel.mockRejectedValue(new Error('Model error'));
 

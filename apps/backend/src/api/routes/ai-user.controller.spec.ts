@@ -11,6 +11,18 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
         { _sum: { costUsd: this._summaryCalls === 2 ? 2 : 0.5 }, scope: 'generator' },
       ]);
     });
+    getUsageSummary = vi.fn().mockResolvedValue({
+      byScope: [{ _sum: { costUsd: 5 }, scope: 'generator' }],
+      totalSpendUsd: 5,
+      monthlySpendUsd: 2,
+      dailySpendUsd: 0.5,
+      budget: {
+        monthlyCap: 10,
+        dailyCap: 1,
+        remainingMonthly: 8,
+        remainingDaily: 0.5,
+      },
+    });
     upsertBrandProfile = vi.fn().mockImplementation((orgId: string, data: any) => ({ organizationId: orgId, ...data }));
     getBrandProfile = vi.fn().mockResolvedValue({ instructions: 'Be professional', language: 'en' });
     getPromptTemplates = vi.fn().mockResolvedValue([]);
@@ -121,18 +133,21 @@ describe('AiUserController', () => {
   });
 
   describe('getUsage', () => {
-    it('returns spend summary with budget info', async () => {
+    it('returns the usage summary from the service', async () => {
       const result = await controller.getUsage(mockOrg);
-      expect(result).toHaveProperty('byScope');
-      expect(result).toHaveProperty('totalSpendUsd');
-      expect(result).toHaveProperty('budget');
-      expect(result.totalSpendUsd).toBe(5);
-      expect(result.monthlySpendUsd).toBe(2);
-      expect(result.dailySpendUsd).toBe(0.5);
-      expect(result.budget.monthlyCap).toBe(10);
-      expect(result.budget.remainingMonthly).toBe(8);
-      expect(result.budget.remainingDaily).toBe(0.5);
-      expect(aiSettings.getSpendSummary).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({
+        byScope: [{ _sum: { costUsd: 5 }, scope: 'generator' }],
+        totalSpendUsd: 5,
+        monthlySpendUsd: 2,
+        dailySpendUsd: 0.5,
+        budget: {
+          monthlyCap: 10,
+          dailyCap: 1,
+          remainingMonthly: 8,
+          remainingDaily: 0.5,
+        },
+      });
+      expect(aiSettings.getUsageSummary).toHaveBeenCalledWith(mockOrg.id);
     });
   });
 

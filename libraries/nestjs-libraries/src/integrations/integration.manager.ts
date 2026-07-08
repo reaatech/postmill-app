@@ -21,6 +21,10 @@ import {
   getEnvEnabledIdentifiers,
   isEnvEnabled,
 } from '@gitroom/nestjs-libraries/integrations/channel-env-credentials';
+import {
+  PROVIDER_CAPABILITIES,
+  ProviderCapability,
+} from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 
 @Injectable()
 export class IntegrationManager {
@@ -207,6 +211,58 @@ export class IntegrationManager {
 
   getAllowedSocialsIntegrations() {
     return this.getSocialProviders().map((p) => p.identifier);
+  }
+
+  // Source the per-provider capability row from the kernel's social manifests
+  // (manifest.capabilities owns the matrix). Falls back to the static
+  // PROVIDER_CAPABILITIES object when the kernel has no usable manifest for the
+  // provider (e.g. an unknown/unregistered identifier). Returns null for unknown
+  // providers to preserve the existing response shape.
+  private _capabilitiesFor(identifier: string): ProviderCapability | null {
+    try {
+      const manifest = this._kernel
+        .listManifests('social')
+        .find((m) => m.providerId === identifier);
+      const caps = manifest?.capabilities as ProviderCapability | undefined;
+      if (caps && Object.keys(caps).length > 0) {
+        return caps;
+      }
+    } catch {
+      // Kernel unavailable — fall through to the static matrix.
+    }
+    return PROVIDER_CAPABILITIES[identifier] || null;
+  }
+
+  // Catalog used by the per-tenant "Add channel" picker and config list. All
+  // assembly (capabilities, flag normalization, customFields resolution) lives
+  // here so controllers only delegate.
+  async getSocialProviderCatalog(): Promise<
+    Array<{
+      identifier: string;
+      name: string;
+      description: string;
+      isExternal: boolean;
+      isWeb3: boolean;
+      isChromeExtension: boolean;
+      customFields: boolean | any[];
+      scopes: string;
+      capabilities: ProviderCapability | null;
+    }>
+  > {
+    const providers = this.getSocialProviders();
+    return Promise.all(
+      providers.map(async (p) => ({
+        identifier: p.identifier,
+        name: p.name,
+        description: p.toolTip || '',
+        isExternal: !!p.externalUrl,
+        isWeb3: !!p.isWeb3,
+        isChromeExtension: !!p.isChromeExtension,
+        customFields: p.customFields ? await p.customFields() : false,
+        scopes: p.scopes?.join(', ') || '',
+        capabilities: this._capabilitiesFor(p.identifier),
+      }))
+    );
   }
   async getSocialIntegration(
     integration: string,

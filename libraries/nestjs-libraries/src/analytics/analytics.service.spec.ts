@@ -1491,6 +1491,69 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getShortLinks', () => {
+    it('aggregates clicks per link and returns enriched link rows', async () => {
+      const from = new Date('2024-01-01');
+      const to = new Date('2024-01-07');
+      (shortLinkSettingsService.getLinksForOrg as any).mockResolvedValue([
+        { id: 'l1', shortUrl: 'https://sh.rt/a', originalUrl: 'https://example.com/a', provider: 'bitly', createdAt: new Date('2024-01-01') },
+        { id: 'l2', shortUrl: 'https://sh.rt/b', originalUrl: 'https://example.com/b', provider: 'bitly', createdAt: new Date('2024-01-02') },
+      ]);
+      (shortLinkSettingsService.getAggregatedClicks as any).mockResolvedValue([
+        { shortLinkId: 'l1', clicks: 42, date: new Date('2024-01-03T12:00:00.000Z') },
+        { shortLinkId: 'l1', clicks: 8, date: new Date('2024-01-04T12:00:00.000Z') },
+        { shortLinkId: 'l2', clicks: 7, date: new Date('2024-01-05T12:00:00.000Z') },
+      ]);
+
+      const result = await service.getShortLinks('org1', from, to);
+
+      expect(shortLinkSettingsService.getLinksForOrg).toHaveBeenCalledWith('org1');
+      expect(shortLinkSettingsService.getAggregatedClicks).toHaveBeenCalledWith('org1', from, to);
+      expect(result).toHaveLength(2);
+      expect(result[0].clicks).toBe(50);
+      expect(result[1].clicks).toBe(7);
+    });
+
+    it('returns zero clicks for links with no snapshots', async () => {
+      (shortLinkSettingsService.getLinksForOrg as any).mockResolvedValue([
+        { id: 'l1', shortUrl: 'https://sh.rt/a', originalUrl: 'https://example.com/a', provider: 'bitly', createdAt: new Date() },
+      ]);
+      (shortLinkSettingsService.getAggregatedClicks as any).mockResolvedValue([]);
+
+      const result = await service.getShortLinks('org1', new Date('2024-01-01'), new Date('2024-01-07'));
+
+      expect(result[0].clicks).toBe(0);
+    });
+  });
+
+  describe('getShortLinkTimeseries', () => {
+    it('aggregates clicks by date and returns a sorted daily series', async () => {
+      const from = new Date('2024-01-01');
+      const to = new Date('2024-01-07');
+      (shortLinkSettingsService.getAggregatedClicks as any).mockResolvedValue([
+        { date: new Date('2024-01-01T12:00:00.000Z'), clicks: 10 },
+        { date: new Date('2024-01-01T12:00:00.000Z'), clicks: 5 },
+        { date: new Date('2024-01-02T12:00:00.000Z'), clicks: 15 },
+      ]);
+
+      const result = await service.getShortLinkTimeseries('org1', from, to);
+
+      expect(shortLinkSettingsService.getAggregatedClicks).toHaveBeenCalledWith('org1', from, to);
+      expect(result).toEqual([
+        { date: '2024-01-01', clicks: 15 },
+        { date: '2024-01-02', clicks: 15 },
+      ]);
+    });
+
+    it('returns empty array when no snapshots exist', async () => {
+      (shortLinkSettingsService.getAggregatedClicks as any).mockResolvedValue([]);
+
+      const result = await service.getShortLinkTimeseries('org1', new Date('2024-01-01'), new Date('2024-01-07'));
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe('getRecommendations (0.1 — real previous-window baseline)', () => {
     const seedCurrent = (impressions: number) => {
       (analyticsRepository.getBestTimeIntegrations as any).mockResolvedValue([

@@ -19,6 +19,7 @@ import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/for
 import { ForgotPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot.password.dto';
 import { ResendActivationDto } from '@gitroom/nestjs-libraries/dtos/auth/resend-activation.dto';
 import { RefreshTokenDto } from '@gitroom/nestjs-libraries/dtos/auth/refresh-token.dto';
+import { OAuthLinkQueryDto } from '@gitroom/nestjs-libraries/dtos/auth/oauth-link-query.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
@@ -245,7 +246,10 @@ export class AuthController {
   }
 
   @Get('/oauth/:provider')
-  async oauthLink(@Param('provider') provider: string, @Query() query: any) {
+  async oauthLink(
+    @Param('provider') provider: string,
+    @Query() query: OAuthLinkQueryDto
+  ) {
     return this._authService.oauthLink(provider, query);
   }
 

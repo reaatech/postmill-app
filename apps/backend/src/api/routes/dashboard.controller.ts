@@ -19,11 +19,7 @@ import { DashboardBriefService } from '@gitroom/nestjs-libraries/dashboard/dashb
 import { Organization, User } from '@prisma/client';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
-import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
-import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
-import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
-import dayjs from 'dayjs';
 import {
   AuthorizationActions,
   Sections,
@@ -46,9 +42,6 @@ export class DashboardController {
   constructor(
     private _dashboardService: DashboardService,
     private _permissionsService: PermissionsService,
-    private _postsService: PostsService,
-    private _integrationService: IntegrationService,
-    private _organizationService: OrganizationService,
     private _rolesService: RolesService,
     private _briefService: DashboardBriefService,
   ) {}
@@ -116,7 +109,15 @@ export class DashboardController {
       throw new UnauthorizedException();
     }
 
-    return this._buildUsage(org);
+    const billingEnabled = !!process.env.STRIPE_PUBLISHABLE_KEY;
+    if (!billingEnabled) {
+      return { billingEnabled: false };
+    }
+
+    const { subscription, options } =
+      await this._permissionsService.getPackageOptions(org.id);
+
+    return this._dashboardService.buildUsage(org, subscription, options);
   }
 
   @Get('/attention')
@@ -139,7 +140,9 @@ export class DashboardController {
 
     let planUsage: PlanUsageSnapshot | undefined;
     if (permissions.has('billing:read')) {
-      planUsage = await this._buildPlanUsage(org);
+      const { subscription, options } =
+        await this._permissionsService.getPackageOptions(org.id);
+      planUsage = await this._dashboardService.buildPlanUsage(org, subscription, options);
     }
 
     const timezone = (user as any).profile?.timezone;
@@ -188,68 +191,11 @@ export class DashboardController {
 
     let planUsage: PlanUsageSnapshot | undefined;
     if (permissions.has('billing:read')) {
-      planUsage = await this._buildPlanUsage(org);
+      const { subscription, options } =
+        await this._permissionsService.getPackageOptions(org.id);
+      planUsage = await this._dashboardService.buildPlanUsage(org, subscription, options);
     }
 
     return this._briefService.generateBrief(org, user, permittedKinds, planUsage);
-  }
-
-  private async _buildUsage(org: Organization) {
-    const billingEnabled = !!process.env.STRIPE_PUBLISHABLE_KEY;
-    if (!billingEnabled) {
-      return { billingEnabled: false };
-    }
-
-    const { subscription, options } =
-      await this._permissionsService.getPackageOptions(org.id);
-
-    const createdAt = subscription?.createdAt || org.createdAt;
-    const totalMonthPast = Math.abs(dayjs(createdAt).diff(dayjs(), 'month'));
-    const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
-
-    const [postsThisCycle, integrations, team] = await Promise.all([
-      this._postsService.countPostsFromDay(org.id, checkFrom.toDate()),
-      this._integrationService.getIntegrationsList(org.id),
-      this._organizationService.getTeam(org.id),
-    ]);
-
-    return {
-      billingEnabled: true,
-      tier: subscription?.subscriptionTier || 'FREE',
-      limits: {
-        postsPerMonth: options.posts_per_month,
-        channels: options.channel,
-        teamMembers: options.team_members,
-      },
-      usage: {
-        postsThisCycle,
-        channels: integrations.filter((i) => !i.refreshNeeded).length,
-        teamMembers: team?.users?.length ?? 0,
-      },
-    };
-  }
-
-  private async _buildPlanUsage(org: Organization): Promise<PlanUsageSnapshot> {
-    const { subscription, options } =
-      await this._permissionsService.getPackageOptions(org.id);
-
-    const createdAt = subscription?.createdAt || org.createdAt;
-    const totalMonthPast = Math.abs(dayjs(createdAt).diff(dayjs(), 'month'));
-    const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
-
-    const [postsThisCycle, integrations, team] = await Promise.all([
-      this._postsService.countPostsFromDay(org.id, checkFrom.toDate()),
-      this._integrationService.getIntegrationsList(org.id),
-      this._organizationService.getTeam(org.id),
-    ]);
-
-    return {
-      postsThisCycle,
-      postsLimit: options.posts_per_month,
-      channels: integrations.filter((i) => !i.refreshNeeded).length,
-      channelsLimit: options.channel,
-      teamMembers: team?.users?.length ?? 0,
-      teamLimit: options.team_members,
-    };
   }
 }
