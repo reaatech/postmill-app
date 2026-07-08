@@ -156,6 +156,15 @@ describe('SesAdapter', () => {
     const snsCertUrl = 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService-certificate.pem';
 
     describe('SubscriptionConfirmation', () => {
+      // Generating a 2048-bit RSA key pair synchronously is CPU-intensive and can
+      // exceed the default 5s test timeout under parallel load. Generate once for
+      // the whole SubscriptionConfirmation block and reuse it across tests.
+      const { publicKey: subPublicKey, privateKey: subPrivateKey } = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+
       // Canonical SNS signing string for SubscriptionConfirmation includes
       // SubscribeURL + Token (not Subject).
       const buildSubSigningString = (payload: any): string => {
@@ -179,11 +188,6 @@ describe('SesAdapter', () => {
 
       // Build a validly-signed SubscriptionConfirmation payload + matching cert.
       const signedSubPayload = () => {
-        const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-          modulusLength: 2048,
-          publicKeyEncoding: { type: 'spki', format: 'pem' },
-          privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-        });
         const payload: any = {
           Type: 'SubscriptionConfirmation',
           MessageId: 'sub-uuid-1234',
@@ -195,9 +199,9 @@ describe('SesAdapter', () => {
           SigningCertUrl: snsCertUrl,
         };
         payload.Signature = crypto
-          .sign('sha1WithRSAEncryption', Buffer.from(buildSubSigningString(payload)), privateKey)
+          .sign('sha1WithRSAEncryption', Buffer.from(buildSubSigningString(payload)), subPrivateKey)
           .toString('base64');
-        return { payload, publicKey };
+        return { payload, publicKey: subPublicKey };
       };
 
       it('confirms a validly-signed, pinned SubscriptionConfirmation', async () => {
@@ -284,6 +288,15 @@ describe('SesAdapter', () => {
     });
 
     describe('Notification', () => {
+      // Generating a 2048-bit RSA key pair synchronously is CPU-intensive and can
+      // exceed the default 5s test timeout under parallel load. Generate once for
+      // the whole Notification block and reuse it across tests.
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: 'spki', format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+      });
+
       const buildSnsSigningString = (payload: any): string => {
         const lines: string[] = [];
         lines.push('Message');
@@ -327,12 +340,6 @@ describe('SesAdapter', () => {
       });
 
       it('returns true when signature is valid', async () => {
-        const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-          modulusLength: 2048,
-          publicKeyEncoding: { type: 'spki', format: 'pem' },
-          privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-        });
-
         const payload = {
           Type: 'Notification',
           MessageId: 'msg-uuid-1234',
@@ -362,12 +369,6 @@ describe('SesAdapter', () => {
       });
 
       it('handles SigningCertURL (uppercase) alias', async () => {
-        const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-          modulusLength: 2048,
-          publicKeyEncoding: { type: 'spki', format: 'pem' },
-          privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-        });
-
         const payload = {
           Type: 'Notification',
           MessageId: 'msg-uuid-1234',
@@ -397,12 +398,6 @@ describe('SesAdapter', () => {
       });
 
       it('verifies SignatureVersion 2 with RSA-SHA256', async () => {
-        const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
-          modulusLength: 2048,
-          publicKeyEncoding: { type: 'spki', format: 'pem' },
-          privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-        });
-
         const payload = {
           Type: 'Notification',
           MessageId: 'msg-uuid-5678',
@@ -434,12 +429,6 @@ describe('SesAdapter', () => {
       });
 
       it('returns false when signature is invalid', async () => {
-        const { publicKey } = crypto.generateKeyPairSync('rsa', {
-          modulusLength: 2048,
-          publicKeyEncoding: { type: 'spki', format: 'pem' },
-          privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-        });
-
         const payload = {
           Type: 'Notification',
           MessageId: 'msg-uuid-1234',
