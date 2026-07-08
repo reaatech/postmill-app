@@ -1,11 +1,16 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
-import { AnalyticsActivity } from '@gitroom/nestjs-libraries/inngest/activities/analytics.activity';
+import {
+  AnalyticsActivity,
+  ChannelSnapshotIntegrationRef,
+} from '@gitroom/nestjs-libraries/inngest/activities/analytics.activity';
 import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
 import { trackRun } from './track-run';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
+
+const INTEGRATION_DAYS_BACK = 7;
 
 // The cron only fans out one `analytics/sync-org` event per org; the per-org work runs in
 // `analytics-sync-org` (below) with its own concurrency cap. A slow org never blocks the rest
@@ -53,9 +58,23 @@ export const createAnalyticsSyncOrg = (analyticsActivity: AnalyticsActivity) =>
     async ({ step, event }) => {
       const { organizationId } = event.data;
 
-      await step.run('collect-channel', () =>
-        analyticsActivity.collectChannelSnapshots(organizationId, 7)
+      // I-02: fan out one durable event per integration so a slow/failing channel
+      // never blocks the rest of the org's snapshot sweep.
+      const integrations = await step.run(
+        'list-channel-snapshot-integrations',
+        () => analyticsActivity.getChannelSnapshotIntegrationIds(organizationId)
       );
+      if (integrations.length > 0) {
+        const today = dayjs.utc().format('YYYY-MM-DD');
+        await step.sendEvent(
+          'fan-out-channel-snapshots',
+          integrations.map((integration) => ({
+            name: 'analytics/sync-integration' as const,
+            data: integration as any,
+            id: `analytics:channel:${organizationId}:${integration.id}:${today}`,
+          }))
+        );
+      }
       // I-04: checkpoint each post-snapshot page in its own durable step so a
       // retry/resume resumes from the last completed page instead of restarting
       // the entire org sweep.
@@ -111,5 +130,28 @@ export const createAnalyticsSyncOrg = (analyticsActivity: AnalyticsActivity) =>
           return analyticsActivity.buildWeeklySummary(organizationId);
         })
         .catch(() => {});
+    }
+  );
+
+// Per-integration channel snapshot, triggered by the per-org fan-out. Each
+// integration gets its own durable execution with an idempotency key so retries
+// are scoped to the failing channel (I-02).
+export const createAnalyticsSyncIntegration = (
+  analyticsActivity: AnalyticsActivity
+) =>
+  inngest.createFunction(
+    { id: 'analytics-sync-integration', concurrency: 10 },
+    { event: 'analytics/sync-integration' },
+    async ({ step, event }) => {
+      const integration = event.data as ChannelSnapshotIntegrationRef;
+      const { organizationId } = integration;
+
+      await step.run(`collect-channel-${integration.id}`, () =>
+        analyticsActivity.collectChannelSnapshotForIntegration(
+          organizationId,
+          integration,
+          INTEGRATION_DAYS_BACK
+        )
+      );
     }
   );

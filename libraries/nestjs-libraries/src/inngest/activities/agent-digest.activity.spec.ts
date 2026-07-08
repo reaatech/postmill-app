@@ -5,7 +5,7 @@ import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.se
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
-import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { Organization } from '@prisma/client';
 
 describe('AgentDigestActivity', () => {
@@ -33,12 +33,12 @@ describe('AgentDigestActivity', () => {
     notify: vi.fn().mockResolvedValue(undefined),
   } as unknown as NotificationService;
 
-  const organizationRepository = {
+  const organizationService = {
     getOrgById: vi.fn().mockResolvedValue({
       id: 'org-1',
       name: 'Test Org',
     } as Organization),
-  } as unknown as OrganizationRepository;
+  } as unknown as OrganizationService;
 
   const aiModelProvider = {
     resolveConfigForScope: vi.fn().mockResolvedValue({ providerId: 'openai' }),
@@ -51,7 +51,7 @@ describe('AgentDigestActivity', () => {
       budgetService,
       mastraService,
       notificationService,
-      organizationRepository,
+      organizationService,
       aiModelProvider,
     );
   });
@@ -82,7 +82,7 @@ describe('AgentDigestActivity', () => {
     });
 
     it('skips when the organization is not found', async () => {
-      vi.mocked(organizationRepository.getOrgById).mockResolvedValueOnce(null);
+      vi.mocked(organizationService.getOrgById).mockResolvedValueOnce(null);
 
       const result = await activity.generate('org-1');
 
