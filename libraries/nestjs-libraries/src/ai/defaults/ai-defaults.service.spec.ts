@@ -4,10 +4,16 @@ import { DefaultsResolutionService } from './defaults-resolution.service';
 import { AIModelProvider } from '../ai-model.provider';
 import { AiMediaService } from '../governance/media.service';
 import { DefaultNotConfiguredError } from './defaults.errors';
+import { OrgDefaultModelRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-default-model.repository';
+import { DefaultsSettingsValidator } from './defaults-settings.validator';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 
 describe('AiDefaultsService', () => {
   const mockResolution = {
     resolve: vi.fn(),
+    resolveAll: vi.fn(),
+    candidates: vi.fn(),
   } as unknown as DefaultsResolutionService;
 
   const mockModelProvider = {
@@ -30,6 +36,33 @@ describe('AiDefaultsService', () => {
     upscaleVideo: vi.fn(),
   } as unknown as AiMediaService;
 
+  const mockDefaultsRepository = {
+    getAll: vi.fn(),
+    upsert: vi.fn(),
+    remove: vi.fn(),
+  } as unknown as OrgDefaultModelRepository;
+
+  const mockSettingsValidator = {
+    validate: vi.fn((_domain, _category, settings) => settings),
+  } as unknown as DefaultsSettingsValidator;
+
+  const mockProviderResolution = {
+    resolveAI: vi.fn(),
+  } as unknown as ProviderResolutionService;
+
+  const mockKernel = {
+    listManifests: vi.fn(),
+    versions: vi.fn(),
+    latestActive: vi.fn(),
+    get: vi.fn(),
+  };
+
+  const mockOrgAiSettings = {
+    getActiveProvider: vi.fn(),
+    getProviders: vi.fn(),
+    getByIdentifier: vi.fn(),
+  } as unknown as OrgAiSettingsService;
+
   let service: AiDefaultsService;
 
   beforeEach(() => {
@@ -38,6 +71,11 @@ describe('AiDefaultsService', () => {
       mockResolution,
       mockModelProvider,
       mockMediaService,
+      mockDefaultsRepository,
+      mockSettingsValidator,
+      mockProviderResolution,
+      mockKernel as any,
+      mockOrgAiSettings,
     );
   });
 
@@ -326,6 +364,121 @@ describe('AiDefaultsService', () => {
       it.each(cases)('%s throws DefaultNotConfiguredError and does not delegate', async (_name, call) => {
         await expect(call()).rejects.toBeInstanceOf(DefaultNotConfiguredError);
       });
+    });
+  });
+
+  describe('model defaults', () => {
+    beforeEach(() => {
+      vi.mocked(mockDefaultsRepository.getAll).mockResolvedValue([]);
+      vi.mocked(mockResolution.resolveAll).mockResolvedValue({
+        'low-reasoning': { providerId: 'openai', version: 'v1', model: 'gpt-4.1', source: 'auto' },
+      });
+    });
+
+    it('getModelDefaults returns resolved and stored categories', async () => {
+      mockDefaultsRepository.getAll.mockResolvedValue([
+        { category: 'low-reasoning', providerId: 'openai', version: 'v1', model: 'gpt-4.1' },
+      ]);
+
+      const result = await service.getModelDefaults('org-1');
+
+      expect(result.categories).toHaveLength(4);
+      const low = result.categories.find((c: any) => c.category === 'low-reasoning');
+      expect(low).toMatchObject({
+        category: 'low-reasoning',
+        providerId: 'openai',
+        version: 'v1',
+        model: 'gpt-4.1',
+        source: 'stored',
+      });
+    });
+
+    it('setModelDefault validates category, sanitizes settings, upserts and busts cache', async () => {
+      mockDefaultsRepository.upsert.mockResolvedValue(undefined);
+      vi.mocked(mockSettingsValidator.validate).mockReturnValue({ temperature: 0.7 });
+
+      const result = await service.setModelDefault('org-1', 'low-reasoning', {
+        providerId: 'openai',
+        version: 'v1',
+        model: 'gpt-4.1',
+        settings: { prompt: 'ignored', temperature: 0.7 },
+      } as any);
+
+      expect(result).toEqual({ category: 'low-reasoning', success: true });
+      expect(mockSettingsValidator.validate).toHaveBeenCalledWith(
+        'ai',
+        'low-reasoning',
+        { prompt: 'ignored', temperature: 0.7 },
+        { providerId: 'openai', model: 'gpt-4.1' },
+      );
+      expect(mockDefaultsRepository.upsert).toHaveBeenCalledWith(
+        'org-1',
+        'ai',
+        'low-reasoning',
+        expect.objectContaining({ settings: { temperature: 0.7 } }),
+      );
+    });
+
+    it('clearModelDefault removes a default', async () => {
+      mockDefaultsRepository.remove.mockResolvedValue(undefined);
+      const result = await service.clearModelDefault('org-1', 'low-reasoning');
+      expect(result).toEqual({ category: 'low-reasoning', success: true });
+      expect(mockDefaultsRepository.remove).toHaveBeenCalledWith('org-1', 'ai', 'low-reasoning');
+    });
+
+    it('rejects invalid model category', async () => {
+      await expect(
+        service.setModelDefault('org-1', 'not-a-category', { providerId: 'openai' } as any),
+      ).rejects.toMatchObject({ status: 400 });
+    });
+  });
+
+  describe('provider catalog', () => {
+    it('listProviders enumerates adapters with version metadata', async () => {
+      mockProviderResolution.resolveAI.mockReturnValue({
+        identifier: 'openai',
+        name: 'OpenAI',
+        type: 'direct',
+        capabilities: { text: true },
+        privacy: {},
+        credentialFields: [{ key: 'apiKey' }],
+      });
+      mockKernel.listManifests.mockReturnValue([{ providerId: 'openai', version: 'v1' }]);
+      mockKernel.versions.mockReturnValue([{ version: 'v1', status: 'active', credentialFields: [{ key: 'apiKey' }] }]);
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1', status: 'active', credentialFields: [{ key: 'apiKey' }] } });
+
+      const result = await service.listProviders();
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        identifier: 'openai',
+        name: 'OpenAI',
+        version: 'v1',
+        status: 'active',
+      });
+    });
+
+    it('getProviderConfigSummary strips credentials from active provider', async () => {
+      mockOrgAiSettings.getActiveProvider.mockResolvedValue({
+        identifier: 'openai',
+        name: 'OpenAI',
+        credentials: { apiKey: 'secret' },
+      });
+      mockOrgAiSettings.getProviders.mockResolvedValue([]);
+      mockKernel.versions.mockReturnValue([]);
+      mockKernel.latestActive.mockReturnValue(undefined);
+
+      const result = await service.getProviderConfigSummary('org-1');
+
+      expect(result.active).not.toHaveProperty('credentials');
+      expect(result.active).toHaveProperty('identifier', 'openai');
+    });
+
+    it('resolveAdapter returns undefined for unknown providers', () => {
+      mockProviderResolution.resolveAI.mockImplementation(() => {
+        throw new Error('not found');
+      });
+      expect(service.resolveAdapter('unknown')).toBeUndefined();
     });
   });
 });

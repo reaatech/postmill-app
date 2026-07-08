@@ -299,6 +299,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
               className="group rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
             >
               <div className="aspect-[4/3] relative overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element -- external stock thumbnail */}
                 <img
                   src={item.thumbUrl}
                   alt={item.description || ''}

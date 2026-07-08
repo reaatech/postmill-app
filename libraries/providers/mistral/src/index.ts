@@ -1,2 +1,3 @@
 import { mistralAiModule } from './v1';
-export default [mistralAiModule];
+const mistralProviderModules = [mistralAiModule];
+export default mistralProviderModules;

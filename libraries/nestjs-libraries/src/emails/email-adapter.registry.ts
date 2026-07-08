@@ -1,28 +1,27 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { parseQualified } from '@gitroom/provider-kernel';
 import { EmailAdapter } from '@gitroom/nestjs-libraries/emails/email-adapter.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
+/**
+ * Facade that resolves the active email adapter through the ProviderKernel.
+ *
+ * The legacy in-memory registry (`_instances`, `register()`, `getAdapter()`,
+ * `list()`) was removed in v4.0.0: email providers now live exclusively in the
+ * kernel and are resolved per-call via ProviderResolutionService so every call
+ * rides the telemetry proxy and feeds per-version health counters. This class
+ * remains as a thin, injectable facade so consumers (EmailService,
+ * EmailWebhooksController) do not need to import ProviderResolutionService
+ * directly and can stay focused on email concerns.
+ */
 @Injectable()
 export class EmailAdapterRegistry {
-  private readonly _instances = new Map<string, EmailAdapter>();
-
   constructor(
     // 4.9: resolve email providers through ProviderResolutionService so every
     // email call rides the telemetry proxy and feeds the per-version health
     // counters — rather than calling `mod.create(ctx)` on the raw kernel module.
-    @Optional()
-    private readonly _resolution?: ProviderResolutionService,
+    private readonly _resolution: ProviderResolutionService,
   ) {}
-
-  /** Eager registration (kept for tests and callers that already have an instance). */
-  register(adapter: EmailAdapter): void {
-    this._instances.set(adapter.name, adapter);
-  }
-
-  getAdapter(name: string): EmailAdapter | undefined {
-    return this._instances.get(name);
-  }
 
   getActiveAdapter(): EmailAdapter {
     const raw = process.env.EMAIL_PROVIDER || '';
@@ -41,7 +40,7 @@ export class EmailAdapterRegistry {
 
     try {
       const { providerId, version } = parseQualified(raw);
-      const adapter = this._resolution!.resolveEmail(
+      const adapter = this._resolution.resolveEmail(
         providerId,
         version ? { version } : {},
       );
@@ -55,14 +54,6 @@ export class EmailAdapterRegistry {
   }
 
   private _kernelEmpty(): EmailAdapter {
-    try {
-      return this._resolution!.resolveEmail('empty');
-    } catch {
-      return this._instances.get('empty')!;
-    }
-  }
-
-  list(): EmailAdapter[] {
-    return Array.from(this._instances.values());
+    return this._resolution.resolveEmail('empty');
   }
 }

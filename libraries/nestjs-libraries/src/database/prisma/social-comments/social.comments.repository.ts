@@ -176,12 +176,15 @@ export class SocialCommentsRepository {
     });
   }
 
-  softDeleteCommentsByIds(ids: string[]) {
+  softDeleteCommentsByIds(ids: string[], orgId: string) {
     if (!ids.length) {
       return Promise.resolve({ count: 0 });
     }
     return this._socialComment.model.socialComment.updateMany({
-      where: { id: { in: ids } },
+      where: {
+        id: { in: ids },
+        post: { organizationId: orgId },
+      },
       data: { deletedAt: new Date() },
     });
   }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useEffect, useMemo } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
 import { IntegrationContext } from '@gitroom/frontend/components/launches/helpers/use.integration';
@@ -129,25 +129,31 @@ const ContinueModal: FC<{
   integrations: string[];
   refreshList: () => void;
 }> = (props) => {
-  const modals = useModals();
+  const { refreshList, added, continueId, integrations, provider } = props;
+  const { openModal } = useModals();
+  const openedRef = useRef(false);
 
   useEffect(() => {
-    modals.openModal({
+    if (openedRef.current) {
+      return;
+    }
+    openedRef.current = true;
+    openModal({
       title: 'Configure Channel',
       children: (close) => (
         <ModalContent
-          {...props}
+          added={added}
+          continueId={continueId}
+          integrations={integrations}
+          provider={provider}
           closeModal={() => {
-            props.refreshList();
+            refreshList();
             close();
           }}
         />
       ),
     });
-    // The modal must open exactly once when this continuation component mounts;
-    // `props` and `modals` are not stable, so listing them would reopen the modal.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [openModal, refreshList, added, continueId, integrations, provider]);
 
   return null;
 };

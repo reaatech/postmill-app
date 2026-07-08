@@ -34,7 +34,7 @@ export const TagsComponent: FC<{
 
   const loadTags = useCallback(async () => {
     return (await fetch('/posts/tags')).json();
-  }, []);
+  }, [fetch]);
 
   const { data, isLoading, mutate } = useSWR('/posts/tags', loadTags);
 
@@ -301,7 +301,7 @@ export const TagsComponentA: FC<{
   const [showModal, setShowModal] = useState<any>(false);
   const loadTags = useCallback(async () => {
     return (await fetch('/posts/tags')).json();
-  }, []);
+  }, [fetch]);
   const { isLoading, data, mutate } = useSWR<{
     tags: {
       name: string;
@@ -326,7 +326,7 @@ export const TagsComponentA: FC<{
         },
       });
     },
-    [tagValue]
+    [tagValue, name, onChange]
   );
   const createNewTag = useCallback(
     async (newTag: any) => {
@@ -375,7 +375,7 @@ export const TagsComponentA: FC<{
         },
       });
     },
-    [tagValue, data]
+    [tagValue, mutate, name, onChange]
   );
   const onAddition = useCallback(
     async (newTag: any) => {
@@ -400,7 +400,7 @@ export const TagsComponentA: FC<{
         },
       });
     },
-    [tagValue, data]
+    [tagValue, data?.tags, createNewTag, name, onChange]
   );
 
   // useEffect(() => {
@@ -428,7 +428,7 @@ export const TagsComponentA: FC<{
       ].filter((f) => f.label),
       (o) => o.label
     );
-  }, [suggestions, tagValue]);
+  }, [data?.tags, suggestions, tagValue]);
 
   const t = useT();
 
@@ -543,7 +543,7 @@ const ShowModal: FC<{
     });
     resolve(tagName);
     close();
-  }, [tagName, color, id]);
+  }, [tagName, color, id, fetch, resolve, close]);
   return (
     <div>
       <Input

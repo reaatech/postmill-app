@@ -1,2 +1,3 @@
 import { vgdShortlinkModule } from './v1';
-export default [vgdShortlinkModule];
+const vgdProviderModules = [vgdShortlinkModule];
+export default vgdProviderModules;

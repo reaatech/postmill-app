@@ -18,6 +18,7 @@ const makeActivity = () => ({
   getAllOrganizationIds: vi.fn().mockResolvedValue(['org-1', 'org-2']),
   collectChannelSnapshots: vi.fn().mockResolvedValue(undefined),
   collectPostSnapshots: vi.fn().mockResolvedValue(undefined),
+  collectPostSnapshotsPage: vi.fn().mockResolvedValue({ processed: 0 }),
   pruneAndRollupSnapshots: vi.fn().mockResolvedValue(undefined),
   notifySnapshotComplete: vi.fn().mockResolvedValue(undefined),
   probeWatchedAccounts: vi.fn().mockResolvedValue(undefined),
@@ -128,7 +129,7 @@ describe('createAnalyticsSyncOrg (per-org event handler)', () => {
     });
 
     expect(step.run).toHaveBeenCalledWith('collect-channel', expect.any(Function));
-    expect(step.run).toHaveBeenCalledWith('collect-post', expect.any(Function));
+    expect(step.run).toHaveBeenCalledWith('collect-post-page-start', expect.any(Function));
     expect(step.run).toHaveBeenCalledWith('prune', expect.any(Function));
     expect(step.run).toHaveBeenCalledWith('side-effects', expect.any(Function));
     expect(step.run).toHaveBeenCalledWith('probe-watched', expect.any(Function));
@@ -136,11 +137,30 @@ describe('createAnalyticsSyncOrg (per-org event handler)', () => {
     expect(step.run).toHaveBeenCalledWith('shortlink-prune', expect.any(Function));
 
     expect(analyticsActivity.collectChannelSnapshots).toHaveBeenCalledWith('org-9', 7);
-    expect(analyticsActivity.collectPostSnapshots).toHaveBeenCalledWith('org-9', 30);
+    expect(analyticsActivity.collectPostSnapshotsPage).toHaveBeenCalledWith('org-9', 30, undefined);
     expect(analyticsActivity.pruneAndRollupSnapshots).toHaveBeenCalledWith('org-9');
     expect(analyticsActivity.notifySnapshotComplete).toHaveBeenCalledWith('org-9');
     expect(analyticsActivity.probeWatchedAccounts).toHaveBeenCalledWith('org-9');
     expect(analyticsActivity.collectShortLinkSnapshots).toHaveBeenCalledWith('org-9');
     expect(analyticsActivity.pruneShortLinkSnapshots).toHaveBeenCalledWith('org-9');
+  });
+
+  it('checkpoints post-snapshot pagination across durable steps when there are more pages', async () => {
+    analyticsActivity.collectPostSnapshotsPage
+      .mockResolvedValueOnce({ processed: 500, nextCursor: 'cursor-1' })
+      .mockResolvedValueOnce({ processed: 100 });
+
+    const step = createMockStep();
+
+    await getHandler()({
+      step,
+      event: { data: { organizationId: 'org-9' } },
+    });
+
+    expect(step.run).toHaveBeenCalledWith('collect-post-page-start', expect.any(Function));
+    expect(step.run).toHaveBeenCalledWith('collect-post-page-cursor-1', expect.any(Function));
+    expect(analyticsActivity.collectPostSnapshotsPage).toHaveBeenCalledTimes(2);
+    expect(analyticsActivity.collectPostSnapshotsPage).toHaveBeenNthCalledWith(1, 'org-9', 30, undefined);
+    expect(analyticsActivity.collectPostSnapshotsPage).toHaveBeenNthCalledWith(2, 'org-9', 30, 'cursor-1');
   });
 });

@@ -18,6 +18,7 @@ const SafeImage: FC<SafeImageProps> = ({
   ...rest
 }) => {
   return (
+    // eslint-disable-next-line @next/next/no-img-element -- shared wrapper for arbitrary image URLs
     <img
       src={src}
       alt={alt?.toString() || ''}

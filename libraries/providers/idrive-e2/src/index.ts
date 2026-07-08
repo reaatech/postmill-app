@@ -1,2 +1,3 @@
 import { idrivee2StorageModule } from './v1';
-export default [idrivee2StorageModule];
+const idrivee2ProviderModules = [idrivee2StorageModule];
+export default idrivee2ProviderModules;

@@ -75,10 +75,12 @@ import { EmailWebhooksController } from '@gitroom/backend/api/routes/email-webho
 import { MediaJobsWebhookController } from '@gitroom/backend/api/routes/media-jobs-webhook.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
-import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
+import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/auth-provider.manager';
+import { ProvidersManager } from '@gitroom/backend/services/auth/providers/providers.manager';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 import { HealthController } from '@gitroom/backend/api/routes/health.controller';
+import { HealthService } from '@gitroom/backend/services/health.service';
 import {
   ProvidersController,
   AdminProvidersController,
@@ -186,6 +188,7 @@ const authenticatedController = [
     TrackService,
     ShortLinkService,
     AuthProviderManager,
+    ProvidersManager,
     AnalyticsService,
     AnalyticsLiveFallbackService,
     AnalyticsOverviewService,
@@ -196,6 +199,7 @@ const authenticatedController = [
     StockMediaService,
     AiGuardMiddleware,
     SessionCleanupService,
+    HealthService,
     AiDesignerGateway,
   ],
   get exports() {

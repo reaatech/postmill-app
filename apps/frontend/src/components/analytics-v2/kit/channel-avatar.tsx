@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useState } from 'react';
+import { FC, useState } from 'react';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 
 interface ChannelAvatarProps {
@@ -22,8 +22,10 @@ export const ChannelAvatar: FC<ChannelAvatarProps> = ({
   size = 28,
   className,
 }) => {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [src]);
+  // Derive failure from the src that actually failed. When `src` changes,
+  // `failed` becomes false automatically without an effect.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = failedSrc === src;
 
   if (!src || failed) {
     return (
@@ -38,7 +40,7 @@ export const ChannelAvatar: FC<ChannelAvatarProps> = ({
       alt=""
       width={size}
       height={size}
-      onError={() => setFailed(true)}
+      onError={() => setFailedSrc(src)}
       className={className ?? 'rounded-[8px] object-cover'}
       style={{ width: size, height: size }}
     />

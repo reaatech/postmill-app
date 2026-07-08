@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useState } from 'react';
+import { FC, useState } from 'react';
 import SafeImage from './safe.image';
 interface ImageSrc {
   src: string;
@@ -9,14 +9,9 @@ interface ImageSrc {
   height: number;
   [key: string]: any;
 }
-const ImageWithFallback: FC<ImageSrc> = (props) => {
+const InnerImageWithFallback: FC<ImageSrc> = (props) => {
   const { src, fallbackSrc, ...rest } = props;
   const [imgSrc, setImgSrc] = useState(src);
-  useEffect(() => {
-    if (src !== imgSrc) {
-      setImgSrc(src);
-    }
-  }, [src]);
   return (
     <SafeImage
       alt=""
@@ -27,5 +22,10 @@ const ImageWithFallback: FC<ImageSrc> = (props) => {
       }}
     />
   );
+};
+const ImageWithFallback: FC<ImageSrc> = (props) => {
+  // Remount the inner component whenever the source changes so the fallback
+  // state resets without an effect-derived setState.
+  return <InnerImageWithFallback key={props.src} {...props} />;
 };
 export default ImageWithFallback;

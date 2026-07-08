@@ -1,2 +1,3 @@
 import { openrouterAiModule, openrouterMediaModule } from './v1';
-export default [openrouterAiModule, openrouterMediaModule];
+const openrouterProviderModules = [openrouterAiModule, openrouterMediaModule];
+export default openrouterProviderModules;

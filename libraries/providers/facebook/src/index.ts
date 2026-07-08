@@ -1,3 +1,4 @@
 export * from './v1';
 import { facebookSocialModule } from './v1';
-export default [facebookSocialModule];
+const facebookProviderModules = [facebookSocialModule];
+export default facebookProviderModules;

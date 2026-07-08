@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useEffect, useState } from 'react';
+import React, { FC, useCallback, useState } from 'react';
 import { DelayIcon, DropdownArrowIcon } from '@gitroom/frontend/components/ui/icons';
 import clsx from 'clsx';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
@@ -29,14 +29,6 @@ export const DelayComponent: FC<{
   
   const isCustomDelay = currentDelay > 0 && !delayOptions.some((opt) => opt.value === currentDelay);
 
-  useEffect(() => {
-    if (isOpen && isCustomDelay) {
-      setCustomValue(String(currentDelay));
-    } else if (isOpen && !isCustomDelay) {
-      setCustomValue('');
-    }
-  }, [isOpen, isCustomDelay, currentDelay]);
-
   const { current, setInternalDelay, setGlobalDelay } = useLaunchStore(
     useShallow((state) => ({
       current: state.current,
@@ -44,6 +36,16 @@ export const DelayComponent: FC<{
       setInternalDelay: state.setInternalDelay,
     }))
   );
+
+  const toggleOpen = useCallback(() => {
+    setIsOpen((open) => {
+      if (!open) {
+        // Opening: seed the custom input from the current delay.
+        setCustomValue(isCustomDelay ? String(currentDelay) : '');
+      }
+      return !open;
+    });
+  }, [isCustomDelay, currentDelay]);
 
   const ref = useClickOutside(() => {
     if (!isOpen) {
@@ -80,7 +82,7 @@ export const DelayComponent: FC<{
   return (
     <div ref={ref} className="relative">
       <div
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         data-tooltip-id="tooltip"
         data-tooltip-content={
           !currentDelay

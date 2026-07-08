@@ -1,2 +1,3 @@
 import { xaiAiModule, xaiMediaModule } from './v1';
-export default [xaiAiModule, xaiMediaModule];
+const xaiProviderModules = [xaiAiModule, xaiMediaModule];
+export default xaiProviderModules;

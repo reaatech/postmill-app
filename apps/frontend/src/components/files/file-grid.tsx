@@ -31,7 +31,7 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
         </svg>
         <div className="flex items-end gap-[2px] h-[18px]">
           {[6, 12, 9, 16, 8, 14, 5, 11, 7].map((h, i) => (
-            <span key={i} style={{ height: h }} className="w-[3px] rounded-full bg-[#2B5CD3]/60" />
+            <span key={i} style={{ height: h }} className="w-[3px] rounded-full bg-btnPrimary/60" />
           ))}
         </div>
       </div>
@@ -120,7 +120,7 @@ export const FileGrid: FC<{
             onDragStart={(e) => handleDragStart(e, file.id)}
             className={clsx(
               'group relative w-[calc(50%-3px)] sm:w-[calc(33.333%-3px)] md:w-[calc(25%-3px)] lg:w-[calc(16.666%-3px)] xl:w-[calc(12.5%-3px)] min-w-[100px] rounded-[8px] cursor-grab active:cursor-grabbing border-[3px] transition-all',
-              isSelected ? 'border-[#2B5CD3]' : 'border-transparent hover:border-[#2B5CD3]/40'
+              isSelected ? 'border-btnPrimary' : 'border-transparent hover:border-btnPrimary/40'
             )}
             onClick={() => {
               if (onSelect) {
@@ -147,7 +147,7 @@ export const FileGrid: FC<{
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all pointer-events-none" />
 
               {isSelected && (
-                <div className="absolute top-[6px] right-[6px] w-[22px] h-[22px] bg-[#2B5CD3] rounded-full flex items-center justify-center">
+                <div className="absolute top-[6px] right-[6px] w-[22px] h-[22px] bg-btnPrimary rounded-full flex items-center justify-center">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -170,7 +170,7 @@ export const FileGrid: FC<{
               {tags.length > 0 && (
                 <div className="flex gap-[4px] mt-[3px] flex-wrap">
                   {tags.slice(0, 2).map((tag: string) => (
-                    <span key={tag} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-[#2B5CD3]/15 text-[#2B5CD3]">{tag}</span>
+                    <span key={tag} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-btnPrimary/15 text-btnPrimary">{tag}</span>
                   ))}
                 </div>
               )}

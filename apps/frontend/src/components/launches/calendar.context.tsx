@@ -226,7 +226,7 @@ export const CalendarWeekProvider: FC<{
   integrations: Integrations[];
 }> = ({ children, integrations }) => {
   const fetch = useFetch();
-  const [internalData, setInternalData] = useState([] as any[]);
+  const [dateOverrides, setDateOverrides] = useState<Record<string, string>>({});
   const [trendings] = useState<string[]>([]);
   const searchParams = useSearchParams();
   const [displaySaved, setDisplaySaved] = useCookie('calendar-display', 'week');
@@ -397,7 +397,6 @@ export const CalendarWeekProvider: FC<{
     }) => {
       setDisplaySaved(newFilters.display);
       setFilters(newFilters);
-      setInternalData([]);
       // Any standard window change clears a custom range.
       setCustomRange(false);
 
@@ -433,6 +432,19 @@ export const CalendarWeekProvider: FC<{
 
   const posts = useMemo(() => calendarData?.posts || [], [calendarData?.posts]);
   const comments = useMemo(() => calendarData?.comments || [], [calendarData?.comments]);
+
+  // Local optimistic date edits are layered over the fetched post set so we
+  // don't need an effect to keep a mirrored state in sync with `posts`.
+  const internalData = useMemo(() => {
+    if (!Object.keys(dateOverrides).length) {
+      return posts;
+    }
+    return posts.map((post: any) =>
+      dateOverrides[post.id]
+        ? { ...post, publishDate: dateOverrides[post.id] }
+        : post
+    );
+  }, [posts, dateOverrides]);
 
   const filteredPosts = useMemo(() => {
     // State filter (All/Scheduled/Draft/Published) applies to BOTH the calendar
@@ -583,30 +595,15 @@ export const CalendarWeekProvider: FC<{
     unreadOnly,
   ]);
 
-  const changeDate = useCallback(
-    (id: string, date: dayjs.Dayjs) => {
-      setInternalData((d) =>
-        d.map((post: Post) => {
-          if (post.id === id) {
-            return {
-              ...post,
-              // Store the server shape (zoned ISO with `Z`); a zone-less
-              // 'YYYY-MM-DDTHH:mm:ss' is misread as local by `newDayjs()`.
-              publishDate: date.utc().toISOString(),
-            };
-          }
-          return post;
-        })
-      );
-    },
-    [posts, internalData]
-  );
+  const changeDate = useCallback((id: string, date: dayjs.Dayjs) => {
+    setDateOverrides((prev) => ({
+      ...prev,
+      // Store the server shape (zoned ISO with `Z`); a zone-less
+      // 'YYYY-MM-DDTHH:mm:ss' is misread as local by `newDayjs()`.
+      [id]: date.utc().toISOString(),
+    }));
+  }, []);
 
-  useEffect(() => {
-    if (posts) {
-      setInternalData(posts);
-    }
-  }, [posts]);
 
   // Count of non-default filters (date range / window are navigation, not counted;
   // Metrics counts once if any of views/likes/comments has a value).

@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
@@ -33,6 +33,11 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
   const [goals, setGoals] = useState<Array<{ metric: string; target: string }>>(
     (editing?.goals || []).map((g) => ({ metric: g.metric, target: String(g.target) }))
   );
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    nameInputRef.current?.focus();
+  }, []);
 
   const addGoal = useCallback(() => {
     setGoals((prev) => [...prev, { metric: GOAL_METRICS[0], target: '' }]);
@@ -94,12 +99,12 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
       <div className="flex flex-col gap-[4px]">
         <label className="text-[12px] text-newTableText">{t('name', 'Name')}</label>
         <input
+          ref={nameInputRef}
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
           placeholder={t('campaign_name_placeholder', 'Campaign name')}
-          autoFocus
         />
       </div>
       <ColorPicker

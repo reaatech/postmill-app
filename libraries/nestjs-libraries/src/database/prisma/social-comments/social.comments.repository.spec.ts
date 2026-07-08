@@ -410,18 +410,24 @@ describe('SocialCommentsRepository', () => {
 
   describe('softDeleteCommentsByIds', () => {
     it('no-ops on an empty id list', async () => {
-      const result = await repository.softDeleteCommentsByIds([]);
+      const result = await repository.softDeleteCommentsByIds([], 'org-1');
       expect(mockSocialComment.updateMany).not.toHaveBeenCalled();
       expect(result).toEqual({ count: 0 });
     });
 
-    it('soft-deletes the given ids', async () => {
+    it('soft-deletes only ids whose post belongs to the org', async () => {
       mockSocialComment.updateMany.mockResolvedValue({ count: 2 });
 
-      const result = await repository.softDeleteCommentsByIds(['db-2', 'db-3']);
+      const result = await repository.softDeleteCommentsByIds(
+        ['db-2', 'db-3'],
+        'org-1'
+      );
 
       expect(mockSocialComment.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['db-2', 'db-3'] } },
+        where: {
+          id: { in: ['db-2', 'db-3'] },
+          post: { organizationId: 'org-1' },
+        },
         data: { deletedAt: expect.any(Date) },
       });
       expect(result).toEqual({ count: 2 });

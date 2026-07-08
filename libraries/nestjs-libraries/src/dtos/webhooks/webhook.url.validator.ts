@@ -29,29 +29,43 @@ function getAllowedPrivateCidrs(): net.BlockList | null {
   }
 
   const list = new net.BlockList();
-  let added = 0;
+  const errors: string[] = [];
   for (const entry of raw.split(',')) {
     const cidr = entry.trim();
     if (!cidr) continue;
     const [addr, prefixStr] = cidr.split('/');
     const version = net.isIP(addr);
-    if (!version) continue;
+    if (!version) {
+      errors.push(`"${cidr}" is not a valid IPv4/IPv6 address`);
+      continue;
+    }
     const family = version === 4 ? 'ipv4' : 'ipv6';
+    const maxPrefix = version === 4 ? 32 : 128;
     try {
       if (prefixStr === undefined) {
         list.addAddress(addr, family);
       } else {
         const prefix = Number(prefixStr);
-        if (!Number.isInteger(prefix) || prefix < 0) continue;
+        if (!Number.isInteger(prefix) || prefix < 0 || prefix > maxPrefix) {
+          errors.push(
+            `"${cidr}" has an invalid prefix length (must be 0-${maxPrefix} for ${family})`
+          );
+          continue;
+        }
         list.addSubnet(addr, prefix, family);
       }
-      added++;
-    } catch {
-      // ignore malformed entries
+    } catch (err) {
+      errors.push(`"${cidr}" could not be added: ${(err as Error).message}`);
     }
   }
 
-  _allowedCidrList = added > 0 ? list : null;
+  if (errors.length) {
+    throw new Error(
+      `Invalid SSRF_ALLOWED_PRIVATE_CIDRS entries: ${errors.join('; ')}`
+    );
+  }
+
+  _allowedCidrList = list;
   return _allowedCidrList;
 }
 

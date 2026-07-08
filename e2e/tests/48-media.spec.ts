@@ -134,7 +134,7 @@ test('media library deep audit', async ({ page }) => {
   }
 
   // ===== 3. Upload control + real upload =====
-  let fileInput = page.locator('input[type="file"]').first(); // CSS literal — no regex.
+  const fileInput = page.locator('input[type="file"]').first(); // CSS literal — no regex.
   try {
     let triggerVisible = false;
     try {

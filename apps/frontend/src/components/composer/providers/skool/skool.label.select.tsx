@@ -5,9 +5,10 @@ import { useCustomProviderFunction } from '@gitroom/frontend/components/launches
 import { Select } from '@gitroom/react/form/select';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-export const SkoolLabelSelect: FC<{
+
+const SkoolLabelSelectInner: FC<{
   name: string;
-  groupId: string | undefined;
+  groupId: string;
   onChange: (event: {
     target: {
       value: string;
@@ -20,7 +21,9 @@ export const SkoolLabelSelect: FC<{
   const customFunc = useCustomProviderFunction();
   const [labels, setLabels] = useState([]);
   const { getValues } = useSettings();
-  const [currentLabel, setCurrentLabel] = useState<string | undefined>();
+  const [currentLabel, setCurrentLabel] = useState<string | undefined>(
+    () => getValues()[name]
+  );
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -31,20 +34,9 @@ export const SkoolLabelSelect: FC<{
     onChange(event);
   };
   useEffect(() => {
-    if (!groupId) {
-      setLabels([]);
-      setCurrentLabel(undefined);
-      return;
-    }
     customFunc.get('label', { id: groupId }).then((data) => setLabels(data));
-  }, [groupId]);
-  useEffect(() => {
-    const settings = getValues()[name];
-    if (settings) {
-      setCurrentLabel(settings);
-    }
-  }, []);
-  if (!groupId || !labels.length) {
+  }, [groupId, customFunc]);
+  if (!labels.length) {
     return null;
   }
   return (
@@ -62,4 +54,22 @@ export const SkoolLabelSelect: FC<{
       ))}
     </Select>
   );
+};
+
+export const SkoolLabelSelect: FC<{
+  name: string;
+  groupId: string | undefined;
+  onChange: (event: {
+    target: {
+      value: string;
+      name: string;
+    };
+  }) => void;
+}> = (props) => {
+  // Remount the inner selector whenever the parent group changes so labels and
+  // the current value reset without effect-derived setState.
+  if (!props.groupId) {
+    return null;
+  }
+  return <SkoolLabelSelectInner key={props.groupId} {...props} groupId={props.groupId} />;
 };

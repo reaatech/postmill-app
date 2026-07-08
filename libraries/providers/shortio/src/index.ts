@@ -1,2 +1,3 @@
 import { shortioShortlinkModule } from './v1';
-export default [shortioShortlinkModule];
+const shortioProviderModules = [shortioShortlinkModule];
+export default shortioProviderModules;

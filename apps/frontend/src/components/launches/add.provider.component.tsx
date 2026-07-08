@@ -16,6 +16,7 @@ import { yupResolver } from '@hookform/resolvers/yup';
 import { web3List } from '@gitroom/frontend/components/launches/web3/web3.list';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
+import Image from 'next/image';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
 export const useAddProvider = (
@@ -847,9 +848,15 @@ export const AddProviderComponent: FC<{
               >
                 <div>
                   {item.identifier === 'youtube' ? (
-                    <img alt="YouTube" src={`/icons/platforms/youtube.svg`} />
+                    <Image
+                      alt="YouTube"
+                      src="/icons/platforms/youtube.svg"
+                      width={32}
+                      height={32}
+                      unoptimized
+                    />
                   ) : (
-                    <img
+                    <Image
                       alt=""
                       className={clsx(
                         'w-[32px] h-[32px]',
@@ -857,6 +864,8 @@ export const AddProviderComponent: FC<{
                           'rounded-full'
                       )}
                       src={`/icons/platforms/${item.identifier}.png`}
+                      width={32}
+                      height={32}
                     />
                   )}
                 </div>

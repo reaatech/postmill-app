@@ -19,6 +19,7 @@ type CommentsActivityMock = {
   getDaysBack: ReturnType<typeof vi.fn>;
   getSweepIntervalMinutes: ReturnType<typeof vi.fn>;
   syncPostComments: ReturnType<typeof vi.fn>;
+  syncPostCommentsPage: ReturnType<typeof vi.fn>;
   dispatchWebhookForComments: ReturnType<typeof vi.fn>;
   pruneComments: ReturnType<typeof vi.fn>;
   notifyNewComments: ReturnType<typeof vi.fn>;
@@ -29,6 +30,7 @@ const makeActivity = (): CommentsActivityMock => ({
   getDaysBack: vi.fn().mockResolvedValue(7),
   getSweepIntervalMinutes: vi.fn().mockResolvedValue(5),
   syncPostComments: vi.fn().mockResolvedValue(undefined),
+  syncPostCommentsPage: vi.fn().mockResolvedValue({ processed: 0 }),
   dispatchWebhookForComments: vi.fn().mockResolvedValue(undefined),
   pruneComments: vi.fn().mockResolvedValue(undefined),
   notifyNewComments: vi.fn().mockResolvedValue(undefined),
@@ -132,14 +134,33 @@ describe('createCommentsSyncOrg (per-org event handler)', () => {
       event: { data: { organizationId: 'org-9', daysBack: 7 } },
     });
 
-    expect(step.run).toHaveBeenCalledWith('sync-comments', expect.any(Function));
+    expect(step.run).toHaveBeenCalledWith('sync-comments-page-start', expect.any(Function));
     expect(step.run).toHaveBeenCalledWith('dispatch-webhook', expect.any(Function));
     expect(step.run).toHaveBeenCalledWith('prune-comments', expect.any(Function));
     expect(step.run).toHaveBeenCalledWith('notify-comments', expect.any(Function));
 
-    expect(commentsActivity.syncPostComments).toHaveBeenCalledWith('org-9', 7);
+    expect(commentsActivity.syncPostCommentsPage).toHaveBeenCalledWith('org-9', 7, undefined);
     expect(commentsActivity.dispatchWebhookForComments).toHaveBeenCalledWith('org-9', 7);
     expect(commentsActivity.pruneComments).toHaveBeenCalledWith('org-9');
     expect(commentsActivity.notifyNewComments).toHaveBeenCalledWith('org-9');
+  });
+
+  it('checkpoints pagination across durable steps when there are more pages', async () => {
+    commentsActivity.syncPostCommentsPage
+      .mockResolvedValueOnce({ processed: 50, nextCursor: 'cursor-1' })
+      .mockResolvedValueOnce({ processed: 10 });
+
+    const step = createMockStep();
+
+    await getHandler()({
+      step,
+      event: { data: { organizationId: 'org-9', daysBack: 7 } },
+    });
+
+    expect(step.run).toHaveBeenCalledWith('sync-comments-page-start', expect.any(Function));
+    expect(step.run).toHaveBeenCalledWith('sync-comments-page-cursor-1', expect.any(Function));
+    expect(commentsActivity.syncPostCommentsPage).toHaveBeenCalledTimes(2);
+    expect(commentsActivity.syncPostCommentsPage).toHaveBeenNthCalledWith(1, 'org-9', 7, undefined);
+    expect(commentsActivity.syncPostCommentsPage).toHaveBeenNthCalledWith(2, 'org-9', 7, 'cursor-1');
   });
 });

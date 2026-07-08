@@ -9,7 +9,7 @@ export const GoogleProvider = () => {
   const gotoLogin = useCallback(async () => {
     const link = await (await fetch('/auth/oauth/GOOGLE')).text();
     window.location.href = link;
-  }, []);
+  }, [fetch]);
   return (
     <div
       onClick={gotoLogin}

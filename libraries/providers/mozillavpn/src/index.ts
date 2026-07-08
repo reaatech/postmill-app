@@ -1,2 +1,3 @@
 import { mozillavpnVpnModule } from './v1';
-export default [mozillavpnVpnModule];
+const mozillavpnProviderModules = [mozillavpnVpnModule];
+export default mozillavpnProviderModules;

@@ -220,7 +220,7 @@ export const ProviderPreviewComponent: FC<ProviderPreviewProps> = ({
   return (
     <IntegrationContext.Provider value={contextValue}>
       <FormProvider {...form}>
-        <div className="flex flex-col text-white p-[10px]">
+        <div className="flex flex-col text-textColor p-[10px]">
           {errors && errors.length > 0 && (
             <div className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">
               <ul className="list-disc ps-5">

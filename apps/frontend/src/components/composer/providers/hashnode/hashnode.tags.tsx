@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { useCustomProviderFunction } from '@gitroom/frontend/components/launches/helpers/use.custom.provider.function';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { ReactTags } from 'react-tag-autocomplete';
@@ -19,7 +19,9 @@ export const HashnodeTags: FC<{
   const customFunc = useCustomProviderFunction();
   const [tags, setTags] = useState<any[]>([]);
   const { getValues, formState: form } = useSettings();
-  const [tagValue, setTagValue] = useState<any[]>([]);
+  const [tagValue, setTagValue] = useState<any[]>(
+    () => getValues()[props.name] || []
+  );
   const onDelete = useCallback(
     (tagIndex: number) => {
       const modify = tagValue.filter((_, i) => i !== tagIndex);
@@ -51,15 +53,11 @@ export const HashnodeTags: FC<{
   );
   useEffect(() => {
     customFunc.get('tags').then((data) => setTags(data));
-    const settings = getValues()[props.name] || [];
-    if (settings) {
-      setTagValue(settings);
-    }
   }, []);
-  const err = useMemo(() => {
-    if (!form || !form.errors[props?.name!]) return;
-    return form?.errors?.[props?.name!]?.message! as string;
-  }, [form?.errors?.[props?.name!]?.message]);
+  const err =
+    form && form.errors[props?.name!]
+      ? (form?.errors?.[props?.name!]?.message as string)
+      : undefined;
   if (!tags.length) {
     return null;
   }

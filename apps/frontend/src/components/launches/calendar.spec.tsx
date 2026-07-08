@@ -32,6 +32,7 @@ vi.mock('@gitroom/helpers/utils/strip.html.validation', () => ({
 
 vi.mock('@gitroom/react/helpers/safe.image', () => ({
   default: ({ src, className, alt }: any) => (
+    // eslint-disable-next-line @next/next/no-img-element -- test mock
     <img src={src} className={className} alt={alt} data-testid="safe-image" />
   ),
 }));

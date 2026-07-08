@@ -12,6 +12,7 @@ import { CampaignActivity } from './activities/campaign.activity';
 import { RetentionActivity } from './activities/retention.activity';
 import { AgentDigestActivity } from './activities/agent-digest.activity';
 import { InngestService } from './inngest.service';
+import { InngestRunService } from './inngest-run.service';
 
 @Module({
   imports: [DatabaseModule],
@@ -27,6 +28,7 @@ import { InngestService } from './inngest.service';
     CampaignActivity,
     RetentionActivity,
     AgentDigestActivity,
+    InngestRunService,
     InngestService,
   ],
   exports: [
@@ -41,6 +43,7 @@ import { InngestService } from './inngest.service';
     CampaignActivity,
     RetentionActivity,
     AgentDigestActivity,
+    InngestRunService,
     InngestService,
   ],
 })

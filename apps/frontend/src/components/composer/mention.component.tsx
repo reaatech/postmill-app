@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useEffect, useImperativeHandle, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import { computePosition, flip, shift } from '@floating-ui/dom';
 import { posToDOMRect, ReactRenderer } from '@tiptap/react';
 
@@ -36,8 +36,16 @@ const debounce = <T extends any[]>(
   };
 };
 
-const MentionList: FC = (props: any) => {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+const MentionList = forwardRef<any, any>((props, ref) => {
+  const [selectedOffset, setSelectedOffset] = useState(0);
+
+  // Derive the index from the offset so the selection stays valid when the
+  // suggestion list changes size, without resetting state in an effect.
+  const selectedIndex = useMemo(() => {
+    const len = props.items?.length || 0;
+    if (!len) return 0;
+    return ((selectedOffset % len) + len) % len;
+  }, [selectedOffset, props.items]);
 
   const selectItem = (index: number) => {
     const item = props.items[index];
@@ -48,22 +56,24 @@ const MentionList: FC = (props: any) => {
   };
 
   const upHandler = () => {
-    setSelectedIndex(
-      (selectedIndex + props.items.length - 1) % props.items.length
-    );
+    setSelectedOffset((offset) => {
+      const len = props.items?.length || 1;
+      return (offset - 1 + len) % len;
+    });
   };
 
   const downHandler = () => {
-    setSelectedIndex((selectedIndex + 1) % props.items.length);
+    setSelectedOffset((offset) => {
+      const len = props.items?.length || 1;
+      return (offset + 1) % len;
+    });
   };
 
   const enterHandler = () => {
     selectItem(selectedIndex);
   };
 
-  useEffect(() => setSelectedIndex(0), [props.items]);
-
-  useImperativeHandle(props.ref, () => ({
+  useImperativeHandle(ref, () => ({
     onKeyDown: ({ event }: { event: any }) => {
       if (event.key === 'ArrowUp') {
         upHandler();
@@ -110,6 +120,7 @@ const MentionList: FC = (props: any) => {
               key={item.id || index}
               onClick={() => selectItem(index)}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- external mention avatar */}
               <img
                 src={item.image || '/no-picture.jpg'}
                 alt={item.label}
@@ -124,7 +135,7 @@ const MentionList: FC = (props: any) => {
       )}
     </div>
   );
-};
+});
 
 const updatePosition = (editor: any, element: any) => {
   if (!editor?.view || !element) {

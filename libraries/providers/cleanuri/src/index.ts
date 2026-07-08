@@ -1,2 +1,3 @@
 import { cleanuriShortlinkModule } from './v1';
-export default [cleanuriShortlinkModule];
+const cleanuriProviderModules = [cleanuriShortlinkModule];
+export default cleanuriProviderModules;

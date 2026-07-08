@@ -1,2 +1,3 @@
 import { heygenMediaModule } from './v1';
-export default [heygenMediaModule];
+const heygenProviderModules = [heygenMediaModule];
+export default heygenProviderModules;

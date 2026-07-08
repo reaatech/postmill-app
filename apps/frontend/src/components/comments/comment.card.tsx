@@ -155,6 +155,7 @@ export const CommentCard: FC<CommentCardProps> = ({
   return (
     <div className="bg-newBgColorInner rounded-[8px] border border-newTableBorder p-[16px] flex items-start gap-[12px]">
       {comment.authorPicture ? (
+        // eslint-disable-next-line @next/next/no-img-element -- external comment author avatar
         <img
           src={comment.authorPicture}
           alt={comment.authorName}

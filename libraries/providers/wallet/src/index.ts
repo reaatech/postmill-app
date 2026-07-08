@@ -1,2 +1,3 @@
 import { walletAuthModule } from './v1';
-export default [walletAuthModule];
+const walletProviderModules = [walletAuthModule];
+export default walletProviderModules;

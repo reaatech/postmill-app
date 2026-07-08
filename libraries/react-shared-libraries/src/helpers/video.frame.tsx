@@ -12,6 +12,9 @@ export const VideoFrame: FC<{
       src={url + '#t=0.1'}
       preload="metadata"
       autoPlay={!!props?.autoplay}
-    />
+      aria-label="Video frame preview"
+    >
+      <track kind="captions" srcLang="en" label="English" />
+    </video>
   );
 };

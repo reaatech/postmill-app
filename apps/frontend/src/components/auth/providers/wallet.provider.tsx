@@ -41,6 +41,10 @@ import { clusterApiUrl } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { WalletUiProvider } from '@gitroom/frontend/components/auth/providers/placeholder/wallet.ui.provider';
+
+const NETWORK = WalletAdapterNetwork.Mainnet;
+const ENDPOINT = clusterApiUrl(NETWORK);
+
 const WalletProvider = () => {
   const gotoLogin = useCallback(async (code: string) => {
     window.location.href = `/auth?provider=FARCASTER&code=${code}`;
@@ -50,10 +54,6 @@ const WalletProvider = () => {
 export const ButtonCaster: FC<{
   login: (code: string) => void;
 }> = (props) => {
-  const network = WalletAdapterNetwork.Mainnet;
-
-  // You can also provide a custom RPC endpoint.
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
   const wallets = useMemo(
     () => [
       new TokenPocketWalletAdapter(),
@@ -80,11 +80,10 @@ export const ButtonCaster: FC<{
       new TrustWalletAdapter(),
       new XDEFIWalletAdapter(),
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [network]
+    []
   );
   return (
-    <ConnectionProvider endpoint={endpoint}>
+    <ConnectionProvider endpoint={ENDPOINT}>
       <WalletProviderWrapper wallets={wallets} autoConnect={false}>
         <WalletModalProvider>
           <DisabledAutoConnect />

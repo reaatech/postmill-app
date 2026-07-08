@@ -1,2 +1,3 @@
 import { sendgridEmailModule } from './v1';
-export default [sendgridEmailModule];
+const sendgridProviderModules = [sendgridEmailModule];
+export default sendgridProviderModules;

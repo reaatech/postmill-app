@@ -48,6 +48,7 @@ export const YoutubeContinue = withContinueProvider<
     <>
       <div className="flex justify-center">
         {item.picture?.data?.url ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external social profile picture
           <img
             className="w-[80px] h-[80px] object-cover rounded-full"
             src={item.picture.data.url}

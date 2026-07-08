@@ -18,37 +18,52 @@ export class CommentsActivity {
     private _notificationService: NotificationService,
   ) {}
 
-  async syncPostComments(orgId: string, daysBack: number): Promise<void> {
+  // Process one keyset page of published posts for comment sync. Durable callers
+  // (the Inngest sync-org function) loop over this with a per-page step.run so
+  // the cursor is checkpointed across retries; the all-pages wrapper below stays
+  // available for callers that don't need durability.
+  async syncPostCommentsPage(
+    orgId: string,
+    daysBack: number,
+    cursor?: string
+  ): Promise<{ nextCursor?: string; processed: number }> {
     await this._orgProviderConfigManager.ensureFresh(orgId);
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
-    let cursor: string | undefined;
-    let hasMore = true;
-    while (hasMore) {
-      const posts = await this._socialCommentsService.getPublishedPostsForSync(
-        orgId,
-        since,
-        cursor
-      );
+    const posts = await this._socialCommentsService.getPublishedPostsForSync(
+      orgId,
+      since,
+      cursor
+    );
 
-      for (const post of posts) {
-        if (!post.releaseId || post.releaseId === 'missing') continue;
+    for (const post of posts) {
+      if (!post.releaseId || post.releaseId === 'missing') continue;
 
-        try {
-          await this._socialCommentsService.syncComments(orgId, post);
-        } catch (err: any) {
-          this.logger.error(
-            `CommentsActivity: Error syncing comments for post ${post.id}:`,
-            { error: err?.message }
-          );
-        }
-      }
-
-      hasMore = posts.length === 50;
-      if (hasMore) {
-        cursor = posts[posts.length - 1].id;
+      try {
+        await this._socialCommentsService.syncComments(orgId, post);
+      } catch (err: any) {
+        this.logger.error(
+          `CommentsActivity: Error syncing comments for post ${post.id}:`,
+          { error: err?.message }
+        );
       }
     }
+
+    const hasMore = posts.length === 50;
+    return {
+      nextCursor: hasMore ? posts[posts.length - 1].id : undefined,
+      processed: posts.length,
+    };
+  }
+
+  // Non-durable all-pages wrapper. Keeps the original contract for callers and
+  // tests that don't need per-page checkpointing.
+  async syncPostComments(orgId: string, daysBack: number): Promise<void> {
+    let cursor: string | undefined;
+    do {
+      const result = await this.syncPostCommentsPage(orgId, daysBack, cursor);
+      cursor = result.nextCursor;
+    } while (cursor);
   }
 
   async getSweepIntervalMinutes(): Promise<number> {
@@ -100,7 +115,8 @@ export class CommentsActivity {
 
     while (batch.length > 0) {
       await this._socialCommentsService.softDeleteCommentsByIds(
-        batch.map((r) => r.id)
+        batch.map((r) => r.id),
+        orgId
       );
 
       batch = await this._socialCommentsService.findCommentsToPrune(

@@ -9,7 +9,7 @@ declare module 'vitest' {
   }
 }
 
-export default async function ({ provide }: GlobalSetupContext) {
+export default async function globalSetup({ provide }: GlobalSetupContext) {
   const { url, drop } = await createTestDatabase();
   provide('dbUrl', url);
   return async () => {

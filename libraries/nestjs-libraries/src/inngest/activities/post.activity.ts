@@ -13,7 +13,10 @@ import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webho
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
-import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import {
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors/bad-body.error';
 import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
 import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
@@ -92,8 +95,8 @@ export class PostActivity {
   // 0.7: atomic publish-state claim. Delegates to the repository's
   // `updateMany({ state: 'QUEUE' → 'PUBLISHING' })` which returns the row count
   // (1 = this run won the claim, 0 = a concurrent/stale run already claimed it).
-  async claimForPublish(id: string) {
-    return this._postsRepository.claimForPublish(id);
+  async claimForPublish(id: string, orgId: string) {
+    return this._postsRepository.claimForPublish(id, orgId);
   }
 
   // Resolve the per-channel VPN proxy dispatcher (or undefined) for a publish.
@@ -174,25 +177,31 @@ export class PostActivity {
         .toLowerCase();
       const maxConcurrentJob = provider?.maxConcurrentJob ?? 1;
 
-      await inngest.send({
-        name: 'post/cancel',
-        data: { postId: post.id },
-      });
-      await inngest.send({
-        name: 'post/publish',
-        data: {
-          postId: post.id,
-          organizationId: post.organizationId,
-          taskQueue,
-          maxConcurrentJob,
-          postNow: true,
-        },
-        // 0.8: unique-per-send id so successive hourly recovery attempts (and a
-        // reschedule's replacement event) are not deduped against a constant
-        // `post_${id}` for ~24h. Double-sends are now caught by the 0.7 atomic
-        // claim, not by Inngest event dedup.
-        id: `post_${post.id}_recovery_${uuidv4()}`,
-      });
+      if (isInngestEnabled()) {
+        await inngest.send({
+          name: 'post/cancel',
+          data: { postId: post.id },
+        });
+        await inngest.send({
+          name: 'post/publish',
+          data: {
+            postId: post.id,
+            organizationId: post.organizationId,
+            taskQueue,
+            maxConcurrentJob,
+            postNow: true,
+          },
+          // 0.8: unique-per-send id so successive hourly recovery attempts (and a
+          // reschedule's replacement event) are not deduped against a constant
+          // `post_${id}` for ~24h. Double-sends are now caught by the 0.7 atomic
+          // claim, not by Inngest event dedup.
+          id: `post_${post.id}_recovery_${uuidv4()}`,
+        });
+      } else {
+        this.logger.debug(
+          `Inngest disabled; skipping recovery re-enqueue for post ${post.id}`
+        );
+      }
     }
   }
 
@@ -524,11 +533,17 @@ export class PostActivity {
       throw err;
     }
 
-    await inngest.send({
-      name: 'streak/start',
-      data: { organizationId: integration.organizationId },
-      id: `streak_${integration.organizationId}`,
-    });
+    if (isInngestEnabled()) {
+      await inngest.send({
+        name: 'streak/start',
+        data: { organizationId: integration.organizationId },
+        id: `streak_${integration.organizationId}`,
+      });
+    } else {
+      this.logger.debug(
+        `Inngest disabled; skipping streak/start for org ${integration.organizationId}`
+      );
+    }
 
     return postNow;
   }
@@ -642,7 +657,7 @@ export class PostActivity {
       }
     );
 
-    const post = await this._postService.getPostByForWebhookId(postId);
+    const post = await this._postService.getPostByForWebhookId(postId, orgId);
     const root = Array.isArray(post) ? post[0] : post;
 
     // D4: stable, documented minimal subset — never ship the raw Prisma row.

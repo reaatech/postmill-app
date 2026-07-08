@@ -15,7 +15,6 @@ export function useCountUp(target: number, duration = 800, enabled = true) {
 
   useEffect(() => {
     if (!isAnimated) {
-      setValue(target);
       return;
     }
 
@@ -45,5 +44,7 @@ export function useCountUp(target: number, duration = 800, enabled = true) {
     };
   }, [target, duration, isAnimated]);
 
-  return value;
+  // When animation is disabled (or reduced motion is preferred) the target is
+  // returned directly, avoiding a synchronous setState in the effect.
+  return isAnimated ? value : target;
 }

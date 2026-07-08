@@ -5,7 +5,6 @@ import {
   FC,
   forwardRef,
   SelectHTMLAttributes,
-  useMemo,
 } from 'react';
 import { clsx } from 'clsx';
 import { useFormContext } from 'react-hook-form';
@@ -39,11 +38,11 @@ export const Select: FC<
     ...rest
   } = props;
   const form = useFormContext();
-  const err = useMemo(() => {
-    if (error) return error;
-    if (!form || !form.formState.errors[props?.name!]) return;
-    return form?.formState?.errors?.[props?.name!]?.message! as string;
-  }, [form?.formState?.errors?.[props?.name!]?.message, error]);
+  const err =
+    error ||
+    (form && form.formState.errors[props?.name!]
+      ? (form?.formState?.errors?.[props?.name!]?.message as string)
+      : undefined);
   return (
     <div className={clsx('flex flex-col', label ? 'gap-[6px]' : '')}>
       <div className={`text-[14px]`}>

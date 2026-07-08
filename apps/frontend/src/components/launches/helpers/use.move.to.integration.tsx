@@ -35,10 +35,6 @@ export const useMoveToIntegrationListener = (
     if (!enabled) {
       return;
     }
-    return load();
-  }, useEffectParams);
-  const load = useCallback(() => {
-    emitter.off('moveToIntegration', callback);
     emitter.on('moveToIntegration', callback);
     return () => {
       emitter.off('moveToIntegration', callback);

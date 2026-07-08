@@ -1,2 +1,3 @@
 import { s3compatibleStorageModule } from './v1';
-export default [s3compatibleStorageModule];
+const s3compatibleProviderModules = [s3compatibleStorageModule];
+export default s3compatibleProviderModules;

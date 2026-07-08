@@ -112,13 +112,17 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     const apiKey = clientInformation?.client_secret || '';
     const instanceUrl = clientInformation?.instanceUrl || 'https://mewe.com';
 
+    if (!instanceUrl.startsWith('https://')) {
+      return 'Invalid MeWe instance URL: only HTTPS is allowed.';
+    }
+
     if (!loginRequestToken) {
       return 'No login request token received. Please try again.';
     }
 
     try {
       // Exchange loginRequestToken for apiToken
-      const tokenResponse = await fetch(
+      const tokenResponse = await this.fetch(
         `${instanceUrl}/api/dev/token?loginRequestToken=${loginRequestToken}`,
         {
           method: 'GET',
@@ -126,7 +130,8 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
             'X-App-Id': appId,
             'X-Api-Key': apiKey,
           },
-        }
+        },
+        'mewe-token'
       );
 
       if (!tokenResponse.ok) {
@@ -147,10 +152,10 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
       const expiresAt = tokenData.expiresAt;
 
       // Fetch user profile
-      const profileResponse = await fetch(`${instanceUrl}/api/dev/me`, {
+      const profileResponse = await this.fetch(`${instanceUrl}/api/dev/me`, {
         method: 'GET',
         headers: this.authHeaders(apiToken, appId, apiKey),
-      });
+      }, 'mewe-profile');
 
       if (!profileResponse.ok) {
         return 'Failed to fetch MeWe profile.';
@@ -233,7 +238,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     const form = new FormData();
     form.append('file', blob, fileName);
 
-    const uploadResponse = await fetch(
+    const uploadResponse = await this.fetch(
       `${instanceUrl}/api/dev/photo/upload`,
       {
         method: 'POST',
@@ -243,7 +248,8 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
           Authorization: `Bearer ${accessToken}`,
         },
         body: form,
-      }
+      },
+      'mewe-photo-upload'
     );
 
     if (!uploadResponse.ok) {
@@ -290,12 +296,12 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
         ? `${instanceUrl}/api/dev/me/post`
         : `${instanceUrl}/api/dev/group/${groupId}/post`;
 
-    // MeWe post endpoint may return 204 (no content), so use raw fetch
-    const postResponse = await fetch(postUrl, {
+    // MeWe post endpoint may return 204 (no content); this.fetch handles SSRF/VPN.
+    const postResponse = await this.fetch(postUrl, {
       method: 'POST',
       headers: this.authHeaders(accessToken, appId, apiKey),
       body: JSON.stringify(postBody),
-    });
+    }, 'mewe-post');
 
     if (!postResponse.ok) {
       const errorText = await postResponse.text();

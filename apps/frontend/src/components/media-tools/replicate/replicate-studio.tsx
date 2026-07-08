@@ -77,8 +77,9 @@ function SaveFolderPicker() {
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-xs text-newTextColor/50 mobile:hidden">Save to</label>
+      <label htmlFor="replicate-save-folder" className="text-xs text-newTextColor/50 mobile:hidden">Save to</label>
       <select
+        id="replicate-save-folder"
         value={saveFolderId || ''}
         onChange={(e) => setSaveFolderId(e.target.value || null)}
         className="px-2 py-1 rounded-lg border border-studioBorder bg-newBgColorInner text-textColor text-xs focus:outline-none max-w-[140px]"

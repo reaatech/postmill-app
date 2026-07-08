@@ -1,2 +1,3 @@
 import { hotspotshieldVpnModule } from './v1';
-export default [hotspotshieldVpnModule];
+const hotspotshieldProviderModules = [hotspotshieldVpnModule];
+export default hotspotshieldProviderModules;

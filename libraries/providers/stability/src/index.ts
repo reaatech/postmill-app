@@ -1,2 +1,3 @@
 import { stabilityMediaModule } from './v1';
-export default [stabilityMediaModule];
+const stabilityProviderModules = [stabilityMediaModule];
+export default stabilityProviderModules;

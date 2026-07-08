@@ -19,7 +19,7 @@ export const MediaSettingsLayout = () => {
       thumbnail: string;
       alt: string;
     }) => void;
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
+     
   } | null>({
     callback: (params: {
       id: string;
@@ -401,10 +401,11 @@ export const MediaComponentInner: FC<{
   return (
     <div className="mt-[10px] flex flex-col gap-[20px]">
       <div className="flex flex-col space-y-2">
-        <label className="text-sm text-textColor font-medium">
+        <label htmlFor="media-alt-text" className="text-sm text-textColor font-medium">
           Alt Text (for accessibility)
         </label>
         <input
+          id="media-alt-text"
           type="text"
           value={altText}
           onChange={(e) => setAltText(e.target.value)}
@@ -459,6 +460,7 @@ export const MediaComponentInner: FC<{
                     <span className="text-sm text-textColor">
                       Current Thumbnail:
                     </span>
+                    {/* eslint-disable-next-line @next/next/no-img-element -- external media thumbnail */}
                     <img
                       src={newThumbnail || thumbnail}
                       alt="Current thumbnail"

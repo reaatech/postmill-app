@@ -1,5 +1,5 @@
 'use client';
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   ProviderPreviewComponent,
   type ProviderPreviewHandle,
@@ -36,23 +36,14 @@ declare global {
 const ProviderPreviewBridge: FC<{ provider: string }> = ({
   provider,
 }) => {
-  // Read __PROVIDER_INIT__ in an effect, not via a useState lazy
-  // initializer. The initializer would run on the server (where `window`
-  // is undefined → {}), and during hydration React reuses the server
-  // state — so the seeded payload would never reach the form. Setting
-  // state inside an effect guarantees the read happens client-side
-  // after mount; useForm's `values` prop then reactively resets the
-  // form to the seed AFTER any field-level `register('x', { value })`
-  // defaults have been applied, so the seed wins.
-  const [init, setInit] = useState<InitPayload>(null);
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.__PROVIDER_INIT__) {
-      // Reading the seeded payload must happen after mount to avoid a hydration
-      // mismatch; the server has no access to `window.__PROVIDER_INIT__`.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setInit(window.__PROVIDER_INIT__ || {});
-    }
-  }, []);
+  // Read __PROVIDER_INIT__ through useSyncExternalStore so the seeded
+  // payload is picked up on the client without calling setState in an effect.
+  // The server snapshot is `null`, matching the server-rendered tree.
+  const init = useSyncExternalStore<InitPayload>(
+    () => () => {}, // the global is seeded before React loads; no subscription needed
+    () => (typeof window !== 'undefined' ? window.__PROVIDER_INIT__ || null : null),
+    () => null
+  );
 
   const controlRef = useRef<ProviderPreviewHandle | null>(null);
 

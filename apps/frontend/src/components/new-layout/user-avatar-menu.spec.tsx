@@ -9,7 +9,10 @@ vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
 }));
 
 vi.mock('@gitroom/react/helpers/safe.image', () => ({
-  default: ({ src, alt, className }: any) => <img src={src} alt={alt} className={className} />,
+  default: ({ src, alt, className }: any) => (
+    // eslint-disable-next-line @next/next/no-img-element -- test mock
+    <img src={src} alt={alt} className={className} />
+  ),
 }));
 
 vi.mock('next/dynamic', () => ({

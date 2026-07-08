@@ -1,2 +1,3 @@
 import { owlyShortlinkModule } from './v1';
-export default [owlyShortlinkModule];
+const owlyProviderModules = [owlyShortlinkModule];
+export default owlyProviderModules;

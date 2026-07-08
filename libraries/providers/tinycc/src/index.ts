@@ -1,2 +1,3 @@
 import { tinyccShortlinkModule } from './v1';
-export default [tinyccShortlinkModule];
+const tinyccProviderModules = [tinyccShortlinkModule];
+export default tinyccProviderModules;

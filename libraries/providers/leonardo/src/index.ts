@@ -1,2 +1,3 @@
 import { leonardoMediaModule } from './v1';
-export default [leonardoMediaModule];
+const leonardoProviderModules = [leonardoMediaModule];
+export default leonardoProviderModules;

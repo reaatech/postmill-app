@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 
 const mockFetchFn = vi.fn();
-let mockUseSWR: any;
 
 vi.mock('swr', () => ({
   default: vi.fn(),
@@ -39,7 +38,7 @@ vi.mock('./comment.composer', () => ({
 import useSWR from 'swr';
 import { CommentThread } from './comment.thread';
 
-mockUseSWR = vi.mocked(useSWR);
+const mockUseSWR = vi.mocked(useSWR);
 
 function stubSwr(overrides: Record<string, any>) {
   mockUseSWR.mockReturnValue({

@@ -57,9 +57,9 @@ describe('PostActivity.claimForPublish (0.7)', () => {
     const claimForPublish = vi.fn().mockResolvedValue(1);
     const { activity } = build({ _postsRepository: { claimForPublish } });
 
-    const result = await activity.claimForPublish('post-1');
+    const result = await activity.claimForPublish('post-1', 'org-1');
 
-    expect(claimForPublish).toHaveBeenCalledWith('post-1');
+    expect(claimForPublish).toHaveBeenCalledWith('post-1', 'org-1');
     expect(result).toBe(1);
   });
 });

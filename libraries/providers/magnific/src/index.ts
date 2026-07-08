@@ -1,2 +1,3 @@
 import { magnificContentPackModule } from './v1';
-export default [magnificContentPackModule];
+const magnificProviderModules = [magnificContentPackModule];
+export default magnificProviderModules;

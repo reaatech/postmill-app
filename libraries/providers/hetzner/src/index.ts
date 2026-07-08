@@ -1,2 +1,3 @@
 import { hetznerStorageModule } from './v1';
-export default [hetznerStorageModule];
+const hetznerProviderModules = [hetznerStorageModule];
+export default hetznerProviderModules;

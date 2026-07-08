@@ -1,6 +1,6 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { RetentionActivity } from '@gitroom/nestjs-libraries/inngest/activities/retention.activity';
-import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
 import { trackRun } from './track-run';
 
 /**
@@ -11,7 +11,7 @@ import { trackRun } from './track-run';
  */
 export const createRetentionPurge = (
   retentionActivity: RetentionActivity,
-  runRepo: InngestRunRepository
+  runRepo: InngestRunService
 ) =>
   inngest.createFunction(
     { id: 'retention-purge' },

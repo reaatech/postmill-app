@@ -12,7 +12,7 @@ const useApprovedApps = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     return (await fetch('/user/approved-apps')).json();
-  }, []);
+  }, [fetch]);
   return useSWR('approved-apps', load, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
@@ -51,7 +51,7 @@ export const ApprovedAppsComponent: FC = () => {
         }
       }
     },
-    []
+    [fetch, mutate, t, toaster]
   );
 
   if (apps === undefined) {
@@ -74,6 +74,7 @@ export const ApprovedAppsComponent: FC = () => {
               >
                 <div className="flex items-center gap-[12px]">
                   {app.oauthApp?.picture?.path ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- external OAuth app logo
                     <img
                       src={app.oauthApp.picture.path}
                       alt={app.oauthApp.name}

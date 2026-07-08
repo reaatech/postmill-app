@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /**
  * useWaitForClass
@@ -10,34 +10,32 @@ import { useEffect, useState } from "react";
  * @returns A boolean indicating if the class is currently present
  */
 export function useWaitForClass(className: string, root: HTMLElement | null = null): boolean {
-  const [found, setFound] = useState(false);
-
-  useEffect(() => {
-    const target = root ?? document.body;
-
-    if (!target) return;
-
-    // Check immediately in case the element is already present
-    if (target.querySelector(`.${className}`)) {
-      setFound(true);
-      return;
-    }
-
-    const observer = new MutationObserver(() => {
-      if (target.querySelector(`.${className}`)) {
-        setFound(true);
-        observer.disconnect();
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      const target = root ?? document.body;
+      if (!target) {
+        return () => {};
       }
-    });
 
-    observer.observe(target, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-    });
+      const observer = new MutationObserver(callback);
+      observer.observe(target, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+      });
 
-    return () => observer.disconnect();
+      return () => observer.disconnect();
+    },
+    [className, root]
+  );
+
+  const getSnapshot = useCallback(() => {
+    const target = root ?? document.body;
+    if (!target) {
+      return false;
+    }
+    return !!target.querySelector(`.${className}`);
   }, [className, root]);
 
-  return found;
+  return useSyncExternalStore(subscribe, getSnapshot, () => false);
 }

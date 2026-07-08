@@ -1,11 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
+// layering: sanctioned leaf-read — OrganizationService depends on NotificationService
+// (sendEmail/hasEmailProvider/createOrgAndUser), so routing getTeam through the service
+// layer would create a NestJS dependency-injection cycle. Reading the repository directly
+// here is a deliberate, behaviour-neutral leaf lookup.
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { PushNotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/push-notification.service';
 import { NotificationDigestService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-digest.service';
 import {
+  BroadcastNotificationDto,
   ChannelToggles,
   DigestFrequency,
   NotificationCategory,
@@ -186,6 +191,52 @@ export class NotificationService {
         });
       }
     }
+  }
+
+  /**
+   * Broadcast an announcement to the org, applying optional per-user and per-role filters.
+   * A-06: the target filtering lives here so callers (e.g. AdminNotificationsController)
+   * only need to pass the DTO.
+   */
+  async broadcast(
+    orgId: string,
+    body: BroadcastNotificationDto
+  ): Promise<{ success: boolean; sentTo: number }> {
+    const team = await this._organizationRepository.getTeam(orgId);
+    const members = team?.users ?? [];
+
+    const allMemberIds = new Set(members.map((m) => m.user.id));
+    let targetUserIds = allMemberIds;
+
+    if (body.targetUserIds && body.targetUserIds.length > 0) {
+      targetUserIds = new Set(
+        Array.from(targetUserIds).filter((id) => body.targetUserIds!.includes(id))
+      );
+    }
+
+    if (body.targetRoles && body.targetRoles.length > 0) {
+      const roleKeys = new Set(body.targetRoles);
+      targetUserIds = new Set(
+        members
+          .filter(
+            (m) =>
+              targetUserIds.has(m.user.id) && m.roleRef && roleKeys.has(m.roleRef.key)
+          )
+          .map((m) => m.user.id)
+      );
+    }
+
+    await this.notify({
+      orgId,
+      category: 'announcements',
+      title: body.title,
+      message: body.message,
+      channels: body.channels ?? { email: true, push: false, inApp: true },
+      override: true,
+      targetUserIds: Array.from(targetUserIds),
+    });
+
+    return { success: true, sentTo: targetUserIds.size };
   }
 
   private async _routeDigestEmails(

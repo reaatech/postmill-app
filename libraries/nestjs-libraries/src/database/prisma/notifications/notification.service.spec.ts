@@ -382,4 +382,105 @@ describe('NotificationService', () => {
 
     expect(mockCreateNotification).not.toHaveBeenCalled();
   });
+
+  describe('broadcast', () => {
+    it('A-06: sends to all members when no filters are provided', async () => {
+      const notifySpy = vi.spyOn(service, 'notify').mockResolvedValue(undefined);
+      mockGetTeam.mockResolvedValue({
+        users: [
+          { user: { id: 'user-1', email: 'a@b.com' }, roleRef: { key: 'admin' } },
+          { user: { id: 'user-2', email: 'b@b.com' }, roleRef: { key: 'member' } },
+        ],
+      });
+
+      const result = await service.broadcast('org-1', {
+        title: 'Subject',
+        message: 'Message',
+      });
+
+      expect(result).toEqual({ success: true, sentTo: 2 });
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: 'org-1',
+          category: 'announcements',
+          title: 'Subject',
+          message: 'Message',
+          override: true,
+          channels: { email: true, push: false, inApp: true },
+          targetUserIds: ['user-1', 'user-2'],
+        })
+      );
+    });
+
+    it('A-06: filters recipients by targetUserIds', async () => {
+      const notifySpy = vi.spyOn(service, 'notify').mockResolvedValue(undefined);
+      mockGetTeam.mockResolvedValue({
+        users: [
+          { user: { id: 'user-1', email: 'a@b.com' }, roleRef: { key: 'admin' } },
+          { user: { id: 'user-2', email: 'b@b.com' }, roleRef: { key: 'member' } },
+        ],
+      });
+
+      const result = await service.broadcast('org-1', {
+        title: 'Subject',
+        message: 'Message',
+        targetUserIds: ['user-2'],
+      });
+
+      expect(result.sentTo).toBe(1);
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetUserIds: ['user-2'],
+        })
+      );
+    });
+
+    it('A-06: filters recipients by targetRoles', async () => {
+      const notifySpy = vi.spyOn(service, 'notify').mockResolvedValue(undefined);
+      mockGetTeam.mockResolvedValue({
+        users: [
+          { user: { id: 'user-1', email: 'a@b.com' }, roleRef: { key: 'admin' } },
+          { user: { id: 'user-2', email: 'b@b.com' }, roleRef: { key: 'member' } },
+        ],
+      });
+
+      const result = await service.broadcast('org-1', {
+        title: 'Subject',
+        message: 'Message',
+        targetRoles: ['member'],
+      });
+
+      expect(result.sentTo).toBe(1);
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetUserIds: ['user-2'],
+        })
+      );
+    });
+
+    it('A-06: intersects targetUserIds and targetRoles', async () => {
+      const notifySpy = vi.spyOn(service, 'notify').mockResolvedValue(undefined);
+      mockGetTeam.mockResolvedValue({
+        users: [
+          { user: { id: 'user-1', email: 'a@b.com' }, roleRef: { key: 'admin' } },
+          { user: { id: 'user-2', email: 'b@b.com' }, roleRef: { key: 'member' } },
+          { user: { id: 'user-3', email: 'c@b.com' }, roleRef: { key: 'member' } },
+        ],
+      });
+
+      const result = await service.broadcast('org-1', {
+        title: 'Subject',
+        message: 'Message',
+        targetUserIds: ['user-1', 'user-2'],
+        targetRoles: ['member'],
+      });
+
+      expect(result.sentTo).toBe(1);
+      expect(notifySpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targetUserIds: ['user-2'],
+        })
+      );
+    });
+  });
 });

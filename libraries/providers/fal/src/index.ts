@@ -1,2 +1,3 @@
 import { falMediaModule } from './v1';
-export default [falMediaModule];
+const falProviderModules = [falMediaModule];
+export default falProviderModules;

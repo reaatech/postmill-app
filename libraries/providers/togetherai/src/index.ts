@@ -1,2 +1,3 @@
 import { togetheraiAiModule, togetheraiMediaModule } from './v1';
-export default [togetheraiAiModule, togetheraiMediaModule];
+const togetheraiProviderModules = [togetheraiAiModule, togetheraiMediaModule];
+export default togetheraiProviderModules;

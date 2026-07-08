@@ -1,2 +1,3 @@
 import { isgdShortlinkModule } from './v1';
-export default [isgdShortlinkModule];
+const isgdProviderModules = [isgdShortlinkModule];
+export default isgdProviderModules;

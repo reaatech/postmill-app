@@ -124,17 +124,18 @@ const PlugPop: FC<{
   const fetch = useFetch();
   const toaster = useToaster();
   const t = useT();
+  const plugData = data?.data;
   const values = useMemo(() => {
-    if (!data?.data) {
+    if (!plugData) {
       return {};
     }
-    return JSON.parse(data.data).reduce((acc: any, current: any) => {
+    return JSON.parse(plugData).reduce((acc: any, current: any) => {
       return {
         ...acc,
         [current.name]: current.value,
       };
     }, {} as any);
-  }, []);
+  }, [plugData]);
   const yupSchema = useMemo(() => {
     return object(
       plug.fields.reduce((acc, field) => {
@@ -148,7 +149,7 @@ const PlugPop: FC<{
         };
       }, {})
     );
-  }, []);
+  }, [plug.fields]);
   const form = useForm({
     resolver: yupResolver(yupSchema),
     values,
@@ -172,7 +173,7 @@ const PlugPop: FC<{
     }
     toaster.show('Plug updated', 'success');
     closeAll();
-  }, []);
+  }, [closeAll, fetch, plug.methodName, settings.providerId, toaster]);
 
   return (
     <FormProvider {...form}>
@@ -209,14 +210,12 @@ const PlugItem: FC<{
   plug: PlugsInterface;
   addPlug: (data?: SavedPlug) => void;
   data?: SavedPlug;
+  mutate?: () => void;
 }> = (props) => {
-  const { plug, addPlug, data } = props;
+  const { plug, addPlug, data, mutate } = props;
   const t = useT();
   const toaster = useToaster();
-  const [activated, setActivated] = useState(!!data?.activated);
-  useEffect(() => {
-    setActivated(!!data?.activated);
-  }, [data?.activated]);
+  const activated = !!data?.activated;
   const fetch = useFetch();
   const changeActivated = useCallback(
     async (status: 'on' | 'off') => {
@@ -229,14 +228,14 @@ const PlugItem: FC<{
           'Content-Type': 'application/json',
         },
       });
-      // Only flip the optimistic toggle when the server actually persisted it.
+      // Only flip the toggle when the server actually persisted it.
       if (!res.ok) {
         toaster.show('Failed to update automation', 'warning');
         return;
       }
-      setActivated(status === 'on');
+      mutate?.();
     },
-    [activated]
+    [data?.id, fetch, mutate, toaster]
   );
   return (
     <div
@@ -271,7 +270,7 @@ const Plug = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     return (await fetch(`/integrations/${plug.providerId}/plugs`)).json();
-  }, [plug.providerId]);
+  }, [fetch, plug.providerId]);
   const { data, isLoading, mutate } = useSWR(`plugs-${plug.providerId}`, load);
   const addEditPlug = useCallback(
     (p: PlugsInterface) => (data?: SavedPlug) => {
@@ -295,7 +294,7 @@ const Plug = () => {
         ),
       });
     },
-    [data]
+    [modals, mutate, plug.identifier, plug.providerId, plug.name]
   );
   if (isLoading) {
     return null;
@@ -308,6 +307,7 @@ const Plug = () => {
           addPlug={addEditPlug(p)}
           plug={p}
           data={data?.find((a: any) => a.plugFunction === p.methodName)}
+          mutate={mutate}
         />
       ))}
     </div>

@@ -1,2 +1,3 @@
 import { cyberghostVpnModule } from './v1';
-export default [cyberghostVpnModule];
+const cyberghostProviderModules = [cyberghostVpnModule];
+export default cyberghostProviderModules;

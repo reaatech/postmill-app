@@ -3,6 +3,7 @@ import { sanitizePostContent } from '@gitroom/helpers/utils/sanitize.post.conten
 export const dynamic = 'force-dynamic';
 import { Metadata } from 'next';
 import SafeImage from '@gitroom/react/helpers/safe.image';
+import Image from 'next/image';
 import Link from 'next/link';
 import { CommentsComponents } from '@gitroom/frontend/components/preview/comments.components';
 import dayjs from 'dayjs';
@@ -119,6 +120,7 @@ export default async function Auth(
                   <div>
                     <div className="flex shrink-0 rounded-full h-30 w-30 relative">
                       <div className="w-[50px] h-[50px] z-[20]">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- external integration avatar */}
                         <img
                           className="w-full h-full relative z-[20] bg-black aspect-square rounded-full border-tableBorder"
                           alt={post[0].integration.name}
@@ -126,10 +128,12 @@ export default async function Auth(
                         />
                       </div>
                       <div className="absolute -end-[5px] -bottom-[5px] w-[30px] h-[30px] z-[20]">
-                        <img
+                        <Image
                           className="w-full h-full bg-black aspect-square rounded-full border-tableBorder"
                           alt={post[0].integration.providerIdentifier}
                           src={`/icons/platforms/${post[0].integration.providerIdentifier}.png`}
+                          width={30}
+                          height={30}
                         />
                       </div>
                     </div>

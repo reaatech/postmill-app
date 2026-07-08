@@ -1,2 +1,3 @@
 import { reelfarmMediaModule } from './v1';
-export default [reelfarmMediaModule];
+const reelfarmProviderModules = [reelfarmMediaModule];
+export default reelfarmProviderModules;

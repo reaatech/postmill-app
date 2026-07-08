@@ -6,6 +6,7 @@ import {
   useLaunchStore,
 } from '@gitroom/frontend/components/composer/store';
 import clsx from 'clsx';
+import Image from 'next/image';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useShallow } from 'zustand/react/shallow';
 import { GlobalIcon } from '@gitroom/frontend/components/ui/icons';
@@ -160,11 +161,13 @@ export const SelectCurrent: FC = () => {
                   }}
                 />
                 {integration.identifier === 'youtube' ? (
-                  <img
+                  <Image
                     alt="YouTube"
                     src="/icons/platforms/youtube.svg"
                     className="absolute z-10 bottom-[2px] end-[2px] min-w-[12px]"
                     width={12}
+                    height={12}
+                    unoptimized
                   />
                 ) : (
                   <SafeImage

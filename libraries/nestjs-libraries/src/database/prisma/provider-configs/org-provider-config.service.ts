@@ -14,6 +14,24 @@ export type ChannelVpnSelection = {
   vpnVersion?: string;
 };
 
+export type DecryptedOrgProviderConfig = {
+  id: string;
+  organizationId: string;
+  identifier: string;
+  name: string;
+  version: string;
+  enabled: boolean;
+  clientId?: string;
+  clientSecret?: string;
+  additionalConfig?: string;
+  redirectUri?: string;
+  scopes?: string;
+  setupNotes?: string;
+  vpnSelection?: ChannelVpnSelection | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 type WritableConfig = {
   name?: string;
   enabled?: boolean;
@@ -97,6 +115,29 @@ export class OrgProviderConfigService {
     return config ? this.#maskSensitive(config) : undefined;
   }
 
+  // Return every org config with decrypted secrets. This is the canonical way for
+  // the manager to refresh its per-org credential cache without reaching into the
+  // repository directly.
+  async getDecryptedConfigs(
+    orgId: string
+  ): Promise<DecryptedOrgProviderConfig[]> {
+    const configs = await this._repository.getByOrg(orgId);
+    return configs.map((config) => {
+      const decrypted = this.#decryptConfig(config);
+      return {
+        ...config,
+        clientId: decrypted.clientId,
+        clientSecret: decrypted.clientSecret,
+        additionalConfig: decrypted.additionalConfig,
+        version: config.version ?? 'v1',
+        redirectUri: config.redirectUri || undefined,
+        scopes: config.scopes || undefined,
+        setupNotes: config.setupNotes || undefined,
+        vpnSelection: this.#parseVpn(config.vpnSelection),
+      };
+    });
+  }
+
   // Decrypt credentials for a specific named config (used when an account/connection
   // is bound to that config — each named set has its own auth).
   async getCredentialsByConfigId(orgId: string, configId: string) {
@@ -110,15 +151,6 @@ export class OrgProviderConfigService {
     const config = await this._repository.getByIdentifier(orgId, identifier);
     if (!config) return undefined;
 
-    return this.#decryptConfig(config);
-  }
-
-  // Decrypt a raw config row (the manager already holds rows from getByOrg).
-  decryptRow(config: {
-    clientId?: string | null;
-    clientSecret?: string | null;
-    additionalConfig?: string | null;
-  }) {
     return this.#decryptConfig(config);
   }
 

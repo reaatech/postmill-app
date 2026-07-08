@@ -115,7 +115,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
     } catch {
       toaster.show('Failed to revoke API key', 'warning');
     }
-  }, [decision, fetch, mutate, toaster]);
+  }, [decision, fetch, mutate, toaster, t]);
 
   const rotateKey = useCallback(async (id: string) => {
     const approved = await decision.open({
@@ -143,7 +143,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
     } catch {
       toaster.show('Failed to rotate API key', 'warning');
     }
-  }, [decision, fetch, mutate, toaster, rotateName, onKeyCreated]);
+  }, [decision, fetch, mutate, toaster, rotateName, onKeyCreated, t]);
 
   if (isLoading) return null;
 
@@ -282,7 +282,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
                     {key.revokedAt ? (
                       <span className="text-red-400">{t('revoked', 'Revoked')}</span>
                     ) : key.expiresAt && new Date(key.expiresAt) < new Date() ? (
-                      <span className="text-yellow-400">{t('expired', 'Expired')}</span>
+                      <span className="text-amber-600">{t('expired', 'Expired')}</span>
                     ) : (
                       <span className="text-green-400">{t('active', 'Active')}</span>
                     )}

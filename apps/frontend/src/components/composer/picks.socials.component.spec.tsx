@@ -10,12 +10,14 @@ vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
 
 vi.mock('@gitroom/react/helpers/safe.image', () => ({
   default: ({ src, alt, className, width, height }: any) => (
+    // eslint-disable-next-line @next/next/no-img-element -- test mock
     <img src={src} alt={alt} className={className} width={width} height={height} />
   ),
 }));
 
 vi.mock('@gitroom/react/helpers/image.with.fallback', () => ({
   default: ({ src, alt, className, style, width, height }: any) => (
+    // eslint-disable-next-line @next/next/no-img-element -- test mock
     <img src={src} alt={alt} className={className} style={style} width={width} height={height} />
   ),
 }));

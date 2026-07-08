@@ -1,3 +1,4 @@
 export * from './v1';
 import { devtoSocialModule } from './v1';
-export default [devtoSocialModule];
+const devtoProviderModules = [devtoSocialModule];
+export default devtoProviderModules;

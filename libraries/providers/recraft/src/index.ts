@@ -1,2 +1,3 @@
 import { recraftMediaModule } from './v1';
-export default [recraftMediaModule];
+const recraftProviderModules = [recraftMediaModule];
+export default recraftProviderModules;

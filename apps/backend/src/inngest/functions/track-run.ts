@@ -1,4 +1,4 @@
-import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
 
 // Minimal structural slice of the Inngest step tools — only `run` is needed here.
 type TrackStep = { run(id: string, fn: () => any): Promise<any> };
@@ -11,7 +11,7 @@ type TrackStep = { run(id: string, fn: () => any): Promise<any> };
 // wrapped `work` so the sleep is excluded from the recorded duration.
 export async function trackRun<T>(
   step: TrackStep,
-  runRepo: InngestRunRepository,
+  runRepo: InngestRunService,
   functionId: string,
   work: () => Promise<T>
 ): Promise<T> {

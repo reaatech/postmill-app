@@ -93,6 +93,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
         )}
       </div>
       {selected?.url && acceptType === 'image' && (
+        // eslint-disable-next-line @next/next/no-img-element -- external media preview
         <img src={selected.url} alt="Preview" className="mt-2 w-full max-h-32 object-cover rounded-lg" />
       )}
     </div>

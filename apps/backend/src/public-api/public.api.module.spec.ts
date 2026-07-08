@@ -46,8 +46,8 @@ describe('PublicApiModule — idempotency middleware (J4)', () => {
   };
 
   it('runs the create handler once for two identical keyed requests', async () => {
-    const module = new PublicApiModule(makeFakeFactory());
-    const mw = (module as any)._idempotency;
+    const testModule = new PublicApiModule(makeFakeFactory());
+    const mw = (testModule as any)._idempotency;
     const handler = vi.fn();
 
     const a = makeReqRes('KEY-1', 'org-1');
@@ -68,8 +68,8 @@ describe('PublicApiModule — idempotency middleware (J4)', () => {
   });
 
   it('isolates the same key across orgs (no cross-tenant replay)', () => {
-    const module = new PublicApiModule(makeFakeFactory());
-    const mw = (module as any)._idempotency;
+    const testModule = new PublicApiModule(makeFakeFactory());
+    const mw = (testModule as any)._idempotency;
     const handler = vi.fn();
 
     const a = makeReqRes('SHARED', 'org-1');
@@ -88,8 +88,8 @@ describe('PublicApiModule — idempotency middleware (J4)', () => {
   });
 
   it('passes through when no Idempotency-Key header is present', () => {
-    const module = new PublicApiModule(makeFakeFactory());
-    const mw = (module as any)._idempotency;
+    const testModule = new PublicApiModule(makeFakeFactory());
+    const mw = (testModule as any)._idempotency;
     const next = vi.fn();
     const req: any = { method: 'POST', path: '/public/v1/posts', headers: {}, org: { id: 'o' } };
     const res: any = { status: vi.fn(), json: vi.fn() };
@@ -98,8 +98,8 @@ describe('PublicApiModule — idempotency middleware (J4)', () => {
   });
 
   it('restores the real verb for DELETE on a cache miss', () => {
-    const module = new PublicApiModule(makeFakeFactory());
-    const mw = (module as any)._idempotency;
+    const testModule = new PublicApiModule(makeFakeFactory());
+    const mw = (testModule as any)._idempotency;
     let methodInHandler: string | undefined;
     const { req, res } = makeReqRes('DEL-1', 'org-1', 'DELETE');
     req.path = '/public/v1/posts/p1';

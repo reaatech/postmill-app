@@ -1,2 +1,3 @@
 import { tavusMediaModule } from './v1';
-export default [tavusMediaModule];
+const tavusProviderModules = [tavusMediaModule];
+export default tavusProviderModules;

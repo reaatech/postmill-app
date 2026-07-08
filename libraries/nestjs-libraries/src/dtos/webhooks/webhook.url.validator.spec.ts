@@ -60,9 +60,34 @@ describe('SSRF IP blocking', () => {
     expect(isBlockedIp('fe80::1')).toBe(true);
   });
 
-  it('ignores malformed entries without throwing', () => {
+  it('throws on malformed entries at parse time', () => {
     process.env.SSRF_ALLOWED_PRIVATE_CIDRS = 'not-an-ip,10.0.0.0/8,,/24';
+    expect(() => isBlockedIp('10.1.2.3')).toThrow(/not a valid IPv4\/IPv6/);
+  });
+
+  it('throws on out-of-range prefix lengths', () => {
+    process.env.SSRF_ALLOWED_PRIVATE_CIDRS = '10.0.0.0/33';
+    expect(() => isBlockedIp('10.1.2.3')).toThrow(
+      /invalid prefix length \(must be 0-32/
+    );
+  });
+
+  it('throws on negative prefix lengths', () => {
+    process.env.SSRF_ALLOWED_PRIVATE_CIDRS = '10.0.0.0/-1';
+    expect(() => isBlockedIp('10.1.2.3')).toThrow(
+      /invalid prefix length \(must be 0-32/
+    );
+  });
+
+  it('throws on IPv6 prefix lengths out of range', () => {
+    process.env.SSRF_ALLOWED_PRIVATE_CIDRS = 'fd00::/129';
+    expect(() => isBlockedIp('fd00::1')).toThrow(
+      /invalid prefix length \(must be 0-128/
+    );
+  });
+
+  it('accepts a bare address and a /8 CIDR', () => {
+    process.env.SSRF_ALLOWED_PRIVATE_CIDRS = '10.0.0.0/8';
     expect(isBlockedIp('10.1.2.3')).toBe(false);
-    expect(isBlockedIp('192.168.1.1')).toBe(true);
   });
 });

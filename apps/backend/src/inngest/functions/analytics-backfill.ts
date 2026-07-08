@@ -8,9 +8,10 @@ export const createAnalyticsBackfill = (analyticsActivity: AnalyticsActivity) =>
     async ({ step, event }) => {
       await step.run('backfill', () => {
         const { integrationId, organizationId } = event.data;
-        return analyticsActivity.backfillIntegration(
-          organizationId ? { integrationId, organizationId } : integrationId
-        );
+        return analyticsActivity.backfillIntegration({
+          integrationId,
+          organizationId,
+        });
       });
     }
   );

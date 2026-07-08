@@ -1,2 +1,3 @@
 import { qwenAiModule, qwenMediaModule } from './v1';
-export default [qwenAiModule, qwenMediaModule];
+const qwenProviderModules = [qwenAiModule, qwenMediaModule];
+export default qwenProviderModules;

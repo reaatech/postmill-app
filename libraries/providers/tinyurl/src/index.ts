@@ -1,2 +1,3 @@
 import { tinyurlShortlinkModule } from './v1';
-export default [tinyurlShortlinkModule];
+const tinyurlProviderModules = [tinyurlShortlinkModule];
+export default tinyurlProviderModules;

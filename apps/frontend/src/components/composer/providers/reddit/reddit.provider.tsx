@@ -53,13 +53,14 @@ const RenderRedditComponent: FC<{
       return (
         <div className="h-[375px] bg-primary rounded-[16px] flex justify-center items-center">
           {!!images?.length &&
-            images.map((image, index) => (
+            images.map((image) => (
               <a
-                key={`image_${index}`}
+                key={image.id}
                 href={showMedia.set(image.path)}
                 className="flex-1 h-full"
                 target="_blank"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
                 <img
                   alt=""
                   className="w-full h-full object-cover"
@@ -91,9 +92,9 @@ const RedditPreview: FC = (props) => {
     <div className="flex flex-col gap-[40px] w-full">
       {settings
         .filter(({ value }) => value?.subreddit)
-        .map(({ value }, index) => (
+        .map(({ value }) => (
           <div
-            key={index}
+            key={value.subreddit}
             className={clsx(
               `bg-newBgColorInner w-full p-[10px] flex flex-col border-newTableBorder border`
             )}
@@ -116,8 +117,8 @@ const RedditPreview: FC = (props) => {
                   restOfPosts.length && 'mt-[40px] flex flex-col gap-[20px]'
                 )}
               >
-                {restOfPosts.map((p, index) => (
-                  <div className="flex gap-[8px]" key={index}>
+                {restOfPosts.map((p) => (
+                  <div className="flex gap-[8px]" key={p.id}>
                     <div className="w-[32px] h-[32px] relative">
                       <SafeImage
                         width={48}

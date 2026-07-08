@@ -261,6 +261,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
                   className="group rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
                 >
                   <div className="aspect-[4/3] relative overflow-hidden bg-studioBorder/10">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
                     <img
                       src={file.path}
                       alt={file.name}

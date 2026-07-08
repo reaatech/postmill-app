@@ -1,2 +1,3 @@
 import { switchyShortlinkModule } from './v1';
-export default [switchyShortlinkModule];
+const switchyProviderModules = [switchyShortlinkModule];
+export default switchyProviderModules;

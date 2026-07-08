@@ -34,7 +34,7 @@ test('render every real page + capture errors', async ({ page }) => {
   }
 
   // ---- Interaction: open a post-detail modal by clicking a card (month view) ----
-  let postDetail = { attempted: false, opened: false, note: '' };
+  const postDetail = { attempted: false, opened: false, note: '' };
   try {
     await page.goto('/launches');
     await page.waitForLoadState('networkidle');

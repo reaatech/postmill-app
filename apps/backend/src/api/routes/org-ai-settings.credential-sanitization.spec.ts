@@ -14,19 +14,17 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.s
 }));
 
 import { OrgAiSettingsController } from './org-ai-settings.controller';
-import type { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 
 const org: Organization = { id: 'org-1' } as any;
 
 function makeController() {
   return new OrgAiSettingsController(
     aiSvcMock as any,
+    {
+      getProviderConfigSummary: vi.fn(),
+    } as unknown as AiDefaultsService,
     { seedUnset: vi.fn() } as any,
-    { resolve: vi.fn(), resolveAll: vi.fn(), candidates: vi.fn() } as any,
-    { get: vi.fn(), upsert: vi.fn(), getAll: vi.fn(), remove: vi.fn() } as any,
-    { resolveAI: (): any => undefined } as unknown as ProviderResolutionService,
-    { validate: (_domain: any, _category: any, settings: any) => settings } as any,
-    undefined as any,
   ) as any;
 }
 
@@ -48,6 +46,15 @@ describe('OrgAiSettingsController — credential sanitization (#53)', () => {
       });
       aiSvcMock.getProviders.mockResolvedValue([]);
       const controller = makeController();
+      controller._defaultsService.getProviderConfigSummary = vi.fn().mockResolvedValue({
+        active: {
+          identifier: 'openai',
+          name: 'OpenAI',
+          type: 'direct',
+          defaultModel: 'gpt-4',
+        },
+        providers: [],
+      });
 
       const result = await controller.getConfig(org);
 
@@ -62,6 +69,10 @@ describe('OrgAiSettingsController — credential sanitization (#53)', () => {
       aiSvcMock.getActiveProvider.mockResolvedValue(null);
       aiSvcMock.getProviders.mockResolvedValue([]);
       const controller = makeController();
+      controller._defaultsService.getProviderConfigSummary = vi.fn().mockResolvedValue({
+        active: null,
+        providers: [],
+      });
 
       const result = await controller.getConfig(org);
 
@@ -86,6 +97,23 @@ describe('OrgAiSettingsController — credential sanitization (#53)', () => {
         },
       ]);
       const controller = makeController();
+      controller._defaultsService.getProviderConfigSummary = vi.fn().mockResolvedValue({
+        active: null,
+        providers: [
+          {
+            identifier: 'openai',
+            name: 'OpenAI',
+            isConfigured: true,
+            isActive: false,
+          },
+          {
+            identifier: 'anthropic',
+            name: 'Anthropic',
+            isConfigured: false,
+            isActive: false,
+          },
+        ],
+      });
 
       const result = await controller.getConfig(org);
 
@@ -93,8 +121,8 @@ describe('OrgAiSettingsController — credential sanitization (#53)', () => {
       expect(result.providers[0]).not.toHaveProperty('credentials');
       expect(
         result.providers.every(
-          (p: Record<string, unknown>) => !('credentials' in p)
-        )
+          (p: Record<string, unknown>) => !('credentials' in p),
+        ),
       ).toBe(true);
     });
 
@@ -110,6 +138,17 @@ describe('OrgAiSettingsController — credential sanitization (#53)', () => {
       });
       aiSvcMock.getProviders.mockResolvedValue([]);
       const controller = makeController();
+      controller._defaultsService.getProviderConfigSummary = vi.fn().mockResolvedValue({
+        active: {
+          identifier: 'anthropic',
+          name: 'Anthropic',
+          type: 'direct',
+          capabilities: ['text', 'vision'],
+          defaultModel: 'claude-opus',
+          imageModel: 'claude-vision',
+        },
+        providers: [],
+      });
 
       const result = await controller.getConfig(org);
 

@@ -1,2 +1,3 @@
 import { pixelmeShortlinkModule } from './v1';
-export default [pixelmeShortlinkModule];
+const pixelmeProviderModules = [pixelmeShortlinkModule];
+export default pixelmeProviderModules;

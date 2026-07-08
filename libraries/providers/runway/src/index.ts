@@ -1,2 +1,3 @@
 import { runwayMediaModule } from './v1';
-export default [runwayMediaModule];
+const runwayProviderModules = [runwayMediaModule];
+export default runwayProviderModules;

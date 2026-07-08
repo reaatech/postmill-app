@@ -237,6 +237,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
             Example of <span className="text-designerAccent">{selectedModel.id}</span>
           </div>
           {selectedModel.coverImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external provider asset
             <img
               src={selectedModel.coverImageUrl}
               alt="Model example"
@@ -322,6 +323,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
             <div className={single ? '' : 'grid grid-cols-2 gap-3'}>
               {urls.map((url, i) => (
                 <div key={url} className="group relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external provider result */}
                   <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-2xl border border-studioBorder" />
                   <ActionOverlay
                     onDownload={() => handleDownload(url)}

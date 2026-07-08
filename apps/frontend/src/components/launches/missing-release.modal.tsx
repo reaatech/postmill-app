@@ -89,6 +89,7 @@ export const MissingReleaseModal: FC<{
                 : 'border-transparent hover:border-textColor/20'
             }`}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element -- external media thumbnail */}
             <img
               src={item.url}
               alt={item.id}

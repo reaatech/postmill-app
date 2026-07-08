@@ -1,2 +1,3 @@
 import { backblazeb2StorageModule } from './v1';
-export default [backblazeb2StorageModule];
+const backblazeb2ProviderModules = [backblazeb2StorageModule];
+export default backblazeb2ProviderModules;

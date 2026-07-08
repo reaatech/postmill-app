@@ -67,7 +67,7 @@ function stripCredentialHeaders(init: RequestInit | undefined): RequestInit {
   const out: Record<string, string> = {};
   const entries: Iterable<[string, string]> =
     src instanceof Headers
-      ? (src as Headers).entries()
+      ? (src as any).entries()
       : Array.isArray(src)
         ? (src as [string, string][])
         : Object.entries(src as Record<string, string>);

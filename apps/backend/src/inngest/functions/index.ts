@@ -9,8 +9,8 @@ import { DigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/dig
 import { CampaignActivity } from '@gitroom/nestjs-libraries/inngest/activities/campaign.activity';
 import { RetentionActivity } from '@gitroom/nestjs-libraries/inngest/activities/retention.activity';
 import { AgentDigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/agent-digest.activity';
-import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
-import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { InngestRunService } from '@gitroom/nestjs-libraries/inngest/inngest-run.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import {
   createAnalyticsCollection,
   createAnalyticsSyncOrg,
@@ -43,25 +43,25 @@ export interface InngestActivities {
   campaignActivity: CampaignActivity;
   retentionActivity: RetentionActivity;
   agentDigestActivity: AgentDigestActivity;
-  inngestRunRepository: InngestRunRepository;
-  organizationRepository: OrganizationRepository;
+  inngestRunService: InngestRunService;
+  organizationService: OrganizationService;
 }
 
 export const createFunctions = (activities: InngestActivities) => [
-  createAnalyticsCollection(activities.analyticsActivity, activities.inngestRunRepository),
+  createAnalyticsCollection(activities.analyticsActivity, activities.inngestRunService),
   createAnalyticsSyncOrg(activities.analyticsActivity),
-  createCommentsCollection(activities.commentsActivity, activities.inngestRunRepository),
+  createCommentsCollection(activities.commentsActivity, activities.inngestRunService),
   createCommentsSyncOrg(activities.commentsActivity),
-  createMissingPostFinder(activities.postActivity, activities.inngestRunRepository),
-  createMediaJobsPoll(activities.mediaJobsActivity, activities.inngestRunRepository),
+  createMissingPostFinder(activities.postActivity, activities.inngestRunService),
+  createMediaJobsPoll(activities.mediaJobsActivity, activities.inngestRunService),
   createMediaRender(activities.mediaJobsActivity),
   createSendEmail(activities.emailActivity),
   createDigestEmailDaily(activities.digestActivity),
   createDigestEmailWeekly(activities.digestActivity),
-  createAgentDigest(activities.agentDigestActivity, activities.organizationRepository),
+  createAgentDigest(activities.agentDigestActivity, activities.organizationService),
   createAgentDigestOrg(activities.agentDigestActivity),
-  createCampaignTagPurge(activities.campaignActivity, activities.inngestRunRepository),
-  createRetentionPurge(activities.retentionActivity, activities.inngestRunRepository),
+  createCampaignTagPurge(activities.campaignActivity, activities.inngestRunService),
+  createRetentionPurge(activities.retentionActivity, activities.inngestRunService),
   createAutopostProcess(activities.autopostActivity),
   createRefreshToken(activities.integrationsActivity),
   createStreakTracker(activities.emailActivity, activities.postActivity),

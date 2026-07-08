@@ -4,8 +4,7 @@ import {
   ButtonHTMLAttributes,
   DetailedHTMLProps,
   FC,
-  useEffect,
-  useRef,
+  useCallback,
   useState,
 } from 'react';
 import { clsx } from 'clsx';
@@ -36,16 +35,17 @@ const ReactLoading = ({ width = 20, height = 20 }: { type?: string; color?: stri
       innerClassName?: string;
     }
   > = ({ children, loading, innerClassName, secondary, danger, ...props }) => {
-  const ref = useRef<HTMLButtonElement | null>(null);
   const [height, setHeight] = useState<number | null>(null);
-  useEffect(() => {
-    setHeight(ref.current?.offsetHeight || 40);
+  const buttonRef = useCallback((node: HTMLButtonElement | null) => {
+    if (node) {
+      setHeight(node.offsetHeight);
+    }
   }, []);
   return (
     <button
       {...props}
       type={props.type || 'button'}
-      ref={ref}
+      ref={buttonRef}
       className={clsx(
         (props.disabled || loading) && 'opacity-50 pointer-events-none',
         `${

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import path from 'path';
 import { ChromiumFrameCaptureService } from './chromium-frame-capture.service';
 import { FfmpegVideoEncoderService } from './ffmpeg-video-encoder.service';
 import type { VideoOutput } from './design-render.types';
@@ -34,7 +35,7 @@ describe.skipIf(process.env.RUN_RENDER_INTEGRATION !== '1')('Chromium + ffmpeg v
     expect(fs.statSync(result.videoPath).size).toBeGreaterThan(1000);
     expect(fs.statSync(result.thumbnailPath).size).toBeGreaterThan(100);
 
-    encoder.cleanup(require('path').dirname(result.videoPath));
+    encoder.cleanup(path.dirname(result.videoPath));
   }, 120000);
 
   it('renders a 1-second red animated GIF with a thumbnail', async () => {
@@ -53,6 +54,6 @@ describe.skipIf(process.env.RUN_RENDER_INTEGRATION !== '1')('Chromium + ffmpeg v
     expect(fs.existsSync(result.thumbnailPath)).toBe(true);
     expect(fs.statSync(result.videoPath).size).toBeGreaterThan(1000);
 
-    encoder.cleanup(require('path').dirname(result.videoPath));
+    encoder.cleanup(path.dirname(result.videoPath));
   }, 120000);
 });

@@ -108,7 +108,7 @@ body * {
 }
 
 .table1 thead {
-  @apply bg-customColor8 border-b border-b-fifth;
+  @apply bg-btnSimple border-b border-b-fifth;
   height: 44px;
   font-size: 12px;
 }
@@ -140,7 +140,7 @@ body * {
   @apply text-white #{!important};
 }
 .swal2-confirm {
-  @apply bg-customColor50 #{!important};
+  @apply bg-newBackdrop #{!important};
   @apply text-white #{!important};
 }
 
@@ -171,12 +171,12 @@ body * {
 }
 
 .react-tags.is-active {
-  @apply border-customColor51;
+  @apply border-btnPrimary;
 }
 
 .react-tags.is-disabled {
   opacity: 0.75;
-  @apply bg-customColor52;
+  @apply bg-btnSimple;
   /* Prevent any clicking on the component */
   pointer-events: none;
   cursor: not-allowed;
@@ -219,7 +219,7 @@ body * {
 }
 
 .react-tags__tag:hover {
-  @apply text-textColor bg-customColor51;
+  @apply text-textColor bg-btnPrimary;
 }
 
 .react-tags__tag::after {
@@ -243,7 +243,7 @@ body * {
   );
   margin-left: 0.5rem;
   font-size: 0.875rem;
-  @apply bg-customColor53;
+  @apply bg-newTableText;
 }
 
 .react-tags__tag:hover::after {
@@ -273,7 +273,7 @@ body * {
 }
 
 .react-tags__combobox-input::placeholder {
-  @apply text-customColor53;
+  @apply text-newTableText;
   opacity: 1;
 }
 
@@ -286,7 +286,7 @@ body * {
   right: -2px;
   max-height: 12.5rem;
   overflow-y: auto;
-  @apply bg-input border border-customColor54;
+  @apply bg-input border border-newSep;
   border-radius: 6px;
   box-shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -4px,
     rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
@@ -302,11 +302,11 @@ body * {
 }
 
 .react-tags__listbox-option:not([aria-disabled='true']).is-active {
-  @apply text-textColor bg-customColor51;
+  @apply text-textColor bg-btnPrimary;
 }
 
 .react-tags__listbox-option[aria-disabled='true'] {
-  @apply text-customColor53;
+  @apply text-newTableText;
   cursor: not-allowed;
   pointer-events: none;
 }
@@ -317,7 +317,7 @@ body * {
 }
 
 .react-tags__listbox-option[aria-selected='true']:not(.is-active)::after {
-  @apply text-customColor51;
+  @apply text-btnPrimary;
 }
 
 .react-tags__listbox-option-highlight {
@@ -377,7 +377,6 @@ body * {
 //}
 
 //.copilotKitWindow {
-//  @apply bg-customColor3 #{!important};
 //}
 
 //.copilotKitButtonIconOpen svg {
@@ -411,7 +410,7 @@ body * {
 
 .uppy-FileInput-container {
   @apply cursor-pointer font-[500] flex justify-center items-center gap-[4px] text-[12px] rounded-[4px] w-[107px] h-[25px] text-textColor border-[2px];
-  @apply bg-customColor3 border-customColor21;
+  @apply bg-newBgColorInner border-newTableBorder;
 }
 
 .uppy-ProgressBar {
@@ -420,7 +419,7 @@ body * {
 }
 
 .uppy-ProgressBar-inner {
-  @apply bg-customColor51;
+  @apply bg-btnPrimary;
   height: 25px;
   border-radius: 4px;
 }
@@ -600,9 +599,6 @@ html[dir='rtl'] [dir='ltr'] {
 }
 .bigWrap .uppy-StatusBar {
   height: 32px !important;
-}
-.uppy-StatusBar {
-  //@apply bg-customColor55;
 }
 //
 //.uppy-Dashboard-inner {

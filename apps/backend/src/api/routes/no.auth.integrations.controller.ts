@@ -125,7 +125,7 @@ export class NoAuthIntegrationsController {
       picture,
       username,
       additionalSettings,
-      // eslint-disable-next-line no-async-promise-executor
+       
     } = await new Promise<AuthTokenDetails>(async (res) => {
       try {
         const auth = await integrationProvider.authenticate(

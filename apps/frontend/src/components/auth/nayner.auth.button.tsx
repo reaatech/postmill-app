@@ -22,15 +22,22 @@ export const NeynarAuthButton: FC<{
   }?client_id=${client_id}`;
   const authOrigin = new URL(neynarLoginUrl).origin;
   const modalRef = useRef<HTMLDivElement>(null);
-  const handleMessage = useCallback(
-    async (event: MessageEvent) => {
+
+  // Ref listener pattern: the stable wrapper is added/removed once, while the
+  // actual handler is kept in a ref so it can read the latest props/refs.
+  const handleMessageRef = useRef<((event: MessageEvent) => void) | undefined>(undefined);
+  const handleMessage = useCallback((event: MessageEvent) => {
+    handleMessageRef.current?.(event);
+  }, []);
+  useEffect(() => {
+    handleMessageRef.current = (event) => {
       if (
         event.origin === authOrigin &&
         event.data &&
         event.data.is_authenticated
       ) {
         authWindowRef.current?.close();
-        window.removeEventListener('message', handleMessage); // Remove listener here
+        window.removeEventListener('message', handleMessage);
         delete event.data.user.profile;
         const _user = {
           signer_uuid: event.data.signer_uuid,
@@ -38,9 +45,9 @@ export const NeynarAuthButton: FC<{
         };
         onLogin(Buffer.from(JSON.stringify(_user)).toString('base64'));
       }
-    },
-    [client_id, onLogin]
-  );
+    };
+  });
+
   const handleSignIn = useCallback(() => {
     const width = 600,
       height = 700;
@@ -59,7 +66,7 @@ export const NeynarAuthButton: FC<{
       return;
     }
     window.addEventListener('message', handleMessage, false);
-  }, [client_id, handleMessage]);
+  }, [neynarLoginUrl, handleMessage]);
   const closeModal = () => setShowModal(false);
   useEffect(() => {
     return () => {

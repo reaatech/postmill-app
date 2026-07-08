@@ -1,3 +1,4 @@
 export * from './v1';
 import { listmonkSocialModule } from './v1';
-export default [listmonkSocialModule];
+const listmonkProviderModules = [listmonkSocialModule];
+export default listmonkProviderModules;

@@ -101,10 +101,10 @@ describe('CommentsActivity', () => {
 
       await activity.pruneComments('org-1');
       expect(socialCommentsService.findCommentsToPrune).toHaveBeenCalled();
-      expect(socialCommentsService.softDeleteCommentsByIds).toHaveBeenCalledWith([
-        'c1',
-        'c2',
-      ]);
+      expect(socialCommentsService.softDeleteCommentsByIds).toHaveBeenCalledWith(
+        ['c1', 'c2'],
+        'org-1'
+      );
     });
 
     it('handles empty result without error', async () => {

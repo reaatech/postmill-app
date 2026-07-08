@@ -1,2 +1,3 @@
 import { cloudflarer2StorageModule } from './v1';
-export default [cloudflarer2StorageModule];
+const cloudflarer2ProviderModules = [cloudflarer2StorageModule];
+export default cloudflarer2ProviderModules;

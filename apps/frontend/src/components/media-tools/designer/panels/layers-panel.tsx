@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useRef, useState } from 'react';
+import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { DesignerElement } from '../designer.store';
 
 interface LayersPanelProps {
@@ -40,6 +40,13 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState('');
   const rowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingId) {
+      renameInputRef.current?.focus();
+    }
+  }, [editingId]);
 
   const selectElement = useCallback(
     (id: string) => {
@@ -222,6 +229,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
 
             {isEditing ? (
               <input
+                ref={renameInputRef}
                 type="text"
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
@@ -234,7 +242,6 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                     cancelRename();
                   }
                 }}
-                autoFocus
                 className="flex-1 h-[22px] px-1.5 rounded-[4px] bg-newBgColor border border-designerAccent text-[11px] text-textColor outline-none"
               />
             ) : (

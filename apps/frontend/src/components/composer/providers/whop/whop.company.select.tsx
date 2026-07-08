@@ -20,7 +20,9 @@ export const WhopCompanySelect: FC<{
   const customFunc = useCustomProviderFunction();
   const [companies, setCompanies] = useState([]);
   const { getValues } = useSettings();
-  const [currentCompany, setCurrentCompany] = useState<string | undefined>();
+  const [currentCompany, setCurrentCompany] = useState<string | undefined>(
+    () => getValues()[props.name]
+  );
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -32,10 +34,6 @@ export const WhopCompanySelect: FC<{
   };
   useEffect(() => {
     customFunc.get('companies').then((data) => setCompanies(data));
-    const settings = getValues()[props.name];
-    if (settings) {
-      setCurrentCompany(settings);
-    }
   }, []);
   if (!companies.length) {
     return null;

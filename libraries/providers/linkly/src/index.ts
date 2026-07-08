@@ -1,2 +1,3 @@
 import { linklyShortlinkModule } from './v1';
-export default [linklyShortlinkModule];
+const linklyProviderModules = [linklyShortlinkModule];
+export default linklyProviderModules;

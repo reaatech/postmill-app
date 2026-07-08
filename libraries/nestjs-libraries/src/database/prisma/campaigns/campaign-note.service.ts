@@ -290,7 +290,7 @@ export class CampaignNoteService {
     emoji: string
   ) {
     await this._loadInCampaign(noteId, campaignId, organizationId);
-    return this._notes.toggleReaction(noteId, userId, emoji);
+    return this._notes.toggleReaction(noteId, userId, emoji, organizationId);
   }
 
   private async _loadInCampaign(

@@ -418,9 +418,9 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
                 </div>
                 {post.image && tryParseJSON(post.image, []).length > 0 && (
                   <div className="flex gap-[6px] mt-[8px] flex-wrap">
-                    {tryParseJSON(post.image, []).map((img: any, i: number) => (
+                    {tryParseJSON(post.image, []).map((img: any) => (
                       <SafeImage
-                        key={i}
+                        key={img.path || img}
                         src={img.path || img}
                         className="w-[80px] h-[80px] rounded-[6px] object-cover"
                         alt=""

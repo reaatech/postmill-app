@@ -75,6 +75,7 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
       >
         <div className="w-[64px] h-[64px] rounded-[8px] bg-newBgColorInner overflow-hidden flex items-center justify-center shrink-0">
           {photo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- external provider asset
             <img src={photo.previewUrl} alt="Selected" className="w-full h-full object-cover" />
           ) : (
             <span className="text-newTextColor/40 text-[22px]">＋</span>

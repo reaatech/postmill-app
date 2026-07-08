@@ -6,16 +6,12 @@ import {
   Req,
 } from '@nestjs/common';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
-import { StripeEventRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/stripe-event.repository';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Stripe')
 @Controller('/stripe')
 export class StripeController {
-  constructor(
-    private readonly _stripeService: StripeService,
-    private readonly _stripeEventRepository: StripeEventRepository,
-  ) {}
+  constructor(private readonly _stripeService: StripeService) {}
 
   @Post('/')
   async stripe(@Req() req: RawBodyRequest<Request>) {
@@ -28,7 +24,7 @@ export class StripeController {
 
     // Maybe it comes from another stripe webhook
     if (
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+       
       // @ts-ignore
       event?.data?.object?.metadata?.service !== 'gitroom' &&
       event.type !== 'invoice.payment_succeeded' &&
@@ -39,7 +35,7 @@ export class StripeController {
 
     // Idempotency (C1): Stripe redelivers events; ignore an event.id we've already
     // processed so a redelivered subscription mutation can't re-run the transition.
-    if (await this._stripeEventRepository.exists(event.id)) {
+    if (await this._stripeService.isEventProcessed(event.id)) {
       return { ok: true };
     }
 
@@ -66,7 +62,7 @@ export class StripeController {
       }
 
       // Record only after successful processing so a thrown error stays retryable.
-      await this._stripeEventRepository.record(event.id, event.type);
+      await this._stripeService.recordEvent(event.id, event.type);
       return result;
     } catch (e) {
       throw new HttpException(e, 500);

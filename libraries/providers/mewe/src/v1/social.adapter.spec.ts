@@ -1,6 +1,16 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MeweProvider } from './social.adapter';
 
+vi.mock('@gitroom/provider-kernel', async (importOriginal) => {
+  const mod = (await importOriginal()) as any;
+  return {
+    ...mod,
+    safeFetch: vi.fn().mockResolvedValue({
+      blob: async () => new Blob(['pixels']),
+    }),
+  };
+});
+
 const mockResponse = (body: {
   groups: Array<{ groupId: string; name: string }>;
   nextPage: string | null;
@@ -111,5 +121,84 @@ describe('MeweProvider.groups (FETCH-06)', () => {
     );
 
     expect(result).toEqual([]);
+  });
+});
+
+describe('MeweProvider authenticate / post / upload SSRF guard (B-02)', () => {
+  const makeClientInfo = (overrides: Record<string, string> = {}) => ({
+    client_id: 'app-id',
+    client_secret: 'api-key',
+    instanceUrl: 'https://mewe.com',
+    ...overrides,
+  });
+
+  it('rejects an HTTP instanceUrl during authentication', async () => {
+    const provider = new MeweProvider();
+    const result = await provider.authenticate(
+      { code: 'code', codeVerifier: 'verifier' },
+      makeClientInfo({ instanceUrl: 'http://internal.local' })
+    );
+
+    expect(result).toBe('Invalid MeWe instance URL: only HTTPS is allowed.');
+  });
+
+  it('routes authentication calls through this.fetch()', async () => {
+    const provider = new MeweProvider();
+    const fetchSpy = vi.spyOn(provider as any, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        apiToken: 'token',
+        expiresAt: new Date(Date.now() + 86400000).toISOString(),
+      }),
+    } as any);
+
+    await provider.authenticate(
+      { code: 'code', codeVerifier: 'verifier' },
+      makeClientInfo()
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://mewe.com/api/dev/token?loginRequestToken=code',
+      expect.objectContaining({ method: 'GET' }),
+      'mewe-token'
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://mewe.com/api/dev/me',
+      expect.objectContaining({ method: 'GET' }),
+      'mewe-profile'
+    );
+  });
+
+  it('routes post and photo-upload calls through this.fetch()', async () => {
+    const provider = new MeweProvider();
+    const fetchSpy = vi.spyOn(provider as any, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'photo-1' }),
+    } as any);
+
+    await provider.post(
+      'id',
+      'access-token',
+      [
+        {
+          message: 'hello',
+          settings: { postType: 'timeline' },
+          media: [{ path: 'https://example.com/photo.jpg' }],
+        } as any,
+      ],
+      { organizationId: 'org-1', id: 'int-1' } as any,
+      makeClientInfo()
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://mewe.com/api/dev/photo/upload',
+      expect.objectContaining({ method: 'POST' }),
+      'mewe-photo-upload'
+    );
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://mewe.com/api/dev/me/post',
+      expect.objectContaining({ method: 'POST' }),
+      'mewe-post'
+    );
   });
 });

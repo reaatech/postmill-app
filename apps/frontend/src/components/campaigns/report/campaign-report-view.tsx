@@ -270,7 +270,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
       `}</style>
 
       <div
-        className="rounded-[12px] p-[24px] text-white flex flex-col gap-[8px]"
+        className="rounded-[12px] p-[24px] text-textColor flex flex-col gap-[8px]"
         style={{ backgroundColor: color }}
       >
         <h1 className="text-[28px] font-[600]">{campaign.name}</h1>

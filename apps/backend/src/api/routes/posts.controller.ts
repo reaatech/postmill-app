@@ -73,6 +73,7 @@ export class PostsController {
   }
 
   @Put('/:id/release-id')
+  @RequirePermission('posts', 'update')
   async updateReleaseId(
     @GetOrgFromRequest() org: Organization,
     @Param('id', ParseCuidPipe) id: string,

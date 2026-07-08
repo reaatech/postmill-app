@@ -282,6 +282,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
                   className="relative overflow-hidden"
                   style={{ aspectRatio: vector.width && vector.height ? `${vector.width} / ${vector.height}` : '4 / 3' }}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external stock thumbnail */}
                   <img
                     src={vector.thumbUrl}
                     alt={vector.description || ''}

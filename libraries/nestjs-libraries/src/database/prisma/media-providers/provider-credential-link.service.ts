@@ -11,6 +11,11 @@ import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/p
 // so the AI- and media-settings services can both inject it without a DI cycle.
 const LINKED_PROVIDERS = new Set(['openai', 'minimax']);
 
+// Intentional cross-domain credential-link service: mirrors API keys between the
+// AI-settings and media-providers domains for providers that are both an LLM hub and
+// a media generation surface. It lives in the media-providers folder because its
+// primary consumer is OrgMediaProviderSettingsService, but it writes both AI and media
+// config rows. No DI cycle is introduced — both owning services depend on this leaf.
 @Injectable()
 export class ProviderCredentialLinkService {
   private readonly _logger = new Logger(ProviderCredentialLinkService.name);

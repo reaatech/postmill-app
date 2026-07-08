@@ -1,2 +1,3 @@
 import { sniplyShortlinkModule } from './v1';
-export default [sniplyShortlinkModule];
+const sniplyProviderModules = [sniplyShortlinkModule];
+export default sniplyProviderModules;

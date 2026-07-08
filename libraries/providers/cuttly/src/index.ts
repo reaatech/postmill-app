@@ -1,2 +1,3 @@
 import { cuttlyShortlinkModule } from './v1';
-export default [cuttlyShortlinkModule];
+const cuttlyProviderModules = [cuttlyShortlinkModule];
+export default cuttlyProviderModules;

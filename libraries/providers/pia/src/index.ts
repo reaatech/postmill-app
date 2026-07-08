@@ -1,2 +1,3 @@
 import { piaVpnModule } from './v1';
-export default [piaVpnModule];
+const piaProviderModules = [piaVpnModule];
+export default piaProviderModules;

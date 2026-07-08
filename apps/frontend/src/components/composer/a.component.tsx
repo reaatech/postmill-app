@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback } from 'react';
+import { FC } from 'react';
 
 export const AComponent: FC<{
   editor: any;

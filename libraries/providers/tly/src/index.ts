@@ -1,2 +1,3 @@
 import { tlyShortlinkModule } from './v1';
-export default [tlyShortlinkModule];
+const tlyProviderModules = [tlyShortlinkModule];
+export default tlyProviderModules;

@@ -19,7 +19,9 @@ export const SelectList: FC<{
   const customFunc = useCustomProviderFunction();
   const [orgs, setOrgs] = useState([]);
   const { getValues } = useSettings();
-  const [currentMedia, setCurrentMedia] = useState<string | undefined>();
+  const [currentMedia, setCurrentMedia] = useState<string | undefined>(
+    () => getValues()[props.name]
+  );
   const onChangeInner = (event: {
     target: {
       value: string;
@@ -31,10 +33,6 @@ export const SelectList: FC<{
   };
   useEffect(() => {
     customFunc.get('list').then((data) => setOrgs(data));
-    const settings = getValues()[props.name];
-    if (settings) {
-      setCurrentMedia(settings);
-    }
   }, []);
   if (!orgs.length) {
     return null;

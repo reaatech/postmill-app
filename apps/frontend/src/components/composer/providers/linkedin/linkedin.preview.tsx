@@ -282,12 +282,13 @@ export const LinkedinPreview: FC<{
       }) +
       `</mark>`;
 
-    return { text: finalValue, images: p.image };
+    return { text: finalValue, images: p.image, id: p.id };
   });
   return (
     <div className="py-[15px] flex flex-col px-[15px] w-full gap-[20px] bg-bgLinkedin rounded-[12px]">
       <div className="flex gap-[8px]">
         <div className="w-[48px] h-[48px]">
+          {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
             alt="social"
@@ -324,9 +325,9 @@ export const LinkedinPreview: FC<{
       />
       {!!renderContent?.[0]?.images?.length && (
         <div className="h-[280px] -mx-[15px] overflow-hidden flex">
-          {renderContent?.[0]?.images.map((image, index) => (
+          {renderContent?.[0]?.images.map((image) => (
             <a
-              key={`image_${index}`}
+              key={image.id}
               className="flex-1"
               href={mediaDir.set(image.path)}
               target="_blank"
@@ -425,10 +426,11 @@ export const LinkedinPreview: FC<{
       </div>
       {renderContent.length > 1 && (
         <>
-          {renderContent.slice(1).map((value, index) => (
-            <div key={index} className="flex flex-col gap-[12px]">
+          {renderContent.slice(1).map((value) => (
+            <div key={value.id ?? value.text} className="flex flex-col gap-[12px]">
               <div className="flex gap-[6px] leading-[17px]">
                 <div className="h-[34px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
                   <img
                     src={integration?.picture || '/no-picture.jpg'}
                     alt="social"

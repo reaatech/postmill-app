@@ -414,7 +414,7 @@ export class FfmpegVideoEncoderService {
 
   private async getAudioDurationMs(filePath: string): Promise<number> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+       
       const mm = await import('music-metadata');
       const meta = await mm.parseFile(filePath);
       const duration = meta.format.duration;

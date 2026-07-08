@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   HttpException,
-  Inject,
   Logger,
   Param,
   Post,
@@ -29,9 +28,7 @@ import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { Provider } from '@prisma/client';
 import * as Sentry from '@sentry/nestjs';
 import { issueCsrfToken } from '@gitroom/backend/services/auth/csrf.middleware';
-import { AuthProviderRepository } from '@gitroom/nestjs-libraries/database/prisma/auth-providers/auth-provider.repository';
-import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
-import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/auth-provider.manager';
 
 @ApiTags('Auth')
 @Controller('/auth')
@@ -40,99 +37,12 @@ export class AuthController {
   constructor(
     private _authService: AuthService,
     private _emailService: EmailService,
-    private _authProviderRepository: AuthProviderRepository,
-    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel
+    private _authProviderManager: AuthProviderManager
   ) {}
-
-  // Latest-active kernel version + status for an auth provider. Degrades to
-  // v1/active when the auth domain has no kernel module registered for this
-  // provider yet.
-  private _versionInfo(provider: string): {
-    version: string;
-    status: string;
-  } {
-    const providerId = provider.toLowerCase();
-    const latest = this._kernel.latestActive('auth', providerId);
-    if (latest) {
-      return {
-        version: latest.manifest.version,
-        status: latest.manifest.status,
-      };
-    }
-    const manifests = this._kernel.versions('auth', providerId);
-    if (manifests.length > 0) {
-      const manifest = manifests[manifests.length - 1];
-      return { version: manifest.version, status: manifest.status };
-    }
-    return { version: DEFAULT_VERSION, status: 'active' };
-  }
 
   @Get('/providers')
   async getProviders() {
-    const dbProviders = await this._authProviderRepository.list();
-    const enabledFromDb = dbProviders.filter((p) => p.enabled);
-
-    if (enabledFromDb.length > 0) {
-      return {
-        providers: enabledFromDb.map((p) => ({
-          provider: p.provider,
-          displayName:
-            p.displayName ||
-            (p.provider === 'GENERIC'
-              ? process.env.NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME || 'OIDC'
-              : p.provider.charAt(0) + p.provider.slice(1).toLowerCase()),
-          ...this._versionInfo(p.provider),
-        })),
-      };
-    }
-
-    const providers: {
-      provider: string;
-      displayName: string;
-      version: string;
-      status: string;
-    }[] = [
-      { provider: 'LOCAL', displayName: 'Email', ...this._versionInfo('LOCAL') },
-    ];
-
-    if (process.env.IS_GENERAL) {
-      if (process.env.POSTMILL_GENERIC_OAUTH) {
-        providers.push({
-          provider: 'GENERIC',
-          displayName:
-            process.env.NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME || 'OIDC',
-          ...this._versionInfo('GENERIC'),
-        });
-      } else {
-        providers.push({
-          provider: 'GOOGLE',
-          displayName: 'Google',
-          ...this._versionInfo('GOOGLE'),
-        });
-        if (process.env.NEYNAR_CLIENT_ID) {
-          providers.push({
-            provider: 'FARCASTER',
-            displayName: 'Farcaster',
-            ...this._versionInfo('FARCASTER'),
-          });
-        }
-        if (process.env.STRIPE_PUBLISHABLE_KEY) {
-          providers.push({
-            provider: 'WALLET',
-            displayName: 'Wallet',
-            ...this._versionInfo('WALLET'),
-          });
-        }
-      }
-    } else {
-      providers.push({
-        provider: 'GITHUB',
-        displayName: 'GitHub',
-        ...this._versionInfo('GITHUB'),
-      });
-    }
-
-    return { providers };
+    return this._authProviderManager.getProviders();
   }
 
   @Get('/can-register')

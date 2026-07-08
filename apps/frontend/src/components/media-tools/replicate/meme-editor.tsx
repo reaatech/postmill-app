@@ -84,13 +84,13 @@ export function MemeEditor() {
       const entry = customFonts?.find((f) => f.family === fontFamily);
       if (!entry) return;
       try {
-        const existing = Array.from(document.fonts.values()).find((ff: any) => ff.family === fontFamily);
+        const existing = Array.from((document.fonts as any).values()).find((ff: any) => ff.family === fontFamily);
         if (existing) return;
         const fontFace = new FontFace(fontFamily, `url(${entry.path})`, {
           weight: entry.weights.map(String).join(', ') || '400',
         });
         const loaded = await fontFace.load();
-        document.fonts.add(loaded);
+        (document.fonts as any).add(loaded);
       } catch {
         /* fall back to system font */
       }

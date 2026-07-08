@@ -201,6 +201,13 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
   const [fontPickerOpen, setFontPickerOpen] = useState(false);
   const [fontSearch, setFontSearch] = useState('');
   const fontWrapRef = useRef<HTMLDivElement>(null);
+  const fontSearchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (fontPickerOpen) {
+      fontSearchInputRef.current?.focus();
+    }
+  }, [fontPickerOpen]);
 
   const filteredFonts = useMemo(() => {
     const customEntries = customFonts.map(
@@ -295,9 +302,10 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Font family (C2) — grouped with search */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] text-newTextColor/40">Font family</label>
+        <label htmlFor="text-font-family" className="text-[11px] text-newTextColor/40">Font family</label>
         <div className="relative" ref={fontWrapRef}>
           <button
+            id="text-font-family"
             type="button"
             aria-haspopup="listbox"
             aria-expanded={fontPickerOpen}
@@ -323,12 +331,12 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
             <div className="absolute z-50 mt-[6px] left-0 w-[280px] rounded-[10px] bg-newBgColorInner border border-studioBorder shadow-menu overflow-hidden">
               <div className="px-[8px] pt-[6px] pb-[2px]">
                 <input
+                  ref={fontSearchInputRef}
                   type="text"
                   placeholder="Search fonts..."
                   value={fontSearch}
                   onChange={(e) => setFontSearch(e.target.value)}
                   className="w-full h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none focus:border-designerAccent placeholder:text-textColor/30"
-                  autoFocus
                 />
               </div>
               <div className="max-h-[300px] overflow-y-auto p-[4px]">
@@ -375,8 +383,9 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Bold / Italic (C2) */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] text-newTextColor/40">Style</label>
+        <label htmlFor="text-style" className="text-[11px] text-newTextColor/40">Style</label>
         <SegmentedControl
+          id="text-style"
           value={styleValue}
           options={[
             { value: 'n', label: 'Normal' },
@@ -397,8 +406,9 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] text-newTextColor/40">Size</label>
+          <label htmlFor="text-font-size" className="text-[11px] text-newTextColor/40">Size</label>
           <input
+            id="text-font-size"
             type="number"
             min={1}
             max={999}
@@ -414,8 +424,9 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] text-newTextColor/40">Weight</label>
+          <label htmlFor="text-font-weight" className="text-[11px] text-newTextColor/40">Weight</label>
           <select
+            id="text-font-weight"
             value={element.fontWeight || 400}
             onChange={(e) => {
               const value = parseInt(e.target.value, 10);
@@ -443,32 +454,24 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] text-newTextColor/40">Align</label>
-        <div className="flex rounded-[6px] border border-studioBorder overflow-hidden">
-          {(['left', 'center', 'right'] as const).map((align) => (
-            <button
-              key={align}
-              type="button"
-              onClick={() => update({ align })}
-              className={`flex-1 h-[34px] text-[13px] text-textColor hover:bg-boxHover transition-colors ${
-                (element.align || 'left') === align
-                  ? 'bg-designerAccent/20 text-designerAccent'
-                  : 'bg-newBgColor'
-              }`}
-              aria-pressed={(element.align || 'left') === align}
-            >
-              {align === 'left' && '⇤'}
-              {align === 'center' && '⇔'}
-              {align === 'right' && '⇥'}
-            </button>
-          ))}
-        </div>
+        <label htmlFor="text-align" className="text-[11px] text-newTextColor/40">Align</label>
+        <SegmentedControl
+          id="text-align"
+          value={element.align || 'left'}
+          options={[
+            { value: 'left', label: '⇤' },
+            { value: 'center', label: '⇔' },
+            { value: 'right', label: '⇥' },
+          ]}
+          onChange={(align) => update({ align: align as 'left' | 'center' | 'right' })}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] text-newTextColor/40">Line height</label>
+          <label htmlFor="text-line-height" className="text-[11px] text-newTextColor/40">Line height</label>
           <input
+            id="text-line-height"
             type="number"
             step={0.1}
             min={0.1}
@@ -485,10 +488,11 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] text-newTextColor/40">
+          <label htmlFor="text-letter-spacing" className="text-[11px] text-newTextColor/40">
             Letter spacing
           </label>
           <input
+            id="text-letter-spacing"
             type="number"
             step={0.5}
             value={element.letterSpacing ?? 0}
@@ -505,8 +509,9 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Text path (C2) — Arc slider, Wave, Circle presets + custom SVG path */}
       <div className="flex flex-col gap-2">
-        <label className="text-[11px] text-newTextColor/40">Text Path</label>
+        <label htmlFor="text-path" className="text-[11px] text-newTextColor/40">Text Path</label>
         <SegmentedControl
+          id="text-path"
           value={pathMode}
           options={[
             { value: 'arc', label: 'Arc' },
