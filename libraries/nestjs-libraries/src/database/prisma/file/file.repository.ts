@@ -216,6 +216,30 @@ export class FileRepository {
     });
   }
 
+  // M-03: batched path lookup so callers (e.g. media studio listJobs) can resolve
+  // many completed jobs in one query instead of N+1.
+  getFilesByPaths(org: string, filePaths: string[]) {
+    return this._file.model.file.findMany({
+      where: {
+        organizationId: org,
+        path: { in: filePaths },
+        deletedAt: null as null,
+      },
+      select: {
+        id: true,
+        name: true,
+        originalName: true,
+        path: true,
+        thumbnail: true,
+        alt: true,
+        thumbnailTimestamp: true,
+        fileSize: true,
+        type: true,
+        folderId: true,
+      },
+    });
+  }
+
   /**
    * Permanently remove the DB row. Callers must delete the underlying storage
    * object before invoking this.

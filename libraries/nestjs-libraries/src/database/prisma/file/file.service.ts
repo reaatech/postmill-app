@@ -73,6 +73,10 @@ export class FileService {
     return this._fileRepository.getFileByPath(org, filePath);
   }
 
+  getFilesByPaths(org: string, filePaths: string[]) {
+    return this._fileRepository.getFilesByPaths(org, filePaths);
+  }
+
   async saveFile(
     org: string,
     fileName: string,

@@ -179,6 +179,8 @@ export class OAuthRepository {
 
   exchangeCodeForToken(
     id: string,
+    organizationId: string,
+    userId: string,
     encryptedToken: string,
     options?: {
       refreshToken?: string;
@@ -188,7 +190,7 @@ export class OAuthRepository {
     }
   ) {
     return this._oauthAuth.model.oAuthAuthorization.update({
-      where: { id },
+      where: { id, organizationId, userId },
       select: {
         organizationId: true,
         organization: {
@@ -263,6 +265,8 @@ export class OAuthRepository {
 
   updateTokens(
     id: string,
+    organizationId: string,
+    userId: string,
     data: {
       accessToken: string;
       refreshToken: string;
@@ -271,7 +275,7 @@ export class OAuthRepository {
     },
   ) {
     return this._oauthAuth.model.oAuthAuthorization.update({
-      where: { id },
+      where: { id, organizationId, userId },
       data: {
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,

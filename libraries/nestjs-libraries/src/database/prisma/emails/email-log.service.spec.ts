@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const repoMock = {
   create: vi.fn(),
-  findById: vi.fn(),
   findByMessageId: vi.fn(),
   updateById: vi.fn(),
   applyStatus: vi.fn(),

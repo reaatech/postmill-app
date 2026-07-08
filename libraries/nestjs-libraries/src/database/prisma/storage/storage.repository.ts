@@ -306,18 +306,18 @@ export class StorageRepository {
     });
   }
 
-  getProviderForFolder(folderId: string) {
-    return this._folder.model.fileFolder.findUnique({
-      where: { id: folderId },
+  getProviderForFolder(folderId: string, orgId: string) {
+    return this._folder.model.fileFolder.findFirst({
+      where: { id: folderId, organizationId: orgId },
       select: { storageProviderId: true },
     });
   }
 
   // Ancestor-aware folder lookup: walks parentId chain to find the mount-root
   // folder carrying storageProviderId. Returns minimal shape for the walk.
-  findFolderWithProvider(id: string) {
-    return this._folder.model.fileFolder.findUnique({
-      where: { id },
+  findFolderWithProvider(id: string, orgId: string) {
+    return this._folder.model.fileFolder.findFirst({
+      where: { id, organizationId: orgId },
       select: { id: true, parentId: true, storageProviderId: true, organizationId: true },
     });
   }

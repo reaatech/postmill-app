@@ -236,6 +236,8 @@ export class OAuthService {
       organization: { paymentId },
     } = await this._oauthRepository.exchangeCodeForToken(
       auth.id,
+      auth.organizationId,
+      auth.userId,
       encryptedToken,
       {
         refreshToken: encryptedRefreshToken,
@@ -296,7 +298,7 @@ export class OAuthService {
     const tokenExpiresAt = new Date(Date.now() + 3600 * 1000);
     const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000);
 
-    await this._oauthRepository.updateTokens(auth.id, {
+    await this._oauthRepository.updateTokens(auth.id, auth.organizationId, auth.userId, {
       accessToken: encryptedNewToken,
       refreshToken: encryptedNewRefresh,
       tokenExpiresAt,

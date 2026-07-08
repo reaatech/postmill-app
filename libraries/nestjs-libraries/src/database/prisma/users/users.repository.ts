@@ -279,9 +279,9 @@ export class UsersRepository {
     });
   }
 
-  async revokeSession(id: string) {
+  async revokeSession(id: string, userId: string) {
     return this._session.model.session.update({
-      where: { id },
+      where: { id, userId },
       data: { revokedAt: new Date() },
     });
   }
@@ -306,13 +306,14 @@ export class UsersRepository {
 
   async rotateSessionToken(
     id: string,
+    userId: string,
     newTokenHash: string,
     previousTokenHash: string,
     ip: string,
     userAgent: string
   ) {
     return this._session.model.session.update({
-      where: { id },
+      where: { id, userId },
       data: {
         tokenHash: newTokenHash,
         previousTokenHash,

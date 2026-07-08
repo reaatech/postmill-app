@@ -90,8 +90,8 @@ export class UsersService {
     return this._usersRepository.findSessionByPreviousTokenHash(previousTokenHash);
   }
 
-  revokeSession(id: string) {
-    return this._usersRepository.revokeSession(id);
+  revokeSession(userId: string, id: string) {
+    return this._usersRepository.revokeSession(id, userId);
   }
 
   revokeAllSessionsExcept(userId: string, currentTokenHash: string) {
@@ -103,6 +103,7 @@ export class UsersService {
   }
 
   rotateSessionToken(
+    userId: string,
     id: string,
     newTokenHash: string,
     previousTokenHash: string,
@@ -111,6 +112,7 @@ export class UsersService {
   ) {
     return this._usersRepository.rotateSessionToken(
       id,
+      userId,
       newTokenHash,
       previousTokenHash,
       ip,

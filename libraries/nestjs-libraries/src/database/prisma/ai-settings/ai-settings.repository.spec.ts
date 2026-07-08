@@ -79,6 +79,7 @@ describe('AiSettingsRepository', () => {
       create: vi.fn().mockResolvedValue({}),
       findUnique: vi.fn().mockResolvedValue(null),
       delete: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
     };
     mockContentIndex = {
       findMany: vi.fn().mockResolvedValue([]),
@@ -757,37 +758,23 @@ describe('AiSettingsRepository', () => {
   });
 
   describe('deletePromptLibraryItem', () => {
-    it('deletes after verifying org ownership', async () => {
-      mockPromptLibraryItem.findUnique.mockResolvedValue({ organizationId: 'org1' });
-      mockPromptLibraryItem.delete.mockResolvedValue({ id: 'li1' });
+    it('deletes scoped by id and organizationId', async () => {
+      mockPromptLibraryItem.deleteMany.mockResolvedValue({ count: 1 });
 
-      await repository.deletePromptLibraryItem('li1', 'org1');
+      const result = await repository.deletePromptLibraryItem('li1', 'org1');
 
-      expect(mockPromptLibraryItem.findUnique).toHaveBeenCalledWith({
-        where: { id: 'li1' },
-        select: { organizationId: true },
+      expect(mockPromptLibraryItem.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'li1', organizationId: 'org1' },
       });
-      expect(mockPromptLibraryItem.delete).toHaveBeenCalledWith({ where: { id: 'li1' } });
+      expect(result).toEqual({ count: 1 });
     });
 
-    it('throws when item is not found', async () => {
-      mockPromptLibraryItem.findUnique.mockResolvedValue(null);
+    it('returns count 0 when item does not belong to the org', async () => {
+      mockPromptLibraryItem.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(
-        repository.deletePromptLibraryItem('ghost', 'org1'),
-      ).rejects.toThrow('Prompt library item not found or access denied');
+      const result = await repository.deletePromptLibraryItem('li1', 'org1');
 
-      expect(mockPromptLibraryItem.delete).not.toHaveBeenCalled();
-    });
-
-    it('throws when org does not match (access denied)', async () => {
-      mockPromptLibraryItem.findUnique.mockResolvedValue({ organizationId: 'org2' });
-
-      await expect(
-        repository.deletePromptLibraryItem('li1', 'org1'),
-      ).rejects.toThrow('Prompt library item not found or access denied');
-
-      expect(mockPromptLibraryItem.delete).not.toHaveBeenCalled();
+      expect(result).toEqual({ count: 0 });
     });
   });
 

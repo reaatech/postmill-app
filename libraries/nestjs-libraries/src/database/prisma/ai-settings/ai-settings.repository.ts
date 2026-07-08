@@ -415,16 +415,9 @@ export class AiSettingsRepository {
     return this._aiPromptLibraryItem.model.aIPromptLibraryItem.create({ data });
   }
 
-  async deletePromptLibraryItem(id: string, organizationId: string) {
-    const item = await this._aiPromptLibraryItem.model.aIPromptLibraryItem.findUnique({
-      where: { id },
-      select: { organizationId: true },
-    });
-    if (!item || item.organizationId !== organizationId) {
-      throw new Error('Prompt library item not found or access denied');
-    }
-    await this._aiPromptLibraryItem.model.aIPromptLibraryItem.delete({
-      where: { id },
+  deletePromptLibraryItem(id: string, organizationId: string) {
+    return this._aiPromptLibraryItem.model.aIPromptLibraryItem.deleteMany({
+      where: { id, organizationId },
     });
   }
 
