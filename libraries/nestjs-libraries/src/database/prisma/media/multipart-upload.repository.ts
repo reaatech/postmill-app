@@ -50,16 +50,16 @@ export class MultipartUploadRepository {
     });
   }
 
-  updateState(id: string, state: string) {
+  updateState(orgId: string, id: string, state: string) {
     return this._multipart.model.multipartUpload.update({
-      where: { id },
+      where: { id, organizationId: orgId },
       data: { state },
     });
   }
 
-  incrementPartCount(id: string) {
+  incrementPartCount(orgId: string, id: string) {
     return this._multipart.model.multipartUpload.update({
-      where: { id },
+      where: { id, organizationId: orgId },
       data: { partCount: { increment: 1 } },
     });
   }

@@ -40,7 +40,7 @@ export class MultipartUploadService {
   async incrementPartCount(organizationId: string, uploadId: string) {
     const record = await this._repository.findByUploadId(organizationId, uploadId);
     if (record) {
-      await this._repository.incrementPartCount(record.id);
+      await this._repository.incrementPartCount(organizationId, record.id);
     }
   }
 }

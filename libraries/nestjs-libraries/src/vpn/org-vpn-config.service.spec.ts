@@ -247,7 +247,7 @@ describe('OrgVpnConfigService', () => {
       ]);
       await service.delete('org-1', 'nordvpn');
       expect(channelConfigRepository.updateById).toHaveBeenCalledTimes(1);
-      expect(channelConfigRepository.updateById).toHaveBeenCalledWith('ch-1', { vpnSelection: null });
+      expect(channelConfigRepository.updateById).toHaveBeenCalledWith('org-1', 'ch-1', { vpnSelection: null });
     });
 
     it('is non-fatal when clearing selections throws', async () => {

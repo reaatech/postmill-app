@@ -337,7 +337,7 @@ export class OrgVpnConfigService {
           (channel as { vpnSelection?: string | null }).vpnSelection,
         );
         if (sel?.enabled && sel.identifier === identifier) {
-          await this._channelConfigRepository.updateById(channel.id, {
+          await this._channelConfigRepository.updateById(orgId, channel.id, {
             vpnSelection: null,
           });
           this._logger.warn(

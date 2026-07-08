@@ -124,12 +124,16 @@ export class BrandsRepository {
   }
 
   async setBrandAsDefault(organizationId: string, brandId: string) {
+    const brand = await this._aiBrandProfile.model.aIBrandProfile.findFirst({
+      where: { id: brandId, organizationId },
+    });
+    if (!brand) return null;
     await this._aiBrandProfile.model.aIBrandProfile.updateMany({
       where: { organizationId, isDefault: true },
       data: { isDefault: false },
     });
     return this._aiBrandProfile.model.aIBrandProfile.update({
-      where: { id: brandId },
+      where: { id: brandId, organizationId },
       data: { isDefault: true },
     });
   }

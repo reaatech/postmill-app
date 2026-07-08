@@ -104,7 +104,7 @@ export class PublicAuthMiddleware implements NestMiddleware {
         // @ts-ignore
         req.user = apiKey.user;
 
-        this._apiKeysService.touchLastUsed(apiKey.id).catch(() => {});
+        this._apiKeysService.touchLastUsed(apiKey.id, apiKey.organizationId).catch(() => {});
       }
     } catch (err) {
       throw new HttpForbiddenException();

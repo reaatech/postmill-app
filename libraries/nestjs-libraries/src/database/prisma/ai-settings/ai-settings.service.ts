@@ -344,6 +344,7 @@ export class AiSettingsService {
   }
 
   updateMediaJob(
+    organizationId: string,
     id: string,
     data: {
       status?: string;
@@ -358,7 +359,7 @@ export class AiSettingsService {
       creditType?: string | null;
     },
   ) {
-    return this._repository.updateMediaJob(id, data);
+    return this._repository.updateMediaJob(organizationId, id, data);
   }
 
   getMediaJobs(organizationId: string, limit = 50) {
@@ -377,13 +378,18 @@ export class AiSettingsService {
     return this._repository.getMediaJobsByProvider(organizationId, provider, limit);
   }
 
-  getMediaJobById(id: string) {
-    return this._repository.getMediaJobById(id);
+  getMediaJobById(organizationId: string, id: string) {
+    return this._repository.getMediaJobById(organizationId, id);
+  }
+
+  // See AiSettingsRepository.getMediaJobByIdUnscoped — job-id-only entry points only.
+  getMediaJobByIdUnscoped(id: string) {
+    return this._repository.getMediaJobByIdUnscoped(id);
   }
 
   // §3.1: atomic status-transition claim — see AiSettingsRepository.claimMediaJobStatus.
-  claimMediaJobStatus(id: string, from: string[], to: string) {
-    return this._repository.claimMediaJobStatus(id, from, to);
+  claimMediaJobStatus(organizationId: string, id: string, from: string[], to: string) {
+    return this._repository.claimMediaJobStatus(organizationId, id, from, to);
   }
 
   getPendingMediaJobs(limit = 100) {

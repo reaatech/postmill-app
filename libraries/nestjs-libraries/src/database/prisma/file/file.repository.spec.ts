@@ -113,7 +113,7 @@ describe('FileRepository — deleteFolder soft-delete handling', () => {
     });
     model.file.count.mockResolvedValue(3);
 
-    await expect(repo.deleteFolder('folder-2')).rejects.toThrow('Folder is not empty');
+    await expect(repo.deleteFolder('org-1', 'folder-2')).rejects.toThrow('Folder is not empty');
     expect(model.fileFolder.delete).not.toHaveBeenCalled();
   });
 });

@@ -235,7 +235,7 @@ export class OrgProviderConfigService {
       (update as any).vpnSelection = await this.#serializeVpn(orgId, data.vpnSelection);
     }
 
-    const result = await this._repository.updateById(id, update as any);
+    const result = await this._repository.updateById(orgId, id, update as any);
     this.#audit('update', orgId, existing.identifier, userId);
     this.#recordCredentialRotated(orgId, existing.identifier, id, userId);
     // 1.3a: evict the cached kernel capability so a resolve rebuilds with fresh creds.
@@ -248,7 +248,7 @@ export class OrgProviderConfigService {
     if (!existing) {
       throw new NotFoundException('Channel config not found.');
     }
-    await this._repository.deleteById(id);
+    await this._repository.deleteById(orgId, id);
     this.#audit('delete', orgId, existing.identifier, userId);
     // 1.3a: evict the cached kernel capability for this provider.
     this._resolution.invalidate('social', existing.identifier, orgId);

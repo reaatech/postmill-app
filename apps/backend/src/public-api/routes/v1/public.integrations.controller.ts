@@ -539,7 +539,7 @@ export class PublicIntegrationsController {
   ) {
     Sentry.metrics.count('public_api-request', 1);
 
-    const job = await this._aiMediaService.getJob(id);
+    const job = await this._aiMediaService.getJob(id, org.id);
     if (!job || job.organizationId !== org.id) {
       throw new HttpException('Job not found', 404);
     }

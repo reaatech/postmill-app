@@ -129,9 +129,9 @@ describe('ApiKeysService', () => {
   });
 
   describe('touchLastUsed', () => {
-    it('delegates to the repository', async () => {
-      await service.touchLastUsed('key-1');
-      expect(repo.touchLastUsed).toHaveBeenCalledWith('key-1');
+    it('delegates to the repository scoped by org', async () => {
+      await service.touchLastUsed('key-1', 'org-1');
+      expect(repo.touchLastUsed).toHaveBeenCalledWith('key-1', 'org-1');
     });
   });
 });

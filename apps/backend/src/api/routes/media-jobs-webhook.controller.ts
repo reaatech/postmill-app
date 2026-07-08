@@ -17,7 +17,7 @@ export class MediaJobsWebhookController {
   @Post('/webhook/:jobId/:token')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   async handle(@Param('jobId') jobId: string, @Param('token') token: string) {
-    const job = await this._lifecycle.getJob(jobId);
+    const job = await this._lifecycle.getJobUnscoped(jobId);
     if (!job || !verifyMediaJobWebhookToken(jobId, job.organizationId, token)) {
       // Identical response for unknown job and bad token — no oracle.
       throw new HttpException('not found', 404);

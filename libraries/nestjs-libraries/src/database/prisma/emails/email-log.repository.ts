@@ -29,18 +29,25 @@ export class EmailLogRepository {
     });
   }
 
-  updateById(id: string, data: {
-    status?: string;
-    providerMessageId?: string;
-    error?: string;
-    deliveredAt?: Date;
-  }) {
-    return this._db.model.emailLog.update({ where: { id }, data });
+  updateById(
+    id: string,
+    organizationId: string | null,
+    data: {
+      status?: string;
+      providerMessageId?: string;
+      error?: string;
+      deliveredAt?: Date;
+    },
+  ) {
+    return this._db.model.emailLog.update({
+      where: { id, organizationId },
+      data,
+    });
   }
 
-  applyStatus(id: string, status: string, deliveredAt?: Date) {
+  applyStatus(id: string, organizationId: string | null, status: string, deliveredAt?: Date) {
     return this._db.model.emailLog.update({
-      where: { id },
+      where: { id, organizationId },
       data: { status, ...(deliveredAt ? { deliveredAt } : {}) },
     });
   }

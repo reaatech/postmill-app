@@ -51,13 +51,25 @@ describe('EmailLogService', () => {
       const updated = { id: 'log-1', status: 'sent', providerMessageId: 'msg-1' };
       repoMock.updateById.mockResolvedValue(updated);
 
-      const result = await service.markSent('log-1', 'msg-1');
+      const result = await service.markSent('log-1', 'msg-1', null);
 
-      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', {
+      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', null, {
         status: 'sent',
         providerMessageId: 'msg-1',
       });
       expect(result).toEqual(updated);
+    });
+
+    it('passes organizationId when supplied', async () => {
+      repoMock.updateById.mockResolvedValue({ id: 'log-1', status: 'sent' });
+
+      await service.markSent('log-1', 'msg-1', 'org-1');
+
+      expect(repoMock.updateById).toHaveBeenCalledWith(
+        'log-1',
+        'org-1',
+        { status: 'sent', providerMessageId: 'msg-1' },
+      );
     });
   });
 
@@ -66,9 +78,9 @@ describe('EmailLogService', () => {
       const error = 'SMTP 550: mailbox not found';
       repoMock.updateById.mockResolvedValue({ id: 'log-1', status: 'failed', error });
 
-      const result = await service.markFailed('log-1', error);
+      const result = await service.markFailed('log-1', error, null);
 
-      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', {
+      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', null, {
         status: 'failed',
         error,
       });
@@ -80,9 +92,9 @@ describe('EmailLogService', () => {
       const expectedRedacted = 'E'.repeat(500) + '...';
       repoMock.updateById.mockResolvedValue({ id: 'log-1', status: 'failed', error: expectedRedacted });
 
-      await service.markFailed('log-1', longError);
+      await service.markFailed('log-1', longError, null);
 
-      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', {
+      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', null, {
         status: 'failed',
         error: expectedRedacted,
       });
@@ -92,9 +104,9 @@ describe('EmailLogService', () => {
       const exactError = 'X'.repeat(500);
       repoMock.updateById.mockResolvedValue({ id: 'log-1', status: 'failed', error: exactError });
 
-      await service.markFailed('log-1', exactError);
+      await service.markFailed('log-1', exactError, null);
 
-      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', {
+      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', null, {
         status: 'failed',
         error: exactError,
       });
@@ -104,12 +116,24 @@ describe('EmailLogService', () => {
       const shortError = 'Short error message';
       repoMock.updateById.mockResolvedValue({ id: 'log-1', status: 'failed', error: shortError });
 
-      await service.markFailed('log-1', shortError);
+      await service.markFailed('log-1', shortError, null);
 
-      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', {
+      expect(repoMock.updateById).toHaveBeenCalledWith('log-1', null, {
         status: 'failed',
         error: shortError,
       });
+    });
+
+    it('passes organizationId when supplied', async () => {
+      repoMock.updateById.mockResolvedValue({ id: 'log-1', status: 'failed', error: 'x' });
+
+      await service.markFailed('log-1', 'x', 'org-1');
+
+      expect(repoMock.updateById).toHaveBeenCalledWith(
+        'log-1',
+        'org-1',
+        { status: 'failed', error: 'x' },
+      );
     });
   });
 
@@ -209,7 +233,7 @@ describe('EmailLogService', () => {
 
       await service.applyWebhookEvent(provider, event);
 
-      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', 'delivered', occurredAt);
+      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', null, 'delivered', occurredAt);
     });
 
     it('does NOT downgrade status (delivered → sent is no-op)', async () => {
@@ -251,7 +275,7 @@ describe('EmailLogService', () => {
 
       await service.applyWebhookEvent(provider, event);
 
-      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', 'delivered', occurredAt);
+      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', null, 'delivered', occurredAt);
     });
 
     it('upgrades from queued → sent', async () => {
@@ -265,7 +289,7 @@ describe('EmailLogService', () => {
 
       await service.applyWebhookEvent(provider, event);
 
-      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', 'sent', undefined);
+      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', null, 'sent', undefined);
     });
 
     it('does NOT upgrade past a terminal negative — bounced row ignores delivered', async () => {
@@ -307,7 +331,7 @@ describe('EmailLogService', () => {
 
       await service.applyWebhookEvent(provider, event);
 
-      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', 'bounced', undefined);
+      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', null, 'bounced', undefined);
     });
 
     it('terminal negatives always upgrade over non-terminal (delivered → complained is applied)', async () => {
@@ -321,7 +345,7 @@ describe('EmailLogService', () => {
 
       await service.applyWebhookEvent(provider, event);
 
-      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', 'complained', undefined);
+      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', null, 'complained', undefined);
     });
 
     it('applies status for unknown existing status (existing status not in STATUS_PRECEDENCE)', async () => {
@@ -335,7 +359,7 @@ describe('EmailLogService', () => {
 
       await service.applyWebhookEvent(provider, event);
 
-      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', 'sent', undefined);
+      expect(repoMock.applyStatus).toHaveBeenCalledWith('log-1', null, 'sent', undefined);
     });
   });
 

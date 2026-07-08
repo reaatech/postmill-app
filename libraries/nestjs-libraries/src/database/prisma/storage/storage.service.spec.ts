@@ -176,7 +176,7 @@ describe('StorageService — migration verify-before-delete (#48/#51)', () => {
     expect(res.migrated).toBe(1);
     expect(res.failed).toBe(0);
     expect(res.done).toBe(true);
-    expect(repo.updateMediaLocation).toHaveBeenCalledWith('m1', 'new-path', null);
+    expect(repo.updateMediaLocation).toHaveBeenCalledWith('org-1', 'm1', 'new-path', null);
     expect(adapterMock.removeFile).toHaveBeenCalledWith('p1');
   });
 
@@ -509,7 +509,7 @@ describe('StorageService — health tracking (#62)', () => {
     const result = await service.testConnection('p1', 'org-1');
 
     expect(result.ok).toBe(true);
-    expect(repo.updateHealthCheck).toHaveBeenCalledWith('p1', true, undefined);
+    expect(repo.updateHealthCheck).toHaveBeenCalledWith('org-1', 'p1', true, undefined);
   });
 
   it('updates error on failed test', async () => {
@@ -531,7 +531,7 @@ describe('StorageService — health tracking (#62)', () => {
     const result = await service.testConnection('p1', 'org-1');
 
     expect(result.ok).toBe(false);
-    expect(repo.updateHealthCheck).toHaveBeenCalledWith('p1', false, 'Access Denied');
+    expect(repo.updateHealthCheck).toHaveBeenCalledWith('org-1', 'p1', false, 'Access Denied');
   });
 });
 

@@ -214,7 +214,7 @@ export class OrgShortLinkSettingsService {
 
     let result;
     try {
-      result = await this._repository.updateById(configId, {
+      result = await this._repository.updateById(orgId, configId, {
         enabled: true,
         ...(encryptedCredentials !== undefined
           ? { credentials: encryptedCredentials }
@@ -279,7 +279,7 @@ export class OrgShortLinkSettingsService {
   async deleteById(orgId: string, id: string) {
     const config = await this._repository.getById(orgId, id);
     if (!config) throw new Error('Configuration not found');
-    const result = await this._repository.deleteById(id);
+    const result = await this._repository.deleteById(orgId, id);
     // 1.3a: evict the cached capability for this provider.
     this._resolution.invalidate('shortlink', config.identifier, orgId);
     return result;

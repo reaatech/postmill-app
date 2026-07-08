@@ -254,6 +254,7 @@ export class AiSettingsRepository {
   }
 
   updateMediaJob(
+    organizationId: string,
     id: string,
     data: {
       status?: string;
@@ -269,7 +270,7 @@ export class AiSettingsRepository {
     },
   ) {
     return this._aiMediaJob.model.aIMediaJob.update({
-      where: { id },
+      where: { id, organizationId },
       data,
     });
   }
@@ -319,7 +320,16 @@ export class AiSettingsRepository {
     });
   }
 
-  getMediaJobById(id: string) {
+  getMediaJobById(organizationId: string, id: string) {
+    return this._aiMediaJob.model.aIMediaJob.findUnique({
+      where: { id, organizationId },
+    });
+  }
+
+  // Unscoped lookup used only by job-id-only entry points (webhook token verification,
+  // Inngest render worker) that immediately validate ownership via the HMAC token or
+  // the organizationId on the returned row. All other reads use `getMediaJobById`.
+  getMediaJobByIdUnscoped(id: string) {
     return this._aiMediaJob.model.aIMediaJob.findUnique({ where: { id } });
   }
 
@@ -328,9 +338,14 @@ export class AiSettingsRepository {
   // drive-on-read listJobs, HeyGenService.getJob); a plain `update` lets two callers
   // both complete one job (double download/File row/notification). Callers proceed
   // only when this returns 1 — the row was still in one of `from` when we flipped it.
-  async claimMediaJobStatus(id: string, from: string[], to: string): Promise<number> {
+  async claimMediaJobStatus(
+    organizationId: string,
+    id: string,
+    from: string[],
+    to: string,
+  ): Promise<number> {
     const res = await this._aiMediaJob.model.aIMediaJob.updateMany({
-      where: { id, status: { in: from } },
+      where: { id, organizationId, status: { in: from } },
       data: { status: to },
     });
     return res.count;

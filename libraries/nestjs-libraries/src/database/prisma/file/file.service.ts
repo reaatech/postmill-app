@@ -128,8 +128,8 @@ export class FileService {
     storageProviderId?: string;
   }) {
     if (data.parentId) {
-      const parent = await this._fileRepository.getFolder(data.parentId);
-      if (!parent || parent.organizationId !== org) {
+      const parent = await this._fileRepository.getFolder(org, data.parentId);
+      if (!parent) {
         throw new HttpException('Parent folder not found', 404);
       }
     }
@@ -138,8 +138,8 @@ export class FileService {
   }
 
   async getFolder(org: string, id: string) {
-    const folder = await this._fileRepository.getFolder(id);
-    if (!folder || folder.organizationId !== org) {
+    const folder = await this._fileRepository.getFolder(org, id);
+    if (!folder) {
       throw new HttpException('Folder not found', 404);
     }
     return folder;
@@ -158,8 +158,8 @@ export class FileService {
     if (!folderId) {
       return undefined;
     }
-    const folder = await this._fileRepository.getFolder(folderId);
-    return folder && folder.organizationId === org ? folderId : undefined;
+    const folder = await this._fileRepository.getFolder(org, folderId);
+    return folder ? folderId : undefined;
   }
 
   /**
@@ -202,16 +202,16 @@ export class FileService {
     tags?: string[];
     color?: string;
   }) {
-    const folder = await this._fileRepository.getFolder(id);
-    if (!folder || folder.organizationId !== org) {
+    const folder = await this._fileRepository.getFolder(org, id);
+    if (!folder) {
       throw new HttpException('Folder not found', 404);
     }
     return this._fileRepository.updateFolder(org, id, data);
   }
 
   async deleteFolder(org: string, id: string) {
-    const folder = await this._fileRepository.getFolder(id);
-    if (!folder || folder.organizationId !== org) {
+    const folder = await this._fileRepository.getFolder(org, id);
+    if (!folder) {
       throw new HttpException('Folder not found', 404);
     }
     return this._fileRepository.deleteFolder(org, id);
@@ -234,8 +234,8 @@ export class FileService {
     }
 
     if (folderId) {
-      const folder = await this._fileRepository.getFolder(folderId);
-      if (!folder || folder.organizationId !== org) {
+      const folder = await this._fileRepository.getFolder(org, folderId);
+      if (!folder) {
         throw new HttpException('Folder not found', 404);
       }
     }
@@ -249,8 +249,8 @@ export class FileService {
 
   async bulkMove(org: string, ids: string[], folderId: string | null) {
     if (folderId) {
-      const folder = await this._fileRepository.getFolder(folderId);
-      if (!folder || folder.organizationId !== org) {
+      const folder = await this._fileRepository.getFolder(org, folderId);
+      if (!folder) {
         throw new HttpException('Folder not found', 404);
       }
     }
@@ -262,8 +262,8 @@ export class FileService {
   }
 
   async getFilesByFolder(org: string, folderId: string, page: number) {
-    const folder = await this._fileRepository.getFolder(folderId);
-    if (!folder || folder.organizationId !== org) {
+    const folder = await this._fileRepository.getFolder(org, folderId);
+    if (!folder) {
       throw new HttpException('Folder not found', 404);
     }
     return this._fileRepository.getFilesByFolder(org, folderId, page);

@@ -170,13 +170,13 @@ describe('OrgShortLinkSettingsRepository', () => {
   });
 
   describe('deleteById', () => {
-    it('deletes by id', async () => {
+    it('deletes by id scoped to org', async () => {
       config.model.orgShortLinkConfig.delete.mockResolvedValue({ id: 'c1' });
 
-      await repo.deleteById('c1');
+      await repo.deleteById(orgId, 'c1');
 
       expect(config.model.orgShortLinkConfig.delete).toHaveBeenCalledWith({
-        where: { id: 'c1' },
+        where: { id: 'c1', organizationId: orgId },
       });
     });
   });
@@ -199,7 +199,7 @@ describe('OrgShortLinkSettingsRepository', () => {
         data: { isActive: false },
       });
       expect(config.model.orgShortLinkConfig.update).toHaveBeenCalledWith({
-        where: { id: 'c1' },
+        where: { id: 'c1', organizationId: orgId },
         data: { isActive: true, enabled: true },
       });
     });

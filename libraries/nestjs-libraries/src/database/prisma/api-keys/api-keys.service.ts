@@ -38,7 +38,7 @@ export class ApiKeysService {
     return this.createKey(userId, orgId, name, expiresAt);
   }
 
-  async touchLastUsed(id: string) {
-    return this.repo.touchLastUsed(id);
+  async touchLastUsed(id: string, orgId: string) {
+    return this.repo.touchLastUsed(id, orgId);
   }
 }

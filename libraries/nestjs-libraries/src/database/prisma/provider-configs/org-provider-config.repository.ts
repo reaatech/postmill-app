@@ -71,23 +71,23 @@ export class OrgProviderConfigRepository {
     });
   }
 
-  updateById(id: string, data: ConfigData) {
+  updateById(orgId: string, id: string, data: ConfigData) {
     return this._orgProviderConfig.model.orgProviderConfiguration.update({
-      where: { id },
+      where: { id, organizationId: orgId },
       data,
     });
   }
 
-  setEnabledById(id: string, enabled: boolean) {
+  setEnabledById(orgId: string, id: string, enabled: boolean) {
     return this._orgProviderConfig.model.orgProviderConfiguration.update({
-      where: { id },
+      where: { id, organizationId: orgId },
       data: { enabled },
     });
   }
 
-  deleteById(id: string) {
+  deleteById(orgId: string, id: string) {
     return this._orgProviderConfig.model.orgProviderConfiguration.delete({
-      where: { id },
+      where: { id, organizationId: orgId },
     });
   }
 }

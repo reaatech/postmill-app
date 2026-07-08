@@ -163,7 +163,7 @@ describe('PublicAuthMiddleware', () => {
     expect(req.org.users[0].users.role).toBe('admin');
     expect(req.org.users[0].users.role).not.toBe('owner');
     expect(req.user).toBe(apiKey.user);
-    expect(apiKeysService.touchLastUsed).toHaveBeenCalledWith('key-1');
+    expect(apiKeysService.touchLastUsed).toHaveBeenCalledWith('key-1', 'org-1');
   });
 
   it('uses the membership of the key\'s org, not another org the user belongs to', async () => {
