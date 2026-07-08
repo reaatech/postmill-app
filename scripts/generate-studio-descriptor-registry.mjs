@@ -7,8 +7,7 @@
 // --check: regenerates the expected metadata and compares it to the on-disk
 // `metadata.ts` files. Exits non-zero if descriptor drift would change metadata.
 
-import pkg from 'glob';
-const { sync: globSync } = pkg;
+import { globSync } from 'glob';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
