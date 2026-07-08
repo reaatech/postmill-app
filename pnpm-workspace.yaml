@@ -4,6 +4,9 @@ packages:
   - libraries/providers/*
 
 overrides:
+  # @reaatech/structured-repair-core declares a zod ^3.23.0 peer but was resolving
+  # to zod 4.x, breaking type/runtime compatibility with workspace zod 3.x schemas.
+  '@reaatech/structured-repair-core>zod': '^3.25.76'
   next: 16.2.7
   react: 19.2.7
   react-dom: 19.2.7
@@ -74,6 +77,9 @@ overrides:
   # tmp <0.2.6: high path traversal via unsanitized prefix/postfix (GHSA-ph9p-34f9-6g65),
   # pulled by external-editor via inquirer. Bump to patched 0.2.x.
   'tmp@<0.2.6': '>=0.2.6'
+  # langsmith <0.6.0: high public prompt pull deserializes untrusted manifests
+  # (GHSA-3644-q5cj-c5c7), pulled by older @langchain/core paths. Bump to patched 0.6+.
+  langsmith: '>=0.6.0'
 
 onlyBuiltDependencies:
   - bcrypt

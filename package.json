@@ -8,7 +8,7 @@
   "engines": {
     "node": ">=22.12.0 <23.0.0"
   },
-  "packageManager": "pnpm@10.6.1",
+  "packageManager": "pnpm@10.34.4",
   "scripts": {
     "dev": "pnpm run --filter ./apps/extension --filter ./apps/backend --filter ./apps/frontend --parallel dev",
     "dev:minimal": "pnpm run --filter ./apps/backend --filter ./apps/frontend --parallel dev",
@@ -92,7 +92,6 @@
     "@microsoft/eslint-formatter-sarif": "2.1.7",
     "@typescript-eslint/eslint-plugin": "^8.30.0",
     "@typescript-eslint/parser": "^8.30.0",
-    "@vitejs/plugin-react": "^4.2.0",
     "@vitest/ui": "^4.1.0",
     "eslint": "^9.39.4",
     "eslint-config-next": "16.2.7",

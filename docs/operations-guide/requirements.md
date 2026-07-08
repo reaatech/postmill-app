@@ -90,3 +90,22 @@ npx nestjs-command run:agent
 Run these inside the application container or with the same environment variables as the backend.
 
 > Verified against v3.8.2
+
+## Native dependency notes
+
+### macOS-only duplicate-class warning
+
+On macOS, test or dev-server logs may show a warning similar to:
+
+```
+Class GNotificationCenterDelegate is implemented in both
+.../sharp-darwin-arm64.../sharp-darwin-arm64.node
+.../canvas.../canvas.node
+One of the two will be used. Which one is undefined.
+```
+
+This is a **benign, macOS-only upstream conflict** between the native modules
+`sharp` and `canvas`. Both packages register the same macOS notification-delegate
+class independently; the warning does not affect Linux production images or
+runtime correctness. No operator action is required. The project pins
+`sharp@^0.34.5` and `canvas@^3.2.3` to keep the overlap as small as possible.
