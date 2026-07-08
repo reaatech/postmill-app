@@ -14,7 +14,7 @@ import {
 import dayjs from 'dayjs';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { Post, Integration, Tags } from '@prisma/client';
+import type { Post, Integration, Tags } from '@prisma/client';
 import { useSearchParams } from 'next/navigation';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
@@ -309,7 +309,7 @@ export const CalendarWeekProvider: FC<{
     }
     const data = await res.json();
     return expandPosts(data);
-  }, [filters, params]);
+  }, [fetch, filters]);
 
   // Single date-range fetch drives both the calendar and the list view (the list
   // renders the same window as a chronological list).
@@ -327,23 +327,23 @@ export const CalendarWeekProvider: FC<{
 
   const defaultSign = useCallback(async () => {
     return await (await fetch('/signatures/default')).json();
-  }, []);
+  }, [fetch]);
 
   const setList = useCallback(async () => {
     return (await fetch('/sets')).json();
-  }, []);
+  }, [fetch]);
 
   const loadCampaigns = useCallback(async () => {
     const r = await fetch('/campaigns');
     if (!r.ok) return [];
     return r.json();
-  }, []);
+  }, [fetch]);
 
   const loadTags = useCallback(async () => {
     const r = await fetch('/posts/tags');
     if (!r.ok) return { tags: [] };
     return r.json();
-  }, []);
+  }, [fetch]);
 
   const { data: sets, mutate } = useSWR('sets', setList, {
     revalidateOnFocus: false,
@@ -408,7 +408,7 @@ export const CalendarWeekProvider: FC<{
       ].filter((f) => f);
       window.history.replaceState(null, '', `/posts?${path.join('&')}`);
     },
-    []
+    [setDisplaySaved]
   );
 
   // Arbitrary start/end date range chosen from the calendar picker. It renders in

@@ -18,7 +18,8 @@ function makeActivity(opts: {
   };
   const aiSettings = {
     getPendingMediaJobs: vi.fn().mockResolvedValue(opts.pending ?? []),
-    getMediaJobById: vi.fn(async (id: string) => opts.jobsById?.[id]),
+    getMediaJobById: vi.fn(async (_orgId: string, id: string) => opts.jobsById?.[id]),
+    getMediaJobByIdUnscoped: vi.fn(async (id: string) => opts.jobsById?.[id]),
   };
   const videoRender = {
     processVideoRender: vi.fn().mockResolvedValue(undefined),

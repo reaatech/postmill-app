@@ -377,7 +377,8 @@ export const EditorWrapper: FC<{
       )}
       {!canEdit && !isCreateSet && (
         <>
-          <div
+          <button
+            type="button"
             onClick={() => {
               setMountKey((k) => k + 1);
               addRemoveInternal(current);
@@ -397,11 +398,11 @@ export const EditorWrapper: FC<{
               )}
             </div>
             <div>
-              <div className="text-textColor rounded-[8px] h-[44px] px-[20px] bg-[#2b5cd3] cursor-pointer flex justify-center items-center">
+              <div className="text-textColor rounded-[8px] h-[44px] px-[20px] bg-btnPrimary flex justify-center items-center">
                 {t('edit_content', 'Edit content')}
               </div>
             </div>
-          </div>
+          </button>
           <div className="absolute w-full h-full left-0 top-0 bg-newBackdrop opacity-60 z-[100] rounded-[12px]" />
         </>
       )}
@@ -456,12 +457,13 @@ export const EditorWrapper: FC<{
                           )}
                         </div>
                         {!!internal && !existingData?.integration && (
-                          <div
-                            className="mt-[12px] flex gap-[20px] items-center cursor-pointer select-none"
+                          <button
+                            type="button"
+                            className="mt-[12px] flex gap-[20px] items-center select-none"
                             onClick={goBackToGlobal}
                           >
                             <div className="flex gap-[6px] items-center">
-                              <div className="w-[8px] h-[8px] rounded-full bg-[#2b5cd3]" />
+                              <div className="w-[8px] h-[8px] rounded-full bg-btnPrimary" />
                               <div className="text-[14px] font-[600]">
                                 {t(
                                   'editing_a_specific_network',
@@ -477,7 +479,7 @@ export const EditorWrapper: FC<{
                                 {t('back_to_global', 'Back to global')}
                               </div>
                             </div>
-                          </div>
+                          </button>
                         )}
                       </div>
                     ) : null}
@@ -553,7 +555,7 @@ export const Editor: FC<{
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   // The emoji picker is portaled to <body> (fixed) so the horizontally-scrolling
   // toolbar's overflow can't clip it.
-  const emojiBtnRef = useRef<HTMLDivElement>(null);
+  const emojiBtnRef = useRef<HTMLButtonElement>(null);
   const emojiPopRef = useRef<HTMLDivElement>(null);
   const [emojiPos, setEmojiPos] = useState<{ left: number; bottom: number } | null>(
     null
@@ -734,8 +736,10 @@ export const Editor: FC<{
                 ref={editorRef}
               />
             </div>
-            <div
-              className="bg-newBgColorInner flex-1"
+            <button
+              type="button"
+              aria-label={t('focus_editor', 'Focus editor')}
+              className="bg-newBgColorInner flex-1 text-left"
               onClick={() => {
                 if (editorInstance?.isFocused) {
                   return;
@@ -758,8 +762,10 @@ export const Editor: FC<{
                 />
               </div>
             </div>
-            <div
-              className="w-full h-[46px] bg-newBgColorInner cursor-text"
+            <button
+              type="button"
+              aria-label={t('focus_editor', 'Focus editor')}
+              className="w-full h-[46px] bg-newBgColorInner"
               onClick={() => {
                 if (editorInstance?.isFocused) {
                   return;
@@ -836,15 +842,17 @@ export const Editor: FC<{
                             )}
                         </ToolbarDropdown>
                       )}
-                      <div
+                      <button
+                        type="button"
                         ref={emojiBtnRef}
                         data-tooltip-id="tooltip"
                         data-tooltip-content={t('insert_emoji', 'Insert Emoji')}
-                        className="select-none cursor-pointer rounded-[6px] w-[30px] h-[30px] bg-newColColor flex justify-center items-center shrink-0"
+                        aria-label={t('insert_emoji', 'Insert Emoji')}
+                        className="select-none rounded-[6px] w-[30px] h-[30px] bg-newColColor flex justify-center items-center shrink-0"
                         onClick={toggleEmoji}
                       >
                         <EmojiIcon />
-                      </div>
+                      </button>
                       {emojiPickerOpen &&
                         emojiPos &&
                         typeof document !== 'undefined' &&

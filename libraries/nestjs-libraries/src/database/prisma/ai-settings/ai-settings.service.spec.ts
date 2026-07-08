@@ -34,6 +34,9 @@ const mockRepo = {
   updateMediaJob: vi.fn(),
   getMediaJobs: vi.fn(),
   getMediaJobStatusCounts: vi.fn(),
+  getMediaJobById: vi.fn(),
+  getMediaJobByIdUnscoped: vi.fn(),
+  claimMediaJobStatus: vi.fn(),
   // AIPromptLibraryItem
   getPromptLibraryItems: vi.fn(),
   createPromptLibraryItem: vi.fn(),
@@ -704,13 +707,13 @@ describe('AiSettingsService', () => {
   });
 
   describe('updateMediaJob', () => {
-    it('delegates to repository', async () => {
+    it('delegates to repository scoped by org', async () => {
       const updated = { id: 'mj1', status: 'completed' };
       mockRepo.updateMediaJob.mockReturnValue(updated);
 
-      const result = await service.updateMediaJob('mj1', { status: 'completed' });
+      const result = await service.updateMediaJob('org-1', 'mj1', { status: 'completed' });
 
-      expect(mockRepo.updateMediaJob).toHaveBeenCalledWith('mj1', { status: 'completed' });
+      expect(mockRepo.updateMediaJob).toHaveBeenCalledWith('org-1', 'mj1', { status: 'completed' });
       expect(result.status).toBe('completed');
     });
   });

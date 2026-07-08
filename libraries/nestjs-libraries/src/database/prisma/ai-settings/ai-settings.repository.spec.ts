@@ -613,17 +613,17 @@ describe('AiSettingsRepository', () => {
   });
 
   describe('updateMediaJob', () => {
-    it('updates a media job by id', async () => {
+    it('updates a media job scoped by org', async () => {
       const updated = { id: 'mj1', status: 'completed', artifactUrl: 'https://cdn.example.com/img.png' };
       mockMediaJob.update.mockResolvedValue(updated);
 
-      const result = await repository.updateMediaJob('mj1', {
+      const result = await repository.updateMediaJob('org-1', 'mj1', {
         status: 'completed',
         artifactUrl: 'https://cdn.example.com/img.png',
       });
 
       expect(mockMediaJob.update).toHaveBeenCalledWith({
-        where: { id: 'mj1' },
+        where: { id: 'mj1', organizationId: 'org-1' },
         data: { status: 'completed', artifactUrl: 'https://cdn.example.com/img.png' },
       });
       expect(result).toEqual(updated);
@@ -631,13 +631,13 @@ describe('AiSettingsRepository', () => {
   });
 
   describe('claimMediaJobStatus (§3.1)', () => {
-    it('conditionally transitions status and returns the updated count', async () => {
+    it('conditionally transitions status scoped by org and returns the updated count', async () => {
       mockMediaJob.updateMany.mockResolvedValue({ count: 1 });
 
-      const count = await repository.claimMediaJobStatus('mj1', ['pending', 'processing'], 'landing');
+      const count = await repository.claimMediaJobStatus('org-1', 'mj1', ['pending', 'processing'], 'landing');
 
       expect(mockMediaJob.updateMany).toHaveBeenCalledWith({
-        where: { id: 'mj1', status: { in: ['pending', 'processing'] } },
+        where: { id: 'mj1', organizationId: 'org-1', status: { in: ['pending', 'processing'] } },
         data: { status: 'landing' },
       });
       expect(count).toBe(1);
@@ -645,7 +645,7 @@ describe('AiSettingsRepository', () => {
 
     it('returns 0 when the row is no longer in an eligible status (lost claim)', async () => {
       mockMediaJob.updateMany.mockResolvedValue({ count: 0 });
-      expect(await repository.claimMediaJobStatus('mj1', ['pending'], 'processing')).toBe(0);
+      expect(await repository.claimMediaJobStatus('org-1', 'mj1', ['pending'], 'processing')).toBe(0);
     });
   });
 

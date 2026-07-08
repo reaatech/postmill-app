@@ -32,16 +32,24 @@ export class EmailLogService {
     return this._repository.create(data);
   }
 
-  async markSent(id: string, providerMessageId: string) {
-    return this._repository.updateById(id, {
-      status: 'sent',
-      providerMessageId,
-    });
+  async markSent(id: string, providerMessageId: string, organizationId: string | null) {
+    return this._repository.updateById(
+      id,
+      organizationId,
+      {
+        status: 'sent',
+        providerMessageId,
+      },
+    );
   }
 
-  async markFailed(id: string, error: string) {
+  async markFailed(id: string, error: string, organizationId: string | null) {
     const redacted = error.length > 500 ? error.slice(0, 500) + '...' : error;
-    return this._repository.updateById(id, { status: 'failed', error: redacted });
+    return this._repository.updateById(
+      id,
+      organizationId,
+      { status: 'failed', error: redacted },
+    );
   }
 
   async applyWebhookEvent(provider: string, event: EmailWebhookEvent) {
@@ -59,6 +67,7 @@ export class EmailLogService {
 
       await this._repository.applyStatus(
         existing.id,
+        existing.organizationId ?? null,
         event.status,
         event.status === 'delivered' ? event.occurredAt : undefined,
       );

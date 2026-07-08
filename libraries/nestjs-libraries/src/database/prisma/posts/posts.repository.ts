@@ -738,7 +738,19 @@ export class PostsRepository {
     campaignId?: string,
     brandId?: string,
   ) {
-    const posts: Post[] = [];
+    const posts: Prisma.PostGetPayload<{
+      select: {
+        id: true;
+        state: true;
+        integration: {
+          select: {
+            id: true;
+            providerIdentifier: true;
+            providerVersion: true;
+          };
+        };
+      };
+    }>[] = [];
     const uuid = uuidv4();
 
     for (const value of body.value) {
@@ -801,6 +813,17 @@ export class PostsRepository {
           update: {
             ...updateData('update'),
 
+          },
+          select: {
+            id: true,
+            state: true,
+            integration: {
+              select: {
+                id: true,
+                providerIdentifier: true,
+                providerVersion: true,
+              },
+            },
           },
         })
       );

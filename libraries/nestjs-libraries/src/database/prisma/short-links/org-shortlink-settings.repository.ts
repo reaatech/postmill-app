@@ -87,9 +87,10 @@ export class OrgShortLinkSettingsRepository {
   }
 
   // Row-id-targeted in-place update (mirrors StorageService.updateConfig by-id).
-  // Ownership is enforced by the caller (service.updateById does getById(orgId,id)
-  // first), so the unique where is the row id alone.
+  // Ownership is enforced in the where clause as defense-in-depth; the caller
+  // already validated the row via getById(orgId, id).
   updateById(
+    orgId: string,
     configId: string,
     data: {
       enabled?: boolean;
@@ -103,14 +104,14 @@ export class OrgShortLinkSettingsRepository {
     },
   ) {
     return this._orgShortLinkConfig.model.orgShortLinkConfig.update({
-      where: { id: configId },
+      where: { id: configId, organizationId: orgId },
       data,
     });
   }
 
-  deleteById(id: string) {
+  deleteById(orgId: string, id: string) {
     return this._orgShortLinkConfig.model.orgShortLinkConfig.delete({
-      where: { id },
+      where: { id, organizationId: orgId },
     });
   }
 
@@ -133,7 +134,7 @@ export class OrgShortLinkSettingsRepository {
     };
     if (version) data.version = version;
     return this._orgShortLinkConfig.model.orgShortLinkConfig.update({
-      where: { id: config.id },
+      where: { id: config.id, organizationId: orgId },
       data,
     });
   }

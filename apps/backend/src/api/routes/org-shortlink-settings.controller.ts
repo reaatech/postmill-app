@@ -26,6 +26,7 @@ import { UpsertShortlinkConfigDto } from '@gitroom/nestjs-libraries/dtos/short-l
 import { TestShortlinkDto } from '@gitroom/nestjs-libraries/dtos/short-links/test-shortlink.dto';
 import { OAuthUrlDto } from '@gitroom/nestjs-libraries/dtos/short-links/oauth-url.dto';
 import { OAuthCallbackDto } from '@gitroom/nestjs-libraries/dtos/short-links/oauth-callback.dto';
+import { SetActiveShortlinkDto } from '@gitroom/backend/dtos/short-links/set-active-shortlink.dto';
 import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
@@ -192,7 +193,7 @@ export class OrgShortLinkSettingsController {
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body() body: { version?: string },
+    @Body() body: SetActiveShortlinkDto,
   ) {
     try {
       const result = await this._orgShortLinkSettings.setActive(org.id, identifier, body.version);

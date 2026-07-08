@@ -1843,7 +1843,7 @@ model AiDesignerSession {
   state           String   @default("intake") // intake|planning|awaiting_plan|executing|delivered|revising
   activeDesignIds Json?    // string[] of Design ids (one per variant)
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @default(now()) @updatedAt
 
   organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user            User               @relation(fields: [userId], references: [id])

@@ -194,28 +194,30 @@ export class VideoRenderService {
   async getJob(orgId: string, jobId: string) {
     // Org-scope the read: never return another org's job status / artifactUrl / error for a
     // guessed or leaked job id. Mirrors HeyGenService.getJob / ReplicateRunnerService.getJob.
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    const job = await this._aiSettings.getMediaJobById(orgId, jobId);
     if (!job || job.organizationId !== orgId) return null;
     return job;
   }
 
   async processVideoRender(jobId: string) {
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    // Job-id-only Inngest entry point: unscoped lookup, then all updates are org-scoped.
+    const job = await this._aiSettings.getMediaJobByIdUnscoped(jobId);
     if (!job || job.provider !== 'chromium-ffmpeg' || job.status !== 'pending') {
       return;
     }
+    const orgId = job.organizationId;
 
     let workDir: string | undefined;
 
     try {
-      await this._aiSettings.updateMediaJob(jobId, { status: 'processing' });
+      await this._aiSettings.updateMediaJob(orgId, jobId, { status: 'processing' });
 
       // Atomically claim the render payload: GETDEL is a single Redis op, so exactly one
       // concurrent runner obtains it (the equivalent of an `updateMany` count===1 claim).
       // A loser sees null here and must NOT mark the job failed — the winner is rendering it.
       const raw = await ioRedis.getdel(payloadKey(jobId));
       if (!raw) {
-        const current = await this._aiSettings.getMediaJobById(jobId);
+        const current = await this._aiSettings.getMediaJobById(orgId, jobId);
         if (current && current.status !== 'pending') {
           this.logger.log(
             `Render ${jobId} already claimed by another runner; skipping duplicate`,
@@ -307,7 +309,7 @@ export class VideoRenderService {
       this.logger.error(
         `Video render failed: ${jobId}: ${(err as Error).message}`,
       );
-      await this._aiSettings.updateMediaJob(jobId, {
+      await this._aiSettings.updateMediaJob(orgId, jobId, {
         status: 'failed',
         error: (err as Error).message.slice(0, 1000),
       });
@@ -317,20 +319,22 @@ export class VideoRenderService {
   }
 
   async processMergeRender(jobId: string) {
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    // Job-id-only Inngest entry point: unscoped lookup, then all updates are org-scoped.
+    const job = await this._aiSettings.getMediaJobByIdUnscoped(jobId);
     if (!job || job.model !== 'local/ffmpeg-merge' || job.status !== 'pending') {
       return;
     }
+    const orgId = job.organizationId;
 
     const workDir = renderWorkDir(jobId);
 
     try {
-      await this._aiSettings.updateMediaJob(jobId, { status: 'processing' });
+      await this._aiSettings.updateMediaJob(orgId, jobId, { status: 'processing' });
 
       // Atomic single-winner claim (see processVideoRender): a loser skips silently.
       const raw = await ioRedis.getdel(mergePayloadKey(jobId));
       if (!raw) {
-        const current = await this._aiSettings.getMediaJobById(jobId);
+        const current = await this._aiSettings.getMediaJobById(orgId, jobId);
         if (current && current.status !== 'pending') {
           this.logger.log(
             `Merge ${jobId} already claimed by another runner; skipping duplicate`,
@@ -383,7 +387,7 @@ export class VideoRenderService {
       }
     } catch (err) {
       this.logger.error(`Merge render failed: ${jobId}: ${(err as Error).message}`);
-      await this._aiSettings.updateMediaJob(jobId, {
+      await this._aiSettings.updateMediaJob(orgId, jobId, {
         status: 'failed',
         error: (err as Error).message.slice(0, 1000),
       });

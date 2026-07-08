@@ -32,6 +32,7 @@ import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.se
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
+import { BrandMemorySearchDto } from '@gitroom/backend/dtos/ai/brand-memory-search.dto';
 import dayjs from 'dayjs';
 
 class UpsertBrandProfileDto {
@@ -880,7 +881,7 @@ For each locale, provide an accurate translation that preserves the meaning, ton
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async searchBrandMemory(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { prompt: string },
+    @Body() body: BrandMemorySearchDto,
   ) {
     try {
       const hits = await this._ragService.searchBrandMemory(

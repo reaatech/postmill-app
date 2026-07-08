@@ -156,9 +156,9 @@ export class StorageRepository {
     });
   }
 
-  updateMediaLocation(id: string, path: string, folderId: string | null) {
+  updateMediaLocation(orgId: string, id: string, path: string, folderId: string | null) {
     return this._file.model.file.update({
-      where: { id },
+      where: { id, organizationId: orgId },
       data: { path, folderId },
     });
   }
@@ -286,12 +286,13 @@ export class StorageRepository {
   }
 
   async updateHealthCheck(
+    orgId: string,
     id: string,
     success: boolean,
     error?: string
   ): Promise<void> {
     await this._storage.model.storageProviderConfig.update({
-      where: { id },
+      where: { id, organizationId: orgId },
       data: success
         ? { lastHealthCheck: new Date(), lastHealthError: null }
         : { lastHealthError: error },

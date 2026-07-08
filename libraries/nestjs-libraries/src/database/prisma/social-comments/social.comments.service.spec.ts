@@ -57,6 +57,7 @@ describe('SocialCommentsService', () => {
     integration: {
       id: 'integration-1',
       providerIdentifier: 'youtube',
+      providerVersion: 'v1',
       token: 'valid-token',
       tokenExpiration: dayjs().add(30, 'day').toDate(),
       internalId: 'yt-channel-1',
@@ -233,7 +234,7 @@ describe('SocialCommentsService', () => {
 
       const result = await service.replyToPost(orgId, userId, postId, message);
 
-      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('youtube');
+      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('youtube', 'v1');
       expect(mockProvider.replyToComment).toHaveBeenCalledWith(
         basePost.integration.internalId,
         basePost.integration.token,
@@ -751,6 +752,7 @@ describe('SocialCommentsService', () => {
       integration: {
         id: 'integration-1',
         providerIdentifier: 'youtube',
+        providerVersion: 'v1',
         token: 'valid-token',
         tokenExpiration: dayjs().add(30, 'day').toDate(),
         internalId: 'yt-channel-1',
@@ -775,7 +777,7 @@ describe('SocialCommentsService', () => {
 
       await service.syncComments(orgId, post as any);
 
-      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('youtube');
+      expect(integrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('youtube', 'v1');
     });
 
     it('fetches a single page of comments and upserts them', async () => {

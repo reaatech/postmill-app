@@ -140,7 +140,7 @@
     "puppeteer": "^22.0.0",
     "resend": "^6.12.4",
     "rss-parser": "^3.13.0",
-    "sharp": "^0.33.4",
+    "sharp": "^0.34.5",
     "slugify": "^1.6.9",
     "socks": "^2.8.9",
     "stripe": "^20.4.0",
@@ -150,7 +150,8 @@
     "twitter-api-v2": "^1.29.0",
     "twitter-text": "^3.1.0",
     "undici": "^8.4.0",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.24",

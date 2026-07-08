@@ -34,13 +34,14 @@ export class AnalyticsLiveFallbackService {
   // (Discord/Slack/…) must be excluded from the coverage denominator, else such
   // an org is permanently "under-covered" and hammers the fallback forever (0.6).
   analyticsSupportingIds(
-    dbIntegrations: { id: string; providerIdentifier: string }[],
+    dbIntegrations: { id: string; providerIdentifier: string; providerVersion?: string | null }[],
   ): string[] {
     return dbIntegrations
       .filter((i) => {
         try {
           return !!this.integrationManager.getSocialIntegrationUnchecked(
             i.providerIdentifier,
+            i.providerVersion ?? undefined,
           )?.analytics;
         } catch {
           return false;
@@ -54,7 +55,7 @@ export class AnalyticsLiveFallbackService {
   // missing channels (0.6). FALLBACK_THRESHOLD stays 0.5.
   async checkCoverage(
     orgId: string,
-    dbIntegrations: { id: string; providerIdentifier: string }[],
+    dbIntegrations: { id: string; providerIdentifier: string; providerVersion?: string | null }[],
     from: Date,
     to: Date
   ): Promise<number> {
@@ -162,7 +163,7 @@ export class AnalyticsLiveFallbackService {
     snapshots: SnapshotLike[],
     org: Organization,
     integrationIds: string[],
-    dbIntegrations: { id: string; providerIdentifier: string }[],
+    dbIntegrations: { id: string; providerIdentifier: string; providerVersion?: string | null }[],
     fromDate: Date,
     toDate: Date,
     metric?: string,
@@ -190,7 +191,7 @@ export class AnalyticsLiveFallbackService {
   async applyLiveFallbackIfNeeded(
     org: Organization,
     integrationIds: string[],
-    dbIntegrations: { id: string; providerIdentifier: string }[],
+    dbIntegrations: { id: string; providerIdentifier: string; providerVersion?: string | null }[],
     fromDate: Date,
     toDate: Date,
     currentSnapshots: SnapshotLike[],

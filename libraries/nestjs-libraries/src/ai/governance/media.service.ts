@@ -193,6 +193,7 @@ interface ProvenanceSignerLike {
 interface ResolvedMediaProvider {
   adapter: MediaProviderAdapter;
   credentials: Record<string, string>;
+  version: string;
 }
 
 type AsyncOperation = 'video' | 'audio' | 'avatar';
@@ -209,14 +210,18 @@ export class AiMediaService {
     @Optional() private _defaultsResolution?: DefaultsResolutionService,
     @Optional() private _orgMediaProviderSettings?: OrgMediaProviderSettingsService,
     @Optional() private _lifecycle?: MediaJobLifecycleService,
+    // layering: sanctioned leaf-read of OrgAiSettingsRepository.
+    // OrgAiSettingsService imports ProviderCredentialLinkService from the media-providers
+    // package, so routing this universal-credential fallback "up" through the AI service
+    // would create a Nest DI cycle. The read is credential-decryption only, behaviour-neutral.
     @Optional() private _orgAiSettingsRepository?: OrgAiSettingsRepository,
     @Optional() private _encryptionService?: EncryptionService,
     @Optional() private _moduleRef?: ModuleRef,
     @Optional() private _budget?: BudgetService,
   ) {}
 
-  async getJob(id: string) {
-    return this._lifecycle?.getJob(id) ?? null;
+  async getJob(id: string, orgId: string) {
+    return this._lifecycle?.getJob(id, orgId) ?? null;
   }
 
   // Resolve a media adapter through the ProviderKernel; returns null for an
@@ -306,7 +311,7 @@ export class AiMediaService {
       });
       if (!adapter || !adapter.capabilities[capability]) continue;
 
-      return { adapter, credentials };
+      return { adapter, credentials, version: resolved.version };
     }
 
     return null;
@@ -345,6 +350,7 @@ export class AiMediaService {
     // media adapter but have no media-side row. Version-agnostic read (1.2 — a
     // v2-pinned AI row must still be found) and the AI row's own `enabled:false`
     // is honored (1.1b).
+    // layering: sanctioned leaf-read (see constructor comment for DI-cycle rationale).
     if (!this._orgAiSettingsRepository || !this._encryptionService) return null;
     const aiConfig = await this._orgAiSettingsRepository
       .findAnyByIdentifier(orgId, providerId)
@@ -606,7 +612,7 @@ export class AiMediaService {
           orgId,
         }) ?? adapter;
 
-      resolved.push({ adapter: pinned, credentials: full.credentials });
+      resolved.push({ adapter: pinned, credentials: full.credentials, version: full.version });
     }
     return resolved;
   }
@@ -894,6 +900,7 @@ export class AiMediaService {
           operation,
           costUsd,
           creditType: OPERATION_CREDIT_TYPE[operation],
+          version: candidate.version ?? 'v1',
         });
 
         try {
@@ -907,11 +914,11 @@ export class AiMediaService {
           if (submission.artifactUrl) {
             // Synchronous provider — complete immediately (download + store + notify).
             await this._lifecycle.completeJob(job, submission.artifactUrl, submission.metadata);
-            const finished = await this._lifecycle.getJob(job.id);
+            const finished = await this._lifecycle.getJob(job.id, options.orgId!);
             return finished?.artifactUrl || job.id;
           }
 
-          await this._lifecycle.attachProviderJob(job.id, submission.jobId);
+          await this._lifecycle.attachProviderJob(job.id, submission.jobId, options.orgId!);
           return job.id;
         } catch (err) {
           lastError = err as Error;
@@ -1221,13 +1228,14 @@ export class AiMediaService {
             operation: 'video-upscale',
             costUsd,
             creditType: OPERATION_CREDIT_TYPE['video-upscale'],
+            version: candidate.version ?? 'v1',
           });
           if (submission.artifactUrl) {
             await this._lifecycle.completeJob(job, submission.artifactUrl, submission.metadata);
-            const finished = await this._lifecycle.getJob(job.id);
+            const finished = await this._lifecycle.getJob(job.id, options.orgId!);
             return finished?.artifactUrl || job.id;
           }
-          await this._lifecycle.attachProviderJob(job.id, submission.jobId);
+          await this._lifecycle.attachProviderJob(job.id, submission.jobId, options.orgId!);
           return job.id;
         }
         return submission.artifactUrl || submission.jobId;
@@ -1261,13 +1269,14 @@ export class AiMediaService {
             operation: 'video-bg',
             costUsd,
             creditType: OPERATION_CREDIT_TYPE['video-bg'],
+            version: candidate.version ?? 'v1',
           });
           if (submission.artifactUrl) {
             await this._lifecycle.completeJob(job, submission.artifactUrl, submission.metadata);
-            const finished = await this._lifecycle.getJob(job.id);
+            const finished = await this._lifecycle.getJob(job.id, options.orgId!);
             return finished?.artifactUrl || job.id;
           }
-          await this._lifecycle.attachProviderJob(job.id, submission.jobId);
+          await this._lifecycle.attachProviderJob(job.id, submission.jobId, options.orgId!);
           return job.id;
         }
         return submission.artifactUrl || submission.jobId;

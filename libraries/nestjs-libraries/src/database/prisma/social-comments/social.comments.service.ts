@@ -98,7 +98,8 @@ export class SocialCommentsService {
     }
 
     const provider = this._integrationManager.getSocialIntegrationUnchecked(
-      post.integration.providerIdentifier
+      post.integration.providerIdentifier,
+      post.integration.providerVersion ?? undefined
     );
     if (!provider?.replyToComment) {
       throw new BadRequestException('Comments not supported for this channel');
@@ -170,7 +171,8 @@ export class SocialCommentsService {
     }
 
     const provider = this._integrationManager.getSocialIntegrationUnchecked(
-      post.integration.providerIdentifier
+      post.integration.providerIdentifier,
+      post.integration.providerVersion ?? undefined
     );
     if (!provider?.likeComment) {
       throw new BadRequestException('Comments not supported for this channel');
@@ -293,7 +295,8 @@ export class SocialCommentsService {
     if (!post.releaseId || post.releaseId === 'missing') return;
 
     const provider = this._integrationManager.getSocialIntegrationUnchecked(
-      post.integration.providerIdentifier
+      post.integration.providerIdentifier,
+      post.integration.providerVersion ?? undefined
     );
     if (!provider?.fetchComments) return;
 
@@ -506,7 +509,8 @@ export class SocialCommentsService {
     }
 
     const provider = this._integrationManager.getSocialIntegrationUnchecked(
-      post.integration.providerIdentifier
+      post.integration.providerIdentifier,
+      post.integration.providerVersion ?? undefined
     );
     if (!provider?.replyToComment) {
       throw new BadRequestException('Comments not supported for this channel');

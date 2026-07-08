@@ -4,7 +4,7 @@ import { mediaJobWebhookToken } from '@gitroom/nestjs-libraries/media/media-job-
 
 function makeController() {
   const lifecycle = {
-    getJob: vi.fn(),
+    getJobUnscoped: vi.fn(),
     processJob: vi.fn().mockResolvedValue('completed'),
   };
   const controller = new MediaJobsWebhookController(lifecycle as never);
@@ -26,7 +26,7 @@ describe('MediaJobsWebhookController (§11.2 webhook completion)', () => {
 
   it('processes the job when the org-bound token is valid', async () => {
     const { controller, lifecycle } = makeController();
-    lifecycle.getJob.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
+    lifecycle.getJobUnscoped.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
 
     const token = mediaJobWebhookToken('job-1', 'org-1');
     const result = await controller.handle('job-1', token);
@@ -37,7 +37,7 @@ describe('MediaJobsWebhookController (§11.2 webhook completion)', () => {
 
   it('returns 404 for an unknown job', async () => {
     const { controller, lifecycle } = makeController();
-    lifecycle.getJob.mockResolvedValue(null);
+    lifecycle.getJobUnscoped.mockResolvedValue(null);
 
     await expect(controller.handle('nope', 'whatever')).rejects.toThrow('not found');
     expect(lifecycle.processJob).not.toHaveBeenCalled();
@@ -45,7 +45,7 @@ describe('MediaJobsWebhookController (§11.2 webhook completion)', () => {
 
   it('returns 404 for a bad token (no oracle difference)', async () => {
     const { controller, lifecycle } = makeController();
-    lifecycle.getJob.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
+    lifecycle.getJobUnscoped.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
 
     await expect(controller.handle('job-1', 'bad-token')).rejects.toThrow('not found');
     expect(lifecycle.processJob).not.toHaveBeenCalled();
@@ -53,7 +53,7 @@ describe('MediaJobsWebhookController (§11.2 webhook completion)', () => {
 
   it('rejects a token minted for another job/org', async () => {
     const { controller, lifecycle } = makeController();
-    lifecycle.getJob.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
+    lifecycle.getJobUnscoped.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
 
     const otherToken = mediaJobWebhookToken('job-2', 'org-1');
     await expect(controller.handle('job-1', otherToken)).rejects.toThrow('not found');
@@ -64,7 +64,7 @@ describe('MediaJobsWebhookController (§11.2 webhook completion)', () => {
 
   it('never trusts the webhook body — completion is driven via processJob (provider status API)', async () => {
     const { controller, lifecycle } = makeController();
-    lifecycle.getJob.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
+    lifecycle.getJobUnscoped.mockResolvedValue({ id: 'job-1', organizationId: 'org-1', status: 'pending' });
     lifecycle.processJob.mockResolvedValue('pending');
 
     const token = mediaJobWebhookToken('job-1', 'org-1');

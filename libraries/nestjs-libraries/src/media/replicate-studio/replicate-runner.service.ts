@@ -365,14 +365,14 @@ export class ReplicateRunnerService {
         throw new Error(errorMsg);
       }
 
-      await this._lifecycle.attachProviderJob(job.id, pred.id);
+      await this._lifecycle.attachProviderJob(job.id, pred.id, orgId);
 
       return { jobId: job.id };
     });
   }
 
   async getJob(orgId: string, jobId: string): Promise<GetJobResult> {
-    const existing = await this._aiSettings.getMediaJobById(jobId);
+    const existing = await this._aiSettings.getMediaJobById(orgId, jobId);
 
     if (!existing || existing.organizationId !== orgId) {
       throw new ForbiddenException('Job not found');
@@ -390,7 +390,7 @@ export class ReplicateRunnerService {
       }
     }
 
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    const job = await this._aiSettings.getMediaJobById(orgId, jobId);
     if (!job || job.organizationId !== orgId) {
       throw new ForbiddenException('Job not found');
     }

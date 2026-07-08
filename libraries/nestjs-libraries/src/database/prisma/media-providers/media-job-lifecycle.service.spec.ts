@@ -35,17 +35,18 @@ function makeService() {
       jobs.set(job.id, job);
       return job;
     }),
-    updateMediaJob: vi.fn().mockImplementation(async (id: string, data: Partial<AIMediaJob>) => {
+    updateMediaJob: vi.fn().mockImplementation(async (_orgId: string, id: string, data: Partial<AIMediaJob>) => {
       const job = { ...(jobs.get(id) || makeJob({ id })), ...data };
       jobs.set(id, job as AIMediaJob);
       return job;
     }),
-    getMediaJobById: vi.fn().mockImplementation(async (id: string) => jobs.get(id) || null),
+    getMediaJobById: vi.fn().mockImplementation(async (_orgId: string, id: string) => jobs.get(id) || null),
+    getMediaJobByIdUnscoped: vi.fn().mockImplementation(async (id: string) => jobs.get(id) || null),
     getPendingMediaJobs: vi.fn().mockResolvedValue([]),
     // §3.1: atomic CAS on status. Mutates the shared job object synchronously (no await
     // between read and write) so it faithfully models the DB's conditional updateMany —
     // exactly one of two concurrent claimants sees the row still in `from`.
-    claimMediaJobStatus: vi.fn().mockImplementation(async (id: string, from: string[], to: string) => {
+    claimMediaJobStatus: vi.fn().mockImplementation(async (_orgId: string, id: string, from: string[], to: string) => {
       const job = jobs.get(id);
       if (!job || !from.includes(job.status)) return 0;
       job.status = to as AIMediaJob['status'];
@@ -145,8 +146,8 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
 
     it('stores the provider job reference under the pending:// scheme', async () => {
       const { service, aiSettings } = makeService();
-      await service.attachProviderJob('job-1', 'ext-99');
-      expect(aiSettings.updateMediaJob).toHaveBeenCalledWith('job-1', { artifactUrl: 'pending://ext-99' });
+      await service.attachProviderJob('job-1', 'ext-99', 'org-1');
+      expect(aiSettings.updateMediaJob).toHaveBeenCalledWith('org-1', 'job-1', { artifactUrl: 'pending://ext-99' });
     });
 
     it('extracts the provider job ref only from pending:// values', () => {
@@ -189,6 +190,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
 
       expect(await service.processJob('old-1')).toBe('failed');
       expect(aiSettings.updateMediaJob).toHaveBeenCalledWith(
+        'org-1',
         'old-1',
         expect.objectContaining({ status: 'failed' }),
       );
@@ -203,7 +205,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(await service.processJob('job-1')).toBe('pending');
       expect(pollJob).toHaveBeenCalledWith('luma-ext-1', { credentials: { apiKey: 'luma-key' } });
       // §3.1: the pending→processing write is now a guarded conditional claim.
-      expect(aiSettings.claimMediaJobStatus).toHaveBeenCalledWith('job-1', ['pending'], 'processing');
+      expect(aiSettings.claimMediaJobStatus).toHaveBeenCalledWith('org-1', 'job-1', ['pending'], 'processing');
     });
 
     it('polls through the version pinned on the job, not the config current version (4.10)', async () => {
@@ -403,6 +405,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(mediaRepository.saveGeneratedMedia).toHaveBeenCalledTimes(2);
       // the sibling was completed with the stored tenant path
       expect(aiSettings.updateMediaJob).toHaveBeenCalledWith(
+        'org-1',
         'created-1',
         expect.objectContaining({ status: 'completed' }),
       );

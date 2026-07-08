@@ -149,14 +149,14 @@ describe('StorageRepository', () => {
   });
 
   describe('updateMediaLocation', () => {
-    it('updates a media item path and folder', async () => {
+    it('updates a media item path and folder scoped by org', async () => {
       mockModel.file.update.mockResolvedValue({ id: 'm1' });
       const repo = makeRepo();
 
-      await repo.updateMediaLocation('m1', 'new-path', 'folder-1');
+      await repo.updateMediaLocation('org-1', 'm1', 'new-path', 'folder-1');
 
       expect(mockModel.file.update).toHaveBeenCalledWith({
-        where: { id: 'm1' },
+        where: { id: 'm1', organizationId: 'org-1' },
         data: { path: 'new-path', folderId: 'folder-1' },
       });
     });
@@ -335,7 +335,7 @@ describe('StorageRepository', () => {
   });
 
   describe('updateHealthCheck', () => {
-    it('sets lastHealthCheck on success', async () => {
+    it('sets lastHealthCheck on success scoped by org', async () => {
       mockModel.storageProviderConfig.update.mockResolvedValue({
         id: 'p1',
         lastHealthCheck: new Date(),
@@ -343,25 +343,25 @@ describe('StorageRepository', () => {
       });
       const repo = makeRepo();
 
-      await repo.updateHealthCheck('p1', true);
+      await repo.updateHealthCheck('org-1', 'p1', true);
 
       expect(mockModel.storageProviderConfig.update).toHaveBeenCalledWith({
-        where: { id: 'p1' },
+        where: { id: 'p1', organizationId: 'org-1' },
         data: { lastHealthCheck: expect.any(Date), lastHealthError: null },
       });
     });
 
-    it('sets lastHealthError on failure', async () => {
+    it('sets lastHealthError on failure scoped by org', async () => {
       mockModel.storageProviderConfig.update.mockResolvedValue({
         id: 'p1',
         lastHealthError: 'Connection failed',
       });
       const repo = makeRepo();
 
-      await repo.updateHealthCheck('p1', false, 'Connection failed');
+      await repo.updateHealthCheck('org-1', 'p1', false, 'Connection failed');
 
       expect(mockModel.storageProviderConfig.update).toHaveBeenCalledWith({
-        where: { id: 'p1' },
+        where: { id: 'p1', organizationId: 'org-1' },
         data: { lastHealthError: 'Connection failed' },
       });
     });

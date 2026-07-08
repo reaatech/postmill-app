@@ -437,6 +437,7 @@ export class AnalyticsRepository {
         id: true,
         name: true,
         providerIdentifier: true,
+        providerVersion: true,
         picture: true,
       },
     });

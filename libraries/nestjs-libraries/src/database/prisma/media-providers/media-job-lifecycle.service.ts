@@ -150,8 +150,12 @@ export class MediaJobLifecycleService {
     }
   }
 
-  async attachProviderJob(jobId: string, providerJobId: string): Promise<void> {
-    await this._aiSettings.updateMediaJob(jobId, {
+  async attachProviderJob(
+    jobId: string,
+    providerJobId: string,
+    organizationId: string,
+  ): Promise<void> {
+    await this._aiSettings.updateMediaJob(organizationId, jobId, {
       artifactUrl: `${PENDING_REF_PREFIX}${providerJobId}`,
     });
   }
@@ -163,8 +167,14 @@ export class MediaJobLifecycleService {
     return null;
   }
 
-  getJob(jobId: string): Promise<AIMediaJob | null> {
-    return this._aiSettings.getMediaJobById(jobId);
+  getJob(jobId: string, organizationId: string): Promise<AIMediaJob | null> {
+    return this._aiSettings.getMediaJobById(organizationId, jobId);
+  }
+
+  // Unscoped lookup used only by the webhook controller to obtain the organizationId
+  // bound to the HMAC token. The caller must verify the token before acting on the row.
+  getJobUnscoped(jobId: string): Promise<AIMediaJob | null> {
+    return this._aiSettings.getMediaJobByIdUnscoped(jobId);
   }
 
   // ── Completion paths ──
@@ -173,11 +183,14 @@ export class MediaJobLifecycleService {
   // webhook body is never trusted for the artifact; the provider's status API is the
   // source of truth) and the polling sweep.
   async processJob(jobId: string): Promise<'pending' | 'completed' | 'failed' | 'skipped'> {
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    // Initial unscoped read: this entry point only has a job id. Ownership is enforced
+    // by the webhook HMAC token upstream, or by the row's organizationId for every
+    // downstream update. All other reads use the scoped `getMediaJobById`.
+    const job = await this._aiSettings.getMediaJobByIdUnscoped(jobId);
     if (!job || (job.status !== 'pending' && job.status !== 'processing')) return 'skipped';
 
     if (Date.now() - job.createdAt.getTime() > JOB_TIMEOUT_MS) {
-      if (!(await this._claimForCompletion(job.id))) return 'skipped';
+      if (!(await this._claimForCompletion(job.id, job.organizationId))) return 'skipped';
       await this.failJob(job, 'Job timed out waiting for the provider');
       return 'failed';
     }
@@ -197,7 +210,7 @@ export class MediaJobLifecycleService {
       { includeDisabled: true },
     );
     if (!config) {
-      if (!(await this._claimForCompletion(job.id))) return 'skipped';
+      if (!(await this._claimForCompletion(job.id, job.organizationId))) return 'skipped';
       await this.failJob(job, `Provider "${job.provider}" is no longer configured`);
       return 'failed';
     }
@@ -216,7 +229,7 @@ export class MediaJobLifecycleService {
     } catch (err) {
       // Unknown/retired provider version throws — fail the job cleanly instead of
       // leaving it pending until the 24h timeout (and 500-ing the webhook path).
-      if (!(await this._claimForCompletion(job.id))) return 'skipped';
+      if (!(await this._claimForCompletion(job.id, job.organizationId))) return 'skipped';
       await this.failJob(
         job,
         `Provider "${job.provider}" could not be resolved: ${(err as Error).message}`,
@@ -224,7 +237,7 @@ export class MediaJobLifecycleService {
       return 'failed';
     }
     if (!adapter?.pollJob) {
-      if (!(await this._claimForCompletion(job.id))) return 'skipped';
+      if (!(await this._claimForCompletion(job.id, job.organizationId))) return 'skipped';
       await this.failJob(job, `Provider "${job.provider}" cannot report job status`);
       return 'failed';
     }
@@ -240,7 +253,7 @@ export class MediaJobLifecycleService {
     }
 
     if (poll.status === 'failed') {
-      if (!(await this._claimForCompletion(job.id))) return 'skipped';
+      if (!(await this._claimForCompletion(job.id, job.organizationId))) return 'skipped';
       await this.failJob(job, poll.error || 'Provider reported failure');
       return 'failed';
     }
@@ -248,7 +261,7 @@ export class MediaJobLifecycleService {
       // §3.1: atomically claim the terminal transition before doing any work. Two
       // concurrent invocations both see `completed`; only the one that flips the row
       // out of pending/processing downloads/stores/notifies — the loser short-circuits.
-      if (!(await this._claimForCompletion(job.id))) return 'skipped';
+      if (!(await this._claimForCompletion(job.id, job.organizationId))) return 'skipped';
       const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata, job.folderId);
       // Land any additional artifacts from the SAME generation (e.g. Suno returns 2 clips) as
       // sibling completed jobs. Done after the primary completes: the atomic claim above already
@@ -267,7 +280,7 @@ export class MediaJobLifecycleService {
     // §3.1: guard the pending→processing write so a slow poller can't regress a job
     // a webhook already completed — the conditional update no-ops unless still pending.
     if (job.status === 'pending') {
-      await this._aiSettings.claimMediaJobStatus(job.id, ['pending'], 'processing');
+      await this._aiSettings.claimMediaJobStatus(job.organizationId, job.id, ['pending'], 'processing');
     }
     return 'pending';
   }
@@ -275,8 +288,12 @@ export class MediaJobLifecycleService {
   // §3.1: atomically claim a job for terminal handling (complete or fail). Returns true
   // only for the single caller that flips it out of pending/processing into the transient
   // `landing` state; concurrent callers that lose the claim must not re-download/re-notify.
-  private async _claimForCompletion(jobId: string): Promise<boolean> {
+  private async _claimForCompletion(
+    jobId: string,
+    organizationId: string,
+  ): Promise<boolean> {
     const count = await this._aiSettings.claimMediaJobStatus(
+      organizationId,
       jobId,
       ['pending', 'processing'],
       'landing',
@@ -365,7 +382,7 @@ export class MediaJobLifecycleService {
         thumbnailPath = thumbStored.path;
       }
 
-      await this._aiSettings.updateMediaJob(job.id, {
+      await this._aiSettings.updateMediaJob(job.organizationId, job.id, {
         status: 'completed',
         artifactUrl: stored.path,
         error: null,
@@ -411,7 +428,7 @@ export class MediaJobLifecycleService {
         folderId,
       });
 
-      await this._aiSettings.updateMediaJob(job.id, {
+      await this._aiSettings.updateMediaJob(job.organizationId, job.id, {
         status: 'completed',
         artifactUrl: stored.path,
         error: null,
@@ -438,7 +455,7 @@ export class MediaJobLifecycleService {
   }
 
   async failJob(job: AIMediaJob, error: string, options?: { notify?: boolean }): Promise<void> {
-    await this._aiSettings.updateMediaJob(job.id, {
+    await this._aiSettings.updateMediaJob(job.organizationId, job.id, {
       status: 'failed',
       error: error.slice(0, 1000),
       ...(this.providerJobRef(job) ? { artifactUrl: null } : {}),

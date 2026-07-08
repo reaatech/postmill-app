@@ -27,6 +27,7 @@ import { Readable, pipeline } from 'stream';
 import { promisify } from 'util';
 import { OnlyURL } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { CreateAgentDto } from '@gitroom/backend/dtos/public/create-agent.dto';
 
 const pump = promisify(pipeline);
 
@@ -42,7 +43,7 @@ export class PublicController {
   ) {}
   @Post('/agent')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  async createAgent(@Body() body: { text: string; apiKey: string }) {
+  async createAgent(@Body() body: CreateAgentDto) {
     if (
       !body.apiKey ||
       !process.env.AGENT_API_KEY ||

@@ -373,9 +373,9 @@ export class FileRepository {
     });
   }
 
-  getFolder(id: string) {
-    return this._fileFolder.model.fileFolder.findUnique({
-      where: { id },
+  getFolder(org: string, id: string) {
+    return this._fileFolder.model.fileFolder.findFirst({
+      where: { id, organizationId: org },
       include: {
         _count: {
           select: { files: true, children: true },

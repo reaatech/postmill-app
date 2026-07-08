@@ -127,7 +127,8 @@ export class PostsService {
     // new connections (the gated getSocialIntegration would throw a 404 here).
     const integrationProvider =
       this._integrationManager.getSocialIntegrationUnchecked(
-        post.integration.providerIdentifier
+        post.integration.providerIdentifier,
+        post.integration.providerVersion ?? undefined
       );
 
     if (!integrationProvider?.missing) {
@@ -207,7 +208,8 @@ export class PostsService {
     // already-connected channels whose provider was later disabled.
     const integrationProvider =
       this._integrationManager.getSocialIntegrationUnchecked(
-        post.integration.providerIdentifier
+        post.integration.providerIdentifier,
+        post.integration.providerVersion ?? undefined
       );
 
     if (!integrationProvider?.postAnalytics) {
@@ -870,10 +872,14 @@ export class PostsService {
     providerIdentifier: string,
     postId: string,
     orgId: string,
-    state: State
+    state: State,
+    providerVersion?: string
   ) {
     const provider =
-      this._integrationManager.getSocialIntegrationUnchecked(providerIdentifier);
+      this._integrationManager.getSocialIntegrationUnchecked(
+        providerIdentifier,
+        providerVersion ?? undefined
+      );
     const taskQueue = providerIdentifier.split('-')[0].toLowerCase();
     const maxConcurrentJob = provider?.maxConcurrentJob ?? 1;
 
@@ -1174,7 +1180,8 @@ export class PostsService {
           (post.settings as any)?.__type,
           posts[0].id,
           orgId,
-          posts[0].state
+          posts[0].state,
+          posts[0].integration?.providerVersion ?? undefined
         ).catch((err) => {});
       }
 
@@ -1293,7 +1300,10 @@ export class PostsService {
 
         const integration = integrationById.get(result.id) || null;
         const provider = integration
-          ? this._integrationManager.getSocialIntegrationUnchecked(integration.providerIdentifier)
+          ? this._integrationManager.getSocialIntegrationUnchecked(
+              integration.providerIdentifier,
+              integration.providerVersion ?? undefined
+            )
           : null;
 
         if (result.emptyContent) {
@@ -1404,7 +1414,8 @@ export class PostsService {
         getPostById.integration.providerIdentifier,
         getPostById.id,
         orgId,
-        state
+        state,
+        getPostById.integration.providerVersion ?? undefined
       );
     } catch (err) {}
 
@@ -1592,7 +1603,8 @@ export class PostsService {
           getPostById.integration.providerIdentifier,
           getPostById.id,
           orgId,
-          getPostById.state === 'DRAFT' ? 'DRAFT' : 'QUEUE'
+          getPostById.state === 'DRAFT' ? 'DRAFT' : 'QUEUE',
+          getPostById.integration.providerVersion ?? undefined
         );
       } catch (err) {}
     }
@@ -2049,7 +2061,8 @@ export class PostsService {
         post.integration!.providerIdentifier,
         post.id,
         orgId,
-        State.QUEUE
+        State.QUEUE,
+        post.integration!.providerVersion ?? undefined
       );
     } catch (err) {
       Logger.warn(

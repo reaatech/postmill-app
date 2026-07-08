@@ -7,9 +7,9 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
 
 const PRIORITY_COLORS: Record<number, string> = {
-  1: 'text-[#F97066] border-[#F97066]',
-  2: 'text-[#FFAC30] border-[#FFAC30]',
-  3: 'text-[#1D9BF0] border-[#1D9BF0]',
+  1: 'text-priorityHigh border-priorityHigh',
+  2: 'text-priorityMedium border-priorityMedium',
+  3: 'text-priorityLow border-priorityLow',
 };
 
 export const RecommendationsTab: FC = () => {

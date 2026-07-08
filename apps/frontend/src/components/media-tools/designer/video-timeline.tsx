@@ -1205,8 +1205,8 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     <div
       ref={timelineRef}
       className="shrink-0 border-t border-studioBorder bg-newBgColorInner flex flex-col"
+      role="toolbar"
       tabIndex={0}
-      role="application"
       aria-label="Video timeline"
       onKeyDown={handleKeyDown}
     >
@@ -1336,6 +1336,13 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         <div style={{ position: 'relative', width: LABEL_WIDTH + totalPixels + 40, minWidth: '100%' }}>
           {/* Ruler */}
           <div
+            role="slider"
+            aria-label="Seek timeline"
+            aria-orientation="horizontal"
+            aria-valuenow={Math.round(playheadMs)}
+            aria-valuemin={0}
+            aria-valuemax={Math.round(vo.durationMs)}
+            tabIndex={0}
             className="sticky top-0 z-10 bg-newBgColorInner border-b border-studioBorder/40"
             style={{ height: RULER_HEIGHT, marginLeft: LABEL_WIDTH }}
             onMouseDown={handleRulerClick}
@@ -1404,6 +1411,13 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
 
                   return (
                     <div
+                      role="slider"
+                      aria-label="Clip"
+                      aria-orientation="horizontal"
+                      aria-valuenow={Math.round(clip.startMs)}
+                      aria-valuemin={0}
+                      aria-valuemax={Math.round(vo.durationMs - (clip.endMs - clip.startMs))}
+                      tabIndex={0}
                       key={clip.id}
                       className={`absolute top-1 rounded-[4px] cursor-pointer group ${
                         sel ? 'ring-2 ring-white/60 z-10' : ''
@@ -1418,6 +1432,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedClip({ outputIndex: currentOutput, trackId: track.id, clipId: clip.id });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setSelectedClip({ outputIndex: currentOutput, trackId: track.id, clipId: clip.id });
+                        }
                       }}
                       onMouseDown={(e) => handleClipMouseDown(e, track.id, clip, 'move')}
                       onContextMenu={(e) => handleClipContextMenu(e, track.id, clip.id)}
@@ -1463,10 +1483,24 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       )}
                       {/* Drag edges */}
                       <div
+                        role="slider"
+                        aria-label="Trim clip start"
+                        aria-orientation="horizontal"
+                        aria-valuenow={Math.round(clip.startMs)}
+                        aria-valuemin={0}
+                        aria-valuemax={Math.round(clip.endMs - 100)}
+                        tabIndex={0}
                         className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-black/20 rounded-l-[4px]"
                         onMouseDown={(e) => handleClipMouseDown(e, track.id, clip, 'start')}
                       />
                       <div
+                        role="slider"
+                        aria-label="Trim clip end"
+                        aria-orientation="horizontal"
+                        aria-valuenow={Math.round(clip.endMs)}
+                        aria-valuemin={Math.round(clip.startMs + 100)}
+                        aria-valuemax={Math.round(vo.durationMs)}
+                        tabIndex={0}
                         className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-black/20 rounded-r-[4px]"
                         onMouseDown={(e) => handleClipMouseDown(e, track.id, clip, 'end')}
                       />
@@ -1488,13 +1522,14 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                         height: TRACK_HEIGHT - 8,
                       }}
                     >
-                      <div
-                        className={`w-2 h-full cursor-pointer flex items-center justify-center rounded-sm ${
+                      <button
+                        type="button"
+                        className={`w-2 h-full flex items-center justify-center rounded-sm ${
                           isTransitioning ? 'bg-yellow-500/40 hover:bg-yellow-500/60' : 'bg-transparent hover:bg-white/10'
                         }`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          const rect = (e.target as HTMLElement).getBoundingClientRect();
+                          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                           setTransitionPopover({
                             trackId: track.id,
                             fromClipId: from.id,
@@ -1504,11 +1539,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                           });
                         }}
                         title={`${TRANSITION_LABELS[tType]} transition`}
+                        aria-label={`${TRANSITION_LABELS[tType]} transition`}
                       >
                         {isTransitioning && (
                           <div className="w-1 h-3 rounded-full bg-yellow-400" />
                         )}
-                      </div>
+                      </button>
                     </div>
                   );
                 })}
@@ -1541,7 +1577,9 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       {/* Track audio settings popover */}
       {trackSettings && (
         <>
-          <div
+          <button
+            type="button"
+            aria-label="Close"
             className="fixed inset-0 z-50"
             onClick={() => setTrackSettings(null)}
           />
@@ -1590,7 +1628,9 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       {/* Transition popover */}
       {transitionPopover && (
         <>
-          <div
+          <button
+            type="button"
+            aria-label="Close"
             className="fixed inset-0 z-50"
             onClick={() => setTransitionPopover(null)}
           />
@@ -1637,7 +1677,9 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       {/* Clip context menu */}
       {clipMenu && (
         <>
-          <div
+          <button
+            type="button"
+            aria-label="Close"
             className="fixed inset-0 z-50"
             onClick={() => {
               setClipMenu(null);

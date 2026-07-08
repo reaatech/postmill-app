@@ -1,10 +1,27 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+
+const TrashThumb: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const img = ref.current;
+    if (!img) return;
+    const onError = () => {
+      img.style.display = 'none';
+    };
+    img.addEventListener('error', onError);
+    return () => img.removeEventListener('error', onError);
+  }, [src]);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img ref={ref} src={src} alt={alt} className="w-full h-full object-cover" />
+  );
+};
 
 export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const fetch = useFetch();
@@ -102,15 +119,9 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
             >
               {media.path && (
                 <div className="aspect-square bg-newTableHeader flex items-center justify-center">
-                  {/* Trash thumbnails load dynamic storage URLs; onError drives the broken-image fallback. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions */}
-                  <img
+                  <TrashThumb
                     src={mediaDirectory.set(media.path)}
                     alt={media.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
                   />
                 </div>
               )}

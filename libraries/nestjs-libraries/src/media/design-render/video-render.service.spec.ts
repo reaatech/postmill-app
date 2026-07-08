@@ -46,6 +46,15 @@ describe('VideoRenderService', () => {
         createdAt: new Date(),
         updatedAt: new Date(),
       }),
+      getMediaJobByIdUnscoped: vi.fn().mockResolvedValue({
+        id: 'job-1',
+        organizationId: orgId,
+        provider: 'chromium-ffmpeg',
+        operation: 'video',
+        status: 'pending',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
       updateMediaJob: vi.fn().mockResolvedValue(undefined),
     } as any;
 
@@ -146,7 +155,7 @@ describe('VideoRenderService', () => {
 
     await service.processVideoRender('job-1');
 
-    expect(aiSettings.updateMediaJob).toHaveBeenCalledWith('job-1', {
+    expect(aiSettings.updateMediaJob).toHaveBeenCalledWith(orgId, 'job-1', {
       status: 'processing',
     });
     expect(encoder.encode).toHaveBeenCalledWith(
@@ -167,6 +176,7 @@ describe('VideoRenderService', () => {
       expect.any(Buffer),
     );
     expect(aiSettings.updateMediaJob).not.toHaveBeenCalledWith(
+      orgId,
       'job-1',
       expect.objectContaining({ status: 'failed' }),
     );
@@ -181,6 +191,7 @@ describe('VideoRenderService', () => {
     await service.processVideoRender('job-1');
 
     expect(aiSettings.updateMediaJob).toHaveBeenCalledWith(
+      orgId,
       'job-1',
       expect.objectContaining({
         status: 'failed',
@@ -229,6 +240,15 @@ describe('VideoRenderService', () => {
     // Stateful job: both runners read 'pending' at the top guard; the winner's
     // updateMediaJob(processing) flips it so the loser's re-read is no longer 'pending'.
     const state = { status: 'pending' };
+    vi.mocked(aiSettings.getMediaJobByIdUnscoped).mockImplementation(
+      async () =>
+        ({
+          id: 'job-1',
+          organizationId: orgId,
+          provider: 'chromium-ffmpeg',
+          status: state.status,
+        }) as any,
+    );
     vi.mocked(aiSettings.getMediaJobById).mockImplementation(
       async () =>
         ({
@@ -238,7 +258,7 @@ describe('VideoRenderService', () => {
           status: state.status,
         }) as any,
     );
-    vi.mocked(aiSettings.updateMediaJob).mockImplementation(async (_id, data: any) => {
+    vi.mocked(aiSettings.updateMediaJob).mockImplementation(async (_orgId, _id, data: any) => {
       if (data?.status) state.status = data.status;
       return undefined as any;
     });
@@ -259,6 +279,7 @@ describe('VideoRenderService', () => {
     // Exactly one render; the loser never marks the job failed.
     expect(encoder.encode).toHaveBeenCalledTimes(1);
     expect(aiSettings.updateMediaJob).not.toHaveBeenCalledWith(
+      orgId,
       'job-1',
       expect.objectContaining({ status: 'failed' }),
     );

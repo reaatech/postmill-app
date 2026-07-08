@@ -401,7 +401,7 @@ describe('AiMediaService', () => {
         credentials: { apiKey: 'luma-key' },
         webhookUrl: 'https://backend.example.com/media-jobs/webhook/tracked-job-1/tok',
       }));
-      expect(lifecycle.attachProviderJob).toHaveBeenCalledWith('tracked-job-1', 'luma-job-1');
+      expect(lifecycle.attachProviderJob).toHaveBeenCalledWith('tracked-job-1', 'luma-job-1', 'org-1');
       expect(result).toBe('tracked-job-1');
     });
 

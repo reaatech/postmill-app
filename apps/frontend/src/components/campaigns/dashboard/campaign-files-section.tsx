@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -58,6 +58,14 @@ const FileTile: FC<{
     : !isVideo && !isAudio
     ? mediaDirectory.set(file.path)
     : '';
+  const thumbRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const img = thumbRef.current;
+    if (!img) return;
+    const onError = () => setBroken(true);
+    img.addEventListener('error', onError);
+    return () => img.removeEventListener('error', onError);
+  }, [thumb]);
 
   return (
     <div className="group relative rounded-[8px] border border-newTableBorder bg-newBgColorInner overflow-hidden hover:border-btnPrimary/50 transition-colors">
@@ -75,14 +83,13 @@ const FileTile: FC<{
               <circle cx="18" cy="16" r="3" />
             </svg>
           ) : thumb && !broken ? (
-            // onError drives the broken-thumbnail fallback below (legitimate use).
-            // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions
+            // eslint-disable-next-line @next/next/no-img-element
             <img
+              ref={thumbRef}
               src={thumb}
               alt={file.alt || file.name}
               className="w-full h-full object-cover"
               loading="lazy"
-              onError={() => setBroken(true)}
             />
           ) : isVideo && !broken ? (
             <video

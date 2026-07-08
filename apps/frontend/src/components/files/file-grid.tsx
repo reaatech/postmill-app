@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useState } from 'react';
+import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import clsx from 'clsx';
@@ -19,6 +19,14 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
     : !isVideo && !isAudio
     ? mediaDirectory.set(file.path)
     : '';
+  const thumbRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const img = thumbRef.current;
+    if (!img) return;
+    const onError = () => setBroken(true);
+    img.addEventListener('error', onError);
+    return () => img.removeEventListener('error', onError);
+  }, [thumb]);
 
   if (isAudio) {
     // Compact audio tile; the full waveform player opens in the modal.
@@ -37,16 +45,16 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
       </div>
     );
   }
+
   if (thumb && !broken) {
     return (
-      // onError drives the broken-thumbnail fallback below (legitimate use).
-      // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions
+      // eslint-disable-next-line @next/next/no-img-element
       <img
+        ref={thumbRef}
         src={thumb}
         alt={file.alt || file.name}
         className="w-full h-full object-cover"
         loading="lazy"
-        onError={() => setBroken(true)}
       />
     );
   }

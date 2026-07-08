@@ -183,7 +183,7 @@ describe('EmailService', () => {
 
     await service.sendEmailSync('a@b.com', 'S', '<p>H</p>');
 
-    expect(mockMarkSent).toHaveBeenCalledWith('log-1', 'msg-xyz');
+    expect(mockMarkSent).toHaveBeenCalledWith('log-1', 'msg-xyz', null);
     expect(mockMarkFailed).not.toHaveBeenCalled();
   });
 
@@ -193,7 +193,7 @@ describe('EmailService', () => {
 
     await service.sendEmailSync('a@b.com', 'S', '<p>H</p>');
 
-    expect(mockMarkSent).toHaveBeenCalledWith('log-1', 'no-id');
+    expect(mockMarkSent).toHaveBeenCalledWith('log-1', 'no-id', null);
   });
 
   // --- sendEmailSync: retry ---
@@ -208,7 +208,7 @@ describe('EmailService', () => {
 
     expect(mockAdapter.send).toHaveBeenCalledTimes(2);
     expect(timer).toHaveBeenCalledWith(700);
-    expect(mockMarkSent).toHaveBeenCalledWith('log-1', 'msg-retry');
+    expect(mockMarkSent).toHaveBeenCalledWith('log-1', 'msg-retry', null);
     expect(mockMarkFailed).not.toHaveBeenCalled();
   });
 
@@ -223,7 +223,7 @@ describe('EmailService', () => {
 
     expect(mockAdapter.send).toHaveBeenCalledTimes(3);
     expect(timer).toHaveBeenCalledTimes(2);
-    expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'ETIMEDOUT');
+    expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'ETIMEDOUT', null);
     expect(mockMarkSent).not.toHaveBeenCalled();
   });
 
@@ -234,7 +234,7 @@ describe('EmailService', () => {
     await expect(service.sendEmailSync('a@b.com', 'S', '<p>H</p>')).rejects.toThrow('invalid address');
 
     expect(mockAdapter.send).toHaveBeenCalledTimes(3);
-    expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'invalid address');
+    expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'invalid address', null);
     expect(mockMarkSent).not.toHaveBeenCalled();
   });
 
@@ -244,7 +244,7 @@ describe('EmailService', () => {
 
     await expect(service.sendEmailSync('a@b.com', 'S', '<p>H</p>')).rejects.toThrow('ECONNREFUSED');
 
-    expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'ECONNREFUSED');
+    expect(mockMarkFailed).toHaveBeenCalledWith('log-1', 'ECONNREFUSED', null);
   });
 
   it('redacts the recipient email in failure logs', async () => {

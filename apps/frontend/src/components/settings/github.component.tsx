@@ -27,7 +27,7 @@ const ConnectedComponent: FC<{
     await fetch(`/settings/repository/${id}`, {
       method: 'DELETE',
     });
-  }, []);
+  }, [deleteRepository, fetch, id]);
 
   const t = useT();
 
@@ -66,7 +66,7 @@ const ConnectComponent: FC<{
       })
     ).json();
     deleteRepository();
-  }, []);
+  }, [deleteRepository, fetch, id]);
   const completeConnection = useCallback(async () => {
     const [select, repo] = url
       .match(/https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)/)!
@@ -82,7 +82,7 @@ const ConnectComponent: FC<{
       return;
     }
     setConnected(`${select}/${repo}`);
-  }, [url]);
+  }, [url, fetch, id, setConnected, toast]);
 
   const t = useT();
 
@@ -135,9 +135,11 @@ export const GithubComponent: FC<{
     login: string;
   }>;
 }> = (props) => {
-  if (typeof window !== 'undefined' && window.opener) {
-    window.close();
-  }
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.opener) {
+      window.close();
+    }
+  }, []);
   const { github, organizations } = props;
   const [githubState, setGithubState] = useState(github);
   useEffect(() => {
@@ -147,11 +149,11 @@ export const GithubComponent: FC<{
   const connect = useCallback(async () => {
     const { url } = await (await fetch('/settings/github/url')).json();
     window.open(url, 'Github Connect', 'width=700,height=700');
-  }, []);
+  }, [fetch]);
   const setConnected = useCallback(
     (g: { id: string; login: string }) => (name: string) => {
       setGithubState((gitlibs) => {
-        return gitlibs.map((git, index) => {
+        return gitlibs.map((git) => {
           if (git.id === g.id) {
             return {
               id: g.id,
@@ -162,17 +164,17 @@ export const GithubComponent: FC<{
         });
       });
     },
-    [githubState]
+    []
   );
   const deleteConnect = useCallback(
     (g: { id: string; login: string }) => () => {
       setGithubState((gitlibs) => {
-        return gitlibs.filter((git, index) => {
+        return gitlibs.filter((git) => {
           return git.id !== g.id;
         });
       });
     },
-    [githubState]
+    []
   );
 
   const t = useT();

@@ -43,7 +43,7 @@ export class MediaJobsActivity {
    * Inngest function). No-ops unless the job is still pending.
    */
   async processRenderJob(jobId: string): Promise<void> {
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    const job = await this._aiSettings.getMediaJobByIdUnscoped(jobId);
     if (!job) return;
     if (job.model === 'local/ffmpeg-merge') {
       await this._videoRenderService.processMergeRender(jobId);

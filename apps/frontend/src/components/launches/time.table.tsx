@@ -65,7 +65,7 @@ export const TimeTable: FC<{
       return;
     }
     modal.closeAll();
-  }, []);
+  }, [modal, t]);
 
   useKeypress('Escape', askClose);
 
@@ -86,7 +86,7 @@ export const TimeTable: FC<{
       }
       setCurrentTimes((prev) => prev.filter((p) => p.time !== value));
     },
-    []
+    [t]
   );
 
   const addHour = useCallback(() => {
@@ -137,14 +137,14 @@ export const TimeTable: FC<{
     }
     mutate();
     modal.closeAll();
-  }, [currentTimes, toaster, t]);
+  }, [currentTimes, fetch, modal, mutate, props.integration.id, toaster, t]);
 
   return (
     <div className="relative w-full max-w-[400px] mx-auto">
       {/* Add Time Slot Section */}
       <div className="bg-newBgColorInner rounded-[12px] p-[20px] border border-newTableBorder">
         <div className="text-[15px] font-semibold mb-[16px] flex items-center gap-[8px]">
-          <DelayIcon size={18} className="text-[#2B5CD3]" />
+          <DelayIcon size={18} className="text-btnPrimary" />
           {t('add_time_slot', 'Add Time Slot')}
         </div>
 
@@ -184,7 +184,7 @@ export const TimeTable: FC<{
           <button
             type="button"
             onClick={addHour}
-            className="h-[42px] px-[16px] bg-[#2B5CD3] hover:bg-[#7640e0] transition-colors rounded-[8px] flex items-center gap-[6px] text-white text-[14px] font-medium"
+            className="h-[42px] px-[16px] bg-btnPrimary hover:opacity-90 transition-colors rounded-[8px] flex items-center gap-[6px] text-white text-[14px] font-medium"
           >
             <PlusIcon size={14} />
             {t('add', 'Add')}
@@ -211,11 +211,11 @@ export const TimeTable: FC<{
                   'group flex items-center justify-between',
                   'h-[48px] px-[16px] rounded-[8px]',
                   'bg-newBgColorInner border border-newTableBorder',
-                  'hover:border-[#2B5CD3]/40 transition-colors'
+                  'hover:border-btnPrimary/40 transition-colors'
                 )}
               >
                 <div className="flex items-center gap-[12px]">
-                  <div className="w-[8px] h-[8px] rounded-full bg-[#2B5CD3]" />
+                  <div className="w-[8px] h-[8px] rounded-full bg-btnPrimary" />
                   <span className="text-[15px] font-medium tabular-nums">
                     {timeSlot.formatted}
                   </span>

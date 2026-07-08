@@ -279,7 +279,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     clientInformation?: ClientInformation
   ) {
     const getAccessToken = await (
-      await fetch(
+      await this.fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           `?client_id=${clientInformation?.client_id || ''}` +
           `&redirect_uri=${encodeURIComponent(
@@ -293,7 +293,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     const { access_token } = await (
-      await fetch(
+      await this.fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           '?grant_type=fb_exchange_token' +
           `&client_id=${clientInformation?.client_id || ''}` +
@@ -303,7 +303,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     const { data } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.facebook.com/v20.0/me/permissions?access_token=${access_token}`
       )
     ).json();
@@ -314,7 +314,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     this.checkScopes(this.scopes, permissions);
 
     const { id, name, picture } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.facebook.com/v20.0/me?fields=id,name,picture&access_token=${access_token}`
       )
     ).json();
@@ -817,7 +817,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      console.error('Error fetching Facebook post analytics:', err);
+      this.logger.warn('Error fetching Facebook post analytics');
       return [];
     }
   }
@@ -840,7 +840,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
         url += `&after=${cursor}`;
       }
 
-      const response = await fetch(url);
+      const response = await this.fetch(url);
       const json = await response.json() as any;
       const data = json?.data || [];
 
@@ -877,7 +877,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     integration: Integration
   ) {
     try {
-      const response = await fetch(
+      const response = await this.fetch(
         `https://graph.facebook.com/v20.0/${parentCommentId}/replies?access_token=${accessToken}`,
         {
           method: 'POST',
@@ -928,13 +928,13 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
   ) {
     try {
       if (like) {
-        await fetch(
+        await this.fetch(
           `https://graph.facebook.com/v20.0/${commentId}/likes?access_token=${accessToken}`,
           { method: 'POST' }
         );
         return { liked: true };
       } else {
-        await fetch(
+        await this.fetch(
           `https://graph.facebook.com/v20.0/${commentId}/likes?access_token=${accessToken}`,
           { method: 'DELETE' }
         );

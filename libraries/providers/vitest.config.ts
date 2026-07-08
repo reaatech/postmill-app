@@ -89,7 +89,7 @@ export default defineConfig({
         'kernel/src/domains/storage-helpers.ts',
       ],
       thresholds: {
-        statements: 70,
+        statements: 75,
         lines: 70,
       },
     },

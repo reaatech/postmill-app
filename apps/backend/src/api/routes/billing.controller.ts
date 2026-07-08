@@ -4,6 +4,10 @@ import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization, User } from '@prisma/client';
 import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.subscribe.dto';
+import { CancelSubscriptionDto } from '@gitroom/backend/dtos/billing/cancel-subscription.dto';
+import { LifetimeCodeDto } from '@gitroom/backend/dtos/billing/lifetime-code.dto';
+import { RefundChargesDto } from '@gitroom/backend/dtos/billing/refund-charges.dto';
+import { AddSubscriptionDto } from '@gitroom/backend/dtos/billing/add-subscription.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
@@ -114,10 +118,11 @@ export class BillingController {
   }
 
   @Post('/cancel')
+  @RequirePermission('billing', 'manage')
   async cancel(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Body() body: { feedback: string }
+    @Body() body: CancelSubscriptionDto
   ) {
     await this._notificationService.sendEmail(
       process.env.EMAIL_FROM_ADDRESS,
@@ -138,9 +143,10 @@ export class BillingController {
   }
 
   @Post('/lifetime')
+  @RequirePermission('billing', 'manage')
   async lifetime(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { code: string }
+    @Body() body: LifetimeCodeDto
   ) {
     return this._stripeService.lifetimeDeal(org.id, body.code);
   }
@@ -157,7 +163,7 @@ export class BillingController {
   @RequirePermission('billing', 'manage')
   async refundCharges(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { chargeIds: string[] }
+    @Body() body: RefundChargesDto
   ) {
     return this._stripeService.refundCharges(org.id, body.chargeIds);
   }
@@ -173,7 +179,7 @@ export class BillingController {
   @Post('/add-subscription')
   @RequirePermission('billing', 'manage')
   async addSubscription(
-    @Body() body: { subscription: string },
+    @Body() body: AddSubscriptionDto,
     @GetUserFromRequest() user: User,
     @GetOrgFromRequest() org: Organization
   ) {

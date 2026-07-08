@@ -320,7 +320,7 @@ export class StorageService {
     const config = await this.#getOrgScopedConfig(id, orgId);
     const result = await this.#buildAdapter(config).testConnection();
     // Track health (#62)
-    await this._storageRepository.updateHealthCheck(id, result.ok, result.error);
+    await this._storageRepository.updateHealthCheck(orgId, id, result.ok, result.error);
     return result;
   }
 
@@ -527,6 +527,7 @@ export class StorageService {
         }
 
         await this._storageRepository.updateMediaLocation(
+          orgId,
           media.id,
           newPath,
           targetFolderId

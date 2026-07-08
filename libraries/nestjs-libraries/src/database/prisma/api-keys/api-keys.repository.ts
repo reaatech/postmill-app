@@ -57,13 +57,14 @@ export class ApiKeysRepository {
     });
   }
 
-  async touchLastUsed(id: string) {
+  async touchLastUsed(id: string, organizationId: string) {
     // Throttle writes: only update when lastUsedAt is null or older than a minute,
     // so a busy key doesn't write on every request.
     const oneMinuteAgo = new Date(Date.now() - 60_000);
     return this.prisma.apiKey.updateMany({
       where: {
         id,
+        organizationId,
         OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: oneMinuteAgo } }],
       },
       data: { lastUsedAt: new Date() },

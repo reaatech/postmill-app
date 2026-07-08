@@ -7,10 +7,8 @@ import {
 } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
-import { SocialAbstract } from '@gitroom/provider-kernel';
+import { safeFetch, SocialAbstract } from '@gitroom/provider-kernel';
 import { createHash, randomBytes } from 'crypto';
-import axios from 'axios';
-import FormDataNew from 'form-data';
 import mime from 'mime-types';
 import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
@@ -179,24 +177,28 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
           )
         ).json();
 
-        const { data } = await axios.get(media.path!, {
-          responseType: 'stream',
-        });
+        const mediaResponse = await safeFetch(media.path!);
+        if (!mediaResponse.ok) {
+          throw new Error(
+            `Failed to download media for VK upload (status ${mediaResponse.status})`
+          );
+        }
+        const arrayBuffer = await mediaResponse.arrayBuffer();
 
         const slash = media.path.split('/').at(-1);
 
-        const formData = new FormDataNew();
-        formData.append('photo', data, {
-          filename: slash,
-          contentType: mime.lookup(slash!) || '',
+        const blob = new Blob([arrayBuffer], {
+          type: mime.lookup(slash!) || 'application/octet-stream',
         });
-        const value = (
-          await axios.post(all.response.upload_url, formData, {
-            headers: {
-              ...formData.getHeaders(),
-            },
+
+        const formData = new FormData();
+        formData.append('photo', blob, slash);
+        const value = await (
+          await this.fetch(all.response.upload_url, {
+            method: 'POST',
+            body: formData,
           })
-        ).data;
+        ).json();
 
         if (hasExtension(media.path, 'mp4')) {
           return {
@@ -212,7 +214,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
 
         const { id } = (
           await (
-            await fetch(
+            await this.fetch(
               `https://api.vk.com/method/photos.saveWallPhoto?access_token=${accessToken}&v=5.251`,
               {
                 method: 'POST',
