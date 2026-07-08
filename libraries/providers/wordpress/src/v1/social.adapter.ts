@@ -12,9 +12,7 @@ import { makeId } from '@gitroom/provider-kernel';
 import { WordpressDto } from '@gitroom/provider-kernel';
 import slugify from 'slugify';
 // import FormData from 'form-data';
-import axios from 'axios';
 import { Tool } from '@gitroom/provider-kernel';
-import { string } from 'yup';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
 

@@ -87,7 +87,8 @@ describe('Facebook - comment capabilities', () => {
       globalThis.fetch = vi.fn().mockResolvedValue(resp({ data: [], paging: {} }));
       await provider.fetchComments('page-1', 'tok', 'post-1', 'cursor-123', mockIntegration);
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        expect.stringContaining('after=cursor-123')
+        expect.stringContaining('after=cursor-123'),
+        expect.anything()
       );
     });
 

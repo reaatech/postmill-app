@@ -194,7 +194,7 @@ export class DevToProvider extends SocialAbstract implements SocialProvider {
     const body = JSON.parse(Buffer.from(params.code, 'base64').toString());
     try {
       const { name, id, profile_image, username } = await (
-        await fetch('https://dev.to/api/users/me', {
+        await this.fetch('https://dev.to/api/users/me', {
           headers: {
             'api-key': body.apiKey,
           },
@@ -218,7 +218,7 @@ export class DevToProvider extends SocialAbstract implements SocialProvider {
   @Tool({ description: 'Tag list', dataSchema: [] })
   async tags(token: string) {
     const tags = await (
-      await fetch('https://dev.to/api/tags?per_page=1000&page=1', {
+      await this.fetch('https://dev.to/api/tags?per_page=1000&page=1', {
         headers: {
           'api-key': token,
         },
@@ -231,7 +231,7 @@ export class DevToProvider extends SocialAbstract implements SocialProvider {
   @Tool({ description: 'Organization list', dataSchema: [] })
   async organizations(token: string) {
     const orgs = await (
-      await fetch('https://dev.to/api/articles/me/all?per_page=1000', {
+      await this.fetch('https://dev.to/api/articles/me/all?per_page=1000', {
         headers: {
           'api-key': token,
         },

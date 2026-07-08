@@ -7,15 +7,13 @@ import {
   SocialProvider,
 } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/provider-kernel';
-import axios from 'axios';
-import FormData from 'form-data';
 import {
+  safeFetch,
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/provider-kernel';
 import { DribbbleDto } from '@gitroom/provider-kernel';
 import mime from 'mime-types';
-import { DiscordDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
 import { metadata as providerMetadata } from './metadata';
@@ -174,37 +172,36 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     postDetails: PostDetails<DribbbleDto>[]
   ): Promise<PostResponse[]> {
-    const { data, status } = await axios.get(
-      postDetails?.[0]?.media?.[0]?.path,
-      {
-        responseType: 'stream',
-      }
-    );
+    const mediaPath = postDetails?.[0]?.media?.[0]?.path;
+    const mediaResponse = await safeFetch(mediaPath);
+    if (!mediaResponse.ok) {
+      throw new Error(
+        `Failed to download media for Dribbble upload (status ${mediaResponse.status})`
+      );
+    }
+    const arrayBuffer = await mediaResponse.arrayBuffer();
 
-    const slash = postDetails?.[0]?.media?.[0]?.path.split('/').at(-1);
+    const slash = mediaPath.split('/').at(-1);
 
-    const formData = new FormData();
-    formData.append('image', data, {
-      filename: slash,
-      contentType: mime.lookup(slash!) || '',
+    const blob = new Blob([arrayBuffer], {
+      type: mime.lookup(slash!) || 'application/octet-stream',
     });
 
+    const formData = new FormData();
+    formData.append('image', blob, slash);
     formData.append('title', postDetails[0].settings.title);
     formData.append('description', postDetails[0].message);
 
-    const data2 = await axios.post(
-      'https://api.dribbble.com/v2/shots',
-      formData,
-      {
-        headers: {
-          ...formData.getHeaders(),
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
-    );
+    const data2 = await this.fetch('https://api.dribbble.com/v2/shots', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: formData,
+    });
 
-    const location = data2.headers['location'];
-    const newId = location.split('/').at(-1);
+    const location = data2.headers.get('location');
+    const newId = location?.split('/').at(-1);
 
     return [
       {

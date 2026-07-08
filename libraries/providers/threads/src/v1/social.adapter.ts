@@ -488,7 +488,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     const since = dayjs().subtract(date, 'day').unix();
 
     const { data, ...all } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.threads.net/v1.0/${id}/threads_insights?metric=views,likes,replies,reposts,quotes&access_token=${accessToken}&period=day&since=${since}&until=${until}`
       )
     ).json();
@@ -536,7 +536,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     fields: { likesAmount: string; post: string }
   ) {
     const { data } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.threads.net/v1.0/${id}/insights?metric=likes&access_token=${integration.token}`
       )
     ).json();
@@ -631,7 +631,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      console.error('Error fetching Threads post analytics:', err);
+      this.logger.warn('Error fetching Threads post analytics');
       return [];
     }
   }
@@ -668,7 +668,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
         raw: reply,
       }));
 
-      const nextCursor = paging?.cursors?.after || paging?.next || undefined;
+      const nextCursor = paging?.cursors?.after || undefined;
 
       return { comments, nextCursor };
     } catch (err) {

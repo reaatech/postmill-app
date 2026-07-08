@@ -105,14 +105,18 @@ import { MeweProvider } from './mewe.provider';
 import { KickProvider } from './kick.provider';
 import { TwitchProvider } from './twitch.provider';
 
-function resp(data: any) {
+function resp(data: any, headers?: Record<string, string>) {
+  const headerMap = new Map();
+  if (headers) {
+    Object.entries(headers).forEach(([k, v]) => headerMap.set(k, v));
+  }
   return {
     status: 200, ok: true,
     json: vi.fn().mockResolvedValue(data),
     text: vi.fn().mockResolvedValue(JSON.stringify(data)),
     blob: vi.fn().mockResolvedValue(new Blob()),
     arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
-    headers: new Map(),
+    headers: headerMap,
   } as any;
 }
 
@@ -185,8 +189,10 @@ describe('dribbble deep', () => {
     expect(r.username).toBe('testuser');
   });
 
-  it('post uses axios to upload shot', async () => {
-    mockAxiosFn.post = vi.fn().mockResolvedValue({ status: 200, data: {}, headers: { location: 'https://dribbble.com/shots/456' } });
+  it('post uploads shot via safeFetch and this.fetch', async () => {
+    globalThis.fetch = vi.fn()
+      .mockImplementationOnce(() => Promise.resolve(resp({}))) // media download
+      .mockImplementationOnce(() => Promise.resolve(resp({}, { location: 'https://dribbble.com/shots/456' }))); // upload shot
     const r = await provider.post('user123', 'tok', [{ id: 'p1', message: 'My shot', media: [{ path: 'https://ex.com/img.jpg' }], settings: { title: 'My Shot' } }]);
     expect(r).toHaveLength(1);
     expect(r[0].postId).toBe('456');
@@ -792,21 +798,23 @@ describe('vk deep', () => {
   });
 
   it('post with image uploads and posts to wall', async () => {
-    mockAxiosFn.post = vi.fn().mockResolvedValue({ data: { photo: 'photo-data', server: 'srv-1', hash: 'hash-1' } });
     globalThis.fetch = vi.fn()
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: { upload_url: 'https://upload.vk.com/photo' } })))
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: [{ id: 'photo-123' }] })))
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: { post_id: 456 } })));
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: { upload_url: 'https://upload.vk.com/photo' } }))) // getWallUploadServer
+      .mockImplementationOnce(() => Promise.resolve(resp({}))) // media download
+      .mockImplementationOnce(() => Promise.resolve(resp({ photo: 'photo-data', server: 'srv-1', hash: 'hash-1' }))) // upload to VK
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: [{ id: 'photo-123' }] }))) // photos.saveWallPhoto
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: { post_id: 456 } }))); // wall.post
     const r = await provider.post('123', 'tok', [{ id: 'p1', message: 'With image', settings: {}, media: [{ path: 'https://ex.com/img.jpg' }] }]);
     expect(r).toHaveLength(1);
     expect(r[0].postId).toBe('456');
   });
 
   it('post with video uploads via video.save', async () => {
-    mockAxiosFn.post = vi.fn().mockResolvedValue({ data: {} });
     globalThis.fetch = vi.fn()
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: { video_id: 'vid-123', upload_url: 'https://upload.vk.com/video' } })))
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: { post_id: 789 } })));
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: { video_id: 'vid-123', upload_url: 'https://upload.vk.com/video' } }))) // video.save
+      .mockImplementationOnce(() => Promise.resolve(resp({}))) // media download
+      .mockImplementationOnce(() => Promise.resolve(resp({}))) // upload to VK
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: { post_id: 789 } }))); // wall.post
     const r = await provider.post('123', 'tok', [{ id: 'p1', message: 'With video', settings: {}, media: [{ path: 'https://ex.com/vid.mp4' }] }]);
     expect(r[0].postId).toBe('789');
   });
@@ -820,11 +828,12 @@ describe('vk deep', () => {
   });
 
   it('comment with media uploads then replies', async () => {
-    mockAxiosFn.post = vi.fn().mockResolvedValue({ data: { photo: 'photo-data', server: 'srv-2', hash: 'hash-2' } });
     globalThis.fetch = vi.fn()
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: { upload_url: 'https://upload.vk.com/photo2' } })))
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: [{ id: 'photo-456' }] })))
-      .mockImplementationOnce(() => Promise.resolve(resp({ response: { comment_id: 888 } })));
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: { upload_url: 'https://upload.vk.com/photo2' } }))) // getWallUploadServer
+      .mockImplementationOnce(() => Promise.resolve(resp({}))) // media download
+      .mockImplementationOnce(() => Promise.resolve(resp({ photo: 'photo-data', server: 'srv-2', hash: 'hash-2' }))) // upload to VK
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: [{ id: 'photo-456' }] }))) // photos.saveWallPhoto
+      .mockImplementationOnce(() => Promise.resolve(resp({ response: { comment_id: 888 } }))); // wall.createComment
     const r = await provider.comment('123', 'post-456', undefined, 'tok', [{ id: 'c2', message: 'With pic', settings: {}, media: [{ path: 'https://ex.com/img.jpg' }] }], {} as any);
     expect(r[0].postId).toBe('888');
   });
