@@ -453,7 +453,7 @@ div div .set-font-family {
 
 .col-calendar:hover:before {
   content: 'Date passed';
-  color: var(--color-text);
+  color: var(--new-btn-text);
   position: absolute;
   left: 50%;
   top: 50%;
@@ -634,7 +634,7 @@ html[dir='rtl'] [dir='ltr'] {
 
 .ProseMirror .mention {
   font-weight: bold;
-  color: #2b5cd3;
+  color: var(--new-btn-primary);
 }
 
 .ProseMirror ul,
@@ -737,7 +737,7 @@ html[dir='rtl'] [dir='ltr'] {
     background-color: var(--new-boxFocused);
     border-radius: 0.4rem;
     box-decoration-break: clone;
-    color: #1d9bf0;
+    color: var(--new-ai-btn);
     &::after {
       content: '\200B';
     }
@@ -904,12 +904,12 @@ html[dir='rtl'] [dir='ltr'] {
 
 /* Text selection */
 ::selection {
-  background: rgba(43, 92, 211, 0.3);
+  background: color-mix(in srgb, var(--new-btn-primary) 30%, transparent);
 }
 
 /* Designer range-slider thumb (used by media-tools/designer/controls Slider).
    The track is painted inline via a gradient; this styles the draggable thumb
-   to match the #2B5CD3 accent across WebKit + Firefox. Additive only. */
+   to match the primary accent across WebKit + Firefox. Additive only. */
 .designer-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -917,7 +917,7 @@ html[dir='rtl'] [dir='ltr'] {
   height: 14px;
   border-radius: 9999px;
   background: #ffffff;
-  border: 2px solid #2b5cd3;
+  border: 2px solid var(--new-btn-primary);
   cursor: pointer;
 }
 
@@ -926,16 +926,16 @@ html[dir='rtl'] [dir='ltr'] {
   height: 14px;
   border-radius: 9999px;
   background: #ffffff;
-  border: 2px solid #2b5cd3;
+  border: 2px solid var(--new-btn-primary);
   cursor: pointer;
 }
 
 /* Designer motion language + drop affordance (G1/G2). Additive only.
    All motion is gated behind prefers-reduced-motion. */
 .designer-canvas-container.designer-drop-active {
-  outline: 2px dashed #2b5cd3;
+  outline: 2px dashed var(--new-btn-primary);
   outline-offset: -4px;
-  background-color: rgba(43, 92, 211, 0.06);
+  background-color: color-mix(in srgb, var(--new-btn-primary) 6%, transparent);
 }
 
 .designer-fade-in {

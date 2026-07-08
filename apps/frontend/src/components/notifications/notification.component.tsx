@@ -265,7 +265,12 @@ const NotificationComponent = () => {
 
   return (
     <div className="relative cursor-pointer select-none" ref={ref}>
-      <div onClick={changeShow} className="relative">
+      <button
+        type="button"
+        aria-label="Notifications"
+        onClick={changeShow}
+        className="relative cursor-pointer"
+      >
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -283,11 +288,11 @@ const NotificationComponent = () => {
           />
         </svg>
         {!!data?.total && (
-          <span className="absolute -top-[2px] -right-[2px] min-w-[16px] h-[16px] px-[4px] flex items-center justify-center bg-[#FF3EA2] text-white text-[10px] font-bold rounded-full border border-newBgColorInner">
+          <span className="absolute -top-[2px] -right-[2px] min-w-[16px] h-[16px] px-[4px] flex items-center justify-center bg-badge text-white text-[10px] font-bold rounded-full border border-newBgColorInner">
             {data.total > 99 ? '99+' : data.total}
           </span>
         )}
-      </div>
+      </button>
       {show && <NotificationOpenComponent onClose={() => setShow(false)} />}
     </div>
   );

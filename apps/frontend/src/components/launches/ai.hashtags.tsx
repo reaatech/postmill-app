@@ -118,18 +118,19 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
         <div className="text-[14px]">{t('platform', 'Platform')}</div>
         <div className="flex flex-wrap gap-[8px]">
           {platforms.map((p) => (
-            <div
+            <button
               key={p}
+              type="button"
               onClick={() => setSelectedPlatform(p)}
               className={clsx(
                 'cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
                 selectedPlatform === p
-                  ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
+                  ? 'bg-btnPrimary border-btnPrimary text-white'
                   : 'bg-newColColor border-newBgLineColor',
               )}
             >
               {p}
-            </div>
+            </button>
           ))}
         </div>
       </div>
@@ -159,7 +160,7 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
             <button
               type="button"
               onClick={copyAll}
-              className="text-[12px] text-[#2B5CD3] hover:underline"
+              className="text-[12px] text-btnPrimary hover:underline"
             >
               {t('copy_selected', 'Copy Selected')}
             </button>
@@ -167,7 +168,7 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
               <button
                 type="button"
                 onClick={applySelected}
-                className="text-[12px] text-[#2B5CD3] hover:underline"
+                className="text-[12px] text-btnPrimary hover:underline"
               >
                 {t('apply_to_post', 'Apply to Post')}
               </button>
@@ -177,18 +178,19 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
             {hashtags.map((tag) => {
               const isSelected = selected.has(tag);
               return (
-                <div
+                <button
                   key={tag}
+                  type="button"
                   onClick={() => toggleTag(tag)}
                   className={clsx(
                     'cursor-pointer rounded-[4px] px-[8px] h-[28px] flex items-center text-[12px] border transition-all',
                     isSelected
-                      ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
-                      : 'bg-newColColor border-newBgLineColor hover:border-[#2B5CD3]',
+                      ? 'bg-btnPrimary border-btnPrimary text-white'
+                      : 'bg-newColColor border-newBgLineColor hover:border-btnPrimary',
                   )}
                 >
                   #{tag}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -212,7 +214,8 @@ export const AiHashtags: FC<HashtagsProps> = ({ onSelect }) => {
   }, [modals, t, onSelect]);
 
   return (
-    <div
+    <button
+      type="button"
       onClick={openModal}
       className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
     >
@@ -227,6 +230,6 @@ export const AiHashtags: FC<HashtagsProps> = ({ onSelect }) => {
           {t('hashtags', 'Hashtags')}
         </div>
       </div>
-    </div>
+    </button>
   );
 };

@@ -171,17 +171,16 @@ export const TagsComponentInner: FC<{
       ref={ref}
       className={clsx(
         'border rounded-[8px] justify-center flex items-center relative h-[36px] lg:h-[44px] text-[13px] lg:text-[15px] font-[600] select-none',
-        isOpen ? 'border-[#2B5CD3]' : 'border-newTextColor/10'
+        isOpen ? 'border-btnPrimary' : 'border-newTextColor/10'
       )}
     >
-      <div
+      <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1"
+        className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1 text-left"
       >
-        <div className="cursor-pointer">
-          <TagIcon />
-        </div>
-        <div className="cursor-pointer flex gap-[4px]">
+        <TagIcon />
+        <div className="flex gap-[4px]">
           {tagValue.length === 0 ? (
             t('add_new_tag', 'Add New Tag')
           ) : (
@@ -198,91 +197,84 @@ export const TagsComponentInner: FC<{
             </>
           )}
         </div>
-        <div className="cursor-pointer">
-          <DropdownArrowIcon rotated={isOpen} />
-        </div>
-      </div>
+        <DropdownArrowIcon rotated={isOpen} />
+      </button>
       {isOpen && (
         <div className="z-[300] absolute start-0 bottom-[100%] w-[240px] bg-newBgColorInner p-[12px] menu-shadow -translate-y-[10px] flex flex-col">
-          {(data?.tags || []).map((p: any) => (
-            <div
-              onClick={() => {
-                const exists = !!tagValue.find((a) => a.id === p.id);
-                let modify = [];
-                if (exists) {
-                  modify = tagValue.filter((a) => a.id !== p.id);
-                } else {
-                  modify = [...tagValue, p];
-                }
-                setTagValue(modify);
-                onChange({
-                  target: {
-                    value: modify.map((p: any) => ({
-                      label: p.name,
-                      value: p.name,
-                    })),
-                    name,
-                  },
-                });
-              }}
-              key={p.name}
-              className="min-h-[40px] py-[8px] px-[20px] -mx-[12px] flex gap-[8px] items-center group"
-            >
-              <Check
-                onChange={() => {}}
-                value={!!tagValue.find((a) => a.id === p.id)}
-              />
-              <div className="h-full flex items-center flex-1 break-all">
-                <span
-                  className="text-[#fff] px-[8px] rounded-[8px] text-shadow-tags"
-                  style={{ backgroundColor: p.color }}
+          {(data?.tags || []).map((p: any) => {
+            const selected = !!tagValue.find((a) => a.id === p.id);
+            return (
+              <div
+                key={p.name}
+                className="min-h-[40px] py-[8px] px-[20px] -mx-[12px] flex gap-[8px] items-center group"
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    const exists = !!tagValue.find((a) => a.id === p.id);
+                    let modify = [];
+                    if (exists) {
+                      modify = tagValue.filter((a) => a.id !== p.id);
+                    } else {
+                      modify = [...tagValue, p];
+                    }
+                    setTagValue(modify);
+                    onChange({
+                      target: {
+                        value: modify.map((p: any) => ({
+                          label: p.name,
+                          value: p.name,
+                        })),
+                        name,
+                      },
+                    });
+                  }}
+                  className="flex-1 flex gap-[8px] items-center text-left"
                 >
-                  {p.name}
-                </span>
+                  <span
+                    className={clsx(
+                      'text-[10px] font-[500] text-center flex border border-btnSimple rounded-[6px] min-w-[20px] min-h-[20px] w-[20px] h-[20px] justify-center items-center',
+                      selected && 'bg-btnPrimary'
+                    )}
+                  >
+                    {selected ? <CheckmarkIcon className="text-white" /> : ''}
+                  </span>
+                  <span
+                    className="text-[#fff] px-[8px] rounded-[8px] text-shadow-tags"
+                    style={{ backgroundColor: p.color }}
+                  >
+                    {p.name}
+                  </span>
+                </button>
+                {!selected && (
+                  <button
+                    type="button"
+                    onClick={(e) => deleteTag(p, e)}
+                    className="ms-auto transition-opacity text-red-500 text-[14px] font-[600] px-[4px]"
+                    aria-label={t('delete_tag', 'Delete tag')}
+                  >
+                    ×
+                  </button>
+                )}
               </div>
-              {!tagValue.find((a) => a.id === p.id) && (
-                <div
-                  onClick={(e) => deleteTag(p, e)}
-                  className="ms-auto transition-opacity cursor-pointer text-red-500 text-[14px] font-[600]"
-                >
-                  ×
-                </div>
-              )}
-            </div>
-          ))}
-          <div
+            );
+          })}
+          <button
+            type="button"
             onClick={addTag}
-            className="cursor-pointer gap-[8px] flex w-full h-[34px] rounded-[8px] mt-[12px] px-[16px] justify-center items-center bg-[#2B5CD3] text-white"
+            className="gap-[8px] flex w-full h-[34px] rounded-[8px] mt-[12px] px-[16px] justify-center items-center bg-btnPrimary text-white"
           >
-            <div>
-              <PlusIcon />
-            </div>
-            <div className="text-[13px] font-[600]">
+            <PlusIcon />
+            <span className="text-[13px] font-[600]">
               {t('add_new_tag', 'Add New Tag')}
-            </div>
-          </div>
+            </span>
+          </button>
         </div>
       )}
     </div>
   );
 };
 
-const Check: FC<{ value: boolean; onChange: (value: boolean) => void }> = ({
-  value,
-  onChange,
-}) => {
-  return (
-    <div
-      onClick={() => onChange(!value)}
-      className={clsx(
-        'text-[10px] font-[500] text-center flex border border-btnSimple rounded-[6px] min-w-[20px] min-h-[20px] w-[20px] h-[20px] justify-center items-center',
-        value && 'bg-[#2B5CD3]'
-      )}
-    >
-      {value ? <CheckmarkIcon className="text-white" /> : ''}
-    </div>
-  );
-};
 export const TagsComponentA: FC<{
   name: string;
   label: string;
@@ -458,18 +450,21 @@ export const TagsComponentA: FC<{
                   backgroundColor: findTag?.color,
                 }}
               >
-                <div
+                <button
+                  type="button"
                   className="absolute -top-[5px] start-[10px] text-[12px] text-red-600 bg-white px-[3px] rounded-full"
                   onClick={edit(findTag)}
                 >
                   {t('edit', 'Edit')}
-                </div>
-                <div
+                </button>
+                <button
+                  type="button"
+                  aria-label={t('delete_tag', 'Delete tag')}
                   className="absolute -top-[5px] -start-[5px] text-[12px] text-red-600 bg-white px-[3px] rounded-full"
                   onClick={() => onDelete(findIndex)}
                 >
                   X
-                </div>
+                </button>
                 <div className="text-white mix-blend-difference">
                   {tag.tag.label}
                 </div>

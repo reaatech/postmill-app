@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { Button } from '@gitroom/react/form/button';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Input } from '@gitroom/react/form/input';
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { array, boolean, object, string } from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Select } from '@gitroom/react/form/select';
@@ -77,13 +77,13 @@ const AddOrEditAutopost: FC<{ data?: any; reload: () => void }> = ({ data, reloa
     },
   });
 
-  const generateContent = form.watch('generateContent');
-  const content = form.watch('content');
-  const url = form.watch('url');
-  const syncLast = form.watch('syncLast');
-  const integrations = form.watch('integrations');
+  const generateContent = useWatch({ name: 'generateContent', control: form.control });
+  const content = useWatch({ name: 'content', control: form.control });
+  const url = useWatch({ name: 'url', control: form.control });
+  const syncLast = useWatch({ name: 'syncLast', control: form.control });
+  const integrations = useWatch({ name: 'integrations', control: form.control });
 
-  const integration = useCallback(async () => (await fetch('/integrations/list')).json(), []);
+  const integration = useCallback(async () => (await fetch('/integrations/list')).json(), [fetch]);
   const { data: dataList, isLoading } = useSWR('integrations', integration, {
     revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false,
     revalidateOnMount: true, refreshWhenHidden: false, refreshWhenOffline: false,
@@ -110,7 +110,7 @@ const AddOrEditAutopost: FC<{ data?: any; reload: () => void }> = ({ data, reloa
     );
     modal.closeAll();
     reload();
-  }, [data, integrations, lastUrl, syncLast, fetch, modal, reload, toast, t]);
+  }, [data, lastUrl, syncLast, fetch, modal, reload, toast, t]);
 
   const sendTest = useCallback(async () => {
     const u = form.getValues('url');
@@ -204,7 +204,7 @@ export const Autopost: FC = () => {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
 
-  const list = useCallback(async () => (await fetch('/autopost')).json(), []);
+  const list = useCallback(async () => (await fetch('/autopost')).json(), [fetch]);
   const { data, mutate, isLoading, error } = useSWR('autopost', list);
 
   const filtered = useMemo(() => {

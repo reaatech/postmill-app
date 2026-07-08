@@ -46,6 +46,6 @@ export const useTrack = (user?: { id?: string } | null) => {
         // Silently ignore tracking errors so they never break the UI.
       }
     },
-    [user?.id, fetch, facebookPixel]
+    [user, fetch, facebookPixel]
   );
 };

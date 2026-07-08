@@ -62,7 +62,7 @@ export const Filters = () => {
 
   // Set dayjs locale based on current language
   const currentLanguage = i18next.resolvedLanguage || 'en';
-  dayjs.locale();
+  dayjs.locale(currentLanguage);
 
   const isListView = calendar.display === 'list';
   // The list view shares the calendar's date navigator: while in list, the
@@ -276,7 +276,7 @@ export const Filters = () => {
 
   const viewToggle = (
     <div className="flex flex-row p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500]">
-      <div
+      <button type="button"
         onClick={setCalendarView}
         className={clsx(
           'pt-[6px] pb-[5px] cursor-pointer flex justify-center items-center w-[34px] text-center rounded-[6px]',
@@ -299,8 +299,8 @@ export const Filters = () => {
             strokeLinejoin="round"
           />
         </svg>
-      </div>
-      <div
+      </button>
+      <button type="button"
         onClick={setList}
         className={clsx(
           'pt-[6px] pb-[5px] flex justify-center items-center cursor-pointer w-[34px] text-center rounded-[6px]',
@@ -352,7 +352,7 @@ export const Filters = () => {
             strokeWidth="1.5"
           />
         </svg>
-      </div>
+      </button>
     </div>
   );
 
@@ -599,18 +599,18 @@ export const Filters = () => {
       <div
         className={clsx(
           'border rounded-[10px] overflow-hidden bg-newBgColorInner transition-colors',
-          activeCount > 0 ? 'border-[#2B5CD3]/50' : 'border-studioBorder'
+          activeCount > 0 ? 'border-btnPrimary/50' : 'border-studioBorder'
         )}
       >
         <button
           type="button"
           onClick={() => toggleGroup(id)}
           aria-expanded={open}
-          className="w-full h-[46px] px-[14px] flex items-center gap-[8px] bg-studioBg hover:bg-[#2B5CD3]/10 transition-colors"
+          className="w-full h-[46px] px-[14px] flex items-center gap-[8px] bg-studioBg hover:bg-btnPrimary/10 transition-colors"
         >
           <span className="text-[13px] font-[600] text-textColor">{title}</span>
           {activeCount > 0 && (
-            <span className="min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#2B5CD3] text-white text-[10px] font-[600] flex items-center justify-center">
+            <span className="min-w-[18px] h-[18px] px-[5px] rounded-full bg-btnPrimary text-white text-[10px] font-[600] flex items-center justify-center">
               {activeCount}
             </span>
           )}
@@ -619,7 +619,7 @@ export const Filters = () => {
             className={clsx(
               'w-[14px] h-[14px] transition-transform duration-200',
               open && 'rotate-180',
-              activeCount > 0 ? 'text-[#2B5CD3]' : 'text-newTableText'
+              activeCount > 0 ? 'text-btnPrimary' : 'text-newTableText'
             )}
             fill="none"
             viewBox="0 0 24 24"
@@ -659,7 +659,7 @@ export const Filters = () => {
       <div className="flex items-center justify-between min-h-[16px]">
         <div className="flex items-center gap-[6px]">
           {chip && (
-            <span className="w-[6px] h-[6px] rounded-full bg-[#2B5CD3]" />
+            <span className="w-[6px] h-[6px] rounded-full bg-btnPrimary" />
           )}
           <div className={sectionLabel}>{title}</div>
         </div>
@@ -667,7 +667,7 @@ export const Filters = () => {
           <button
             type="button"
             onClick={chip.onClear}
-            className="text-[11px] font-[600] text-[#2B5CD3] hover:underline"
+            className="text-[11px] font-[600] text-btnPrimary hover:underline"
           >
             {t('clear', 'Clear')}
           </button>
@@ -719,7 +719,7 @@ export const Filters = () => {
             />
           </svg>
           {calendar.appliedFilterCount > 0 && (
-            <span className="absolute -top-[6px] -end-[6px] min-w-[18px] h-[18px] px-[4px] rounded-full bg-[#2B5CD3] text-white text-[11px] font-[600] leading-[18px] text-center">
+            <span className="absolute -top-[6px] -end-[6px] min-w-[18px] h-[18px] px-[4px] rounded-full bg-btnPrimary text-white text-[11px] font-[600] leading-[18px] text-center">
               {calendar.appliedFilterCount}
             </span>
           )}
@@ -777,7 +777,7 @@ export const Filters = () => {
           !drawerOpen && 'pointer-events-none'
         )}
       >
-        <div
+        <button type="button"
           className={clsx(
             'absolute inset-0 bg-black/50 transition-opacity duration-200',
             drawerOpen ? 'opacity-100' : 'opacity-0'
@@ -795,7 +795,7 @@ export const Filters = () => {
             <div className="flex items-center gap-[8px]">
               <div className="text-[16px] font-[600]">{t('filters', 'Filters')}</div>
               {calendar.appliedFilterCount > 0 && (
-                <span className="min-w-[20px] h-[20px] px-[6px] rounded-full bg-[#2B5CD3] text-white text-[11px] font-[600] flex items-center justify-center">
+                <span className="min-w-[20px] h-[20px] px-[6px] rounded-full bg-btnPrimary text-white text-[11px] font-[600] flex items-center justify-center">
                   {calendar.appliedFilterCount}
                 </span>
               )}
@@ -804,7 +804,7 @@ export const Filters = () => {
               type="button"
               aria-label={t('close', 'Close')}
               onClick={() => setDrawerOpen(false)}
-              className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-newTableText hover:bg-[#2B5CD3]/15 hover:text-textColor transition-all"
+              className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-newTableText hover:bg-btnPrimary/15 hover:text-textColor transition-all"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -834,7 +834,7 @@ export const Filters = () => {
                   {sectionHeader(t('date_range', 'Date range'))}
                   <div className="flex items-center gap-[10px]">
                     <div className="flex-1 border h-[42px] border-newTableBorder bg-newTableBorder gap-[1px] flex items-center rounded-[8px] overflow-hidden">
-                      <div
+                      <button type="button"
                         onClick={previous}
                         className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
                       >
@@ -853,13 +853,13 @@ export const Filters = () => {
                             strokeLinejoin="round"
                           />
                         </svg>
-                      </div>
+                      </button>
                       <div className="flex-1 text-center bg-newBgColorInner h-full flex items-center justify-center">
                         <div className="py-[3px] px-[9px] rounded-[5px] transition-all text-[14px]">
                           {getDisplayText()}
                         </div>
                       </div>
-                      <div
+                      <button type="button"
                         onClick={next}
                         className="cursor-pointer text-textColor rtl:rotate-180 px-[9px] bg-newBgColorInner h-full flex items-center justify-center hover:text-textItemFocused hover:bg-boxFocused"
                       >
@@ -878,14 +878,14 @@ export const Filters = () => {
                             strokeLinejoin="round"
                           />
                         </svg>
-                      </div>
+                      </button>
                     </div>
-                    <div
+                    <button type="button"
                       onClick={setToday}
                       className="shrink-0 hover:text-textItemFocused hover:bg-boxFocused h-[42px] px-[12px] flex justify-center items-center rounded-[8px] transition-all cursor-pointer text-[14px] font-[500] bg-newBgColorInner border border-newTableBorder"
                     >
                       {t('today', 'Today')}
-                    </div>
+                    </button>
                   </div>
                 </div>
 
@@ -894,7 +894,7 @@ export const Filters = () => {
                   {sectionHeader(t('window', 'Window'))}
                   <div className="flex w-full p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500]">
                     {(['day', 'week', 'month'] as const).map((mode) => (
-                      <div
+                      <button type="button"
                         key={mode}
                         className={clsx(
                           'flex-1 pt-[6px] pb-[5px] cursor-pointer text-center rounded-[6px]',
@@ -910,9 +910,9 @@ export const Filters = () => {
                         }}
                       >
                         {t(mode, mode.charAt(0).toUpperCase() + mode.slice(1))}
-                      </div>
+                      </button>
                     ))}
-                    <div
+                    <button type="button"
                       className={clsx(
                         'flex-1 pt-[6px] pb-[5px] cursor-pointer text-center rounded-[6px]',
                         showCustomPicker && 'text-textItemFocused bg-boxFocused'
@@ -926,7 +926,7 @@ export const Filters = () => {
                       }}
                     >
                       {t('custom', 'Custom')}
-                    </div>
+                    </button>
                   </div>
 
                   {showCustomPicker && (
@@ -990,7 +990,7 @@ export const Filters = () => {
                       value={calendar.contentSearch}
                       onChange={(e) => calendar.setContentSearch(e.target.value)}
                       placeholder={t('search_post_content', 'Search post content...')}
-                      className="w-full h-[38px] pl-[38px] pr-[10px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] text-textColor outline-none focus:border-[#2B5CD3]"
+                      className="w-full h-[38px] pl-[38px] pr-[10px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] text-textColor outline-none focus:border-btnPrimary"
                     />
                   </div>
                 </div>
@@ -1000,7 +1000,7 @@ export const Filters = () => {
                   {sectionHeader(t('media', 'Media'), 'media')}
                   <div className="flex w-full p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500]">
                     {mediaTypeOptions.map((option) => (
-                      <div
+                      <button type="button"
                         key={option.value}
                         onClick={() => calendar.setMediaTypeFilter(option.value)}
                         className={clsx(
@@ -1010,7 +1010,7 @@ export const Filters = () => {
                         )}
                       >
                         {option.label}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1045,7 +1045,7 @@ export const Filters = () => {
                   {sectionHeader(t('status', 'Status'), 'status')}
                   <div className="flex w-full p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500]">
                     {listStateOptions.map((option) => (
-                      <div
+                      <button type="button"
                         key={option.value}
                         onClick={setListStateFilter(option.value)}
                         className={clsx(
@@ -1055,7 +1055,7 @@ export const Filters = () => {
                         )}
                       >
                         {option.label}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1096,7 +1096,7 @@ export const Filters = () => {
                     type="checkbox"
                     checked={calendar.recurringOnly}
                     onChange={(e) => calendar.setRecurringOnly(e.target.checked)}
-                    className="w-[16px] h-[16px] accent-[#2B5CD3]"
+                    className="w-[16px] h-[16px] accent-btnPrimary"
                   />
                   {t('recurring_only', 'Recurring posts only')}
                 </label>
@@ -1113,7 +1113,7 @@ export const Filters = () => {
                   {sectionHeader(t('engagement', 'Engagement'), 'engagement')}
                   <div className="flex flex-row flex-wrap gap-[8px] text-[14px] font-[500]">
                     {engagementFilterOptions.map((option) => (
-                      <div
+                      <button type="button"
                         key={option.value}
                         onClick={setEngagementFilter(option.value)}
                         className={clsx(
@@ -1124,7 +1124,7 @@ export const Filters = () => {
                         )}
                       >
                         {option.label}
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -1144,7 +1144,7 @@ export const Filters = () => {
                     type="checkbox"
                     checked={calendar.unreadOnly}
                     onChange={(e) => calendar.setUnreadOnly(e.target.checked)}
-                    className="w-[16px] h-[16px] accent-[#2B5CD3]"
+                    className="w-[16px] h-[16px] accent-btnPrimary"
                   />
                   {t('unread_comments_only', 'Unread replies only')}
                 </label>
@@ -1230,7 +1230,7 @@ export const Filters = () => {
               type="button"
               onClick={clearAll}
               disabled={calendar.appliedFilterCount === 0}
-              className="flex-1 h-[40px] rounded-[8px] border border-newTableBorder text-[14px] font-[500] text-textColor hover:bg-[#2B5CD3]/10 transition-all disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
+              className="flex-1 h-[40px] rounded-[8px] border border-newTableBorder text-[14px] font-[500] text-textColor hover:bg-btnPrimary/10 transition-all disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
             >
               {calendar.appliedFilterCount > 0
                 ? t('clear_all_count', 'Clear all ({{count}})', {
@@ -1241,7 +1241,7 @@ export const Filters = () => {
             <button
               type="button"
               onClick={() => setDrawerOpen(false)}
-              className="flex-1 h-[40px] rounded-[8px] bg-[#2B5CD3] text-white text-[14px] font-[600] hover:opacity-90 transition-all"
+              className="flex-1 h-[40px] rounded-[8px] bg-btnPrimary text-white text-[14px] font-[600] hover:opacity-90 transition-all"
             >
               {t('done', 'Done')}
             </button>

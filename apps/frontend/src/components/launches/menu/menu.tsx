@@ -21,7 +21,7 @@ import {
 } from '@gitroom/frontend/components/launches/calendar.context';
 import { BotPicture } from '@gitroom/frontend/components/launches/bot.picture';
 import { CustomerModal } from '@gitroom/frontend/components/launches/customer.modal';
-import { Integration } from '@prisma/client';
+import type { Integration } from '@prisma/client';
 import { SettingsModal } from '@gitroom/frontend/components/launches/settings.modal';
 import { CustomVariables } from '@gitroom/frontend/components/launches/add.provider.component';
 import { useRouter } from 'next/navigation';
@@ -64,7 +64,7 @@ export const Menu: FC<{
   const modal = useModals();
   const [show, setShow] = useState<false | { x: number; y: number }>(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const ref = useClickOutside<HTMLDivElement>(() => {
+  const ref = useClickOutside<HTMLButtonElement>(() => {
     setShow(false);
   });
   const showRef = useRef(undefined);
@@ -92,7 +92,7 @@ export const Menu: FC<{
   const findIntegration: any = useMemo(() => {
     return integrations.find((integration) => integration.id === id);
   }, [integrations, id]);
-  const changeShow: MouseEventHandler<HTMLDivElement> = useCallback(
+  const changeShow: MouseEventHandler<HTMLButtonElement> = useCallback(
     (e) => {
       e.stopPropagation();
       // @ts-ignore
@@ -309,6 +309,7 @@ export const Menu: FC<{
     setShow(false);
   }, [integrations, t, id, modal, mutate, toast]);
   const updateCredentials = useCallback(() => {
+    if (!findIntegration) return;
     modal.openModal({
       title: t('custom_url', 'Custom URL'),
       withCloseButton: false,
@@ -326,11 +327,16 @@ export const Menu: FC<{
   }, [t, findIntegration, modal, router]);
 
   return (
-    <div
-      className="cursor-pointer relative select-none flex"
-      onClick={changeShow}
-      ref={ref}
-    >
+    <div className="relative flex">
+      <button
+        type="button"
+        ref={ref}
+        className="cursor-pointer relative select-none flex bg-transparent border-0 p-0"
+        onClick={changeShow}
+        aria-label={t('channel_menu', 'Channel menu')}
+        aria-haspopup="menu"
+        aria-expanded={!!show}
+      >
       <svg
         xmlns="http://www.w3.org/2000/svg"
         width="24"
@@ -347,17 +353,22 @@ export const Menu: FC<{
       <div>
         <div ref={showRef} />
       </div>
+      </button>
       {show && (
         <div
           ref={menuRef}
-          onClick={(e) => e.stopPropagation()}
           style={{ left: show.x, top: show.y }}
           className={`fixed p-[12px] bg-newBgColorInner shadow-menu flex flex-col gap-[16px] z-[100] rounded-[8px] border border-newTableBorder text-nowrap`}
+          role="menu"
         >
           {canDisable && !findIntegration?.refreshNeeded && (
-            <div
-              className="flex gap-[12px] items-center py-[8px] px-[10px]"
-              onClick={createPost(findIntegration!)}
+            <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
+              onClick={() => {
+                if (!findIntegration) return;
+                createPost(findIntegration)();
+              }}
             >
               <div>
                 <svg
@@ -376,11 +387,12 @@ export const Menu: FC<{
               <div className="text-[14px]">
                 {t('create_new_post', 'Create a new post')}
               </div>
-            </div>
+            </button>
           )}
-          <div
-            className="flex gap-[12px] items-center py-[8px] px-[10px]"
-            onClick={copyChannelId(findIntegration)}
+          <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
+              onClick={copyChannelId(findIntegration)}
           >
             <div>
               <svg
@@ -405,13 +417,14 @@ export const Menu: FC<{
               </svg>
             </div>
             <div className="text-[14px]">{t('copy_id', 'Copy Channel ID')}</div>
-          </div>
+          </button>
           {canDisable &&
             findIntegration?.refreshNeeded &&
             !findIntegration.customFields && (
-              <div
-                className="flex gap-[12px] items-center py-[8px] px-[10px]"
-                onClick={refreshChannel(findIntegration!)}
+              <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
+              onClick={refreshChannel(findIntegration!)}
               >
                 <div>
                   <svg
@@ -430,11 +443,12 @@ export const Menu: FC<{
                 <div className="text-[14px]">
                   {t('reconnect_channel', 'Reconnect channel')}
                 </div>
-              </div>
+              </button>
             )}
           {!!findIntegration?.isCustomFields && (
-            <div
-              className="flex gap-[12px] items-center py-[8px] px-[10px]"
+            <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
               onClick={updateCredentials}
             >
               <div>
@@ -454,11 +468,12 @@ export const Menu: FC<{
               <div className="text-[14px]">
                 {t('update_credentials', 'Update Credentials')}
               </div>
-            </div>
+            </button>
           )}
           {findIntegration?.additionalSettings !== '[]' && (
-            <div
-              className="flex gap-[12px] items-center py-[8px] px-[10px]"
+            <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
               onClick={additionalSettings}
             >
               <div>
@@ -478,11 +493,12 @@ export const Menu: FC<{
               <div className="text-[14px]">
                 {t('additional_settings', 'Additional Settings')}
               </div>
-            </div>
+            </button>
           )}
           {(canChangeProfilePicture || canChangeNickName) && (
-            <div
-              className="flex gap-[12px] items-center py-[8px] px-[10px]"
+            <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
               onClick={changeBotPicture}
             >
               <div>
@@ -508,11 +524,12 @@ export const Menu: FC<{
                   .filter((f) => f)
                   .join(' / ')}
               </div>
-            </div>
+            </button>
           )}
-          <div
-            className="flex gap-[12px] items-center py-[8px] px-[10px]"
-            onClick={addToCustomer}
+          <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
+              onClick={addToCustomer}
           >
             <div>
               <svg
@@ -531,10 +548,11 @@ export const Menu: FC<{
             <div className="text-[14px]">
               {t('move_add_to_group', 'Move / add to group')}
             </div>
-          </div>
-          <div
-            className="flex gap-[12px] items-center py-[8px] px-[10px]"
-            onClick={editTimeTable}
+          </button>
+          <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
+              onClick={editTimeTable}
           >
             <div>
               <svg
@@ -553,10 +571,11 @@ export const Menu: FC<{
             <div className="text-[14px]">
               {t('edit_time_slots', 'Edit Time Slots')}
             </div>
-          </div>
+          </button>
           {canEnable && (
-            <div
-              className="flex gap-[12px] items-center py-[8px] px-[10px]"
+            <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
               onClick={enableChannel}
             >
               <div>
@@ -576,12 +595,13 @@ export const Menu: FC<{
               <div className="text-[14px]">
                 {t('enable_channel', 'Enable Channel')}
               </div>
-            </div>
+            </button>
           )}
 
           {canDisable && (
-            <div
-              className="flex gap-[12px] items-center py-[8px] px-[10px]"
+            <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
               onClick={disableChannel}
             >
               <div>
@@ -601,12 +621,13 @@ export const Menu: FC<{
               <div className="text-[14px]">
                 {t('disable_channel', 'Disable Channel')}
               </div>
-            </div>
+            </button>
           )}
 
-          <div
-            className="flex gap-[12px] items-center py-[8px] px-[10px]"
-            onClick={deleteChannel}
+          <button
+              type="button"
+              className="flex gap-[12px] items-center py-[8px] px-[10px] text-left bg-transparent border-0 text-textColor w-full"
+              onClick={deleteChannel}
           >
             <div>
               <svg
@@ -623,7 +644,7 @@ export const Menu: FC<{
               </svg>
             </div>
             <div className="text-[14px]">{t('delete', 'Delete')}</div>
-          </div>
+          </button>
         </div>
       )}
     </div>

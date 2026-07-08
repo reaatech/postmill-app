@@ -1,3 +1,5 @@
+'use client';
+
 import { FC, ReactNode } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
@@ -43,13 +45,18 @@ export const TopTitle: FC<{
         )}
         {children}
         {shouldExpend !== undefined && (
-          <div className="cursor-pointer">
-            {!shouldExpend ? (
-              <ExpandIcon onClick={expend} className="text-white" />
+          <button
+            type="button"
+            aria-label={shouldExpend ? 'Collapse' : 'Expand'}
+            onClick={shouldExpend ? collapse : expend}
+            className="cursor-pointer"
+          >
+            {shouldExpend ? (
+              <CollapseIcon className="text-textColor" />
             ) : (
-              <CollapseIcon onClick={collapse} className="text-white" />
+              <ExpandIcon className="text-textColor" />
             )}
-          </div>
+          </button>
         )}
       </div>
     </div>

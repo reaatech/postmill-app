@@ -55,7 +55,7 @@ const AiBestTimeModal: FC<{ close: () => void }> = (props) => {
           <button
             onClick={loadBestTime}
             disabled={loading}
-            className="cursor-pointer text-white disabled:opacity-80 disabled:cursor-not-allowed w-full h-[42px] px-[20px] items-center justify-center bg-[#2B5CD3] flex rounded-[6px]"
+            className="cursor-pointer text-white disabled:opacity-80 disabled:cursor-not-allowed w-full h-[42px] px-[20px] items-center justify-center bg-btnPrimary flex rounded-[6px]"
           >
             {loading ? (
               <Loading height={16} width={16} type="spin" color="#fff" />
@@ -117,7 +117,8 @@ export const AiBestTime: FC = () => {
 
   return (
     <div className="relative">
-      <div
+      <button
+        type="button"
         onClick={openModal}
         className={clsx(
           'cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
@@ -164,7 +165,7 @@ export const AiBestTime: FC = () => {
             {t('best_times', 'Best Times')}
           </div>
         </div>
-      </div>
+      </button>
     </div>
   );
 };

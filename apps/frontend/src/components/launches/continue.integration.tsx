@@ -266,11 +266,11 @@ export const ContinueIntegration: FC<{
   // Success state for non-logged users without returnURL
   if (successState) {
     return (
-      <div className="flex flex-1 items-center justify-center text-white relative overflow-hidden">
+      <div className="flex flex-1 items-center justify-center text-textColor relative overflow-hidden">
         {/* Background gradient decoration */}
         <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
+          <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-btnPrimary rounded-full blur-[120px]" />
+          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-ai rounded-full blur-[120px]" />
         </div>
 
         <div className="relative z-10 text-center">
@@ -305,16 +305,16 @@ export const ContinueIntegration: FC<{
   // Show the two-step selection UI
   if (twoStepState && Provider) {
     return (
-      <div className="flex flex-1 items-center justify-center text-white relative overflow-hidden">
+      <div className="flex flex-1 items-center justify-center text-textColor relative overflow-hidden">
         {/* Background gradient decoration */}
         <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
+          <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-btnPrimary rounded-full blur-[120px]" />
+          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-ai rounded-full blur-[120px]" />
         </div>
 
         {/* Content */}
         <div className="relative z-10 w-full max-w-[550px] mx-auto px-[20px]">
-          <div className="bg-[#1A1919] rounded-[16px] p-[32px] flex flex-col gap-[24px]">
+          <div className="bg-newBgColorInner rounded-[16px] p-[32px] flex flex-col gap-[24px]">
             <div className="flex flex-col gap-[8px] text-center">
               <h1 className="text-[24px] font-semibold">
                 {t('configure_your_channel', 'Configure Your Channel')}
@@ -363,11 +363,11 @@ export const ContinueIntegration: FC<{
 
   if (error) {
     return (
-      <div className="flex flex-1 items-center justify-center text-white relative overflow-hidden">
+      <div className="flex flex-1 items-center justify-center text-textColor relative overflow-hidden">
         {/* Background gradient decoration */}
         <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
+          <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-btnPrimary rounded-full blur-[120px]" />
+          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-ai rounded-full blur-[120px]" />
         </div>
 
         <div className="relative z-10 text-center">
@@ -402,11 +402,11 @@ export const ContinueIntegration: FC<{
 
   // Loading state
   return (
-    <div className="flex flex-1 items-center justify-center text-white relative overflow-hidden">
+    <div className="flex flex-1 items-center justify-center text-textColor relative overflow-hidden">
       {/* Background gradient decoration */}
       <div className="absolute inset-0 opacity-30">
-        <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-        <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
+        <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-btnPrimary rounded-full blur-[120px]" />
+        <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-ai rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 text-center">
@@ -418,7 +418,7 @@ export const ContinueIntegration: FC<{
         </div>
         {/* Loading spinner */}
         <div className="mt-[32px] flex justify-center">
-          <div className="w-[48px] h-[48px] border-[3px] border-[#2B5CD3] border-t-transparent rounded-full animate-spin" />
+          <div className="w-[48px] h-[48px] border-[3px] border-btnPrimary border-t-transparent rounded-full animate-spin" />
         </div>
       </div>
     </div>
