@@ -82,7 +82,8 @@ export class IntegrationTriggerTool implements AgentToolInterface {
 
         const integrationProvider =
           this._integrationManager.getSocialIntegrationUnchecked(
-            getIntegration.providerIdentifier
+            getIntegration.providerIdentifier,
+            getIntegration.providerVersion ?? undefined
           )!;
 
         if (!integrationProvider) {

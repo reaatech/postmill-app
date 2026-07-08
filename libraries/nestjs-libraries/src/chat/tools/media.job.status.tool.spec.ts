@@ -79,7 +79,7 @@ describe('MediaJobStatusTool', () => {
       access: { mode: 'user' },
     });
 
-    expect(lifecycle.getJob).toHaveBeenCalledWith('job-3');
+    expect(lifecycle.getJob).toHaveBeenCalledWith('job-3', org.id);
     expect(Array.isArray(result)).toBe(true);
     expect(result).toEqual([
       {

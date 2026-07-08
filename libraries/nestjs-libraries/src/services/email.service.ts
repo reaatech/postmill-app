@@ -147,9 +147,9 @@ export class EmailService {
         });
 
         if (result.providerMessageId) {
-          await this._emailLogService.markSent(log.id, result.providerMessageId);
+          await this._emailLogService.markSent(log.id, result.providerMessageId, log.organizationId ?? null);
         } else {
-          await this._emailLogService.markSent(log.id, 'no-id');
+          await this._emailLogService.markSent(log.id, 'no-id', log.organizationId ?? null);
         }
 
         return;
@@ -167,7 +167,7 @@ export class EmailService {
 
     const errorMsg = (lastErr as Error)?.message || 'Unknown error';
     this._logger.warn(`Email failed after 3 attempts for recipient ${this._redactedId(to)}: ${errorMsg}`);
-    await this._emailLogService.markFailed(log.id, errorMsg);
+    await this._emailLogService.markFailed(log.id, errorMsg, log.organizationId ?? null);
     throw lastErr;
   }
 

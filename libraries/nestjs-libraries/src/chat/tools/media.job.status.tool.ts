@@ -68,10 +68,10 @@ export class MediaJobStatusTool implements AgentToolInterface {
         }
 
         if (inputData.jobId) {
-          const job = await this._lifecycle.getJob(inputData.jobId);
+          const job = await this._lifecycle.getJob(inputData.jobId, org.id);
           // getJob does a findUnique with no org filter — enforce ownership
           // here. Identical response for missing vs foreign (no existence oracle).
-          if (!job || (job as any).organizationId !== org.id) {
+          if (!job || job.organizationId !== org.id) {
             return { error: `Job ${inputData.jobId} not found` };
           }
           return [

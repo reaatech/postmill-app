@@ -212,7 +212,7 @@ export class MediaStudioService {
         return { jobId: job.id };
       }
 
-      await this._lifecycle.attachProviderJob(job.id, submit.jobId);
+      await this._lifecycle.attachProviderJob(job.id, submit.jobId, orgId);
       return { jobId: job.id };
     } catch (err) {
       await this._lifecycle.failJob(job, (err as Error).message, { notify: false });

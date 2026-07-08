@@ -76,13 +76,17 @@ export class HeyGenService {
 
   // ── Credentials ──
 
-  private async _getApiKey(orgId: string): Promise<string> {
+  private async _getConfig(orgId: string): Promise<{ key: string; version: string }> {
     const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, 'heygen');
     const key = config?.credentials?.apiKey || config?.credentials?.key || config?.credentials?.token;
     if (!key) {
       throw new ForbiddenException('HeyGen is not configured. Add an API key in Settings → Media.');
     }
-    return key;
+    return { key, version: config?.version ?? 'v1' };
+  }
+
+  private async _getApiKey(orgId: string): Promise<string> {
+    return (await this._getConfig(orgId)).key;
   }
 
   private _headers(apiKey: string): Record<string, string> {
@@ -172,7 +176,7 @@ export class HeyGenService {
       throw new ForbiddenException('At least one scene is required');
     }
 
-    const apiKey = await this._getApiKey(orgId);
+    const { key: apiKey, version } = await this._getConfig(orgId);
     const videoInputs = await Promise.all(
       params.scenes.map((scene) => this._buildVideoInput(orgId, scene)),
     );
@@ -184,6 +188,7 @@ export class HeyGenService {
       provider: 'heygen',
       operation: 'avatar',
       model: 'heygen',
+      version,
       folderId: params.folderId,
       inputJson: JSON.stringify({ scenes: params.scenes, dimension: params.dimension, title: params.title }),
     });
@@ -210,7 +215,7 @@ export class HeyGenService {
         throw new Error(msg || 'HeyGen returned no video id');
       }
 
-      await this._lifecycle.attachProviderJob(job.id, `video:${videoId}`);
+      await this._lifecycle.attachProviderJob(job.id, `video:${videoId}`, orgId);
       return { jobId: job.id };
     } catch (err) {
       await this._lifecycle.failJob(job, (err as Error).message, { notify: false });
@@ -259,7 +264,7 @@ export class HeyGenService {
     userId: string,
     params: { voiceId: string; text: string; folderId?: string | null },
   ): Promise<{ jobId: string }> {
-    const apiKey = await this._getApiKey(orgId);
+    const { key: apiKey, version } = await this._getConfig(orgId);
 
     const job = await this._lifecycle.createPendingJob({
       organizationId: orgId,
@@ -267,6 +272,7 @@ export class HeyGenService {
       provider: 'heygen',
       operation: 'audio',
       model: 'heygen',
+      version,
       folderId: params.folderId,
       inputJson: JSON.stringify({ voiceId: params.voiceId, text: params.text }),
     });
@@ -282,7 +288,7 @@ export class HeyGenService {
       const audioId = body.data?.audio_id || body.data?.id;
       if (!audioId) throw new Error('HeyGen returned no audio id');
 
-      await this._lifecycle.attachProviderJob(job.id, `tts:${audioId}`);
+      await this._lifecycle.attachProviderJob(job.id, `tts:${audioId}`, orgId);
       return { jobId: job.id };
     } catch (err) {
       await this._lifecycle.failJob(job, (err as Error).message, { notify: false });
@@ -314,7 +320,7 @@ export class HeyGenService {
     params: { fileId?: string; url?: string; languages: string[]; folderId?: string | null },
   ): Promise<{ jobs: Array<{ language: string; jobId: string }> }> {
     if (!params.languages?.length) throw new ForbiddenException('Pick at least one language');
-    const apiKey = await this._getApiKey(orgId);
+    const { key: apiKey, version } = await this._getConfig(orgId);
     const sourceUrl = params.url || (params.fileId ? await this._resolvePublicUrl(orgId, params.fileId) : null);
     if (!sourceUrl) throw new ForbiddenException('A source video is required');
 
@@ -326,6 +332,7 @@ export class HeyGenService {
         provider: 'heygen',
         operation: 'video',
         model: 'heygen',
+        version,
         folderId: params.folderId,
         inputJson: JSON.stringify({ source: sourceUrl, language }),
       });
@@ -339,7 +346,7 @@ export class HeyGenService {
         const body = (await res.json()) as { data?: { video_translate_id?: string } };
         const id = body.data?.video_translate_id;
         if (!id) throw new Error('HeyGen returned no translation id');
-        await this._lifecycle.attachProviderJob(job.id, `translate:${id}`);
+        await this._lifecycle.attachProviderJob(job.id, `translate:${id}`, orgId);
         jobs.push({ language, jobId: job.id });
       } catch (err) {
         await this._lifecycle.failJob(job, (err as Error).message, { notify: false });
@@ -436,7 +443,7 @@ export class HeyGenService {
   // Drive completion by polling so jobs finish even where no public webhook can reach
   // this instance (local dev / private deploys). processJob is a no-op once terminal.
   async getJob(orgId: string, jobId: string) {
-    const existing = await this._aiSettings.getMediaJobById(jobId);
+    const existing = await this._aiSettings.getMediaJobById(orgId, jobId);
     if (!existing || existing.organizationId !== orgId) {
       throw new ForbiddenException('Job not found');
     }
@@ -447,7 +454,7 @@ export class HeyGenService {
         // Transient poll failure — leave pending for the next poll/sweep.
       }
     }
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    const job = await this._aiSettings.getMediaJobById(orgId, jobId);
     if (!job || job.organizationId !== orgId) throw new ForbiddenException('Job not found');
     return this._presentJob(orgId, job);
   }

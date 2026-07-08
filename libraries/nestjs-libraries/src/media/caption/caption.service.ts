@@ -120,7 +120,7 @@ export class CaptionService {
       );
       if (!ok) throw new Error('Failed to store captioned video');
 
-      const finished = await this._lifecycle.getJob(job.id);
+      const finished = await this._lifecycle.getJob(job.id, orgId);
       return finished?.artifactUrl || job.id;
     } catch (err) {
       await this._lifecycle.failJob(job, (err as Error).message);

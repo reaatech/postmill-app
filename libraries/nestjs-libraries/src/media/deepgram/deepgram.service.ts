@@ -114,12 +114,14 @@ export class DeepgramService {
     userId: string | undefined,
     params: { text: string; segments?: TranscriptSegment[] },
   ): Promise<{ jobId: string; path: string }> {
+    const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, 'deepgram');
     const job = await this._lifecycle.createPendingJob({
       organizationId: orgId,
       userId,
       provider: 'deepgram',
       operation: 'stt',
       model: 'deepgram',
+      version: config?.version ?? 'v1',
       inputJson: JSON.stringify({ operation: 'stt', segments: params.segments?.length ?? 0 }),
     });
     const ok = await this._lifecycle.completeJobWithBuffer(
@@ -129,7 +131,7 @@ export class DeepgramService {
       { provider: 'deepgram', ...(params.segments ? { segments: params.segments } : {}) },
     );
     if (!ok) throw new ForbiddenException('Failed to store transcript');
-    const stored = await this._aiSettings.getMediaJobById(job.id);
+    const stored = await this._aiSettings.getMediaJobById(orgId, job.id);
     return { jobId: job.id, path: stored?.artifactUrl ?? '' };
   }
 
