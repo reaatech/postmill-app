@@ -36,7 +36,7 @@ const eslintConfig = [
       'react/display-name': 'off',                                 // ~80 anonymous component exports
       '@typescript-eslint/ban-ts-comment': 'off',                  // ~120 ts-ignore/ts-expect-error comments
       '@typescript-eslint/no-empty-object-type': 'off',            // ~60 empty interfaces used as extension points
-      '@typescript-eslint/prefer-as-const': 'off',                 // ~40 literal type vs const assertions
+      '@typescript-eslint/prefer-as-const': 'error',               // ~40 literal type vs const assertions
       '@typescript-eslint/no-non-null-asserted-optional-chain': 'off', // ~30 occurrences
       // React Compiler rule: 108 occurrences across 42 frontend files. Each fix
       // requires careful dependency review to avoid breaking memoization semantics.

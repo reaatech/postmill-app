@@ -113,6 +113,10 @@ export class CommentsActivity {
       1000
     );
 
+    // Idempotent-retry choice: the entire prune runs inside one durable step.run
+    // ('prune-comments' in the Inngest function). Batching by 1000 keeps each
+    // soft-delete call bounded; softDeleteCommentsByIds is idempotent, so a retry
+    // after a partial batch simply re-deletes the same ids and continues.
     while (batch.length > 0) {
       await this._socialCommentsService.softDeleteCommentsByIds(
         batch.map((r) => r.id),

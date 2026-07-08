@@ -122,7 +122,7 @@ abstract class BaseGuardrail implements Guardrail<string, string> {
 class PromptInjectionGuard extends BaseGuardrail {
   readonly id = 'prompt-injection';
   readonly name = 'Prompt Injection Detection';
-  override readonly type: 'input' = 'input';
+  override readonly type = 'input' as const;
 
   constructor(config: GuardrailEntry) {
     super('input', config);
@@ -144,7 +144,7 @@ class PromptInjectionGuard extends BaseGuardrail {
 class PIIScanningGuard extends BaseGuardrail {
   readonly id = 'pii-scanning';
   readonly name = 'PII Scanning';
-  override readonly type: 'input' = 'input';
+  override readonly type = 'input' as const;
 
   constructor(config: GuardrailEntry) {
     super('input', config);
@@ -164,7 +164,7 @@ class PIIScanningGuard extends BaseGuardrail {
 class ModerationPolicyGuard extends BaseGuardrail {
   readonly id = 'moderation-policies';
   readonly name = 'Moderation Policies';
-  override readonly type: 'input' = 'input';
+  override readonly type = 'input' as const;
 
   constructor(config: GuardrailEntry) {
     super('input', config);
@@ -190,7 +190,7 @@ class ModerationPolicyGuard extends BaseGuardrail {
 class ContentPolicyGuard extends BaseGuardrail {
   readonly id = 'content-policy';
   readonly name = 'Content Policy';
-  override readonly type: 'output' = 'output';
+  override readonly type = 'output' as const;
 
   constructor(config: GuardrailEntry) {
     super('output', config);
@@ -216,7 +216,7 @@ class ContentPolicyGuard extends BaseGuardrail {
 class BrandSafetyGuard extends BaseGuardrail {
   readonly id = 'brand-safety';
   readonly name = 'Brand Safety';
-  override readonly type: 'output' = 'output';
+  override readonly type = 'output' as const;
 
   constructor(config: GuardrailEntry) {
     super('output', config);
@@ -239,7 +239,7 @@ class BrandSafetyGuard extends BaseGuardrail {
 class NSFWDetectionGuard extends BaseGuardrail {
   readonly id = 'nsfw-detection';
   readonly name = 'NSFW Detection';
-  override readonly type: 'output' = 'output';
+  override readonly type = 'output' as const;
 
   constructor(config: GuardrailEntry) {
     super('output', config);

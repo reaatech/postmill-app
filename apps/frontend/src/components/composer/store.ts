@@ -151,7 +151,7 @@ const initialState = {
   postComment: PostComment.ALL,
   tags: [] as { label: string; value: string }[],
   totalChars: 0,
-  tab: 0 as 0,
+  tab: 0 as const,
   isCreateSet: false,
   current: 'global',
   locked: false,
