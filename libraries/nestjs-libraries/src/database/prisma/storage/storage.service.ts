@@ -718,7 +718,7 @@ export class StorageService {
       }
       seen.add(currentId);
 
-      const folder = await this._storageRepository.findFolderWithProvider(currentId);
+      const folder = await this._storageRepository.findFolderWithProvider(currentId, orgId);
       if (!folder) break;
       if (folder.organizationId !== orgId) {
         throw new HttpException('Folder not found', 404);

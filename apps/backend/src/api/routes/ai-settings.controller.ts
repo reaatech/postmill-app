@@ -60,19 +60,6 @@ import {
 @Controller('/admin/ai-settings')
 @UseGuards(SuperAdminGuard, OrgRbacGuard)
 export class AiSettingsController {
-  private readonly SENSITIVE_KEY_PATTERNS = [
-    'apikey',
-    'api_key',
-    'secret',
-    'password',
-    'token',
-    'credential',
-    'authorization',
-    'bearer',
-    'privatekey',
-    'private_key',
-  ];
-
   constructor(
     private _aiSettingsService: AiSettingsService,
     private _aiSettingsManager: AiSettingsManager,
@@ -120,104 +107,11 @@ export class AiSettingsController {
     return out;
   }
 
-  private _aiVersionMeta(identifier: string, preferredVersion?: string) {
-    const manifests = this._kernel?.versions('ai', identifier) ?? [];
-    const selected = preferredVersion
-      ? manifests.find((m) => m.version === preferredVersion)
-      : this._kernel?.latestActive('ai', identifier)?.manifest;
-    const fallback = manifests[0];
-    const target = selected ?? fallback;
-
-    return {
-      version: target?.version ?? preferredVersion ?? DEFAULT_VERSION,
-      status: target?.status ?? 'active',
-      availableVersions: manifests.map((m) => ({
-        version: m.version,
-        status: m.status,
-        credentialFields: m.credentialFields,
-      })),
-      credentialFields: target?.credentialFields,
-    };
-  }
-
-  private _isSensitiveKey(key: string) {
-    const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return this.SENSITIVE_KEY_PATTERNS.some((pattern) =>
-      normalized.includes(pattern.replace(/[^a-z0-9]/g, '')),
-    );
-  }
-
-  private _redactSensitive(value: any): any {
-    if (Array.isArray(value)) {
-      return value.map((item) => this._redactSensitive(item));
-    }
-    if (!value || typeof value !== 'object') {
-      return value;
-    }
-
-    return Object.entries(value).reduce((acc, [key, item]) => {
-      acc[key] = this._isSensitiveKey(key)
-        ? '[REDACTED]'
-        : this._redactSensitive(item);
-      return acc;
-    }, {} as Record<string, any>);
-  }
-
-  private _safeJson(raw: any) {
-    if (!raw) return null;
-    if (typeof raw !== 'string') return this._redactSensitive(raw);
-    try {
-      return this._redactSensitive(JSON.parse(raw));
-    } catch {
-      return '[REDACTED_UNPARSEABLE_CONFIG]';
-    }
-  }
-
-  private _isProviderConfigured(
-    adapter: AIProviderAdapter | undefined,
-    config: Awaited<ReturnType<AiSettingsService['getProviderConfigByIdentifier']>>,
-  ) {
-    if (!adapter || !config) return false;
-
-    try {
-      const decrypted = this._aiSettingsService.decryptProviderConfig(config);
-      const credentials = decrypted.credentials || {};
-      return adapter.credentialFields
-        .filter((field) => field.required)
-        .every((field) => {
-          const value = credentials[field.key];
-          return typeof value === 'string' && value.trim().length > 0;
-        });
-    } catch {
-      return false;
-    }
-  }
-
   @Get('/providers')
   @RequirePermission('ai-config', 'manage')
   async listProviders(@GetUserFromRequest() user: User) {
     this._assertSuperAdmin(user);
-    const adapters = this._listAdapters();
-    const dbConfigs = await this._aiSettingsService.getProviderConfigs();
-    const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
-
-    return adapters.map((adapter) => {
-      const dbConfig = dbConfigMap.get(adapter.identifier);
-      const isConfigured = this._isProviderConfigured(adapter, dbConfig);
-      const meta = this._aiVersionMeta(adapter.identifier);
-
-      return {
-        identifier: adapter.identifier,
-        name: adapter.name,
-        type: adapter.type,
-        capabilities: adapter.capabilities,
-        privacy: adapter.privacy,
-        enabled: dbConfig?.enabled || false,
-        isConfigured,
-        credentialFields: meta.credentialFields ?? adapter.credentialFields,
-        ...meta,
-      };
-    });
+    return this._aiSettingsService.listProviderCatalog();
   }
 
   @Get('/providers/:identifier')
@@ -232,7 +126,7 @@ export class AiSettingsController {
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     const config = await this._aiSettingsService.getProviderConfigByIdentifier(identifier);
-    const isConfigured = this._isProviderConfigured(adapter, config);
+    const isConfigured = this._aiSettingsService.isProviderConfigured(adapter, config);
 
     let creds: Record<string, string> = {};
     if (config) {
@@ -242,7 +136,7 @@ export class AiSettingsController {
       } catch { /* use empty creds */ }
     }
     const models = await adapter.listModels(creds);
-    const meta = this._aiVersionMeta(identifier, version);
+    const meta = this._aiSettingsService.getProviderVersionMeta(identifier, version);
 
     return {
       identifier: adapter.identifier,
@@ -255,7 +149,7 @@ export class AiSettingsController {
       isConfigured,
       defaultModel: config?.defaultModel || '',
       reasoningModel: config?.reasoningModel || '',
-      extraConfig: this._safeJson(config?.extraConfig),
+      extraConfig: this._aiSettingsService.safeJson(config?.extraConfig),
       models,
       ...meta,
     };
@@ -370,7 +264,7 @@ export class AiSettingsController {
     if (!body.model) throw new BadRequestException('model is required');
 
     const config = await this._aiSettingsService.getProviderConfigByIdentifier(providerId);
-    if (!config?.enabled || !this._isProviderConfigured(adapter, config)) {
+    if (!config?.enabled || !this._aiSettingsService.isProviderConfigured(adapter, config)) {
       throw new BadRequestException(
         'Provider must be enabled and configured before it can be activated',
       );
@@ -556,7 +450,7 @@ export class AiSettingsController {
     await this._aiSettingsService.createAuditLog({
       userId: user.id,
       action: 'update-rag',
-      detail: JSON.stringify(this._redactSensitive(rag)),
+      detail: JSON.stringify(this._aiSettingsService.redactSensitive(rag)),
     });
     await this._aiSettingsManager.refreshCache();
 
@@ -585,7 +479,7 @@ export class AiSettingsController {
 
     return adapters.map((adapter) => {
       const dbConfig = dbConfigMap.get(adapter.identifier);
-      const isConfigured = this._isProviderConfigured(adapter, dbConfig);
+      const isConfigured = this._aiSettingsService.isProviderConfigured(adapter, dbConfig);
 
       const hasImage =
         typeof adapter.createImageModel === 'function' ||
@@ -725,7 +619,7 @@ export class AiSettingsController {
       enabled: c.enabled,
       defaultModel: c.defaultModel,
       reasoningModel: c.reasoningModel,
-      extraConfig: this._safeJson(c.extraConfig),
+      extraConfig: this._aiSettingsService.safeJson(c.extraConfig),
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     }));

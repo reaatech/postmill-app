@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "test": "vitest run",
     "release": "tsup && pnpm publish --access public",
     "release:dry": "tsup && pnpm publish --access public --dry-run --no-git-checks"
   },
@@ -22,8 +23,13 @@
   ],
   "author": "Nevo David",
   "license": "AGPL-3.0",
-  "dependencies": {},
+  "dependencies": {
+    "@gitroom/nestjs-libraries": "workspace:*"
+  },
   "devDependencies": {
-    "tsup": "^8.5.1"
+    "@types/node": "^22.13.0",
+    "tsup": "^8.5.1",
+    "typescript": "5.5.4",
+    "vitest": "^4.1.0"
   }
 }

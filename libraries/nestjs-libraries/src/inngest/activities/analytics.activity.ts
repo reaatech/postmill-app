@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Integration } from '@prisma/client';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
@@ -29,6 +30,27 @@ import {
 import { getRetentionDays } from '@gitroom/nestjs-libraries/analytics/analytics-aggregation';
 
 dayjs.extend(isoWeek);
+
+// I-02: the fields required by the per-integration fan-out event and by
+// collectChannelSnapshotForIntegration. Matches the 'analytics/sync-integration'
+// Inngest event payload so the handler can pass event.data through directly.
+export interface ChannelSnapshotIntegrationRef {
+  id: string;
+  type: string;
+  disabled: boolean;
+  deletedAt: Date | null;
+  providerIdentifier: string;
+  providerVersion?: string | null;
+  internalId: string;
+  token: string;
+  tokenExpiration?: Date | null;
+  refreshToken: string;
+  name: string;
+  picture: string | null;
+  rootInternalId: string;
+  organizationId: string;
+  providerConfigId?: string | null;
+}
 
 const CHANNEL_DAYS_BACK = 7;
 const POST_SNAPSHOT_BATCH_SIZE = 500;
@@ -104,6 +126,19 @@ export class AnalyticsActivity {
     return orgs.map((o) => o.id);
   }
 
+  async getChannelSnapshotIntegrationIds(
+    orgId: string
+  ): Promise<ChannelSnapshotIntegrationRef[]> {
+    await this._orgProviderConfigManager.ensureFresh(orgId);
+
+    const integrations = await this._integrationService.getIntegrationsList(
+      orgId
+    );
+    return integrations.filter(
+      (i) => i.type === 'social' && !i.disabled && !i.deletedAt
+    ) as ChannelSnapshotIntegrationRef[];
+  }
+
   async collectChannelSnapshots(
     orgId: string,
     daysBack: number = CHANNEL_DAYS_BACK
@@ -118,82 +153,104 @@ export class AnalyticsActivity {
     );
 
     for (const integration of socialIntegrations) {
-      const provider = this._integrationManager.getSocialIntegrationUnchecked(
-        integration.providerIdentifier,
-        integration.providerVersion ?? undefined
+      await this.collectChannelSnapshotForIntegration(
+        orgId,
+        integration,
+        daysBack
       );
-      if (!provider?.analytics) continue;
+    }
+  }
 
-      let token = integration.token;
-      if (
-        integration.tokenExpiration &&
-        dayjs(integration.tokenExpiration).isBefore(dayjs())
-      ) {
-        const refreshed = await this._refreshIntegrationService.refresh(
-          integration
-        );
-        if (!refreshed || !refreshed.accessToken) continue;
-        token = refreshed.accessToken;
-        if (provider.refreshWait) {
-          await timer(10000);
-        }
+  async collectChannelSnapshotForIntegration(
+    orgId: string,
+    integration: ChannelSnapshotIntegrationRef,
+    daysBack: number = CHANNEL_DAYS_BACK
+  ): Promise<void> {
+    await this._orgProviderConfigManager.ensureFresh(orgId);
+
+    if (
+      integration.type !== 'social' ||
+      integration.disabled ||
+      integration.deletedAt
+    ) {
+      return;
+    }
+
+    const provider = this._integrationManager.getSocialIntegrationUnchecked(
+      integration.providerIdentifier,
+      integration.providerVersion ?? undefined
+    );
+    if (!provider?.analytics) return;
+
+    let token = integration.token;
+    if (
+      integration.tokenExpiration &&
+      dayjs(integration.tokenExpiration).isBefore(dayjs())
+    ) {
+      const refreshed = await this._refreshIntegrationService.refresh(
+        integration as Integration
+      );
+      if (!refreshed || !refreshed.accessToken) return;
+      token = refreshed.accessToken;
+      if (provider.refreshWait) {
+        await timer(10000);
       }
+    }
 
-      const channelRows: {
-        organizationId: string;
-        integrationId: string;
-        metric: string;
-        value: number;
-        date: Date;
-      }[] = [];
+    const channelRows: {
+      organizationId: string;
+      integrationId: string;
+      metric: string;
+      value: number;
+      date: Date;
+    }[] = [];
 
-      try {
-        const clientInformation = await this._integrationManager.requireClientInformation(
+    try {
+      const clientInformation = await this._integrationManager.requireClientInformation(
+        integration.providerIdentifier,
+        integration.organizationId,
+        integration.providerConfigId
+      ).catch(() => undefined);
+
+      const data = await provider.analytics(
+        integration.internalId,
+        token,
+        daysBack,
+        clientInformation
+      );
+
+      for (const entry of data) {
+        const canonical = normalizeMetric(
           integration.providerIdentifier,
-          integration.organizationId,
-          integration.providerConfigId
-        ).catch(() => undefined);
-
-        const data = await provider.analytics(
-          integration.internalId,
-          token,
-          daysBack,
-          clientInformation
+          entry.label
         );
+        if (!canonical) continue;
 
-        for (const entry of data) {
-          const canonical = normalizeMetric(
-            integration.providerIdentifier,
-            entry.label
-          );
-          if (!canonical) continue;
+        for (const point of entry.data) {
+          const val = parseFloat(String(point.total));
+          if (isNaN(val)) continue;
 
-          for (const point of entry.data) {
-            const val = parseFloat(String(point.total));
-            if (isNaN(val)) continue;
-
-            channelRows.push({
-              organizationId: orgId,
-              integrationId: integration.id,
-              metric: canonical,
-              value: val,
-              date: dayjs(point.date).startOf('day').toDate(),
-            });
-          }
+          channelRows.push({
+            organizationId: orgId,
+            integrationId: integration.id,
+            metric: canonical,
+            value: val,
+            date: dayjs(point.date).startOf('day').toDate(),
+          });
         }
-
-        if (channelRows.length > 0) {
-          await this._analyticsRepository.upsertChannelSnapshots(channelRows);
-        }
-      } catch (err: any) {
-        if (err instanceof RefreshToken) {
-          continue;
-        }
-        this.logger.error(
-          `AnalyticsActivity: Error collecting analytics for ${integration.id}:`,
-          { integrationId: integration.id, providerId: integration.providerIdentifier, error: err?.message }
-        );
       }
+
+      if (channelRows.length > 0) {
+        await this._analyticsRepository.upsertChannelSnapshots(channelRows);
+      }
+    } catch (err: any) {
+      if (err instanceof RefreshToken) {
+        return;
+      }
+      this.logger.error(
+        `AnalyticsActivity: Error collecting analytics for ${integration.id}:`,
+        { integrationId: integration.id, providerId: integration.providerIdentifier, error: err?.message }
+      );
     }
   }
 
@@ -863,23 +920,21 @@ export class AnalyticsActivity {
       const now = new Date();
       for (const p of notifiable) p.row.notifiedAt = now;
 
-      await this._analyticsRepository.createAnomalies(pending.map((p) => p.row));
-
-      // 7.3: stamp lastFiredAt on rules that fired this run so the cooldown gate
-      // above suppresses a daily re-fire. P2: batch into a single updateMany.
-      if (firedRuleIds.size > 0) {
-        try {
-          await this._analyticsRepository.updateAlertRulesLastFiredAt(
-            orgId,
-            Array.from(firedRuleIds),
-            now
-          );
-        } catch (err) {
-          this.logger.warn('alert-rule lastFiredAt batch update failed', {
-            error: (err as Error)?.message,
-            ruleIds: Array.from(firedRuleIds),
-          });
-        }
+      // M-05: persist anomalies and stamp rule lastFiredAt atomically inside a
+      // repository $transaction so retries cannot re-notify without stamping.
+      try {
+        await this._analyticsRepository.createAnomaliesAndStampRules(
+          pending.map((p) => p.row),
+          orgId,
+          Array.from(firedRuleIds),
+          now
+        );
+      } catch (err) {
+        this.logger.warn('anomaly persistence + rule stamp transaction failed', {
+          error: (err as Error)?.message,
+          ruleIds: Array.from(firedRuleIds),
+        });
+        return;
       }
 
       // 6.8: dispatch an `analytics.anomaly_detected` webhook for the persisted

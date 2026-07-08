@@ -90,7 +90,7 @@ export const SelectCurrent: FC = () => {
 
       addOrRemoveSelectedIntegration(sIntegration, {});
     },
-    []
+    [addOrRemoveSelectedIntegration, modals]
   );
 
   return (
@@ -103,52 +103,55 @@ export const SelectCurrent: FC = () => {
             locked && 'opacity-50 pointer-events-none'
           )}
         >
-          <div
+          <button
+            type="button"
             onClick={() => {
               setHide(true);
               setCurrent('global');
             }}
             className={clsx(
-              'cursor-pointer flex gap-[8px] rounded-[8px] w-[40px] h-[40px] justify-center items-center bg-newBgLineColor',
+              'cursor-pointer flex gap-[8px] rounded-[8px] w-[40px] h-[40px] justify-center items-center bg-newBgLineColor p-0',
               current !== 'global'
-                ? 'text-[#A3A3A3]'
+                ? 'text-[#A3A3A3] border-0'
                 : 'border border-[#2b5cd3] text-[#2b5cd3]'
             )}
           >
             <div>
               <GlobalIcon />
             </div>
-          </div>
+          </button>
           {selectedIntegrations.map(({ integration }) => (
             <div
-              onClick={() => {
-                setHide(true);
-                setCurrent(integration.id);
-              }}
               key={integration.id}
               className={clsx(
-                'border cursor-pointer relative flex gap-[8px] w-[40px] h-[40px] rounded-[8px] items-center bg-newBgLineColor justify-center',
+                'border relative flex gap-[8px] w-[40px] h-[40px] rounded-[8px] items-center bg-newBgLineColor justify-center',
                 current === integration.id
                   ? 'border-[#2b5cd3] text-[#2b5cd3]'
                   : 'border-transparent'
               )}
             >
-              <div
+              <button
+                type="button"
                 onClick={removeSocial(integration)}
-                className="absolute justify-center items-center flex w-[8px] h-[8px] -top-[1px] -start-[3px] bg-red-500 rounded-full text-white text-[8px]"
+                className="absolute z-10 justify-center items-center flex w-[8px] h-[8px] -top-[1px] -start-[3px] bg-red-500 rounded-full text-white text-[8px] border-0 p-0 cursor-pointer"
               >
                 X
-              </div>
-              <IsGlobal id={integration.id} />
-              <div
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setHide(true);
+                  setCurrent(integration.id);
+                }}
                 {...{
                   'data-tooltip-id': 'tooltip',
                   'data-tooltip-content': integration.name,
                 }}
                 className={clsx(
-                  'relative w-full h-full rounded-full flex justify-center items-center filter transition-all duration-500'
+                  'relative w-full h-full rounded-full flex justify-center items-center filter transition-all duration-500 border-0 p-0 bg-transparent cursor-pointer'
                 )}
               >
+                <IsGlobal id={integration.id} />
                 <SafeImage
                   src={integration.picture || '/no-picture.jpg'}
                   className="rounded-full min-w-[26px]"
@@ -178,7 +181,7 @@ export const SelectCurrent: FC = () => {
                     height={12}
                   />
                 )}
-              </div>
+              </button>
             </div>
           ))}
         </div>

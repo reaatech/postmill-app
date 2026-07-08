@@ -62,7 +62,7 @@ export const DelayComponent: FC<{
 
       return setGlobalDelay(index, minutes);
     },
-    [currentIndex, current]
+    [current, setInternalDelay, setGlobalDelay]
   );
 
   const handleSelectDelay = useCallback(
@@ -81,7 +81,8 @@ export const DelayComponent: FC<{
 
   return (
     <div ref={ref} className="relative">
-      <div
+      <button
+        type="button"
         onClick={toggleOpen}
         data-tooltip-id="tooltip"
         data-tooltip-content={
@@ -90,26 +91,27 @@ export const DelayComponent: FC<{
             : `${t('delay_comment_by', 'Comment delayed by')} ${getCurrentDelayLabel()}`
         }
         className={clsx(
-          'cursor-pointer flex items-center gap-[4px]',
+          'cursor-pointer flex items-center gap-[4px] border-0 p-0 bg-transparent',
           currentDelay > 0 && 'bg-[#2b5cd3] text-white rounded-full'
         )}
       >
         <DelayIcon />
-      </div>
+      </button>
       {isOpen && (
         <div className="z-[300] absolute end-0 top-[100%] w-[200px] bg-newBgColorInner p-[8px] menu-shadow translate-y-[10px] flex flex-col rounded-[8px]">
           <div className="grid grid-cols-4 gap-[4px]">
             {delayOptions.map((option) => (
-              <div
+              <button
+                type="button"
                 onClick={() => handleSelectDelay(option.value)}
                 key={option.value}
                 className={clsx(
-                  'h-[32px] flex items-center justify-center rounded-[4px] cursor-pointer hover:bg-newBgColor text-[13px]',
+                  'h-[32px] flex items-center justify-center rounded-[4px] cursor-pointer hover:bg-newBgColor text-[13px] border-0 p-0',
                   currentDelay === option.value && 'bg-[#2B5CD3] text-white hover:bg-[#2B5CD3]'
                 )}
               >
                 {option.label}
-              </div>
+              </button>
             ))}
           </div>
           <div className="border-t border-newTextColor/10 mt-[8px] pt-[8px]">

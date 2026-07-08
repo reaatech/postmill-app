@@ -574,4 +574,82 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(cutoff.getTime()).toBeLessThan(Date.now());
     });
   });
+
+  describe('completeJobWithBuffer (M-06)', () => {
+    function bufferCtx(jobOverrides: Partial<AIMediaJob> = {}) {
+      const ctx = makeService();
+      const job = makeJob({
+        status: 'processing',
+        artifactUrl: null,
+        operation: 'video',
+        ...jobOverrides,
+      });
+      ctx.jobs.set(job.id, job);
+      ctx.orgSettings.getConfigForProvider.mockResolvedValue({
+        credentials: { apiKey: 'k' },
+        storageProviderId: null,
+        storageRootFolderId: 'root-1',
+        version: 'v1',
+      });
+      return { ...ctx, job };
+    }
+
+    it('claims the job, stores the buffer, completes, and notifies', async () => {
+      const { service, job, jobs, mediaRepository, notificationService } = bufferCtx();
+
+      const ok = await service.completeJobWithBuffer(
+        job,
+        Buffer.from('vid'),
+        'video/mp4',
+        { model: 'test' },
+      );
+
+      expect(ok).toBe(true);
+      expect(jobs.get('job-1')!.status).toBe('completed');
+      expect(jobs.get('job-1')!.artifactUrl).toBe('/uploads/org-1/artifact.mp4');
+      expect(mediaRepository.saveGeneratedMedia).toHaveBeenCalledWith(
+        'org-1',
+        expect.objectContaining({ type: 'video', metadata: expect.objectContaining({ model: 'test' }) }),
+      );
+      expect(notificationService.notify).toHaveBeenCalled();
+    });
+
+    it('is idempotent: returns true without re-writing when the job is already completed', async () => {
+      const { service, job, jobs, mediaRepository, notificationService } = bufferCtx();
+      jobs.set('job-1', { ...job, status: 'completed', artifactUrl: '/uploads/org-1/done.mp4' });
+
+      const ok = await service.completeJobWithBuffer(job, Buffer.from('vid'), 'video/mp4');
+
+      expect(ok).toBe(true);
+      expect(mediaRepository.saveGeneratedMedia).not.toHaveBeenCalled();
+      expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+
+    it('fails the job and returns false when storage throws', async () => {
+      const { service, job, jobs, mediaRepository } = bufferCtx();
+      mediaRepository.saveGeneratedMedia.mockRejectedValue(new Error('disk full'));
+
+      const ok = await service.completeJobWithBuffer(job, Buffer.from('vid'), 'video/mp4');
+
+      expect(ok).toBe(false);
+      expect(jobs.get('job-1')!.status).toBe('failed');
+      expect(jobs.get('job-1')!.error).toContain('disk full');
+    });
+
+    it('two concurrent completions produce exactly one file row and one notification', async () => {
+      const { service, job, mediaRepository, notificationService } = bufferCtx();
+
+      const [a, b] = await Promise.all([
+        service.completeJobWithBuffer(job, Buffer.from('vid'), 'video/mp4'),
+        service.completeJobWithBuffer(job, Buffer.from('vid'), 'video/mp4'),
+      ]);
+
+      // Exactly one worker wins the atomic claim and completes; the loser observes
+      // the job in `landing` mid-completion and returns false. A later retry sees
+      // `completed` and returns true idempotently.
+      expect([a, b].filter(Boolean)).toHaveLength(1);
+      expect(mediaRepository.saveGeneratedMedia).toHaveBeenCalledTimes(1);
+      expect(notificationService.notify).toHaveBeenCalledTimes(1);
+    });
+  });
 });

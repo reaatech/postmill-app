@@ -563,8 +563,9 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           folder.storageProviderId && providersMap?.[folder.storageProviderId];
         return (
           <div key={folder.id}>
-            <div
-              className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
+            <button
+              type="button"
+              className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all border-0 bg-transparent text-left w-full ${
                 selectedFolderId === folder.id
                   ? 'bg-designerAccent/20 text-textColor'
                   : 'text-textColor hover:bg-studioBorder/50'
@@ -594,7 +595,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               <span className="text-[11px] text-newTextColor/40">
                 {folder._count?.files || 0}
               </span>
-            </div>
+            </button>
             {folder.children?.length ? renderFolderTree(folder.children, depth + 1) : null}
           </div>
         );
@@ -1116,12 +1117,10 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
     }
   }, [
     store,
-    doc,
     outputFormats,
     quality,
     scale,
     selectedOutputs,
-    fetch,
     pingDownload,
     renderPdfOnServer,
     uploadBlob,
@@ -1298,8 +1297,9 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           <div className="text-[13px] font-medium text-textColor">Choose destination folder</div>
 
           <div className="max-h-[260px] overflow-y-auto border border-studioBorder rounded-[8px] p-[8px] bg-newBgColorInner">
-            <div
-              className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
+            <button
+              type="button"
+              className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all border-0 bg-transparent text-left w-full ${
                 selectedFolderId === null
                   ? 'bg-designerAccent/20 text-textColor'
                   : 'text-textColor hover:bg-studioBorder/50'
@@ -1319,7 +1319,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                 <path d="M1 6H15" stroke="currentColor" strokeWidth="1.3" />
               </svg>
               <span className="flex-1 truncate">All Files (root)</span>
-            </div>
+            </button>
             {folders && renderFolderTree(folders)}
           </div>
 
@@ -1823,8 +1823,9 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <div className="w-full flex flex-col gap-2 mt-1">
                     <div className="text-[13px] font-medium text-textColor">Poster / Thumbnail</div>
                     <div className="flex items-center gap-3">
-                      <div
-                        className={`w-[80px] h-[80px] rounded-[6px] border overflow-hidden cursor-pointer ${posterSource === 'rendered' ? 'border-designerAccent ring-2 ring-designerAccent/30' : 'border-studioBorder'}`}
+                      <button
+                        type="button"
+                        className={`w-[80px] h-[80px] rounded-[6px] border overflow-hidden cursor-pointer p-0 bg-transparent ${posterSource === 'rendered' ? 'border-designerAccent ring-2 ring-designerAccent/30' : 'border-studioBorder'}`}
                         onClick={() => {
                           setPosterSource('rendered');
                           setPosterUrl(renderedPosterUrl);
@@ -1836,7 +1837,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                           alt="Rendered poster"
                           className="w-full h-full object-cover"
                         />
-                      </div>
+                      </button>
                       <div className="flex flex-col gap-1">
                         <button
                           onClick={() => {

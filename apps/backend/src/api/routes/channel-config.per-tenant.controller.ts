@@ -4,7 +4,6 @@ import {
   Controller,
   Delete,
   Get,
-  Inject,
   Param,
   Put,
   Post,
@@ -16,12 +15,6 @@ import { ApiTags } from '@nestjs/swagger';
 import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import {
-  PROVIDER_CAPABILITIES,
-  ProviderCapability,
-} from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
-import { ProviderKernel } from '@gitroom/provider-kernel';
-import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import {
   CreateChannelConfigDto,
@@ -35,55 +28,28 @@ export class ChannelConfigPerTenantController {
     private _orgProviderConfigService: OrgProviderConfigService,
     private _orgProviderConfigManager: OrgProviderConfigManager,
     private _integrationManager: IntegrationManager,
-    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
   ) {}
-
-  // Source the per-provider capability row from the kernel's social manifests
-  // (manifest.capabilities owns the matrix). Falls back to the static
-  // PROVIDER_CAPABILITIES object when the kernel has no usable manifest for the
-  // provider (e.g. an unknown/unregistered identifier). Returns null for unknown
-  // providers to preserve the existing response shape.
-  private capabilitiesFor(identifier: string): ProviderCapability | null {
-    try {
-      const manifest = this._kernel
-        .listManifests('social')
-        .find((m) => m.providerId === identifier);
-      const caps = manifest?.capabilities as ProviderCapability | undefined;
-      if (caps && Object.keys(caps).length > 0) {
-        return caps;
-      }
-    } catch {
-      // Kernel unavailable — fall through to the static matrix.
-    }
-    return PROVIDER_CAPABILITIES[identifier] || null;
-  }
 
   // Static provider catalog — used by the "Add channel" picker. Declared before
   // the `/:id` routes so it isn't captured as an id.
   @Get('/providers')
   @RequirePermission('channels', 'manage')
   async listProviders() {
-    return this._integrationManager.getSocialProviders().map((p) => ({
-      identifier: p.identifier,
-      name: p.name,
-      description: p.toolTip || '',
-      isExternal: !!p.externalUrl,
-      isWeb3: !!p.isWeb3,
-      isChromeExtension: !!p.isChromeExtension,
-      customFields: !!p.customFields,
-      scopes: p.scopes?.join(', ') || '',
-      capabilities: this.capabilitiesFor(p.identifier),
-    }));
+    return this._integrationManager.getSocialProviderCatalog();
   }
 
   // The org's named credential-config instances (the list rows).
   @Get('/')
   @RequirePermission('channels', 'manage')
   async listConfigs(@GetOrgFromRequest() org: Organization) {
-    const configs = await this._orgProviderConfigService.getConfigs(org.id);
+    const [configs, catalog] = await Promise.all([
+      this._orgProviderConfigService.getConfigs(org.id),
+      this._integrationManager.getSocialProviderCatalog(),
+    ]);
+    const entryByIdentifier = new Map(catalog.map((e) => [e.identifier, e]));
     return configs.map((c) => ({
       ...c,
-      capabilities: this.capabilitiesFor(c.identifier),
+      capabilities: entryByIdentifier.get(c.identifier)?.capabilities || null,
     }));
   }
 
@@ -97,9 +63,11 @@ export class ChannelConfigPerTenantController {
     if (!config) {
       throw new BadRequestException('Channel config not found');
     }
+    const catalog = await this._integrationManager.getSocialProviderCatalog();
+    const entry = catalog.find((e) => e.identifier === config.identifier);
     return {
       ...config,
-      capabilities: this.capabilitiesFor(config.identifier),
+      capabilities: entry?.capabilities || null,
     };
   }
 

@@ -52,7 +52,7 @@ export const CalendarItem: FC<{
     commentCount?: number;
     unreadComments?: number;
   };
-}> = memo((props) => {
+}> = memo(function CalendarItem(props) {
   const t = useT();
   const {
     editPost,

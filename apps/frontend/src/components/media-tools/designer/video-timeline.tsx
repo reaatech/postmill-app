@@ -654,6 +654,115 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     setZoomPxPerMs((z) => Math.max(z / 1.5, 0.01));
   }, []);
 
+  const SLIDER_STEP_MS = 100;
+  const SLIDER_BIG_STEP_MS = 1000;
+
+  const handleRulerKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (
+        !['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(
+          e.key
+        )
+      ) {
+        return;
+      }
+      e.preventDefault();
+      const state = store.getState();
+      const vo = state.doc.outputs[currentOutput] as VideoOutput | undefined;
+      const max = vo?.durationMs ?? 0;
+      const step = e.shiftKey ? SLIDER_BIG_STEP_MS : SLIDER_STEP_MS;
+      let next = playheadMs;
+      if (e.key === 'ArrowLeft') next -= step;
+      else if (e.key === 'ArrowRight') next += step;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = max;
+      else if (e.key === 'PageUp') next -= step * 5;
+      else if (e.key === 'PageDown') next += step * 5;
+      next = Math.max(0, Math.min(max, next));
+      setPlayhead(next);
+      previewRef.current?.seek(next);
+    },
+    [currentOutput, playheadMs, setPlayhead, store]
+  );
+
+  const handleClipKeyDown = useCallback(
+    (e: React.KeyboardEvent, trackId: string, clip: VideoClip) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setSelectedClip({ outputIndex: currentOutput, trackId, clipId: clip.id });
+        return;
+      }
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      e.stopPropagation();
+      const state = store.getState();
+      const vo = state.doc.outputs[currentOutput] as VideoOutput | undefined;
+      const max = vo?.durationMs ?? 0;
+      const step =
+        (e.shiftKey ? SLIDER_BIG_STEP_MS : SLIDER_STEP_MS) *
+        (e.key === 'ArrowLeft' ? -1 : 1);
+      const duration = clip.endMs - clip.startMs;
+      const nextStart = Math.max(
+        0,
+        Math.min(max - duration, clip.startMs + step)
+      );
+      state.updateClip(currentOutput, trackId, clip.id, {
+        startMs: Math.round(nextStart),
+      });
+    },
+    [currentOutput, setSelectedClip, store]
+  );
+
+  const handleEdgeKeyDown = useCallback(
+    (
+      e: React.KeyboardEvent,
+      trackId: string,
+      clip: VideoClip,
+      edge: 'start' | 'end'
+    ) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      e.stopPropagation();
+      const state = store.getState();
+      const vo = state.doc.outputs[currentOutput] as VideoOutput | undefined;
+      const max = vo?.durationMs ?? 0;
+      const step =
+        (e.shiftKey ? SLIDER_BIG_STEP_MS : SLIDER_STEP_MS) *
+        (e.key === 'ArrowLeft' ? -1 : 1);
+      if (edge === 'start') {
+        const nextStart = Math.max(
+          0,
+          Math.min(clip.endMs - 100, clip.startMs + step)
+        );
+        state.updateClip(currentOutput, trackId, clip.id, {
+          startMs: Math.round(nextStart),
+        });
+      } else {
+        const nextEnd = Math.max(
+          clip.startMs + 100,
+          Math.min(max, clip.endMs + step)
+        );
+        state.updateClip(currentOutput, trackId, clip.id, {
+          endMs: Math.round(nextEnd),
+        });
+      }
+    },
+    [currentOutput, store]
+  );
+
+  const handleSliderKeyUp = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (
+        ['ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'].includes(
+          e.key
+        )
+      ) {
+        store.getState().pushHistory();
+      }
+    },
+    [store]
+  );
+
   const handleClipMouseDown = useCallback(
     (e: React.MouseEvent, trackId: string, clip: VideoClip, edge: 'start' | 'end' | 'move') => {
       e.stopPropagation();
@@ -1342,10 +1451,13 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
             aria-valuenow={Math.round(playheadMs)}
             aria-valuemin={0}
             aria-valuemax={Math.round(vo.durationMs)}
+            aria-valuetext={formatTime(playheadMs)}
             tabIndex={0}
             className="sticky top-0 z-10 bg-newBgColorInner border-b border-studioBorder/40"
             style={{ height: RULER_HEIGHT, marginLeft: LABEL_WIDTH }}
             onMouseDown={handleRulerClick}
+            onKeyDown={handleRulerKeyDown}
+            onKeyUp={handleSliderKeyUp}
           >
             <div className="relative h-full pointer-events-none">
               {rulerMarks.map((m) => (
@@ -1417,6 +1529,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       aria-valuenow={Math.round(clip.startMs)}
                       aria-valuemin={0}
                       aria-valuemax={Math.round(vo.durationMs - (clip.endMs - clip.startMs))}
+                      aria-valuetext={`Start ${formatTime(clip.startMs)}`}
                       tabIndex={0}
                       key={clip.id}
                       className={`absolute top-1 rounded-[4px] cursor-pointer group ${
@@ -1433,12 +1546,8 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                         e.stopPropagation();
                         setSelectedClip({ outputIndex: currentOutput, trackId: track.id, clipId: clip.id });
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          setSelectedClip({ outputIndex: currentOutput, trackId: track.id, clipId: clip.id });
-                        }
-                      }}
+                      onKeyDown={(e) => handleClipKeyDown(e, track.id, clip)}
+                      onKeyUp={handleSliderKeyUp}
                       onMouseDown={(e) => handleClipMouseDown(e, track.id, clip, 'move')}
                       onContextMenu={(e) => handleClipContextMenu(e, track.id, clip.id)}
                     >
@@ -1489,9 +1598,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                         aria-valuenow={Math.round(clip.startMs)}
                         aria-valuemin={0}
                         aria-valuemax={Math.round(clip.endMs - 100)}
+                        aria-valuetext={formatTime(clip.startMs)}
                         tabIndex={0}
                         className="absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-black/20 rounded-l-[4px]"
                         onMouseDown={(e) => handleClipMouseDown(e, track.id, clip, 'start')}
+                        onKeyDown={(e) => handleEdgeKeyDown(e, track.id, clip, 'start')}
+                        onKeyUp={handleSliderKeyUp}
                       />
                       <div
                         role="slider"
@@ -1500,9 +1612,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                         aria-valuenow={Math.round(clip.endMs)}
                         aria-valuemin={Math.round(clip.startMs + 100)}
                         aria-valuemax={Math.round(vo.durationMs)}
+                        aria-valuetext={formatTime(clip.endMs)}
                         tabIndex={0}
                         className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize opacity-0 group-hover:opacity-100 bg-black/20 rounded-r-[4px]"
                         onMouseDown={(e) => handleClipMouseDown(e, track.id, clip, 'end')}
+                        onKeyDown={(e) => handleEdgeKeyDown(e, track.id, clip, 'end')}
+                        onKeyUp={handleSliderKeyUp}
                       />
                     </div>
                   );

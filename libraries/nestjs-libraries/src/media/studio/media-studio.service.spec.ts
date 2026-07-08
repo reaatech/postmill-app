@@ -51,6 +51,7 @@ function makeService() {
   const fileService = {
     getFileById: vi.fn(),
     getFileByPath: vi.fn(),
+    getFilesByPaths: vi.fn().mockResolvedValue([]),
   };
 
   const redis = {
@@ -317,6 +318,51 @@ describe('MediaStudioService', () => {
       expect(models).toEqual([]);
       expect(orgSettings.getConfigForProvider).not.toHaveBeenCalled();
       expect(resolution.resolveMedia).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listJobs file lookup (M-03)', () => {
+    it('issues a single batched findMany for all completed artifact paths', async () => {
+      const { service, aiSettings, fileService, lifecycle } = makeService();
+      const completedJobs = [
+        {
+          id: 'job-1',
+          status: 'completed',
+          operation: 'image',
+          artifactUrl: '/uploads/org-1/a.png',
+          error: null,
+          createdAt: new Date(),
+        },
+        {
+          id: 'job-2',
+          status: 'completed',
+          operation: 'image',
+          artifactUrl: '/uploads/org-1/b.png',
+          error: null,
+          createdAt: new Date(),
+        },
+      ];
+      aiSettings.getMediaJobsByProvider.mockResolvedValue(completedJobs);
+      fileService.getFilesByPaths.mockResolvedValue([
+        { id: 'file-1', path: '/uploads/org-1/a.png' },
+        { id: 'file-2', path: '/uploads/org-1/b.png' },
+      ]);
+
+      const result = await service.listJobs('org-1', 'test-provider');
+
+      expect(lifecycle.processJob).not.toHaveBeenCalled();
+      expect(fileService.getFilesByPaths).toHaveBeenCalledTimes(1);
+      expect(fileService.getFilesByPaths).toHaveBeenCalledWith('org-1', [
+        '/uploads/org-1/a.png',
+        '/uploads/org-1/b.png',
+      ]);
+      expect(fileService.getFileByPath).not.toHaveBeenCalled();
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: 'job-1', fileId: 'file-1' }),
+          expect.objectContaining({ id: 'job-2', fileId: 'file-2' }),
+        ]),
+      );
     });
   });
 });

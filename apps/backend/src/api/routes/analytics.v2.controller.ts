@@ -515,23 +515,7 @@ export class AnalyticsV2Controller {
     const from = fromStr ? new Date(fromStr) : dayjs().subtract(30, 'day').toDate();
     const to = toStr ? new Date(toStr) : dayjs().toDate();
 
-    const links = await this._analyticsService.getLinksForOrg(org.id);
-    const snapshots = await this._analyticsService.getAggregatedClicks(org.id, from, to);
-
-    const clickMap = new Map<string, number>();
-    for (const snap of snapshots) {
-      const current = clickMap.get(snap.shortLinkId) || 0;
-      clickMap.set(snap.shortLinkId, current + snap.clicks);
-    }
-
-    return links.map((link) => ({
-      id: link.id,
-      shortUrl: link.shortUrl,
-      originalUrl: link.originalUrl,
-      provider: link.provider,
-      clicks: clickMap.get(link.id) || 0,
-      createdAt: link.createdAt,
-    }));
+    return this._analyticsService.getShortLinks(org.id, from, to);
   }
 
   @Get('/shortlinks/timeseries')
@@ -543,17 +527,6 @@ export class AnalyticsV2Controller {
     const from = fromStr ? new Date(fromStr) : dayjs().subtract(30, 'day').toDate();
     const to = toStr ? new Date(toStr) : dayjs().toDate();
 
-    const snapshots = await this._analyticsService.getAggregatedClicks(org.id, from, to);
-
-    const dateMap = new Map<string, number>();
-    for (const snap of snapshots) {
-      const dateKey = dayjs(snap.date).format('YYYY-MM-DD');
-      const current = dateMap.get(dateKey) || 0;
-      dateMap.set(dateKey, current + snap.clicks);
-    }
-
-    return Array.from(dateMap.entries())
-      .map(([date, clicks]) => ({ date, clicks }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+    return this._analyticsService.getShortLinkTimeseries(org.id, from, to);
   }
 }

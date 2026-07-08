@@ -23,9 +23,9 @@ export function usePageVisibility(page: number) {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      document.removeEventListener('blur', onBlur);
-      document.removeEventListener('focus', focus);
+      window.removeEventListener('blur', onBlur);
+      window.removeEventListener('focus', onFocus);
     };
-  }, []);
+  }, [page]);
   return isVisible;
 }

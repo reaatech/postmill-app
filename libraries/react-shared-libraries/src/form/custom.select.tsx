@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { clsx } from 'clsx';
@@ -64,7 +65,7 @@ export const CustomSelect: FC<{
     return {
       label: placeholder,
     };
-  }, [value, options]);
+  }, [value, options, placeholder]);
   const changeOpen = useCallback(() => {
     setIsOpen(!isOpen);
   }, [isOpen]);
@@ -74,11 +75,15 @@ export const CustomSelect: FC<{
       setIsOpen(false);
       e.stopPropagation();
     },
-    []
+    [form, props.name]
   );
+  const onChangeRef = useRef(onChange);
   useEffect(() => {
-    if (onChange) {
-      onChange();
+    onChangeRef.current = onChange;
+  }, [onChange]);
+  useEffect(() => {
+    if (onChangeRef.current) {
+      onChangeRef.current();
     }
   }, [value]);
   return (

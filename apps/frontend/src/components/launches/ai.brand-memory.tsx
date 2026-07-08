@@ -112,9 +112,9 @@ export const BrandMemoryPanel: FC = () => {
           <h4 className="text-[14px] font-medium">
             {t('relevant_posts', 'Relevant Top-Performing Posts')}
           </h4>
-          {hits.map((hit, i) => (
+          {hits.map((hit) => (
             <div
-              key={i}
+              key={hit.sourceId}
               className="p-[12px] bg-newBgColor border border-newTableBorder rounded-[8px]"
             >
               <p className="text-[13px] text-newTableText line-clamp-4">

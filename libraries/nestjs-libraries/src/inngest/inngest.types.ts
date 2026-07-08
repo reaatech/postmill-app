@@ -1,4 +1,5 @@
 import { EventSchemas } from 'inngest';
+import { ChannelSnapshotIntegrationRef } from './activities/analytics.activity';
 
 export type InngestEvents = {
   'post/publish': {
@@ -71,6 +72,17 @@ export type InngestEvents = {
   'analytics/sync-org': {
     data: {
       organizationId: string;
+    };
+  };
+  'analytics/sync-integration': {
+    data: ChannelSnapshotIntegrationRef;
+  };
+  'digest/send-one': {
+    data: {
+      userId: string;
+      email: string;
+      organizationId: string;
+      frequency: 'daily' | 'weekly';
     };
   };
   'media/render': {

@@ -189,7 +189,7 @@ export const Providers = [
     component: PeerTubeProvider,
   },
 ];
-export const ShowAllProviders = forwardRef((props, ref) => {
+export const ShowAllProviders = forwardRef(function ShowAllProviders(props, ref) {
   const { date, current, global, selectedIntegrations, allIntegrations } =
     useLaunchStore(
       useShallow((state) => ({

@@ -147,4 +147,9 @@ export class CampaignTagService {
     const m = await this._resolver.resolveBatch(orgId, entityType, [entityId]);
     return m.get(entityId)?.name || entityId;
   }
+
+  async purgeExpiredItems(days: number): Promise<{ deleted: number }> {
+    const result = await this._items.deleteExpired(days, new Date());
+    return { deleted: result.count };
+  }
 }

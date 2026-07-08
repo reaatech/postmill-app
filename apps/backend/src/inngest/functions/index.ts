@@ -14,13 +14,17 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import {
   createAnalyticsCollection,
   createAnalyticsSyncOrg,
+  createAnalyticsSyncIntegration,
 } from './analytics-collection';
 import { createCommentsCollection, createCommentsSyncOrg } from './comments-collection';
 import { createMissingPostFinder } from './missing-post-finder';
 import { createMediaJobsPoll } from './media-jobs-poll';
 import { createMediaRender } from './media-render';
 import { createSendEmail } from './send-email';
-import { createDigestEmailDaily } from './digest-email-daily';
+import {
+  createDigestEmailDaily,
+  createDigestSendOne,
+} from './digest-email-daily';
 import { createDigestEmailWeekly } from './digest-email-weekly';
 import { createAgentDigest, createAgentDigestOrg } from './agent-digest';
 import { createCampaignTagPurge } from './campaign-tag-purge';
@@ -50,6 +54,7 @@ export interface InngestActivities {
 export const createFunctions = (activities: InngestActivities) => [
   createAnalyticsCollection(activities.analyticsActivity, activities.inngestRunService),
   createAnalyticsSyncOrg(activities.analyticsActivity),
+  createAnalyticsSyncIntegration(activities.analyticsActivity),
   createCommentsCollection(activities.commentsActivity, activities.inngestRunService),
   createCommentsSyncOrg(activities.commentsActivity),
   createMissingPostFinder(activities.postActivity, activities.inngestRunService),
@@ -58,6 +63,7 @@ export const createFunctions = (activities: InngestActivities) => [
   createSendEmail(activities.emailActivity),
   createDigestEmailDaily(activities.digestActivity),
   createDigestEmailWeekly(activities.digestActivity),
+  createDigestSendOne(activities.digestActivity),
   createAgentDigest(activities.agentDigestActivity, activities.organizationService),
   createAgentDigestOrg(activities.agentDigestActivity),
   createCampaignTagPurge(activities.campaignActivity, activities.inngestRunService),

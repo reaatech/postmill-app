@@ -70,7 +70,7 @@ export const ShortlinkPicker: FC<{
     setIsOpen(false);
   });
 
-  const providers = data?.providers || [];
+  const providers = useMemo(() => data?.providers || [], [data?.providers]);
   const activeIdentifier = data?.activeIdentifier || null;
 
   const activeProvider = useMemo(
@@ -133,9 +133,10 @@ export const ShortlinkPicker: FC<{
         isOpen ? 'border-[#2B5CD3]' : 'border-newTextColor/10'
       )}
     >
-      <div
+      <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1 cursor-pointer"
+        className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1 cursor-pointer border-0 p-0 bg-transparent"
       >
         <div className={clsx('cursor-pointer', enabled && 'text-[#2B5CD3]')}>
           <LinkIcon />
@@ -146,29 +147,31 @@ export const ShortlinkPicker: FC<{
         <div className="cursor-pointer">
           <DropdownArrowIcon rotated={isOpen} />
         </div>
-      </div>
+      </button>
       {isOpen && (
         <div className="z-[300] absolute start-0 bottom-[100%] w-[240px] bg-newBgColorInner p-[12px] menu-shadow -translate-y-[10px] flex flex-col">
-          <div
+          <button
+            type="button"
             onClick={() => {
               onChange(false);
               setIsOpen(false);
             }}
             className={clsx(
-              'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center',
+              'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center border-0 bg-transparent text-left',
               !enabled && 'text-[#2B5CD3]'
             )}
           >
             {t('no_short_links', 'No short links')}
-          </div>
+          </button>
           {providers.map((provider) => {
             const selected = enabled && provider.identifier === activeIdentifier;
             return (
-              <div
+              <button
+                type="button"
                 key={provider.identifier}
                 onClick={() => activate(provider.identifier)}
                 className={clsx(
-                  'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex flex-col justify-center',
+                  'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex flex-col justify-center border-0 bg-transparent text-left',
                   selected && 'text-[#2B5CD3]'
                 )}
               >
@@ -178,7 +181,7 @@ export const ShortlinkPicker: FC<{
                     {provider.customDomain}
                   </span>
                 ) : null}
-              </div>
+              </button>
             );
           })}
         </div>

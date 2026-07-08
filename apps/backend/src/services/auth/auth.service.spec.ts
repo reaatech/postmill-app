@@ -202,8 +202,9 @@ describe('AuthService (backend)', () => {
       expect(result.refreshToken).toMatch(/^[0-9a-f]{128}$/);
       expect(result.refreshToken).not.toBe(oldToken);
 
-      const [sessionId, newHash, prevHash, ip, ua] =
+      const [userId, sessionId, newHash, prevHash, ip, ua] =
         usersService.rotateSessionToken.mock.calls[0];
+      expect(userId).toBe('user-1');
       expect(sessionId).toBe('session-1');
       expect(newHash).toBe(sha256(result.refreshToken));
       expect(prevHash).toBe('current-hash');
@@ -234,7 +235,10 @@ describe('AuthService (backend)', () => {
       expect(usersService.findSessionByPreviousTokenHash).toHaveBeenCalledWith(
         sha256('reused-rotated-token')
       );
-      expect(usersService.revokeSession).toHaveBeenCalledWith('session-1');
+      expect(usersService.revokeSession).toHaveBeenCalledWith(
+        'user-1',
+        'session-1'
+      );
       expect(usersService.rotateSessionToken).not.toHaveBeenCalled();
     });
 
@@ -272,7 +276,10 @@ describe('AuthService (backend)', () => {
       await expect(
         service.refreshAccessToken('expired-token', 'ip', 'ua')
       ).rejects.toThrow('Refresh token has expired');
-      expect(usersService.revokeSession).toHaveBeenCalledWith('session-1');
+      expect(usersService.revokeSession).toHaveBeenCalledWith(
+        'user-1',
+        'session-1'
+      );
       expect(usersService.rotateSessionToken).not.toHaveBeenCalled();
     });
 
@@ -328,7 +335,10 @@ describe('AuthService (backend)', () => {
         userId: 'user-1',
       });
       await service.revokeSession('user-1', 'session-1');
-      expect(usersService.revokeSession).toHaveBeenCalledWith('session-1');
+      expect(usersService.revokeSession).toHaveBeenCalledWith(
+        'user-1',
+        'session-1'
+      );
     });
   });
 

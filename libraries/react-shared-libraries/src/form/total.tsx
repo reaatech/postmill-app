@@ -18,7 +18,7 @@ export const Total: FC<{
       }
       form.setValue(name, value);
     },
-    [value]
+    [form, name]
   );
   useEffect(() => {
     if (customOnChange) {

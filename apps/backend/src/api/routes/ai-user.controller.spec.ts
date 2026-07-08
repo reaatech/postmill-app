@@ -11,6 +11,18 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
         { _sum: { costUsd: this._summaryCalls === 2 ? 2 : 0.5 }, scope: 'generator' },
       ]);
     });
+    getUsageSummary = vi.fn().mockResolvedValue({
+      byScope: [{ _sum: { costUsd: 5 }, scope: 'generator' }],
+      totalSpendUsd: 5,
+      monthlySpendUsd: 2,
+      dailySpendUsd: 0.5,
+      budget: {
+        monthlyCap: 10,
+        dailyCap: 1,
+        remainingMonthly: 8,
+        remainingDaily: 0.5,
+      },
+    });
     upsertBrandProfile = vi.fn().mockImplementation((orgId: string, data: any) => ({ organizationId: orgId, ...data }));
     getBrandProfile = vi.fn().mockResolvedValue({ instructions: 'Be professional', language: 'en' });
     getPromptTemplates = vi.fn().mockResolvedValue([]);
@@ -18,6 +30,7 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
     deletePromptTemplate = vi.fn().mockResolvedValue({});
     getPromptLibraryItems = vi.fn().mockResolvedValue([]);
     createPromptLibraryItem = vi.fn().mockResolvedValue({});
+    deletePromptLibraryItem = vi.fn().mockResolvedValue({});
   },
 }));
 
@@ -46,6 +59,8 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/media.service', () => ({
 vi.mock('@gitroom/nestjs-libraries/ai/governance/rag.service', () => ({
   RagService: class {
     search = vi.fn().mockRejectedValue(new Error('not wired'));
+    searchBrandMemory = vi.fn().mockResolvedValue([]);
+    indexTopPerformingPosts = vi.fn().mockResolvedValue({ indexed: 3 });
   },
 }));
 
@@ -121,18 +136,21 @@ describe('AiUserController', () => {
   });
 
   describe('getUsage', () => {
-    it('returns spend summary with budget info', async () => {
+    it('returns the usage summary from the service', async () => {
       const result = await controller.getUsage(mockOrg);
-      expect(result).toHaveProperty('byScope');
-      expect(result).toHaveProperty('totalSpendUsd');
-      expect(result).toHaveProperty('budget');
-      expect(result.totalSpendUsd).toBe(5);
-      expect(result.monthlySpendUsd).toBe(2);
-      expect(result.dailySpendUsd).toBe(0.5);
-      expect(result.budget.monthlyCap).toBe(10);
-      expect(result.budget.remainingMonthly).toBe(8);
-      expect(result.budget.remainingDaily).toBe(0.5);
-      expect(aiSettings.getSpendSummary).toHaveBeenCalledTimes(3);
+      expect(result).toEqual({
+        byScope: [{ _sum: { costUsd: 5 }, scope: 'generator' }],
+        totalSpendUsd: 5,
+        monthlySpendUsd: 2,
+        dailySpendUsd: 0.5,
+        budget: {
+          monthlyCap: 10,
+          dailyCap: 1,
+          remainingMonthly: 8,
+          remainingDaily: 0.5,
+        },
+      });
+      expect(aiSettings.getUsageSummary).toHaveBeenCalledWith(mockOrg.id);
     });
   });
 
@@ -349,6 +367,88 @@ describe('AiUserController', () => {
       await expect(controller.search(mockOrg, { query: 'test' })).rejects.toThrow(
         expect.objectContaining({ status: HttpStatus.SERVICE_UNAVAILABLE }),
       );
+    });
+  });
+
+  describe('coverage of remaining handlers', () => {
+    it('deletePromptTemplate delegates to the service', async () => {
+      const result = await controller.deletePromptTemplate(mockOrg, 'utility.generatePosts');
+      expect(aiSettings.deletePromptTemplate).toHaveBeenCalledWith(mockOrg.id, 'utility.generatePosts');
+      expect(result).toEqual({ success: true });
+    });
+
+    it('createPromptLibraryItem delegates to the service', async () => {
+      const result = await controller.createPromptLibraryItem(mockOrg, {
+        title: 'Test',
+        content: 'Content',
+      });
+      expect(aiSettings.createPromptLibraryItem).toHaveBeenCalledWith({
+        organizationId: mockOrg.id,
+        title: 'Test',
+        content: 'Content',
+      });
+      expect(result).toBeDefined();
+    });
+
+    it('generateHashtags returns hashtags from the model', async () => {
+      (aiModelProvider as any).generateObject = vi.fn().mockResolvedValueOnce({
+        hashtags: ['#hello', '#world'],
+      });
+      const result: any = await controller.generateHashtags(mockOrg, {
+        content: 'Hello world',
+        platform: 'twitter',
+      });
+      expect(result.hashtags).toEqual(['#hello', '#world']);
+    });
+
+    it('checkCompliance returns compliance result', async () => {
+      (aiModelProvider as any).generateObject = vi.fn().mockResolvedValueOnce({
+        passed: true,
+        violations: [],
+        suggestions: ['Keep it up'],
+      });
+      const result: any = await controller.checkCompliance(mockOrg, {
+        content: 'Nice post',
+        platform: 'x',
+      });
+      expect(result.passed).toBe(true);
+    });
+
+    it('draftCommentReply returns sentiment analysis', async () => {
+      (aiModelProvider as any).generateObject = vi.fn().mockResolvedValueOnce({
+        comments: [{ content: 'Nice', sentiment: 'positive', confidence: 0.9 }],
+        overallSentiment: 'positive',
+      });
+      const result: any = await controller.draftCommentReply(mockOrg, {
+        commentId: 'c-1',
+        postContent: 'Great post!',
+        action: 'sentiment',
+      });
+      expect(result.overallSentiment).toBe('positive');
+    });
+
+    it('draftCommentReply returns summary analysis', async () => {
+      (aiModelProvider as any).generateObject = vi.fn().mockResolvedValueOnce({
+        summary: 'A summary',
+        keyPoints: ['Point 1'],
+        actionItems: ['Action 1'],
+      });
+      const result: any = await controller.draftCommentReply(mockOrg, {
+        commentId: 'c-1',
+        postContent: 'Great post!',
+        action: 'summary',
+      });
+      expect(result.summary).toBe('A summary');
+    });
+
+    it('indexBrandMemory returns indexing result', async () => {
+      const result = await controller.indexBrandMemory(mockOrg, mockUser);
+      expect(result).toEqual({ indexed: 3 });
+    });
+
+    it('searchBrandMemory returns hits', async () => {
+      const result = await controller.searchBrandMemory(mockOrg, { prompt: 'campaign' } as any);
+      expect(result).toEqual({ hits: [] });
     });
   });
 });

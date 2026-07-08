@@ -257,10 +257,10 @@ export const Sets: FC = () => {
                 {/* Media preview stack */}
                 {media.length > 0 ? (
                   <div className="flex items-center -space-x-[10px] shrink-0">
-                    {media.slice(0, 3).map((m, i) => (
+                    {media.slice(0, 3).map((m) => (
                       // eslint-disable-next-line @next/next/no-img-element -- external media thumbnail
                       <img
-                        key={m.id || i}
+                        key={m.id}
                         src={m.thumbnail || m.path}
                         alt=""
                         className="w-[44px] h-[44px] rounded-[8px] object-cover border border-newTableBorder bg-newTableHeader"

@@ -66,7 +66,7 @@ export const Subreddit: FC<{
         },
       });
     },
-    [value]
+    [value, name, onChange]
   );
   const setURL = useCallback(
     (e: any) => {
@@ -80,7 +80,7 @@ export const Subreddit: FC<{
         },
       });
     },
-    [value]
+    [value, name, onChange]
   );
   const search = useDebouncedCallback(
     useCallback(async (e: FormEvent<HTMLInputElement>) => {
@@ -94,7 +94,7 @@ export const Subreddit: FC<{
       const results = await func.get('subreddits', { word: e.target.value });
       // @ts-ignore
       setResults(results);
-    }, []),
+    }, [func]),
     500
   );
   return (
@@ -143,15 +143,16 @@ export const Subreddit: FC<{
             }}
           />
           {!!results.length && !loading && (
-            <div className="z-[400] w-full absolute bg-input -mt-[20px] outline-none border-newTableBorder border cursor-pointer">
+            <div className="z-[400] w-full absolute bg-input -mt-[20px] outline-none border-newTableBorder border">
               {results.map((r: { id: string; name: string }) => (
-                <div
+                <button
+                  type="button"
                   onClick={setResult(r)}
                   key={r.id}
-                  className="px-[16px] py-[5px] hover:bg-secondary"
+                  className="px-[16px] py-[5px] hover:bg-secondary cursor-pointer text-left w-full border-0 p-0 bg-transparent"
                 >
                   {r.name}
-                </div>
+                </button>
               ))}
             </div>
           )}

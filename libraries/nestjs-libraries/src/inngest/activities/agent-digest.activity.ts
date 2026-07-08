@@ -7,7 +7,7 @@ import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.se
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
-import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 
 type AgentDigestContext = {
   organization: string;
@@ -39,7 +39,7 @@ export class AgentDigestActivity {
     private _budgetService: BudgetService,
     private _mastraService: MastraService,
     private _notificationService: NotificationService,
-    private _organizationRepository: OrganizationRepository,
+    private _organizationService: OrganizationService,
     private _aiModelProvider: AIModelProvider,
   ) {}
 
@@ -63,7 +63,7 @@ export class AgentDigestActivity {
       return { threadId, notified: false, skipped: true, reason: 'budget_exceeded' };
     }
 
-    const organization = await this._organizationRepository.getOrgById(orgId);
+    const organization = await this._organizationService.getOrgById(orgId);
     if (!organization) {
       this._logger.warn(`Skipping agent digest for ${orgId}: organization not found`);
       return { threadId, notified: false, skipped: true, reason: 'org_not_found' };

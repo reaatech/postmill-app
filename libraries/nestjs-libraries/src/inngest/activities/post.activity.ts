@@ -86,6 +86,9 @@ export class PostActivity {
     private _orgProviderConfigService: OrgProviderConfigService,
     private _orgVpnConfigService: OrgVpnConfigService,
     private _vpnDispatcherService: VpnDispatcherService,
+    // layering: sanctioned leaf-read — UTM append only needs the campaign's
+    // utmEnabled flag; CampaignsService depends on PostsService, so routing up
+    // through the service layer would create a NestJS dependency-injection cycle.
     private _campaignsRepository: CampaignsRepository,
     // layering: sanctioned leaf-read — atomic publish claim delegates straight
     // to the repo (mirrors the injected _campaignsRepository above).

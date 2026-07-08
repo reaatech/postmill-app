@@ -613,7 +613,9 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
 
       return { comments, nextCursor: after };
     } catch (err) {
-      this.logger.error('Reddit fetchComments error:', err);
+      this.logger.error(
+        `Reddit fetchComments error: ${(err as Error)?.message || 'unknown'}`
+      );
       return { comments: [] };
     }
   }
@@ -668,7 +670,9 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         likedByMe: false,
       };
     } catch (err) {
-      this.logger.error('Reddit replyToComment error:', err);
+      this.logger.error(
+        `Reddit replyToComment error: ${(err as Error)?.message || 'unknown'}`
+      );
       return {
         platformCommentId: '',
         parentPlatformCommentId: parentCommentId,

@@ -863,7 +863,9 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
 
       return { comments, nextCursor };
     } catch (err) {
-      this.logger.error('Facebook fetchComments error:', err);
+      this.logger.error(
+        `Facebook fetchComments error: ${(err as Error)?.message || 'unknown'}`
+      );
       return { comments: [] };
     }
   }
@@ -903,7 +905,9 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
         createdAt: new Date().toISOString(),
       };
     } catch (err) {
-      this.logger.error('Facebook replyToComment error:', err);
+      this.logger.error(
+        `Facebook replyToComment error: ${(err as Error)?.message || 'unknown'}`
+      );
       return {
         platformCommentId: '',
         parentPlatformCommentId: parentCommentId,
@@ -941,7 +945,9 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
         return { liked: false };
       }
     } catch (err) {
-      this.logger.error('Facebook likeComment error:', err);
+      this.logger.error(
+        `Facebook likeComment error: ${(err as Error)?.message || 'unknown'}`
+      );
       throw err;
     }
   }

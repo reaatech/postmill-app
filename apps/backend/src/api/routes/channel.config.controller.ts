@@ -52,42 +52,8 @@ export class ChannelConfigController {
   @RequirePermission('channels', 'manage')
   async listConfigs(@GetUserFromRequest() user: User) {
     this._assertSuperAdmin(user);
-    const dbConfigs = await this._providerConfigService.getAll();
-    const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
-
-    return this._integrationManager.getSocialProviders().map((p) => {
-      const dbConfig = dbConfigMap.get(p.identifier);
-      const isConfigured = dbConfig
-        ? (() => {
-            try {
-              const d = this._providerConfigService.decryptConfig(dbConfig);
-              return !!(d.clientId || d.clientSecret);
-            } catch (err) {
-              this._logger.warn(
-                `Failed to decrypt config for ${p.identifier}, treating as unconfigured: ${
-                  (err as Error)?.message ?? String(err)
-                }`
-              );
-              return false;
-            }
-          })()
-        : false;
-
-      return {
-        identifier: p.identifier,
-        name: p.name,
-        description: p.toolTip || '',
-        enabled: dbConfig?.enabled || false,
-        isConfigured,
-        setupInstructions: dbConfig?.setupInstructions || '',
-        additionalConfig: dbConfig?.additionalConfig || '',
-        isExternal: !!p.externalUrl,
-        isWeb3: !!p.isWeb3,
-        isChromeExtension: !!p.isChromeExtension,
-        customFields: !!p.customFields,
-        scopes: p.scopes?.join(', ') || '',
-      };
-    });
+    const providers = this._integrationManager.getSocialProviders();
+    return this._providerConfigService.getProviderCatalog(providers);
   }
 
   @Get('/:identifier')
@@ -97,29 +63,8 @@ export class ChannelConfigController {
     @Param('identifier') identifier: string
   ) {
     this._assertSuperAdmin(user);
-    const config = await this._providerConfigService.getByIdentifier(
-      identifier
-    );
-
-    const provider =
-      this._integrationManager.getSocialIntegrationUnchecked(identifier);
-
-    return {
-      identifier,
-      name: provider?.name || identifier,
-      enabled: config?.enabled || false,
-      redirectUri: config?.redirectUri || '',
-      scopes: config?.scopes || provider?.scopes?.join(', ') || '',
-      setupInstructions: config?.setupInstructions || '',
-      isConfigured: config
-        ? (() => { const d = this._providerConfigService.decryptConfig(config); return !!(d.clientId || d.clientSecret); })()
-        : false,
-      additionalConfig: config?.additionalConfig || '',
-      isExternal: !!provider?.externalUrl,
-      isWeb3: !!provider?.isWeb3,
-      isChromeExtension: !!provider?.isChromeExtension,
-      customFields: !!provider?.customFields,
-    };
+    const providers = this._integrationManager.getSocialProviders();
+    return this._providerConfigService.getProviderCatalogEntry(identifier, providers);
   }
 
   @Put('/:identifier')

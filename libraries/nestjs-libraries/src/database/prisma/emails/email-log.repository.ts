@@ -19,10 +19,6 @@ export class EmailLogRepository {
     return this._db.model.emailLog.create({ data });
   }
 
-  findById(id: string) {
-    return this._db.model.emailLog.findUnique({ where: { id } });
-  }
-
   findByMessageId(provider: string, providerMessageId: string) {
     return this._db.model.emailLog.findFirst({
       where: { provider, providerMessageId },

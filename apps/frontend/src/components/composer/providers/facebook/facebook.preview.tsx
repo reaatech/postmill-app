@@ -137,9 +137,9 @@ export const FacebookPreview: FC<{
       />
       {!!renderContent?.[0]?.images?.length && (
         <div className="h-[280px] -mx-[15px] overflow-hidden flex">
-          {renderContent?.[0]?.images.map((image, index) => (
+          {renderContent?.[0]?.images.map((image) => (
             <a
-              key={`image_${index}`}
+              key={image.path}
               className="flex-1"
               href={mediaDir.set(image.path)}
               target="_blank"
@@ -243,8 +243,8 @@ export const FacebookPreview: FC<{
               </svg>
             </div>
           </div>
-          {renderContent.slice(1).map((value, index) => (
-            <div key={index} className="flex flex-col gap-[12px]">
+          {renderContent.slice(1).map((value) => (
+            <div key={value.text} className="flex flex-col gap-[12px]">
               <div className="flex gap-[6px] leading-[17px]">
                 <div className="h-[34px]">
                   {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
@@ -269,9 +269,9 @@ export const FacebookPreview: FC<{
                     />
                     {!!value.images?.length && (
                       <div className="h-[100px] mt-[12px] -mx-[15px] overflow-hidden flex">
-                        {value.images.map((image, index) => (
+                        {value.images.map((image) => (
                           <a
-                            key={`image_${index}`}
+                            key={image.path}
                             className="flex-1"
                             href={mediaDir.set(image.path)}
                             target="_blank"

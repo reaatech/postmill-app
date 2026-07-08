@@ -329,7 +329,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
 
       return { comments, nextCursor: undefined };
     } catch (err) {
-      this.logger.error('Mastodon fetchComments error:', err);
+      this.logger.error(`Mastodon fetchComments error: ${(err as Error)?.message || String(err)}`);
       return { comments: [] };
     }
   }
@@ -372,7 +372,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
         createdAt: response.created_at,
       };
     } catch (err) {
-      this.logger.error('Mastodon replyToComment error:', err);
+      this.logger.error(`Mastodon replyToComment error: ${(err as Error)?.message || String(err)}`);
       return {
         platformCommentId: '',
         parentPlatformCommentId: parentCommentId,
@@ -411,7 +411,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     } catch (err: any) {
       // Surface the failure so the caller (service → UI) can revert the
       // optimistic toggle and tell the user, rather than reporting a fake state.
-      this.logger.error('Mastodon likeComment error:', err);
+      this.logger.error(`Mastodon likeComment error: ${err?.message || String(err)}`);
       throw err;
     }
   }

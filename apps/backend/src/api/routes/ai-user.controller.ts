@@ -196,52 +196,7 @@ export class AiUserController {
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getUsage(@GetOrgFromRequest() org: Organization) {
-    const summary = await this._aiSettingsService.getSpendSummary(org.id);
-    const now = dayjs();
-    const monthSummary = await this._aiSettingsService.getSpendSummary(
-      org.id,
-      now.startOf('month').toDate(),
-    );
-    const daySummary = await this._aiSettingsService.getSpendSummary(
-      org.id,
-      now.startOf('day').toDate(),
-    );
-
-    const settings = await this._aiSettingsManager.getSettings();
-    const budgetSettings = settings?.budgetSettings as any;
-    const totalSpend = summary.reduce(
-      (acc: number, s: any) => acc + (s._sum?.costUsd || 0),
-      0,
-    );
-    const monthlySpend = monthSummary.reduce(
-      (acc: number, s: any) => acc + (s._sum?.costUsd || 0),
-      0,
-    );
-    const dailySpend = daySummary.reduce(
-      (acc: number, s: any) => acc + (s._sum?.costUsd || 0),
-      0,
-    );
-
-    return {
-      byScope: summary,
-      totalSpendUsd: totalSpend,
-      monthlySpendUsd: monthlySpend,
-      dailySpendUsd: dailySpend,
-      budget: budgetSettings
-        ? {
-            monthlyCap: budgetSettings.monthlyCap ?? null,
-            dailyCap: budgetSettings.dailyCap ?? null,
-            remainingMonthly:
-              budgetSettings.monthlyCap != null
-                ? Math.max(0, budgetSettings.monthlyCap - monthlySpend)
-                : null,
-            remainingDaily:
-              budgetSettings.dailyCap != null
-                ? Math.max(0, budgetSettings.dailyCap - dailySpend)
-                : null,
-          }
-        : null,
-    };
+    return this._aiSettingsService.getUsageSummary(org.id);
   }
 
   @Get('/media-providers')

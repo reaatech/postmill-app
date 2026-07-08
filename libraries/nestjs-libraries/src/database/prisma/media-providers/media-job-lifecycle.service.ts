@@ -346,18 +346,33 @@ export class MediaJobLifecycleService {
     thumbnailBuffer?: Buffer,
     folderId?: string,
   ): Promise<boolean> {
+    // M-06: idempotent, crash-safe completion for buffer-based jobs (local render,
+    // slide, caption, transcript). These jobs have no provider poll path, so we must
+    // guard the terminal transition ourselves. Claim the job into the transient
+    // `landing` state before any storage writes; a crash after storage leaves the job
+    // in `landing`, and reclaimStaleLandingJobs resets it to `processing` for retry.
+    const current = await this.getJob(job.id, job.organizationId);
+    if (!current) return false;
+    if (current.status === 'completed') return true;
+
+    if (!(await this._claimForCompletion(current.id, current.organizationId))) {
+      // Lost the race: re-read once to see if another worker completed it.
+      const winner = await this.getJob(job.id, job.organizationId);
+      return winner?.status === 'completed';
+    }
+
     try {
       const stored = await this._writeToTenantStorage({
-        organizationId: job.organizationId,
-        provider: job.provider,
-        operation: job.operation,
-        baseName: `${job.operation}-${job.id}`,
+        organizationId: current.organizationId,
+        provider: current.provider,
+        operation: current.operation,
+        baseName: `${current.operation}-${current.id}`,
         buffer,
         mime,
         folderId,
         metadata: {
           ...metadata,
-          provider: metadata?.provider || job.provider,
+          provider: metadata?.provider || current.provider,
           mime,
           source: 'ai-media',
         },
@@ -366,15 +381,15 @@ export class MediaJobLifecycleService {
       let thumbnailPath: string | undefined;
       if (thumbnailBuffer) {
         const thumbStored = await this._writeToTenantStorage({
-          organizationId: job.organizationId,
-          provider: job.provider,
+          organizationId: current.organizationId,
+          provider: current.provider,
           operation: 'image',
-          baseName: `${job.operation}-${job.id}-thumb`,
+          baseName: `${current.operation}-${current.id}-thumb`,
           buffer: thumbnailBuffer,
           mime: 'image/jpeg',
           folderId,
           metadata: {
-            provider: job.provider,
+            provider: current.provider,
             mime: 'image/jpeg',
             source: 'ai-media-thumbnail',
           },
@@ -382,14 +397,14 @@ export class MediaJobLifecycleService {
         thumbnailPath = thumbStored.path;
       }
 
-      await this._aiSettings.updateMediaJob(job.organizationId, job.id, {
+      await this._aiSettings.updateMediaJob(current.organizationId, current.id, {
         status: 'completed',
         artifactUrl: stored.path,
         error: null,
       });
 
       if (thumbnailPath) {
-        await this._fileService.saveMediaInformation(job.organizationId, {
+        await this._fileService.saveMediaInformation(current.organizationId, {
           id: stored.mediaId,
           thumbnail: thumbnailPath,
           alt: '',
@@ -398,14 +413,14 @@ export class MediaJobLifecycleService {
       }
 
       await this._notify(
-        job,
+        current,
         'success',
-        `AI ${job.operation} ready`,
-        `Your generated ${job.operation} is ready in the media library.`,
+        `AI ${current.operation} ready`,
+        `Your generated ${current.operation} is ready in the media library.`,
       );
       return true;
     } catch (err) {
-      await this.failJob(job, `Failed to store generated artifact: ${(err as Error).message}`);
+      await this.failJob(current, `Failed to store generated artifact: ${(err as Error).message}`);
       return false;
     }
   }

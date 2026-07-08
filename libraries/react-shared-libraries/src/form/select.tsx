@@ -25,7 +25,7 @@ export const Select: FC<
     translationKey?: string;
     translationParams?: Record<string, string | number>;
   }
-> = forwardRef((props, ref) => {
+> = forwardRef(function Select(props, ref) {
   const {
     label,
     className,

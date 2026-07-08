@@ -89,11 +89,11 @@ export const PostSelector: FC<{
         },
       }
     ).then((res) => res.json());
-  }, [date]);
+  }, [date, fetch]);
   const onCloseWithEmptyString = useCallback(() => {
     onSelect('');
     onClose();
-  }, []);
+  }, [onClose, onSelect]);
   const [current, setCurrent] = useState<string | undefined>(undefined);
   const select = useCallback(
     (id: string) => () => {
@@ -101,7 +101,7 @@ export const PostSelector: FC<{
       onSelect(current === id ? undefined : `(post:${id})`);
       onClose();
     },
-    [current]
+    [current, onClose, onSelect]
   );
   const { data: loadData } = useSWR('old-posts', fetchOldPosts);
   const data = useMemo(() => {
@@ -167,10 +167,11 @@ export const PostSelector: FC<{
                 <div className="mt-[10px]">
                   <div className="flex flex-row flex-wrap gap-[10px]">
                     {data.map((p: any) => (
-                      <div
+                      <button
+                        type="button"
                         onClick={select(p.id)}
                         className={clsx(
-                          'cursor-pointer overflow-hidden flex gap-[20px] flex-col w-[200px] h-[200px] text-ellipsis p-3 border border-newTableBorder rounded-[8px] hover:bg-primary',
+                          'm-0 p-0 border-0 bg-transparent cursor-pointer overflow-hidden flex gap-[20px] flex-col w-[200px] h-[200px] text-ellipsis p-3 border border-newTableBorder rounded-[8px] hover:bg-primary text-left',
                           current === p.id ? 'bg-primary' : 'bg-secondary'
                         )}
                         key={p.id}
@@ -202,7 +203,7 @@ export const PostSelector: FC<{
                           {t('status', 'Status:')}
                           {p.state}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>

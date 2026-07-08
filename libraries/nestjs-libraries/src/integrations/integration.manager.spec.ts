@@ -1042,4 +1042,68 @@ describe('IntegrationManager', () => {
       expect(identifiers).toContain('peertube');
     });
   });
+
+  describe('getSocialProviderCatalog', () => {
+    it('returns catalog entries with normalized flags and capabilities from the kernel', async () => {
+      const kernelWithCaps = {
+        listManifests: (domain?: string) =>
+          !domain || domain === 'social'
+            ? providerInstances.map((p) => ({
+                ...moduleFor(p.identifier)!.manifest,
+                capabilities:
+                  p.identifier === 'x'
+                    ? { analytics: true, comments: true }
+                    : {},
+              }))
+            : [],
+        get: (_domain: string, id: string, _version?: string) => moduleFor(id),
+        latestActive: (_domain: string, id: string) => moduleFor(id),
+      } as any;
+
+      const m = new IntegrationManager(
+        {} as any,
+        {} as any,
+        kernelWithCaps,
+        fakeResolutionService(kernelWithCaps),
+      );
+
+      const catalog = await m.getSocialProviderCatalog();
+
+      expect(catalog.length).toBeGreaterThanOrEqual(36);
+      const xEntry = catalog.find((c) => c.identifier === 'x');
+      expect(xEntry).toMatchObject({
+        identifier: 'x',
+        name: 'X',
+        description: 'X',
+        isExternal: false,
+        isWeb3: false,
+        isChromeExtension: false,
+        customFields: false,
+        scopes: '',
+        capabilities: { analytics: true, comments: true },
+      });
+
+      const telegramEntry = catalog.find((c) => c.identifier === 'telegram');
+      expect(telegramEntry?.isWeb3).toBe(true);
+      expect(telegramEntry?.customFields).toEqual([
+        {
+          key: 'bot_token',
+          label: 'Bot Token',
+          defaultValue: '',
+          validation: '^[0-9]+:[a-zA-Z0-9_-]+$',
+          type: 'password',
+        },
+      ]);
+    });
+
+    it('returns a catalog even when kernel manifests provide empty capabilities', async () => {
+      // The default fakeKernel provides capabilities: {} for every provider, so
+      // the method should still produce entries without crashing.
+      const catalog = await manager.getSocialProviderCatalog();
+      expect(catalog.length).toBeGreaterThanOrEqual(36);
+      for (const entry of catalog) {
+        expect(entry).toHaveProperty('capabilities');
+      }
+    });
+  });
 });

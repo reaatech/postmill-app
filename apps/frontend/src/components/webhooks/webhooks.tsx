@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { Button } from '@gitroom/react/form/button';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Input } from '@gitroom/react/form/input';
-import { FormProvider, useForm } from 'react-hook-form';
+import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { object, string, array } from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
 import { Select } from '@gitroom/react/form/select';
@@ -65,11 +65,11 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
     },
   });
 
-  const events = form.watch('events');
-  const integrations = form.watch('integrations');
-  const url = form.watch('url');
+  const events = useWatch({ control: form.control, name: 'events' });
+  const integrations = useWatch({ control: form.control, name: 'integrations' });
+  const url = useWatch({ control: form.control, name: 'url' });
 
-  const integrationList = useCallback(async () => (await fetch('/integrations/list')).json(), []);
+  const integrationList = useCallback(async () => (await fetch('/integrations/list')).json(), [fetch]);
   const { data: dataList, isLoading } = useSWR('integrations', integrationList, {
     revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false,
     revalidateOnMount: true, refreshWhenHidden: false, refreshWhenOffline: false,
@@ -109,7 +109,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
       setTestResult({ success: false, status: 0, error: 'Connection failed' });
     }
     setTesting(false);
-  }, [url, data?.id, fetch]);
+  }, [url, data, fetch]);
 
   const toggleEvent = useCallback((event: string) => {
     const current = form.getValues('events') || [];
@@ -196,7 +196,7 @@ export const Webhooks: FC = () => {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
 
-  const list = useCallback(async () => (await fetch('/webhooks')).json(), []);
+  const list = useCallback(async () => (await fetch('/webhooks')).json(), [fetch]);
   const { data, mutate, isLoading, error } = useSWR('webhooks', list);
 
   const filtered = useMemo(() => {

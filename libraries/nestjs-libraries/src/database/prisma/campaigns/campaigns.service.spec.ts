@@ -93,6 +93,52 @@ describe('CampaignsService', () => {
     );
   });
 
+  it('validates goals on create and rejects non-array shapes', async () => {
+    const { service, campaignsRepository } = makeService();
+    await expect(
+      service.create({
+        organizationId: 'org1',
+        name: 'Launch',
+        goals: { metric: 'posts', target: 10 } as any,
+      })
+    ).rejects.toBeInstanceOf(Error);
+    expect(campaignsRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('validates goals on create and rejects invalid goal fields', async () => {
+    const { service, campaignsRepository } = makeService();
+    await expect(
+      service.create({
+        organizationId: 'org1',
+        name: 'Launch',
+        goals: [{ metric: '', target: -1 }],
+      })
+    ).rejects.toBeInstanceOf(Error);
+    expect(campaignsRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('passes validated goals through create', async () => {
+    const { service, campaignsRepository } = makeService();
+    await service.create({
+      organizationId: 'org1',
+      name: 'Launch',
+      goals: [{ metric: 'posts', target: 10 }],
+    });
+    expect(campaignsRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ goals: [{ metric: 'posts', target: 10 }] })
+    );
+  });
+
+  it('validates goals on update and strips undefined goals', async () => {
+    const { service, campaignsRepository } = makeService();
+    await service.update('c1', 'org1', { name: 'Renamed' });
+    expect(campaignsRepository.update).toHaveBeenCalledWith(
+      'c1',
+      'org1',
+      expect.objectContaining({ name: 'Renamed', goals: undefined })
+    );
+  });
+
   it('strips shareToken/shareEnabled from single get', async () => {
     const { service } = makeService();
     const result = await service.get('c1', 'org1');

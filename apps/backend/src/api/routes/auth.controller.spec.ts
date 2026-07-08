@@ -259,7 +259,7 @@ describe('AuthController — F1 behavioural tests', () => {
       await expect(
         service.refreshAccessToken('a-rotated-out-token', '1.2.3.4', 'agent')
       ).rejects.toThrow(/reuse/i);
-      expect(users.revokeSession).toHaveBeenCalledWith('sess-reused');
+      expect(users.revokeSession).toHaveBeenCalledWith('u1', 'sess-reused');
     });
 
     it('controller.refresh returns 401 when the service rejects (e.g. reuse detected)', async () => {

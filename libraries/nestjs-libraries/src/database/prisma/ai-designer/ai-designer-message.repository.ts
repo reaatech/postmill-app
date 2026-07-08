@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import type { AiDesignerMessage as PrismaAiDesignerMessage } from '@prisma/client';
 import type { AiDesignerMessagePayload } from '@gitroom/nestjs-libraries/ai-designer/ai-designer.types';
+import { AiDesignerMessageContentSchema } from '@gitroom/nestjs-libraries/ai-designer/ai-designer.schemas';
 
 // Hard ceiling on messages returned per read; long sessions accumulate
 // `progress` rows and an unbounded read would ship them all on every resume.
@@ -33,9 +34,19 @@ export class AiDesignerMessageRepository {
         agent: data.agent ?? null,
         kind: data.kind,
         replyTo: data.replyTo ?? null,
-        content: data.content as any,
+        content: this._parseContent(data.content),
       },
     });
+  }
+
+  private _parseContent(value: unknown): any {
+    try {
+      return AiDesignerMessageContentSchema.parse(value);
+    } catch (err) {
+      throw new BadRequestException(
+        `Invalid AI designer message content: ${(err as Error)?.message ?? String(err)}`
+      );
+    }
   }
 
   /**

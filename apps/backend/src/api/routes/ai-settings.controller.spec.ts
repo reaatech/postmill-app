@@ -42,8 +42,14 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
     createAuditLog = vi.fn().mockResolvedValue({});
     createSpendLog = vi.fn().mockResolvedValue({});
     getSpendSummary = vi.fn().mockResolvedValue([]);
+    getUsageSummary = vi.fn().mockResolvedValue({});
     getAuditLogs = vi.fn().mockResolvedValue([]);
     decryptProviderConfig = vi.fn().mockReturnValue({ credentials: { apiKey: 'sk-test' } });
+    listProviderCatalog = vi.fn().mockResolvedValue([]);
+    getProviderVersionMeta = vi.fn().mockReturnValue({ version: 'v1', status: 'active', availableVersions: [], credentialFields: [{ key: 'apiKey', required: true }] });
+    isProviderConfigured = vi.fn().mockReturnValue(true);
+    redactSensitive = vi.fn().mockImplementation((v: any) => v);
+    safeJson = vi.fn().mockReturnValue(null);
   },
 }));
 
@@ -52,6 +58,8 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-settings.manager', () => ({
     getSettings = vi.fn().mockResolvedValue({ activeProvider: null, activeModel: null });
     refreshCache = vi.fn();
   },
+  normalizeProviderId: vi.fn((id?: string | null) => id || null),
+  qualifyProviderId: vi.fn((id?: string | null) => id || null),
 }));
 
 vi.mock('@gitroom/nestjs-libraries/ai/governance/provider-health.service', () => ({
@@ -122,6 +130,7 @@ describe('AiSettingsController', () => {
     rag = new (RagService as any)();
     orgMediaProviderSettings = {
       upsert: vi.fn().mockResolvedValue({}),
+      getEnabledIdentifiers: vi.fn().mockResolvedValue([]),
     };
 
     controller = new AiSettingsController(
@@ -138,15 +147,19 @@ describe('AiSettingsController', () => {
   });
 
   describe('listProviders', () => {
-    it('returns a list of providers with metadata', async () => {
+    it('returns the provider catalog from the service', async () => {
+      (aiSettings as any).listProviderCatalog.mockResolvedValue([
+        { identifier: 'openai', name: 'OpenAI', capabilities: {}, isConfigured: true },
+      ]);
+
       const result = await controller.listProviders(superAdmin);
+
       expect(Array.isArray(result)).toBe(true);
-      if (result.length > 0) {
-        expect(result[0]).toHaveProperty('identifier');
-        expect(result[0]).toHaveProperty('name');
-        expect(result[0]).toHaveProperty('capabilities');
-        expect(result[0]).toHaveProperty('isConfigured');
-      }
+      expect(result[0]).toHaveProperty('identifier');
+      expect(result[0]).toHaveProperty('name');
+      expect(result[0]).toHaveProperty('capabilities');
+      expect(result[0]).toHaveProperty('isConfigured');
+      expect(aiSettings.listProviderCatalog).toHaveBeenCalled();
     });
 
     it('is gated with RequirePermission decorator', () => {
@@ -155,34 +168,6 @@ describe('AiSettingsController', () => {
         controller.listProviders,
       );
       expect(metadata).toEqual({ resource: 'ai-config', action: 'manage' });
-    });
-
-    it('marks providers configured when all required credential fields are present, not only apiKey', async () => {
-      const regionAdapter = {
-        ...mockAdapter,
-        identifier: 'bedrock',
-        credentialFields: [
-          { key: 'accessKeyId', label: 'Access Key ID', type: 'password', required: true },
-          { key: 'secretAccessKey', label: 'Secret Access Key', type: 'password', required: true },
-          { key: 'region', label: 'Region', type: 'string', required: true },
-        ],
-      };
-      mockKernel.listManifests.mockReturnValue([{ providerId: 'bedrock', version: 'v1' }]);
-      mockResolveAI.mockReturnValue(regionAdapter);
-      (aiSettings as any).getProviderConfigs.mockResolvedValue([
-        { identifier: 'bedrock', enabled: true, credentials: 'encrypted' },
-      ]);
-      (aiSettings as any).decryptProviderConfig.mockReturnValue({
-        credentials: {
-          accessKeyId: 'AKIA...',
-          secretAccessKey: 'secret',
-          region: 'us-east-1',
-        },
-      });
-
-      const result = await controller.listProviders(superAdmin);
-
-      expect(result[0].isConfigured).toBe(true);
     });
   });
 
@@ -194,22 +179,29 @@ describe('AiSettingsController', () => {
       expect(result.models[0].id).toBe('gpt-4.1');
     });
 
-    it('redacts sensitive nested extraConfig fields', async () => {
+    it('delegates extraConfig redaction to the service', async () => {
+      const rawExtraConfig = JSON.stringify({
+        baseURL: 'https://api.example.test/v1',
+        apiKey: 'sk-leak',
+        nested: { accessToken: 'tok-leak', region: 'us-east-1' },
+      });
       (aiSettings as any).getProviderConfigByIdentifier.mockResolvedValue({
         identifier: 'openai',
         enabled: true,
         credentials: 'encrypted',
         defaultModel: 'gpt-4.1',
         imageModel: null,
-        extraConfig: JSON.stringify({
-          baseURL: 'https://api.example.test/v1',
-          apiKey: 'sk-leak',
-          nested: { accessToken: 'tok-leak', region: 'us-east-1' },
-        }),
+        extraConfig: rawExtraConfig,
+      });
+      (aiSettings as any).safeJson.mockReturnValue({
+        baseURL: 'https://api.example.test/v1',
+        apiKey: '[REDACTED]',
+        nested: { accessToken: '[REDACTED]', region: 'us-east-1' },
       });
 
       const result = await controller.getProvider(superAdmin, 'openai');
 
+      expect(aiSettings.safeJson).toHaveBeenCalledWith(rawExtraConfig);
       expect(result.extraConfig).toEqual({
         baseURL: 'https://api.example.test/v1',
         apiKey: '[REDACTED]',
@@ -380,7 +372,8 @@ describe('AiSettingsController', () => {
   });
 
   describe('listOrgProviderConfigs', () => {
-    it('redacts sensitive extraConfig values for org provider configs', async () => {
+    it('delegates extraConfig redaction to the service', async () => {
+      const rawExtraConfig = JSON.stringify({ webhookSecret: 'secret', label: 'prod' });
       (aiSettings as any).getOrgProviderConfigs = vi.fn().mockResolvedValue([
         {
           id: 'cfg-1',
@@ -389,18 +382,214 @@ describe('AiSettingsController', () => {
           enabled: true,
           defaultModel: 'gpt-4.1',
           imageModel: null,
-          extraConfig: JSON.stringify({ webhookSecret: 'secret', label: 'prod' }),
+          extraConfig: rawExtraConfig,
           createdAt: new Date('2026-01-01T00:00:00Z'),
           updatedAt: new Date('2026-01-01T00:00:00Z'),
         },
       ]);
+      (aiSettings as any).safeJson.mockReturnValue({
+        webhookSecret: '[REDACTED]',
+        label: 'prod',
+      });
 
       const result = await controller.listOrgProviderConfigs(superAdmin, 'org-1');
 
+      expect(aiSettings.safeJson).toHaveBeenCalledWith(rawExtraConfig);
       expect(result[0].extraConfig).toEqual({
         webhookSecret: '[REDACTED]',
         label: 'prod',
       });
+    });
+  });
+
+  describe('coverage of remaining handlers', () => {
+    it('getGovernance parses and returns settings', async () => {
+      (aiSettings as any).getSystemSettings.mockResolvedValue({
+        guardrailSettings: JSON.stringify({ enabled: true }),
+        budgetSettings: JSON.stringify({ monthlyCap: 100 }),
+        rateLimitSettings: null,
+        observability: null,
+        mcpSettings: null,
+        ragSettings: null,
+        fallbackProvider: 'openai',
+        fallbackImageProvider: null,
+      });
+
+      const result = await controller.getGovernance(superAdmin);
+
+      expect(result.guardrailSettings).toEqual({ enabled: true });
+      expect(result.budgetSettings).toEqual({ monthlyCap: 100 });
+      expect(result.fallbackProvider).toBe('openai');
+      expect(result.fallbackImageProvider).toBeNull();
+    });
+
+    it('getGovernance returns empty object when no settings', async () => {
+      (aiSettings as any).getSystemSettings.mockResolvedValue(null);
+      const result = await controller.getGovernance(superAdmin);
+      expect(result).toEqual({});
+    });
+
+    it('saveGovernance writes settings and audit log', async () => {
+      const body = {
+        guardrailSettings: { enabled: true },
+        budgetSettings: { monthlyCap: 100 },
+        rateLimitSettings: {},
+        observability: {},
+        mcpSettings: {},
+        ragSettings: {},
+        fallbackProvider: 'openai',
+        fallbackImageProvider: 'dall-e',
+      };
+
+      const result = await controller.saveGovernance(superAdmin, body as any);
+
+      expect(aiSettings.upsertSystemSettings).toHaveBeenCalled();
+      expect(aiSettings.createAuditLog).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
+    });
+
+    it('getAudit returns audit logs', async () => {
+      (aiSettings as any).getAuditLogs.mockResolvedValue([{ id: 'audit-1' }]);
+      const result = await controller.getAudit(superAdmin);
+      expect(result).toEqual([{ id: 'audit-1' }]);
+    });
+
+    it('getRagSettings parses stored settings', async () => {
+      (aiSettings as any).getSystemSettings.mockResolvedValue({
+        ragSettings: JSON.stringify({ vectorStore: 'pgvector' }),
+      });
+      const result = await controller.getRagSettings(superAdmin);
+      expect(result).toEqual({ vectorStore: 'pgvector' });
+    });
+
+    it('getRagSettings returns empty object when unset', async () => {
+      (aiSettings as any).getSystemSettings.mockResolvedValue(null);
+      const result = await controller.getRagSettings(superAdmin);
+      expect(result).toEqual({});
+    });
+
+    it('saveRagSettings persists valid vectorStore', async () => {
+      const result = await controller.saveRagSettings(superAdmin, {
+        ragSettings: { vectorStore: 'qdrant' },
+      } as any);
+      expect(aiSettings.upsertSystemSettings).toHaveBeenCalledWith({
+        ragSettings: { vectorStore: 'qdrant' },
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it('saveRagSettings rejects invalid vectorStore', async () => {
+      await expect(
+        controller.saveRagSettings(superAdmin, {
+          ragSettings: { vectorStore: 'pinecone' },
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('listMediaProviders returns media-capable adapters', async () => {
+      const result = await controller.listMediaProviders(superAdmin);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result[0]).toHaveProperty('identifier');
+      expect(result[0]).toHaveProperty('supportedOperations');
+    });
+
+    it('saveMediaProvider mirrors enabled flag to every org', async () => {
+      (aiSettings as any).getAllOrgIds = vi.fn().mockResolvedValue(['org-1', 'org-2']);
+      const result = await controller.saveMediaProvider(superAdmin, 'openai', {
+        enabled: true,
+        operations: ['image'],
+        c2paAvailable: false,
+      } as any);
+      expect(orgMediaProviderSettings.upsert).toHaveBeenCalledTimes(2);
+      expect(result.identifier).toBe('openai');
+    });
+
+    it('updateSecretSettings merges and persists secrets', async () => {
+      (aiSettings as any).getDecryptedSystemSettings.mockResolvedValue({
+        secretSettings: { existing: 'value' },
+      });
+      const result = await controller.updateSecretSettings(superAdmin, {
+        secretSettings: { newKey: 'newValue' },
+      } as any);
+      expect(aiSettings.upsertSystemSettings).toHaveBeenCalledWith({
+        secretSettings: { existing: 'value', newKey: 'newValue' },
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it('previewProvider returns generated and checked output', async () => {
+      const result = await controller.previewProvider(superAdmin, 'openai', {
+        prompt: 'Hello',
+      } as any);
+      expect(result).toHaveProperty('text');
+      expect(aiSettings.createSpendLog).toHaveBeenCalled();
+    });
+
+    it('previewProvider rejects when budget is exceeded', async () => {
+      mockBudgetService.checkBudget.mockResolvedValueOnce({
+        allowed: false,
+        reason: 'Budget exceeded',
+      });
+      await expect(
+        controller.previewProvider(superAdmin, 'openai', { prompt: 'Hello' } as any),
+      ).rejects.toThrow(expect.objectContaining({ status: 429 }));
+    });
+
+    it('upsertOrgProviderConfig writes config and audit log', async () => {
+      (aiSettings as any).getOrgProviderConfig = vi.fn().mockResolvedValue(null);
+      (aiSettings as any).upsertOrgProviderConfig = vi.fn().mockResolvedValue({
+        identifier: 'openai',
+        enabled: true,
+        updatedAt: new Date(),
+      });
+
+      const result = await controller.upsertOrgProviderConfig(
+        superAdmin,
+        'org-1',
+        'openai',
+        { enabled: true, credentials: { apiKey: 'sk' } } as any,
+      );
+
+      expect(aiSettings.upsertOrgProviderConfig).toHaveBeenCalled();
+      expect(aiSettings.createAuditLog).toHaveBeenCalled();
+      expect(result.identifier).toBe('openai');
+    });
+
+    it('upsertOrgProviderConfig mirrors OpenAI credentials to MediaProviderConfig', async () => {
+      (aiSettings as any).getOrgProviderConfig = vi.fn().mockResolvedValue(null);
+      (aiSettings as any).upsertOrgProviderConfig = vi.fn().mockResolvedValue({
+        identifier: 'openai',
+        enabled: true,
+        updatedAt: new Date(),
+      });
+
+      await controller.upsertOrgProviderConfig(
+        superAdmin,
+        'org-1',
+        'openai',
+        { enabled: true, credentials: { apiKey: 'sk' } } as any,
+      );
+
+      expect(orgMediaProviderSettings.upsert).toHaveBeenCalledWith(
+        'org-1',
+        'openai',
+        expect.objectContaining({ enabled: true, credentials: { apiKey: 'sk' } }),
+      );
+    });
+
+    it('deleteOrgProviderConfig removes config and logs', async () => {
+      (aiSettings as any).deleteOrgProviderConfig = vi.fn().mockResolvedValue({});
+      const result = await controller.deleteOrgProviderConfig(superAdmin, 'org-1', 'openai');
+      expect(aiSettings.deleteOrgProviderConfig).toHaveBeenCalledWith('org-1', 'openai');
+      expect(result).toEqual({ success: true });
+    });
+
+    it('_resolveAdapter returns undefined when resolution throws', async () => {
+      mockResolveAI.mockImplementationOnce(() => {
+        throw new Error('kernel not ready');
+      });
+      // getProvider uses _resolveAdapter internally and should map undefined to BadRequest
+      await expect(controller.getProvider(superAdmin, 'openai')).rejects.toThrow(BadRequestException);
     });
   });
 });

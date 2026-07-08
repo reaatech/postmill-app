@@ -1378,7 +1378,7 @@ describe('moltbook deep', () => {
   });
 
   it('authenticate fetches agent profile', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: { success: true, agent: { id: 'agent-123', name: 'TestAgent', display_name: 'Test Agent' } } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ success: true, agent: { id: 'agent-123', name: 'TestAgent', display_name: 'Test Agent' } }));
     const r = await provider.authenticate({ code: 'molt-api-key', codeVerifier: 'v' });
     expect(r.id).toBe('TestAgent');
     expect(r.name).toBe('Test Agent');
@@ -1386,7 +1386,7 @@ describe('moltbook deep', () => {
   });
 
   it('post creates post via API', async () => {
-    mockAxios.post.mockResolvedValueOnce({ data: { success: true, post: { id: 'molt-post-1' } } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ success: true, post: { id: 'molt-post-1' } }));
     const r = await provider.post('agent-123', 'molt-api-key', [{ id: 'p1', message: 'Hello Moltbook!', settings: { submolt: 'general' } }], {} as any);
     expect(r).toHaveLength(1);
     expect(r[0].postId).toBe('molt-post-1');
@@ -1394,39 +1394,39 @@ describe('moltbook deep', () => {
   });
 
   it('post with default submolt', async () => {
-    mockAxios.post.mockResolvedValueOnce({ data: { success: true, post: { id: 'molt-post-2' } } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ success: true, post: { id: 'molt-post-2' } }));
     const r = await provider.post('agent-123', 'molt-api-key', [{ id: 'p1', message: 'Default submolt', settings: {} }], {} as any);
     expect(r[0].postId).toBe('molt-post-2');
   });
 
   it('comment creates comment on post', async () => {
-    mockAxios.post.mockResolvedValueOnce({ data: { success: true, comment: { id: 'molt-comment-1' } } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ success: true, comment: { id: 'molt-comment-1' } }));
     const r = await provider.comment('agent-123', 'molt-post-1', undefined, 'molt-api-key', [{ id: 'c1', message: 'Nice!', settings: {} }], {} as any);
     expect(r).toHaveLength(1);
     expect(r[0].postId).toBe('molt-comment-1');
   });
 
   it('comment with lastCommentId', async () => {
-    mockAxios.post.mockResolvedValueOnce({ data: { success: true, comment: { id: 'molt-comment-2' } } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ success: true, comment: { id: 'molt-comment-2' } }));
     const r = await provider.comment('agent-123', 'molt-post-1', 'parent-comment', 'molt-api-key', [{ id: 'c2', message: 'Reply', settings: {} }], {} as any);
     expect(r[0].postId).toBe('molt-comment-2');
   });
 
   it('registerAgent registers new agent', async () => {
-    mockAxios.post.mockResolvedValueOnce({ data: { success: true, agent: { id: 'new-agent', name: 'MyBot' } } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ success: true, agent: { id: 'new-agent', name: 'MyBot' } }));
     const r = await provider.registerAgent('MyBot', 'A test bot');
     expect(r.id).toBe('new-agent');
     expect(r.name).toBe('MyBot');
   });
 
   it('checkAgentStatus returns status', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: { status: 'active' } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ status: 'active' }));
     const r = await provider.checkAgentStatus('api-key');
     expect(r.status).toBe('active');
   });
 
   it('getAgentProfile fetches profile', async () => {
-    mockAxios.get.mockResolvedValueOnce({ data: { success: true, agent: { id: 'agent-123', name: 'TestAgent' } } });
+    globalThis.fetch = vi.fn().mockResolvedValueOnce(resp({ success: true, agent: { id: 'agent-123', name: 'TestAgent' } }));
     const r = await provider.getAgentProfile('api-key');
     expect(r.name).toBe('TestAgent');
   });

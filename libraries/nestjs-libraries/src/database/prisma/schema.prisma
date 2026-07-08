@@ -389,6 +389,7 @@ model AnalyticsAlertRule {
   updatedAt       DateTime @updatedAt
 
   @@index([organizationId, enabled])
+  @@index([integrationId])
 }
 
 // Org-level public share dashboard config (7.6). One row per org; token is a
@@ -532,6 +533,7 @@ model Post {
   @@index([state])
   @@index([organizationId])
   @@index([parentPostId])
+  @@index([campaignId])
   @@index([intervalInDays])
   @@index([creationMethod])
   @@index([createdAt])

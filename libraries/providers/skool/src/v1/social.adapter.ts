@@ -109,7 +109,7 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
       }
 
       const data = await (
-        await fetch('https://api2.skool.com/self', {
+        await this.fetch('https://api2.skool.com/self', {
           method: 'GET',
           headers: {
             Cookie: `auth_token=${cookies.auth_token}; client_id=${cookies.client_id}`,
@@ -136,7 +136,7 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
     try {
       const { client_id, auth_token } = this.getCookies(integration);
       const { groups } = await (
-        await fetch(
+        await this.fetch(
           `https://api2.skool.com/users/${id}/groups?offset=0&limit=30`,
           {
             headers: {

@@ -18,9 +18,8 @@ export interface StockPhotoItem extends StockItemBase {
   color: string | null;
 }
 
-export interface StockVectorItem extends StockItemBase {
-  // Vectors reuse the photo shape; source is typically 'pixabay'.
-}
+// Vectors reuse the photo shape; source is typically 'pixabay'.
+export type StockVectorItem = StockItemBase;
 
 export interface StockVideoItem extends StockItemBase {
   duration: number;

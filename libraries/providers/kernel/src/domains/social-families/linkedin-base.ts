@@ -1072,7 +1072,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
       return { comments, nextCursor };
     } catch (err) {
-      this.logger.error('LinkedIn fetchComments error:', err);
+      this.logger.error(`LinkedIn fetchComments error: ${(err as Error)?.message || String(err)}`);
       return { comments: [] };
     }
   }
@@ -1128,7 +1128,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         createdAt: new Date().toISOString(),
       };
     } catch (err) {
-      this.logger.error('LinkedIn replyToComment error:', err);
+      this.logger.error(`LinkedIn replyToComment error: ${(err as Error)?.message || String(err)}`);
       return {
         platformCommentId: '',
         parentPlatformCommentId: parentCommentId,
@@ -1190,7 +1190,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         return { liked: false };
       }
     } catch (err) {
-      this.logger.error('LinkedIn likeComment error:', err);
+      this.logger.error(`LinkedIn likeComment error: ${(err as Error)?.message || String(err)}`);
       throw err;
     }
   }

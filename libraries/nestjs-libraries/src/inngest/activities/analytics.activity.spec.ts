@@ -120,6 +120,10 @@ describe('AnalyticsActivity', () => {
       getDayPostSnapshots: vi.fn().mockResolvedValue([]),
       getRecentAnomaly: vi.fn().mockResolvedValue(null),
       createAnomalies: vi.fn().mockResolvedValue({ count: 0 }),
+      createAnomaliesAndStampRules: vi.fn().mockResolvedValue({
+        created: { count: 0 },
+        stamped: { count: 0 },
+      }),
       getSnapshots: vi.fn().mockResolvedValue([]),
       getMetricDetailTopPosts: vi.fn().mockResolvedValue([]),
       listAnomalies: vi.fn().mockResolvedValue([]),
@@ -1567,8 +1571,8 @@ describe('AnalyticsActivity', () => {
       analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(spikeSeries());
       await activity.detectAnomalies('org-1');
 
-      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
-      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(analyticsRepository.createAnomaliesAndStampRules).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][0];
       expect(rows).toHaveLength(1);
       expect(rows[0].direction).toBe('spike');
       expect(rows[0].notifiedAt).toBeInstanceOf(Date);
@@ -1589,8 +1593,8 @@ describe('AnalyticsActivity', () => {
       analyticsRepository.getRecentAnomaly.mockResolvedValue({ id: 'prev' });
       await activity.detectAnomalies('org-1');
 
-      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
-      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(analyticsRepository.createAnomaliesAndStampRules).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][0];
       expect(rows[0].notifiedAt).toBeUndefined();
       expect(notificationService.notifyAnalyticsAnomaly).not.toHaveBeenCalled();
     });
@@ -1603,7 +1607,7 @@ describe('AnalyticsActivity', () => {
       ]);
       await activity.detectAnomalies('org-1');
 
-      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      const rows = analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][0];
       expect(rows[0].topPostId).toBe('p-hi');
       expect(notificationService.notifyAnalyticsAnomaly.mock.calls[0][0].topPostTitle).toContain('Launch day!');
     });
@@ -1611,7 +1615,7 @@ describe('AnalyticsActivity', () => {
     it('is a no-op (no throw) when there are no snapshots', async () => {
       analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue([]);
       await expect(activity.detectAnomalies('org-1')).resolves.toBeUndefined();
-      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+      expect(analyticsRepository.createAnomaliesAndStampRules).not.toHaveBeenCalled();
     });
 
     it("excludes today's PARTIAL day from detection (no false drop at the 02:00 sweep)", async () => {
@@ -1634,7 +1638,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.detectAnomalies('org-1');
 
-      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+      expect(analyticsRepository.createAnomaliesAndStampRules).not.toHaveBeenCalled();
       expect(notificationService.notifyAnalyticsAnomaly).not.toHaveBeenCalled();
     });
 
@@ -1655,8 +1659,8 @@ describe('AnalyticsActivity', () => {
 
       await activity.detectAnomalies('org-1');
 
-      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
-      const persisted = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(analyticsRepository.createAnomaliesAndStampRules).toHaveBeenCalledTimes(1);
+      const persisted = analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][0];
       expect(persisted[0].direction).toBe('spike');
     });
 
@@ -1691,16 +1695,19 @@ describe('AnalyticsActivity', () => {
 
       await activity.detectAnomalies('org-1');
 
-      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
-      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(analyticsRepository.createAnomaliesAndStampRules).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][0];
       const ruleRow = rows.find((r: any) => r.ruleId === 'rule-1');
       expect(ruleRow).toBeDefined();
       expect(ruleRow.integrationId).toBe('i1');
       expect(ruleRow.metric).toBe('followers');
       expect(ruleRow.direction).toBe('spike');
       expect(
-        analyticsRepository.updateAlertRulesLastFiredAt
-      ).toHaveBeenCalledWith('org-1', ['rule-1'], expect.any(Date));
+        analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][2]
+      ).toEqual(['rule-1']);
+      expect(
+        analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][3]
+      ).toBeInstanceOf(Date);
       expect(notificationService.notifyAnalyticsAnomaly).toHaveBeenCalledTimes(1);
     });
 
@@ -1725,7 +1732,7 @@ describe('AnalyticsActivity', () => {
 
       expect(analyticsRepository.updateAlertRule).not.toHaveBeenCalled();
       // No auto-anomaly on a flat stock series and the rule is suppressed → nothing persisted.
-      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+      expect(analyticsRepository.createAnomaliesAndStampRules).not.toHaveBeenCalled();
     });
 
     it('does NOT fire a gte rule when the latest value is below threshold', async () => {
@@ -1748,7 +1755,7 @@ describe('AnalyticsActivity', () => {
       await activity.detectAnomalies('org-1');
 
       expect(analyticsRepository.updateAlertRule).not.toHaveBeenCalled();
-      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+      expect(analyticsRepository.createAnomaliesAndStampRules).not.toHaveBeenCalled();
     });
 
     it('merges a rule firing onto a detector row sharing the same key (R4.3)', async () => {
@@ -1771,8 +1778,8 @@ describe('AnalyticsActivity', () => {
 
       await activity.detectAnomalies('org-1');
 
-      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
-      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(analyticsRepository.createAnomaliesAndStampRules).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][0];
       const impressionRows = rows.filter(
         (r: any) => r.integrationId === 'i1' && r.metric === 'impressions'
       );
@@ -1781,10 +1788,13 @@ describe('AnalyticsActivity', () => {
       expect(impressionRows[0].ruleId).toBe('rule-42');
       // exactly one notification
       expect(notificationService.notifyAnalyticsAnomaly).toHaveBeenCalledTimes(1);
-      // the rule still stamps lastFiredAt
+      // the rule still stamps lastFiredAt inside the same transaction call
       expect(
-        analyticsRepository.updateAlertRulesLastFiredAt
-      ).toHaveBeenCalledWith('org-1', ['rule-42'], expect.any(Date));
+        analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][2]
+      ).toEqual(['rule-42']);
+      expect(
+        analyticsRepository.createAnomaliesAndStampRules.mock.calls[0][3]
+      ).toBeInstanceOf(Date);
     });
   });
 

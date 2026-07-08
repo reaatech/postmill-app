@@ -88,9 +88,12 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
 
       {!isLoading && data && data.length > 0 && (
         <div className="flex flex-col gap-[8px] max-h-[500px] overflow-y-auto">
-          {data.map((item: any, idx: number) => (
+          {data.map((item: any) => (
             <div
-              key={idx}
+              key={
+                item.id ??
+                `${item.source || 'search'}-${(item.content || item.text || item.snippet || '').slice(0, 40)}`
+              }
               className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
             >
               <div className="text-[13px] leading-[20px] whitespace-pre-wrap mb-[8px]">
@@ -130,10 +133,11 @@ export const AiSearch: FC = () => {
 
   return (
     <div className="relative">
-      <div
+      <button
+        type="button"
         onClick={openModal}
         className={clsx(
-          'cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
+          'm-0 p-0 border-0 bg-transparent cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
         )}
       >
         <div className="flex gap-[5px] items-center">
@@ -164,7 +168,7 @@ export const AiSearch: FC = () => {
             {t('ai_search', 'AI Search')}
           </div>
         </div>
-      </div>
+      </button>
     </div>
   );
 };

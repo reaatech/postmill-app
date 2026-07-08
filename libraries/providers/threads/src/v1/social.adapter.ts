@@ -672,7 +672,9 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
 
       return { comments, nextCursor };
     } catch (err) {
-      this.logger.error('Threads fetchComments error:', err);
+      this.logger.error(
+        `Threads fetchComments error: ${(err as Error)?.message || 'unknown'}`
+      );
       return { comments: [] };
     }
   }
@@ -714,7 +716,9 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
         createdAt: new Date().toISOString(),
       };
     } catch (err) {
-      this.logger.error('Threads replyToComment error:', err);
+      this.logger.error(
+        `Threads replyToComment error: ${(err as Error)?.message || 'unknown'}`
+      );
       throw err;
     }
   }

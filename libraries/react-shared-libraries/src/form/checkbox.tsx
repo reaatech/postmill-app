@@ -19,7 +19,7 @@ export const Checkbox = forwardRef<
     }) => void;
     variant?: 'default' | 'hollow';
   }
->((props, ref: any) => {
+>(function Checkbox(props, ref: any) {
   const { checked, className, label, disableForm, variant } = props;
   const form = useFormContext();
   const register = disableForm ? {} : form.register(props.name!);

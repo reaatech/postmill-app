@@ -142,7 +142,7 @@ export class AIModelProvider {
   ): any {
     try {
       return this._resolution.resolveAI(providerId, {
-        version: options.version ?? 'v1',
+        version: options.version,
         credentials: options.credentials ?? {},
         orgId: options.orgId,
       });
@@ -1019,6 +1019,18 @@ export class AIModelProvider {
     }
   }
 
+  async resolveProviderRef(
+    scope: AIScope,
+    orgId?: string,
+  ): Promise<{ providerId: string; version: string }> {
+    try {
+      const config = await this._resolveConfig(scope, orgId);
+      return { providerId: config.providerId, version: config.version ?? 'v1' };
+    } catch {
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
+    }
+  }
+
   async resolveConfigForScope(scope: AIScope, orgId?: string): Promise<ResolvedConfig | null> {
     try {
       return await this._resolveConfig(scope, orgId);
@@ -1028,8 +1040,12 @@ export class AIModelProvider {
     }
   }
 
-  hasCapability(adapterId: string, capability: keyof AICapabilities): boolean {
-    const adapter = this._resolveAI(adapterId);
+  hasCapability(
+    adapterId: string,
+    capability: keyof AICapabilities,
+    version?: string,
+  ): boolean {
+    const adapter = this._resolveAI(adapterId, { version });
     return adapter?.capabilities?.[capability] === true;
   }
 
@@ -1038,8 +1054,12 @@ export class AIModelProvider {
     modelId: string,
     capability: keyof AICapabilities,
     creds?: Record<string, string>,
+    version?: string,
   ): Promise<boolean | null> {
-    const adapter = this._resolveAI(adapterId, { credentials: creds });
+    const adapter = this._resolveAI(adapterId, {
+      credentials: creds,
+      version,
+    });
     if (!adapter) return null;
     const models = await adapter.listModels(creds || {});
     const model = models.find((m: { id: string }) => m.id === modelId);

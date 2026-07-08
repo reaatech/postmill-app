@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
 import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
@@ -10,6 +10,16 @@ import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file
 import { ENTITY_ENUM_TO_SLUG } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-entity.types';
 import { computeGoalProgress } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-goal-progress';
 import { randomBytes } from 'crypto';
+import { z } from 'zod';
+
+export const CampaignGoalSchema = z.object({
+  metric: z.string().min(1),
+  target: z.number().finite().gte(0),
+});
+
+export const CampaignGoalsSchema = z.array(CampaignGoalSchema);
+
+export type CampaignGoal = z.infer<typeof CampaignGoalSchema>;
 
 @Injectable()
 export class CampaignsService {
@@ -83,7 +93,18 @@ export class CampaignsService {
     return safeCampaign;
   }
 
-  create(params: {
+  private _validateGoals(goals: unknown): CampaignGoal[] | undefined {
+    if (goals === undefined || goals === null) return undefined;
+    const parsed = CampaignGoalsSchema.safeParse(goals);
+    if (!parsed.success) {
+      throw new BadRequestException(
+        `Invalid campaign goals: ${parsed.error.errors.map((e) => e.message).join(', ')}`
+      );
+    }
+    return parsed.data;
+  }
+
+  async create(params: {
     organizationId: string;
     name: string;
     color?: string;
@@ -94,13 +115,14 @@ export class CampaignsService {
     client?: string;
     project?: string;
     tags?: string[];
-    goals?: any;
+    goals?: CampaignGoal[] | unknown;
     createdById?: string;
   }) {
-    return this._campaignsRepository.create(params);
+    const goals = this._validateGoals(params.goals);
+    return this._campaignsRepository.create({ ...params, goals });
   }
 
-  update(id: string, organizationId: string, data: {
+  async update(id: string, organizationId: string, data: {
     name?: string;
     color?: string;
     description?: string;
@@ -111,9 +133,10 @@ export class CampaignsService {
     client?: string;
     project?: string;
     tags?: string[];
-    goals?: any;
+    goals?: CampaignGoal[] | unknown;
   }) {
-    return this._campaignsRepository.update(id, organizationId, data);
+    const goals = this._validateGoals(data.goals);
+    return this._campaignsRepository.update(id, organizationId, { ...data, goals });
   }
 
   remove(id: string, organizationId: string) {

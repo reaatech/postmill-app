@@ -101,7 +101,7 @@ export class BrandsRepository {
     });
     if (!brand) return null;
     return this._aiBrandProfile.model.aIBrandProfile.update({
-      where: { id: brandId },
+      where: { id: brandId, organizationId },
       data,
     });
   }
@@ -112,7 +112,7 @@ export class BrandsRepository {
     });
     if (!brand) return null;
     return this._aiBrandProfile.model.aIBrandProfile.delete({
-      where: { id: brandId },
+      where: { id: brandId, organizationId },
     });
   }
 
@@ -154,7 +154,7 @@ export class BrandsRepository {
     const existing = (brand.customFonts as any[]) || [];
     existing.push(font);
     await this._aiBrandProfile.model.aIBrandProfile.update({
-      where: { id: brand.id },
+      where: { id: brand.id, organizationId },
       data: { customFonts: existing },
     });
     return existing;
@@ -166,7 +166,7 @@ export class BrandsRepository {
     const existing = (brand.customFonts as any[]) || [];
     const next = existing.filter((f: any) => f.fileId !== fileId);
     await this._aiBrandProfile.model.aIBrandProfile.update({
-      where: { id: brand.id },
+      where: { id: brand.id, organizationId },
       data: { customFonts: next },
     });
     return next;

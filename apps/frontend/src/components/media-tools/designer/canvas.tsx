@@ -202,7 +202,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         setSelectedIds(groupIds);
       }
     },
-    [output, selectedIds, setSelectedIds]
+    [output, selectedIds, setSelectedIds, isVideo]
   );
 
   const handleStageMouseDown = useCallback(
@@ -299,7 +299,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
       setGuides(lines);
       setHud({ x: node.x(), y: node.y() - 22, text: `${Math.round(node.x())}, ${Math.round(node.y())}` });
     },
-    [output, selectedIds, output.width, output.height, snapEnabled]
+    [output, selectedIds, snapEnabled, isVideo]
   );
 
   // Element drags fire on the element node itself and bubble to the Layer (the
@@ -640,7 +640,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
           toaster.show('Failed to upload file', 'warning');
         });
     },
-    [addElement, viewportX, viewportY, zoom, store, output, toaster, fetch]
+    [addElement, viewportX, viewportY, zoom, store, output, toaster, fetch, isVideo]
   );
 
   const bg = output?.bg;
@@ -648,12 +648,13 @@ export const DesignerCanvas: FC<CanvasProps> = ({
     bg?.type === 'gradient' ? gradientFillProps(bg.gradient, output.width, output.height) : {};
 
   return (
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
     <div
       ref={containerRef}
       className={`flex-1 min-w-0 relative overflow-hidden bg-[#e5e7eb] designer-canvas-container ${
         isPanning ? 'cursor-grabbing' : isSpacePressed ? 'cursor-grab' : 'cursor-default'
       }`}
-      tabIndex={0}
+      tabIndex={0} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex
       role="application"
       aria-label="Design canvas"
       onKeyDown={handleKeyDown}

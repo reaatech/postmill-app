@@ -36,10 +36,11 @@ export const SetSelectionModal: FC<{
 
       <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
         {sets.map((set) => (
-          <div
+          <button
+            type="button"
             key={set.id}
             onClick={() => onSelect(set)}
-            className="p-3 border border-newTableBorder rounded-lg cursor-pointer hover:transition-colors"
+            className="w-full text-left m-0 p-0 border-0 bg-transparent p-3 border border-newTableBorder rounded-lg cursor-pointer hover:transition-colors"
           >
             <div className="font-medium">{set.name}</div>
             {set.description && (
@@ -47,7 +48,7 @@ export const SetSelectionModal: FC<{
                 {set.description}
               </div>
             )}
-          </div>
+          </button>
         ))}
       </div>
 
@@ -63,7 +64,7 @@ export const SetSelectionModal: FC<{
   );
 };
 
-export const CalendarColumn: FC<{
+const CalendarColumn: FC<{
   getDate: dayjs.Dayjs;
   randomHour?: boolean;
 }> = memo((props) => {
@@ -383,25 +384,28 @@ export const CalendarColumn: FC<{
             </div>
           ))}
           {!showAll && postList.length > 3 && (
-            <div
-              className="text-center hover:underline py-[5px] text-textColor"
+            <button
+              type="button"
+              className="w-full text-center hover:underline py-[5px] text-textColor m-0 p-0 border-0 bg-transparent"
               onClick={showAllFunc}
             >
               {t('show_more', '+ Show more')} ({postList.length - 3})
-            </div>
+            </button>
           )}
           {showAll && postList.length > 3 && (
-            <div
-              className="text-center hover:underline py-[5px]"
+            <button
+              type="button"
+              className="w-full text-center hover:underline py-[5px] m-0 p-0 border-0 bg-transparent"
               onClick={showLessFunc}
             >
               {t('show_less', '- Show less')}
-            </div>
+            </button>
           )}
         </div>
         {!isBeforeNow && (
-          <div
-            className="pb-[2.5px] px-[5px] flex-1 flex"
+          <button
+            type="button"
+            className="pb-[2.5px] px-[5px] flex-1 flex m-0 p-0 border-0 bg-transparent"
             onClick={integrations.length ? addModal : addProvider}
           >
             <div
@@ -470,9 +474,12 @@ export const CalendarColumn: FC<{
                 </div>
               )}
             </div>
-          </div>
+          </button>
         )}
       </div>
     </div>
   );
 });
+
+CalendarColumn.displayName = 'CalendarColumn';
+export { CalendarColumn };

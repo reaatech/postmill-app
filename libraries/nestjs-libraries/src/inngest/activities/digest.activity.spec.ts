@@ -92,4 +92,59 @@ describe('DigestActivity', () => {
     expect(result).toEqual({ sent: 0, failed: 1 });
     expect(emailService.sendEmail).not.toHaveBeenCalled();
   });
+
+  describe('fan-out helpers (I-01)', () => {
+    it('getPendingDigestTargets flattens users by organization', async () => {
+      vi.mocked(preferenceService.getPreferencesByDigestFrequency).mockResolvedValue([
+        { userId: 'user-1', user: { email: 'a@b.com' } },
+        { userId: 'user-2', user: { email: 'c@d.com' } },
+      ]);
+      vi.mocked(digestService.getOrganizationIdsForUser).mockImplementation(async (userId: string) => {
+        return userId === 'user-1' ? ['org-1', 'org-2'] : [];
+      });
+
+      const targets = await activity.getPendingDigestTargets('daily');
+
+      expect(targets).toEqual([
+        { userId: 'user-1', email: 'a@b.com', organizationId: 'org-1' },
+        { userId: 'user-1', email: 'a@b.com', organizationId: 'org-2' },
+      ]);
+    });
+
+    it('sendOneDigest sends and deletes when pending items exist', async () => {
+      vi.mocked(digestService.getPendingForUser).mockResolvedValue([
+        { id: 'q-2', title: 'T2', message: 'M2', html: null, category: 'comments', createdAt: new Date() },
+      ] as any);
+
+      const result = await activity.sendOneDigest({
+        userId: 'user-1',
+        email: 'a@b.com',
+        organizationId: 'org-1',
+        frequency: 'daily',
+      });
+
+      expect(result).toEqual({ sent: true });
+      expect(emailService.sendEmail).toHaveBeenCalledWith(
+        'a@b.com',
+        '[Postmill] Daily digest',
+        '<p><strong>T2</strong><br/>M2</p>',
+        'top'
+      );
+      expect(digestService.deleteByIds).toHaveBeenCalledWith(['q-2']);
+    });
+
+    it('sendOneDigest returns sent:false when no pending items exist', async () => {
+      vi.mocked(digestService.getPendingForUser).mockResolvedValue([]);
+
+      const result = await activity.sendOneDigest({
+        userId: 'user-1',
+        email: 'a@b.com',
+        organizationId: 'org-1',
+        frequency: 'daily',
+      });
+
+      expect(result).toEqual({ sent: false });
+      expect(emailService.sendEmail).not.toHaveBeenCalled();
+    });
+  });
 });
