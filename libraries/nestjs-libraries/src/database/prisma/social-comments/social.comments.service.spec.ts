@@ -819,7 +819,7 @@ describe('SocialCommentsService', () => {
         })
       );
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1, orgId);
     });
 
     it('paginates with cursor and stops when no nextCursor', async () => {
@@ -854,7 +854,7 @@ describe('SocialCommentsService', () => {
       );
       expect(socialCommentsRepo.upsertComment).toHaveBeenCalledTimes(2);
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 2);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 2, orgId);
     });
 
     it('limits pagination to MAX_PAGES (5)', async () => {
@@ -872,7 +872,7 @@ describe('SocialCommentsService', () => {
 
       expect(mockProvider.fetchComments).toHaveBeenCalledTimes(5);
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 5);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 5, orgId);
     });
 
     it('stops when an empty page is returned', async () => {
@@ -892,7 +892,7 @@ describe('SocialCommentsService', () => {
 
       expect(mockProvider.fetchComments).toHaveBeenCalledTimes(2);
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1, orgId);
     });
 
     it('refreshes expired token before fetching', async () => {
@@ -920,7 +920,7 @@ describe('SocialCommentsService', () => {
         { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(expiredPost.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(expiredPost.id, 0);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(expiredPost.id, 0, orgId);
     });
 
     it('skips fetch when token refresh returns falsy', async () => {
@@ -952,7 +952,7 @@ describe('SocialCommentsService', () => {
       // Partial/failed sweep → no soft-delete reconciliation.
       expect(socialCommentsRepo.softDeleteCommentsByIds).not.toHaveBeenCalled();
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 0);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 0, orgId);
     });
 
     it('stops paging on a generic error without reconciling deletions', async () => {
@@ -985,7 +985,10 @@ describe('SocialCommentsService', () => {
 
       await service.syncComments(orgId, post as any);
 
-      expect(socialCommentsRepo.softDeleteCommentsByIds).toHaveBeenCalledWith(['db-2']);
+      expect(socialCommentsRepo.softDeleteCommentsByIds).toHaveBeenCalledWith(
+        ['db-2'],
+        orgId
+      );
     });
 
     it('does NOT reconcile deletions when pagination is truncated at MAX_PAGES', async () => {
@@ -1033,7 +1036,7 @@ describe('SocialCommentsService', () => {
         })
       );
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1, orgId);
     });
 
     it('passes defaults for missing comment fields', async () => {
@@ -1061,7 +1064,7 @@ describe('SocialCommentsService', () => {
         })
       );
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
-      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1);
+      expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(post.id, 1, orgId);
     });
   });
 });

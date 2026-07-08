@@ -151,14 +151,11 @@ export class PostsRepository {
     });
   }
 
-  updateImages(id: string, images: string, orgId?: string) {
+  updateImages(id: string, images: string, orgId: string) {
     return this._post.model.post.update({
       where: {
         id,
-        // Defense-in-depth org scoping (B5): applied when the caller threads orgId
-        // (mirrors updateReleaseId). Optional so existing callers stay behaviour-identical;
-        // org is already enforced upstream.
-        ...(orgId ? { organizationId: orgId } : {}),
+        organizationId: orgId,
       },
       data: {
         image: images,
@@ -575,9 +572,10 @@ export class PostsRepository {
   // 0.7: atomic publish state-claim. Flips exactly one QUEUE post to PUBLISHING and
   // returns the affected row count — the worker aborts the run when count === 0 so a
   // recovery enqueue racing a live run (or a "post now" during sleep) can't double-post.
-  async claimForPublish(id: string): Promise<number> {
+  // D2: org-scoped so a leaked id cannot claim another tenant's post.
+  async claimForPublish(id: string, orgId: string): Promise<number> {
     const { count } = await this._post.model.post.updateMany({
-      where: { id, state: 'QUEUE', deletedAt: null },
+      where: { id, organizationId: orgId, state: 'QUEUE', deletedAt: null },
       data: { state: 'PUBLISHING' },
     });
     return count;
@@ -1052,17 +1050,18 @@ export class PostsRepository {
     });
   }
 
-  async updateCommentCount(postId: string, count: number) {
+  async updateCommentCount(postId: string, count: number, orgId: string) {
     return this._post.model.post.update({
-      where: { id: postId },
+      where: { id: postId, organizationId: orgId },
       data: { commentCount: count },
     });
   }
 
-  getPostByForWebhookId(postId: string) {
+  getPostByForWebhookId(postId: string, orgId: string) {
     return this._post.model.post.findMany({
       where: {
         id: postId,
+        organizationId: orgId,
         deletedAt: null,
         parentPostId: null,
       },

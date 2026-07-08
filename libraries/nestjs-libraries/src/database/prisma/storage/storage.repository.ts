@@ -181,15 +181,23 @@ export class StorageRepository {
       where: { storageProviderId: providerId },
       include: { _count: { select: { files: true, children: true } } },
     });
-    for (const folder of folders) {
-      if (folder._count.files === 0 && folder._count.children === 0) {
-        await this._folder.model.fileFolder.delete({ where: { id: folder.id } });
-      } else {
-        await this._folder.model.fileFolder.update({
-          where: { id: folder.id },
-          data: { storageProviderId: null },
-        });
-      }
+    const emptyIds = folders
+      .filter((f) => f._count.files === 0 && f._count.children === 0)
+      .map((f) => f.id);
+    const nonEmptyIds = folders
+      .filter((f) => f._count.files > 0 || f._count.children > 0)
+      .map((f) => f.id);
+
+    if (emptyIds.length) {
+      await this._folder.model.fileFolder.deleteMany({
+        where: { id: { in: emptyIds } },
+      });
+    }
+    if (nonEmptyIds.length) {
+      await this._folder.model.fileFolder.updateMany({
+        where: { id: { in: nonEmptyIds } },
+        data: { storageProviderId: null },
+      });
     }
   }
 
@@ -290,9 +298,9 @@ export class StorageRepository {
     });
   }
 
-  setDefaultFolder(providerId: string, folderId: string | null) {
+  setDefaultFolder(providerId: string, folderId: string | null, orgId: string) {
     return this._storage.model.storageProviderConfig.update({
-      where: { id: providerId },
+      where: { id: providerId, organizationId: orgId },
       data: { defaultFolderId: folderId },
     });
   }

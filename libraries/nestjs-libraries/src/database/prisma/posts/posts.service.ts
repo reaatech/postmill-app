@@ -180,8 +180,8 @@ export class PostsService {
     return this._postRepository.getPostById(postId, orgId);
   }
 
-  updateCommentCount(postId: string, count: number) {
-    return this._postRepository.updateCommentCount(postId, count);
+  updateCommentCount(postId: string, count: number, orgId: string) {
+    return this._postRepository.updateCommentCount(postId, count, orgId);
   }
 
   async updateReleaseId(orgId: string, postId: string, releaseId: string) {
@@ -581,7 +581,8 @@ export class PostsService {
       if (imageUpdateNeeded) {
         await this._postRepository.updateImages(
           id,
-          JSON.stringify(getImageList)
+          JSON.stringify(getImageList),
+          orgId
         );
       }
 
@@ -861,8 +862,8 @@ export class PostsService {
     return this._postRepository.countPostsFromDay(orgId, date);
   }
 
-  getPostByForWebhookId(id: string) {
-    return this._postRepository.getPostByForWebhookId(id);
+  getPostByForWebhookId(id: string, orgId: string) {
+    return this._postRepository.getPostByForWebhookId(id, orgId);
   }
 
   async startWorkflow(

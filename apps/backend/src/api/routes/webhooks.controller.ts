@@ -19,6 +19,7 @@ import {
 } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { safeFetch, webhookSignature, webhookTimeoutMs } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 @ApiTags('Webhooks')
 @Controller('/webhooks')
@@ -40,6 +41,7 @@ export class WebhookController {
   }
 
   @Put('/')
+  @RequirePermission('webhooks', 'update')
   async updateWebhook(
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpdateDto
@@ -81,6 +83,7 @@ export class WebhookController {
   }
 
   @Delete('/:id')
+  @RequirePermission('webhooks', 'delete')
   async deleteWebhook(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -89,7 +92,12 @@ export class WebhookController {
   }
 
   @Post('/send')
-  async sendWebhook(@Body() body: SendWebhookDto, @Query() query: OnlyURL) {
+  @RequirePermission('webhooks', 'create')
+  async sendWebhook(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: SendWebhookDto,
+    @Query() query: OnlyURL
+  ) {
     try {
       const serialized = JSON.stringify({
         event: 'webhook.send',

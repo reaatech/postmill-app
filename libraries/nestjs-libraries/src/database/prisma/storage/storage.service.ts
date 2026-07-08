@@ -759,7 +759,7 @@ export class StorageService {
     if (!config) {
       throw new HttpException('Provider not found', 404);
     }
-    const updated = await this._storageRepository.setDefaultFolder(providerId, folderId);
+    const updated = await this._storageRepository.setDefaultFolder(providerId, folderId, orgId);
     await this.#audit('set-default-folder', orgId, config, userId);
     return this.#sanitize(updated);
   }

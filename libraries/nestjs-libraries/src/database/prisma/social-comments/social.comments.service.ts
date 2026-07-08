@@ -405,11 +405,11 @@ export class SocialCommentsService {
       const toDelete = existing
         .filter((c) => !syncedIds.has(c.platformCommentId))
         .map((c) => c.id);
-      await this._socialCommentsRepository.softDeleteCommentsByIds(toDelete);
+      await this._socialCommentsRepository.softDeleteCommentsByIds(toDelete, orgId);
     }
 
     const count = await this._socialCommentsRepository.countComments(post.id);
-    await this._postsService.updateCommentCount(post.id, count);
+    await this._postsService.updateCommentCount(post.id, count, orgId);
   }
 
   async syncInbox(orgId: string): Promise<{ synced: boolean; timestamp: string }> {
@@ -472,8 +472,8 @@ export class SocialCommentsService {
     return this._socialCommentsRepository.findCommentsToPrune(orgId, cutoff, take);
   }
 
-  softDeleteCommentsByIds(ids: string[]) {
-    return this._socialCommentsRepository.softDeleteCommentsByIds(ids);
+  softDeleteCommentsByIds(ids: string[], orgId: string) {
+    return this._socialCommentsRepository.softDeleteCommentsByIds(ids, orgId);
   }
 
   getPostsForCommentDigest(orgId: string, cutoff: Date, take = 10) {
