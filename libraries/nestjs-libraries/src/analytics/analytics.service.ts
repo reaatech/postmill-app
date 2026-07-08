@@ -119,7 +119,7 @@ export class AnalyticsService {
 
   private async checkCoverage(
     orgId: string,
-    dbIntegrations: { id: string; providerIdentifier: string }[],
+    dbIntegrations: { id: string; providerIdentifier: string; providerVersion?: string | null }[],
     from: Date,
     to: Date
   ): Promise<number> {

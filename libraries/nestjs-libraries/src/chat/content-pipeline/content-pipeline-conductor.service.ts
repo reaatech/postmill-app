@@ -1,10 +1,11 @@
 import '@gitroom/nestjs-libraries/ai-designer/agent-mesh/agent-mesh-env.shim';
 import { randomUUID } from 'crypto';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { dispatchToAgent } from '@reaatech/agent-mesh-router';
 import type { AgentResponse } from '@reaatech/agent-mesh';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import {
   CONTENT_PIPELINE_AGENTS,
   CONTENT_PIPELINE_AGENT_IDS,
@@ -88,7 +89,9 @@ export class ContentPipelineConductorService {
 
   constructor(
     private readonly _budget: BudgetService,
-    private readonly _integrations: IntegrationManager
+    private readonly _integrations: IntegrationManager,
+    @Optional()
+    private readonly _integrationService?: IntegrationService
   ) {}
 
   async generate(
@@ -110,7 +113,8 @@ export class ContentPipelineConductorService {
       tone: brief.tone,
     });
 
-    const platformLimits = this._buildPlatformLimits(platforms);
+    const versions = await this._buildProviderVersionMap(orgId, platforms);
+    const platformLimits = this._buildPlatformLimits(platforms, versions);
 
     const perPlatform = await this._runCopywriter(orgId, userId, deadline, {
       plan,
@@ -372,11 +376,45 @@ export class ContentPipelineConductorService {
     }
   }
 
-  private _buildPlatformLimits(platforms: string[]): PlatformLimit[] {
+  private async _buildProviderVersionMap(
+    orgId: string,
+    platforms: string[]
+  ): Promise<Record<string, string> | undefined> {
+    if (!this._integrationService) {
+      return undefined;
+    }
+
+    try {
+      const integrations =
+        await this._integrationService.getIntegrationsList(orgId);
+      const map: Record<string, string> = {};
+      for (const integration of integrations) {
+        if (
+          platforms.includes(integration.providerIdentifier) &&
+          integration.providerVersion
+        ) {
+          map[integration.providerIdentifier] = integration.providerVersion;
+        }
+      }
+      return map;
+    } catch {
+      // Non-fatal: if the integration lookup fails we still want the pipeline
+      // to run with default max-length fallbacks.
+      return undefined;
+    }
+  }
+
+  private _buildPlatformLimits(
+    platforms: string[],
+    versions?: Record<string, string>
+  ): PlatformLimit[] {
     return platforms.map((id) => {
       let maxLength: number | undefined;
       try {
-        const provider = this._integrations.getSocialIntegrationUnchecked(id);
+        const provider = this._integrations.getSocialIntegrationUnchecked(
+          id,
+          versions?.[id] ?? undefined
+        );
         if (provider && typeof provider.maxLength === 'function') {
           maxLength = provider.maxLength();
         }

@@ -537,7 +537,8 @@ describe('PostsService Inngest dispatch', () => {
     await service.startWorkflow('linkedin-page', 'post-page', 'org-5', 'QUEUE' as State);
 
     expect(integrationManagerMock.getSocialIntegrationUnchecked).toHaveBeenCalledWith(
-      'linkedin-page'
+      'linkedin-page',
+      undefined
     );
     expect(inngest.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -561,6 +562,30 @@ describe('PostsService Inngest dispatch', () => {
         data: expect.objectContaining({
           taskQueue: 'unknown',
           maxConcurrentJob: 1,
+        }),
+      })
+    );
+  });
+
+  it('PV-09 regression: startWorkflow resolves the pinned provider version', async () => {
+    integrationManagerMock.getSocialIntegrationUnchecked.mockImplementation(
+      (_id: string, version?: string) =>
+        version === 'v1'
+          ? { maxConcurrentJob: 7 }
+          : { maxConcurrentJob: 99 }
+    );
+
+    await service.startWorkflow('x', 'post-v1', 'org-7', 'QUEUE' as State, 'v1');
+
+    expect(integrationManagerMock.getSocialIntegrationUnchecked).toHaveBeenCalledWith(
+      'x',
+      'v1'
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'post/publish',
+        data: expect.objectContaining({
+          maxConcurrentJob: 7,
         }),
       })
     );
@@ -927,7 +952,7 @@ describe('1.2 — retry post', () => {
           organizationId: 'org-1',
           state: 'ERROR',
           publishDate: new Date('2026-06-11T10:00:00.000Z'),
-          integration: { providerIdentifier: 'x' },
+          integration: { providerIdentifier: 'x', providerVersion: 'v1' },
         }),
       },
     });
@@ -940,7 +965,7 @@ describe('1.2 — retry post', () => {
       'org-1',
       expect.any(Date),
     );
-    expect(startSpy).toHaveBeenCalledWith('x', 'p1', 'org-1', State.QUEUE);
+    expect(startSpy).toHaveBeenCalledWith('x', 'p1', 'org-1', State.QUEUE, 'v1');
   });
 
   it('rejects non-ERROR posts', async () => {
