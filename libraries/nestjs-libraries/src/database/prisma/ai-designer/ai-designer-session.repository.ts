@@ -1,7 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import type { AiDesignerSession as PrismaAiDesignerSession } from '@prisma/client';
 import type { AiDesignerConfig, AiDesignerSessionState, DesignBrief } from '@gitroom/nestjs-libraries/ai-designer/ai-designer.types';
+import {
+  AiDesignerConfigSchema,
+  AiDesignerStateSchema,
+  ActiveDesignIdsSchema,
+  DesignBriefSchema,
+} from '@gitroom/nestjs-libraries/ai-designer/ai-designer.schemas';
 
 @Injectable()
 export class AiDesignerSessionRepository {
@@ -23,10 +29,21 @@ export class AiDesignerSessionRepository {
         userId: data.userId,
         mode: data.mode,
         format: data.format,
-        config: data.config as any,
-        brief: (data.brief ?? null) as any,
-        state: data.state ?? 'intake',
-        activeDesignIds: (data.activeDesignIds ?? null) as any,
+        config: this._parse(
+          'config',
+          data.config,
+          AiDesignerConfigSchema
+        ) as any,
+        brief:
+          data.brief === undefined || data.brief === null
+            ? null
+            : (this._parse('brief', data.brief, DesignBriefSchema) as any),
+        state: this._parse('state', data.state ?? 'intake', AiDesignerStateSchema) as any,
+        activeDesignIds: this._parse(
+          'activeDesignIds',
+          data.activeDesignIds ?? null,
+          ActiveDesignIdsSchema
+        ) as any,
       },
     });
   }
@@ -76,12 +93,29 @@ export class AiDesignerSessionRepository {
       activeDesignIds?: string[] | null;
     }
   ): Promise<PrismaAiDesignerSession> {
-    const prismaData: any = {};
-    if (data.state !== undefined) prismaData.state = data.state;
-    if (data.brief !== undefined) prismaData.brief = data.brief as any;
-    if (data.config !== undefined) prismaData.config = data.config as any;
+    const prismaData: Record<string, unknown> = {};
+    if (data.state !== undefined) {
+      prismaData.state = this._parse('state', data.state, AiDesignerStateSchema) as any;
+    }
+    if (data.brief !== undefined) {
+      prismaData.brief =
+        data.brief === null
+          ? null
+          : (this._parse('brief', data.brief, DesignBriefSchema) as any);
+    }
+    if (data.config !== undefined) {
+      prismaData.config = this._parse(
+        'config',
+        data.config,
+        AiDesignerConfigSchema
+      ) as any;
+    }
     if (data.activeDesignIds !== undefined) {
-      prismaData.activeDesignIds = data.activeDesignIds as any;
+      prismaData.activeDesignIds = this._parse(
+        'activeDesignIds',
+        data.activeDesignIds,
+        ActiveDesignIdsSchema
+      ) as any;
     }
 
     // Sessions are user-private (find/delete scope by userId too) — keep the
@@ -101,5 +135,19 @@ export class AiDesignerSessionRepository {
     return this._prisma.aiDesignerSession.delete({
       where: { id, organizationId, userId },
     });
+  }
+
+  private _parse<T>(
+    column: string,
+    value: unknown,
+    schema: import('zod').ZodType<T>
+  ): T {
+    try {
+      return schema.parse(value);
+    } catch (err) {
+      throw new BadRequestException(
+        `Invalid AI designer ${column}: ${(err as Error)?.message ?? String(err)}`
+      );
+    }
   }
 }

@@ -6,6 +6,7 @@ function makeService(overrides: any = {}) {
   const items = {
     tag: vi.fn().mockResolvedValue({}),
     setPostCampaign: vi.fn().mockResolvedValue({}),
+    deleteExpired: vi.fn().mockResolvedValue({ count: 0 }),
     ...overrides.items,
   };
   const resolver = {
@@ -71,5 +72,18 @@ describe('CampaignTagService.tagItem', () => {
     expect(items.tag).not.toHaveBeenCalled();
     // POST resolves its name via the fixed 'a post' short-circuit, never the resolver.
     expect(resolver.resolveBatch).not.toHaveBeenCalled();
+  });
+
+  describe('purgeExpiredItems', () => {
+    it('delegates to the repository and returns the deleted count', async () => {
+      const { service, items } = makeService({
+        items: { deleteExpired: vi.fn().mockResolvedValue({ count: 5 }) },
+      });
+
+      const result = await service.purgeExpiredItems(30);
+
+      expect(items.deleteExpired).toHaveBeenCalledWith(30, expect.any(Date));
+      expect(result).toEqual({ deleted: 5 });
+    });
   });
 });

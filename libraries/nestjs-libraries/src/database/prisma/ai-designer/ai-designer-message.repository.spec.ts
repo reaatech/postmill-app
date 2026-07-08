@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { BadRequestException } from '@nestjs/common';
 
 const redisMock = vi.hoisted(() => ({
   incr: vi.fn(),
@@ -102,5 +103,27 @@ describe('AiDesignerMessageRepository seq self-heal', () => {
     prisma.aiDesignerMessage.create.mockRejectedValue(new Error('boom'));
     await expect(repo.createNext(baseMsg)).rejects.toThrow('boom');
     expect(prisma.aiDesignerMessage.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects malformed message content before persisting', async () => {
+    redisMock.incr.mockResolvedValue(5);
+    await expect(
+      repo.createNext({
+        ...baseMsg,
+        content: { kind: 'text', unexpected: 'value' } as any,
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.aiDesignerMessage.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown message kind before persisting', async () => {
+    redisMock.incr.mockResolvedValue(5);
+    await expect(
+      repo.createNext({
+        ...baseMsg,
+        content: { kind: 'unknown', text: 'hi' } as any,
+      })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.aiDesignerMessage.create).not.toHaveBeenCalled();
   });
 });

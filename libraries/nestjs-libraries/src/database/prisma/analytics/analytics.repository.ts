@@ -891,6 +891,41 @@ export class AnalyticsRepository {
     });
   }
 
+  // M-05: anomaly persistence and rule-last-fired stamping must be atomic so a
+  // retry cannot re-notify without stamping (or stamp without persisting).
+  createAnomaliesAndStampRules(
+    rows: {
+      organizationId: string;
+      integrationId: string;
+      metric: string;
+      date: Date;
+      value: number;
+      baseline: number;
+      deviation: number;
+      direction: string;
+      topPostId?: string | null;
+      ruleId?: string | null;
+      notifiedAt?: Date | null;
+    }[],
+    orgId: string,
+    ruleIds: string[],
+    lastFiredAt: Date,
+  ) {
+    if (rows.length === 0 && ruleIds.length === 0) {
+      return Promise.resolve({ created: { count: 0 }, stamped: { count: 0 } });
+    }
+    return this._prisma.$transaction([
+      this._analyticsAnomaly.model.analyticsAnomaly.createMany({
+        data: rows,
+        skipDuplicates: true,
+      }),
+      this._prisma.analyticsAlertRule.updateMany({
+        where: { id: { in: ruleIds }, organizationId: orgId },
+        data: { lastFiredAt },
+      }),
+    ]);
+  }
+
   // Org-scoped delete — deleteMany so a cross-org id deletes 0 rows.
   deleteAlertRule(orgId: string, id: string) {
     return this._prisma.analyticsAlertRule.deleteMany({

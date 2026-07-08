@@ -232,19 +232,29 @@ export class MediaStudioService {
       singleFlight(`media-job:${j.id}`, () => this._lifecycle.processJob(j.id)).catch(() => undefined),
     );
     const jobs = await this._aiSettings.getMediaJobsByProvider(orgId, provider, limit);
-    return Promise.all(jobs.map((j) => this._presentJob(orgId, j)));
+    // M-03: batch-resolve File rows for all completed jobs in a single findMany,
+    // then map back to jobs, eliminating the N+1 query in _presentJob.
+    const fileMap = await this._resolveFileMap(orgId, jobs);
+    return jobs.map((j) => this._presentJob(j, fileMap));
   }
 
-  private async _presentJob(orgId: string, job: AIMediaJob) {
+  private async _resolveFileMap(orgId: string, jobs: AIMediaJob[]): Promise<Map<string, { id: string }>> {
+    const completedPaths = jobs
+      .filter((j) => j.status === 'completed' && j.artifactUrl)
+      .map((j) => j.artifactUrl!);
+    if (completedPaths.length === 0) return new Map<string, { id: string }>();
+    const files = (await this._fileService
+      .getFilesByPaths(orgId, completedPaths)
+      .catch(() => [])) as Array<{ path: string; id: string }>;
+    return new Map(files.map((f) => [f.path, f]));
+  }
+
+  private _presentJob(job: AIMediaJob, fileMap: Map<string, { id: string }>) {
     // The pending `pending://` ref is internal and must never reach the client; only a
     // completed job has a real /files URL. Resolve the File id too so the composer
     // handoff ("Post") can attach it.
     const completed = job.status === 'completed' && job.artifactUrl;
-    let fileId: string | null = null;
-    if (completed) {
-      const file = await this._fileService.getFileByPath(orgId, job.artifactUrl!).catch(() => null);
-      fileId = file?.id ?? null;
-    }
+    const fileId = completed ? fileMap.get(job.artifactUrl!)?.id ?? null : null;
     return {
       id: job.id,
       operation: job.operation,

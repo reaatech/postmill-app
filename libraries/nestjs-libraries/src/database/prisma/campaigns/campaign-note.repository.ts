@@ -85,32 +85,36 @@ export class CampaignNoteRepository {
 
   // Toggle a reaction: remove if it already exists, else create.
   // D7: defense-in-depth org check — the note must belong to the caller's org.
+  // M-04: the read/delete/create runs inside a Prisma transaction so concurrent
+  // toggles cannot both see "no existing reaction" and create duplicate rows.
   async toggleReaction(
     noteId: string,
     userId: string,
     emoji: string,
     organizationId: string
   ) {
-    const note = await this._prisma.campaignNote.findFirst({
-      where: { id: noteId, organizationId, deletedAt: null },
-      select: { id: true },
-    });
-    if (!note) {
-      throw new Error('Note not found');
-    }
-
-    const existing = await this._prisma.campaignNoteReaction.findUnique({
-      where: { noteId_userId_emoji: { noteId, userId, emoji } },
-    });
-    if (existing) {
-      await this._prisma.campaignNoteReaction.delete({
-        where: { id: existing.id },
+    return this._prisma.$transaction(async (tx) => {
+      const note = await tx.campaignNote.findFirst({
+        where: { id: noteId, organizationId, deletedAt: null },
+        select: { id: true },
       });
-      return { reacted: false };
-    }
-    await this._prisma.campaignNoteReaction.create({
-      data: { noteId, userId, emoji },
+      if (!note) {
+        throw new Error('Note not found');
+      }
+
+      const existing = await tx.campaignNoteReaction.findUnique({
+        where: { noteId_userId_emoji: { noteId, userId, emoji } },
+      });
+      if (existing) {
+        await tx.campaignNoteReaction.delete({
+          where: { id: existing.id },
+        });
+        return { reacted: false };
+      }
+      await tx.campaignNoteReaction.create({
+        data: { noteId, userId, emoji },
+      });
+      return { reacted: true };
     });
-    return { reacted: true };
   }
 }
