@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Button } from '@gitroom/react/form/button';
 import { SetupStepper } from '@gitroom/frontend/components/setup/setup-stepper';
@@ -35,6 +36,19 @@ export function SetupWizard() {
   const fetch = useFetch();
   const router = useRouter();
   const { mutate: globalMutate } = useSWRConfig();
+
+  // Setup configures org-level providers (owner/admin only). A member who lands here directly
+  // can't complete the required LLM step (AI-config endpoints 403) — send them to the app
+  // instead of a dead-end wizard. The layout gate already avoids force-redirecting members
+  // here; this covers direct navigation / stale links.
+  const permissions = usePermissions();
+  const canCompleteSetup =
+    permissions.isSuperAdmin || permissions.isOwner || permissions.isAdmin;
+  useEffect(() => {
+    if (permissions.isResolved && !canCompleteSetup) {
+      router.replace('/dashboard');
+    }
+  }, [permissions.isResolved, canCompleteSetup, router]);
 
   // Restore the active step after an OAuth full-page round-trip (connecting a channel or an
   // OAuth short-link provider navigates the tab out to the provider and back; the gate then

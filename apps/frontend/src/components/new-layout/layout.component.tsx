@@ -103,7 +103,17 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   // Only gate once `user` has loaded. `!user?.setupCompleted` is truthy while the
   // SWR request is still in flight (user === undefined), which would redirect to
   // /setup on every reload before we even know the real value.
-  const mustSetup = !!user && !user.setupCompleted;
+  //
+  // Setup configures org-level providers (AI/channels/…) — an owner/admin concern. A member
+  // CANNOT complete the required LLM step (the AI-config endpoints 403), so forcing them onto
+  // /setup is a dead-end. Only redirect users who can actually finish it; everyone else
+  // proceeds into the app, which runs in the existing no-AI state until an admin configures a
+  // provider. Wait for permissions to resolve before deciding, so a member is never trapped.
+  const permissions = usePermissions();
+  const canCompleteSetup =
+    permissions.isSuperAdmin || permissions.isOwner || permissions.isAdmin;
+  const setupIncomplete = !!user && !user.setupCompleted;
+  const mustSetup = setupIncomplete && permissions.isResolved && canCompleteSetup;
 
   useEffect(() => {
     if (mustSetup) {
@@ -112,6 +122,9 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   }, [mustSetup, router]);
 
   if (!user) return null;
+  // Hold rendering while setup is incomplete and we don't yet know the role — avoids briefly
+  // flashing the app to someone who is about to be redirected to /setup.
+  if (setupIncomplete && !permissions.isResolved) return null;
   if (mustSetup) return null;
 
   return (
