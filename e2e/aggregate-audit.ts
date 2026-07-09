@@ -54,12 +54,15 @@ for (const persona of PERSONAS) {
   if (ex?.findings) for (const f of ex.findings) {
     for (const flag of f.flags || []) add(f.area || 'misc', f.path, typeOf(flag), sevOf(flag), 'exercise', persona, flag);
   }
-  // A11y
-  const a11y = read(`results-a11y-${persona}.json`);
-  if (a11y?.findings) for (const f of a11y.findings) {
-    for (const v of f.violations || []) {
-      const sev: Sev = v.impact === 'critical' || v.impact === 'serious' ? 'P2' : 'P3';
-      add(f.area || 'misc', f.path, `a11y:${v.id}`, sev, 'a11y', persona, `${v.impact} ${v.help} ×${v.nodes}`);
+  // A11y — per theme (dark/light) plus the legacy untagged file.
+  for (const theme of ['dark', 'light', '']) {
+    const a11y = read(theme ? `results-a11y-${persona}-${theme}.json` : `results-a11y-${persona}.json`);
+    if (a11y?.findings) for (const f of a11y.findings) {
+      for (const v of f.violations || []) {
+        const sev: Sev = v.impact === 'critical' || v.impact === 'serious' ? 'P2' : 'P3';
+        const tag = theme ? `a11y:${v.id}@${theme}` : `a11y:${v.id}`;
+        add(f.area || 'misc', f.path, tag, sev, 'a11y', persona, `${v.impact} ${v.help} ×${v.nodes}`);
+      }
     }
   }
 }

@@ -12,10 +12,17 @@ import { ROUTES } from './lib/routes';
  */
 const PERSONA = () => test.info().project.name || 'admin';
 
-test('axe a11y scan every route', async ({ page }) => {
+// Theme to scan: `E2E_THEME=light` sets the `mode` cookie so axe runs against the light palette
+// (surfaces light-only contrast issues). Defaults to the app default (dark).
+const THEME = process.env.E2E_THEME === 'light' ? 'light' : 'dark';
+
+test('axe a11y scan every route', async ({ page, context }) => {
   test.setTimeout(300_000);
   const persona = PERSONA();
   const findings: any[] = [];
+  if (THEME === 'light') {
+    await context.addCookies([{ name: 'mode', value: 'light', domain: 'localhost', path: '/' }]);
+  }
 
   for (const route of ROUTES) {
     const f: any = { name: route.name, path: route.path, persona, area: route.area };
@@ -52,8 +59,8 @@ test('axe a11y scan every route', async ({ page }) => {
   }
 
   fs.writeFileSync(
-    path.join(__dirname, `../results-a11y-${persona}.json`),
-    JSON.stringify({ persona, findings }, null, 2)
+    path.join(__dirname, `../results-a11y-${persona}-${THEME}.json`),
+    JSON.stringify({ persona, theme: THEME, findings }, null, 2)
   );
 
   const withViol = findings.filter((f) => f.violationCount > 0);
