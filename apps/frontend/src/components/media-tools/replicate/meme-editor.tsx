@@ -337,7 +337,7 @@ export function MemeEditor() {
                     e.stopPropagation();
                     removeLayer(l.id);
                   }}
-                  className="text-red-400 hover:text-red-300 ml-2"
+                  className="text-dangerText hover:text-red-300 ml-2"
                 >
                   ✕
                 </button>

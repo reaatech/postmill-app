@@ -20,6 +20,9 @@
     /* Accessible accent text for subtle btnPrimary/15 chips (a11y: text-btnPrimary fails
        AA ~3.3:1 on the tinted-over-dark bg). Lighter blue → ~5.9:1 on dark chip surfaces. */
     --new-btn-primary-accent: #6d95ec;
+    /* Theme-aware danger/error text (a11y: text-dangerText is only ~2.5:1 on the light bg).
+       Dark: light red (readable on dark surfaces + dark-red chips). */
+    --new-danger-text: #f87171;
     --new-ai-btn: #1d9bf0;
     --new-promo: #aa0fa4;
     --new-badge: #d6006e;
@@ -79,6 +82,9 @@
     /* Accessible accent text for subtle btnPrimary/15 chips in light mode: darker blue →
        ~5.7:1 on the light tinted chip bg (plain btnPrimary is ~4.2:1 there). */
     --new-btn-primary-accent: #1e47b8;
+    /* Light: deep red — passes on the page bg, white cards, AND the light-pink bg-red-900/20
+       danger chips (a lighter red would fail on those). */
+    --new-danger-text: #a01212;
     --new-ai-btn: #1d9bf0;
     --new-promo: #aa0fa4;
     --new-badge: #d6006e;

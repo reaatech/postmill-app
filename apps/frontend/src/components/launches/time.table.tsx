@@ -223,7 +223,7 @@ export const TimeTable: FC<{
                 <button
                   type="button"
                   onClick={removeSlot(timeSlot.value)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-[8px] hover:bg-red-500/10 rounded-[6px] text-red-400 hover:text-red-500"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity p-[8px] hover:bg-red-500/10 rounded-[6px] text-dangerText hover:text-red-500"
                 >
                   <TrashIcon size={16} />
                 </button>

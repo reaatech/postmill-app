@@ -358,7 +358,7 @@ export const ComposerLibraryModal: FC<ComposerLibraryModalProps> = ({
 
         {!isLoading && error && (
           <div className="flex flex-col items-center justify-center h-[160px] gap-[12px] text-center">
-            <span className="text-[14px] text-red-400">
+            <span className="text-[14px] text-dangerText">
               {t('library_load_failed', 'Failed to load library items')}
             </span>
             <Button onClick={() => window.location.reload()} secondary>

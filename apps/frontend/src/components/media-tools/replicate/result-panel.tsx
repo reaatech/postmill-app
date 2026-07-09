@@ -279,7 +279,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
     return (
       <Frame>
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-16 px-6">
-          <p className="text-red-400 text-center">{error || 'Generation failed'}</p>
+          <p className="text-dangerText text-center">{error || 'Generation failed'}</p>
           {!isInputError && (
             <p className="text-xs text-newTextColor/50 text-center max-w-sm">
               If a generation fails for no clear reason, check your{' '}

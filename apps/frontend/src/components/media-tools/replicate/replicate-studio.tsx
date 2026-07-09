@@ -239,7 +239,7 @@ function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string })
     runState === 'running'
       ? 'text-amber-600'
       : runState === 'error'
-        ? 'text-red-400'
+        ? 'text-dangerText'
         : runState === 'success'
           ? 'text-green-400'
           : 'text-newTextColor/50';

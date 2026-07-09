@@ -262,7 +262,7 @@ export function ProviderConfigForm<Meta = any>({
           className={`text-[13px] px-[12px] py-[8px] rounded-[4px] ${
             testResult === 'success'
               ? 'bg-green-900/20 text-green-400'
-              : 'bg-red-900/20 text-red-400'
+              : 'bg-red-900/20 text-dangerText'
           }`}
         >
           {testResult === 'success'

@@ -83,7 +83,7 @@ export const FilePreviewModal: FC<{
           {onRemoveFromCampaign && (
             <button
               onClick={() => onRemoveFromCampaign(file)}
-              className="px-[16px] py-[10px] rounded-[8px] border border-red-500/50 text-red-400 text-[13px] font-[500] hover:bg-red-500/10 transition-all"
+              className="px-[16px] py-[10px] rounded-[8px] border border-red-500/50 text-dangerText text-[13px] font-[500] hover:bg-red-500/10 transition-all"
             >
               Remove from campaign
             </button>

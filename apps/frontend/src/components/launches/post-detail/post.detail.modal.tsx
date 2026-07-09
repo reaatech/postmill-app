@@ -322,7 +322,7 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
               <div className="text-[12px] text-red-500 font-[500] mb-[4px]">
                 {t('error_details', 'Error details')}
               </div>
-              <div className="text-[12px] text-red-400 break-words">
+              <div className="text-[12px] text-dangerText break-words">
                 {mainPost.errors.map((e: any) => e.message || e.error).join('; ')}
               </div>
             </div>

@@ -324,7 +324,7 @@ export const FolderTree: FC<{
           <div className="border-t border-newBorder my-[4px]" />
           <button
             onClick={() => handleDelete(contextMenu.folderId)}
-            className="w-full text-left px-[12px] py-[8px] text-[13px] text-red-400 hover:bg-boxHover transition-all"
+            className="w-full text-left px-[12px] py-[8px] text-[13px] text-dangerText hover:bg-boxHover transition-all"
           >
             Delete
           </button>

@@ -175,7 +175,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
           </div>
 
           {testResult && (
-            <div className={clsx('mt-[12px] p-[12px] rounded-[4px] text-[13px]', testResult.success ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-400')}>
+            <div className={clsx('mt-[12px] p-[12px] rounded-[4px] text-[13px]', testResult.success ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-dangerText')}>
               {testResult.success
                 ? t('webhook_test_success', 'Webhook responded with status {status}', { status: String(testResult.status) })
                 : t('webhook_test_failed', 'Webhook test failed: {error}', { error: testResult.error || 'Unknown error' })}
@@ -273,7 +273,7 @@ export const Webhooks: FC = () => {
 
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
-            <div className="text-red-400 text-[14px]">{t('failed_loading_webhooks', 'Failed to load webhooks')}</div>
+            <div className="text-dangerText text-[14px]">{t('failed_loading_webhooks', 'Failed to load webhooks')}</div>
             <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
@@ -322,7 +322,7 @@ export const Webhooks: FC = () => {
                   <div className="flex justify-end gap-[8px]">
                     <button onClick={() => testPing(w)} className="text-[12px] text-textColor hover:underline">{t('test', 'Test')}</button>
                     <button onClick={addWebhook(w)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
-                    <button onClick={deleteHook(w)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
+                    <button onClick={deleteHook(w)} className="text-[12px] text-dangerText hover:underline">{t('delete', 'Delete')}</button>
                   </div>
                 </div>
               ))}

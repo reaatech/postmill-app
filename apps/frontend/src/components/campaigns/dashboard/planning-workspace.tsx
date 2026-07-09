@@ -469,7 +469,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
 
       {blockedMessages.length > 0 && (
         <div className="rounded-[8px] border border-red-500/30 bg-red-500/10 p-[12px] flex flex-col gap-[6px]">
-          <span className="text-[13px] font-medium text-red-400">
+          <span className="text-[13px] font-medium text-dangerText">
             {t('promote_blocked', 'Some drafts could not be promoted')}
           </span>
           <ul className="list-disc list-inside text-[12px] text-red-300">
