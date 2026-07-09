@@ -540,6 +540,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           id: post.id,
         },
         group,
+        // Per-post `type` mirrors the submit mode. Required for drafts: create.post.dto skips
+        // per-provider settings validation only when the POST's own `type === 'draft'`
+        // (@ValidateIf on Post.settings) — without it, a draft with X/provider settings is
+        // rejected by forbidNonWhitelisted and silently fails to save (data loss).
+        ...(type === 'draft' ? { type: 'draft' } : {}),
         settings: colorize(post.settings),
         value: post.values.map((value: any) => ({
           ...(value.id ? { id: value.id } : {}),
