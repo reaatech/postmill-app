@@ -15,9 +15,12 @@ import { StepStorage } from '@gitroom/frontend/components/setup/steps/step-stora
 import { StepShortlinks } from '@gitroom/frontend/components/setup/steps/step-shortlinks';
 import { StepVpn } from '@gitroom/frontend/components/setup/steps/step-vpn';
 
-// Only StepLlm consumes `onProviderChange`; the others are no-arg components and
-// remain assignable to this prop type (extra optional props are ignored).
-const STEP_COMPONENTS: React.FC<{ onProviderChange?: () => void }>[] = [
+// Only StepLlm consumes `onProviderChange` / `onActiveChange`; the others are no-arg
+// components and remain assignable to this prop type (extra optional props are ignored).
+const STEP_COMPONENTS: React.FC<{
+  onProviderChange?: () => void;
+  onActiveChange?: (active: boolean) => void;
+}>[] = [
   StepLlm,
   StepAiMedia,
   StepChannels,
@@ -47,6 +50,9 @@ export function SetupWizard() {
   const [skippedSteps, setSkippedSteps] = useState<Set<number>>(new Set());
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+  // Live, uncached active-provider signal reported by StepLlm's own SWR surface — the
+  // authoritative gate source (the /dashboard/summary read below is Redis-cached 60s).
+  const [llmActive, setLlmActive] = useState(false);
 
   const steps = useMemo(
     () => [
@@ -85,7 +91,9 @@ export function SetupWizard() {
     }
   }, [currentStep]);
 
-  const aiProviderActive = !!summary?.aiProviderActive;
+  // Prefer the live surface signal; fall back to the (cached) summary so a returning user
+  // resuming setup with an already-active provider still clears the gate on first mount.
+  const aiProviderActive = llmActive || !!summary?.aiProviderActive;
   const isLastStep = currentStep === steps.length - 1;
   const canFinish = aiProviderActive;
 
@@ -172,7 +180,10 @@ export function SetupWizard() {
       />
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ActiveStepComponent onProviderChange={handleProviderChange} />
+        <ActiveStepComponent
+          onProviderChange={handleProviderChange}
+          onActiveChange={setLlmActive}
+        />
       </div>
 
       {finishError && (
