@@ -5,6 +5,9 @@ import { OpenAIAdapter } from '../ai.adapter';
 vi.mock('@ai-sdk/openai', () => ({
   createOpenAI: vi.fn(() => ({
     languageModel: vi.fn(() => ({ modelId: 'gpt-4.1' })),
+    // The adapter pins language models to Chat Completions via `.chat()` (avoids the
+    // Responses-API `{ type: 'text' }` 400) — mock it to mirror `.languageModel()`.
+    chat: vi.fn((modelId: string) => ({ modelId })),
     imageModel: vi.fn(function() { return {}; }),
     textEmbeddingModel: vi.fn(function() { return {}; }),
     speechModel: vi.fn(function() { return {}; }),
