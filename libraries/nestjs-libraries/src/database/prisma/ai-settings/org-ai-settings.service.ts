@@ -14,7 +14,7 @@ import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/p
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
 import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
-import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
+import { bustDefaultsCatalogCache } from '@gitroom/nestjs-libraries/ai/defaults/defaults-cache';
 import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 
 @Injectable()
@@ -26,8 +26,7 @@ export class OrgAiSettingsService {
     private _encryption: EncryptionService,
     private _resolution: ProviderResolutionService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
-    @Inject(forwardRef(() => AiDefaultsService))
-    private _defaultsService: AiDefaultsService,
+    @Inject(forwardRef(() => DefaultsSeedService))
     private _defaultsSeed: DefaultsSeedService,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
   ) {}
@@ -203,7 +202,7 @@ export class OrgAiSettingsService {
     // Intentionally detached + non-fatal: seeding must never delay or fail the provider
     // config response.
     this._defaultsSeed.seedUnset(orgId).catch(() => undefined);
-    this._defaultsService.bustDefaultsCatalogCache(orgId);
+    bustDefaultsCatalogCache(orgId);
 
     return result;
   }
@@ -229,7 +228,7 @@ export class OrgAiSettingsService {
 
     // Eagerly seed any unset model/media defaults now that the active provider changed.
     this._defaultsSeed.seedUnset(orgId).catch(() => undefined);
-    this._defaultsService.bustDefaultsCatalogCache(orgId);
+    bustDefaultsCatalogCache(orgId);
 
     return result;
   }
@@ -242,7 +241,7 @@ export class OrgAiSettingsService {
     const result = await this._repository.delete(orgId, identifier, version);
     // 1.3a: evict the cached capability for the deleted config.
     this._resolution.invalidate('ai', identifier, orgId);
-    this._defaultsService.bustDefaultsCatalogCache(orgId);
+    bustDefaultsCatalogCache(orgId);
     return result;
   }
 

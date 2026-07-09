@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { shuffle } from 'lodash';
 import { z } from 'zod';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
@@ -39,6 +39,7 @@ export class OpenaiService {
   private readonly _logger = new Logger(OpenaiService.name);
 
   constructor(
+    @Inject(forwardRef(() => AIModelProvider))
     private readonly _aiModelProvider: AIModelProvider,
     private readonly _aiMediaService: AiMediaService,
   ) {}

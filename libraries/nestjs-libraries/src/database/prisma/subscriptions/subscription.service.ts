@@ -14,6 +14,7 @@ export class SubscriptionService {
     private readonly _subscriptionRepository: SubscriptionRepository,
     @Inject(forwardRef(() => IntegrationService))
     private readonly _integrationService: IntegrationService,
+    @Inject(forwardRef(() => OrganizationService))
     private readonly _organizationService: OrganizationService
   ) {}
 

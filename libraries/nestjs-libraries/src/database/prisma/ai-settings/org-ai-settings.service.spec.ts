@@ -33,10 +33,6 @@ const mockKernel = {
   latestActive: vi.fn(),
 };
 
-const mockDefaultsService = {
-  bustDefaultsCatalogCache: vi.fn(),
-};
-
 const mockDefaultsSeed = {
   seedUnset: vi.fn().mockResolvedValue(undefined),
 };
@@ -45,8 +41,8 @@ vi.mock('./org-ai-settings.repository', () => ({
   OrgAiSettingsRepository: vi.fn(() => mockRepo),
 }));
 
-vi.mock('@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service', () => ({
-  AiDefaultsService: vi.fn(() => mockDefaultsService),
+vi.mock('@gitroom/nestjs-libraries/ai/defaults/defaults-cache', () => ({
+  bustDefaultsCatalogCache: vi.fn(),
 }));
 
 vi.mock('@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service', () => ({
@@ -79,6 +75,7 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/media-providers/provider-cred
 }));
 
 import { OrgAiSettingsService } from './org-ai-settings.service';
+import { bustDefaultsCatalogCache as mockBustCache } from '@gitroom/nestjs-libraries/ai/defaults/defaults-cache';
 
 describe('OrgAiSettingsService.upsert auto-activation', () => {
   let service: OrgAiSettingsService;
@@ -94,7 +91,6 @@ describe('OrgAiSettingsService.upsert auto-activation', () => {
       mockEncryption as any,
       mockResolution as any,
       mockKernel as any,
-      mockDefaultsService as any,
       mockDefaultsSeed as any,
       undefined,
     );
@@ -260,7 +256,7 @@ describe('OrgAiSettingsService.upsert auto-activation', () => {
     await service.upsert('org-1', 'openai', { enabled: false });
 
     expect(mockDefaultsSeed.seedUnset).toHaveBeenCalledWith('org-1');
-    expect(mockDefaultsService.bustDefaultsCatalogCache).toHaveBeenCalledWith('org-1');
+    expect(mockBustCache).toHaveBeenCalledWith('org-1');
   });
 });
 
@@ -287,7 +283,6 @@ describe('OrgAiSettingsService reads/mutations', () => {
       mockEncryption as any,
       mockResolution as any,
       mockKernel as any,
-      mockDefaultsService as any,
       mockDefaultsSeed as any,
       undefined,
     );
@@ -469,7 +464,7 @@ describe('OrgAiSettingsService reads/mutations', () => {
       await service.setActive('org-1', 'openai');
 
       expect(mockDefaultsSeed.seedUnset).toHaveBeenCalledWith('org-1');
-      expect(mockDefaultsService.bustDefaultsCatalogCache).toHaveBeenCalledWith('org-1');
+      expect(mockBustCache).toHaveBeenCalledWith('org-1');
     });
   });
 
@@ -526,7 +521,7 @@ describe('OrgAiSettingsService reads/mutations', () => {
       mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1' });
       mockRepo.delete.mockResolvedValue({ ok: true });
       await service.delete('org-1', 'openai');
-      expect(mockDefaultsService.bustDefaultsCatalogCache).toHaveBeenCalledWith('org-1');
+      expect(mockBustCache).toHaveBeenCalledWith('org-1');
     });
 
     it('getBudget delegates to the repository', async () => {

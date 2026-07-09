@@ -19,6 +19,7 @@ import {
 @Injectable()
 export class RefreshIntegrationService {
   constructor(
+    @Inject(forwardRef(() => IntegrationManager))
     private _integrationManager: IntegrationManager,
     @Inject(forwardRef(() => IntegrationService))
     private _integrationService: IntegrationService

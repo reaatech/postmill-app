@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import {
   BadRequestException,
+  forwardRef,
   Inject,
   Injectable,
   Logger,
@@ -42,6 +43,7 @@ export class IntegrationManager {
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     private _providerResolutionService: ProviderResolutionService,
     private _integrationRepository: IntegrationRepository,
+    @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
   ) {}
 

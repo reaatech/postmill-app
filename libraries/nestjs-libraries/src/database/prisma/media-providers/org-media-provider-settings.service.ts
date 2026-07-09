@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional, Inject, HttpException } from '@nestjs/common';
+import { forwardRef, Injectable, Logger, Optional, Inject, HttpException } from '@nestjs/common';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
@@ -57,6 +57,7 @@ export class OrgMediaProviderSettingsService {
     private _resolution: ProviderResolutionService,
     private _fileService: FileService,
     private _storageService: StorageService,
+    @Inject(forwardRef(() => DefaultsSeedService))
     private _defaultsSeed: DefaultsSeedService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,

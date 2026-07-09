@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { OrgDefaultModelRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-default-model.repository';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { DefaultsResolutionService } from './defaults-resolution.service';
@@ -11,6 +11,7 @@ export class DefaultsSeedService {
   constructor(
     private _repository: OrgDefaultModelRepository,
     private _resolution: DefaultsResolutionService,
+    @Inject(forwardRef(() => OrganizationService))
     private _organizationService: OrganizationService,
   ) {}
 
