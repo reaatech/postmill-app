@@ -234,7 +234,7 @@ const AddOrEditSignature: FC<{
             <button
               type="button"
               onClick={() => setPicture(null)}
-              className="text-[12px] text-dangerText hover:underline"
+              className="text-[12px] text-red-400 hover:underline"
             >
               {t('remove', 'Remove')}
             </button>
@@ -457,7 +457,7 @@ export const SignaturesComponent: FC<{
 
       {!isLoading && error && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
-          <span className="text-[14px] text-dangerText">
+          <span className="text-[14px] text-red-400">
             {t('failed_loading_signatures', 'Failed to load signatures')}
           </span>
           <button
@@ -577,7 +577,7 @@ export const SignaturesComponent: FC<{
                   </button>
                   <button
                     onClick={deleteSignature(sig)}
-                    className="text-[12px] text-dangerText hover:underline"
+                    className="text-[12px] text-red-400 hover:underline"
                   >
                     {t('delete', 'Delete')}
                   </button>

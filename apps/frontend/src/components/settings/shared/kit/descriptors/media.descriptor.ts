@@ -129,7 +129,7 @@ export const mediaDescriptor: ProviderSurfaceDescriptor<MediaMeta> = {
       {
         key: 'video',
         label: 'Video',
-        activeClass: 'bg-red-500/20 text-dangerText border-red-500/40',
+        activeClass: 'bg-red-500/20 text-red-400 border-red-500/40',
       },
       {
         key: 'audio',
@@ -141,7 +141,7 @@ export const mediaDescriptor: ProviderSurfaceDescriptor<MediaMeta> = {
 
   capabilityMeta: {
     image: { label: 'Image', color: 'bg-blue-500/20 text-blue-400' },
-    video: { label: 'Video', color: 'bg-red-500/20 text-dangerText' },
+    video: { label: 'Video', color: 'bg-red-500/20 text-red-400' },
     audio: { label: 'Audio', color: 'bg-green-500/20 text-green-400' },
     avatar: { label: 'Avatar', color: 'bg-purple-500/20 text-purple-400' },
   },

@@ -88,7 +88,7 @@ const CAPABILITY_COLORS: Record<string, string> = {
   comments: 'bg-purple-500/20 text-purple-400',
   firstComment: 'bg-amber-500/20 text-amber-400',
   poll: 'bg-emerald-500/20 text-emerald-400',
-  video: 'bg-red-500/20 text-dangerText',
+  video: 'bg-red-500/20 text-red-400',
   carousel: 'bg-pink-500/20 text-pink-400',
   altText: 'bg-cyan-500/20 text-cyan-400',
   linkPreview: 'bg-indigo-500/20 text-indigo-400',
@@ -312,7 +312,7 @@ const ProviderPicker: FC<{
                       </span>
                     )}
                     {retired && (
-                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-red-500/15 text-dangerText">
+                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-red-500/15 text-red-400">
                         {t('retired', 'Retired')}
                       </span>
                     )}

@@ -308,7 +308,7 @@ export const TeamsComponent = () => {
 
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
-            <div className="text-dangerText text-[14px]">{t('failed_loading_team', 'Failed to load team')}</div>
+            <div className="text-red-400 text-[14px]">{t('failed_loading_team', 'Failed to load team')}</div>
             <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
@@ -370,7 +370,7 @@ export const TeamsComponent = () => {
                   align: 'right',
                   render: (m: any) =>
                     canManageMember(m) ? (
-                      <button onClick={remove(m)} className="text-[12px] text-dangerText hover:text-red-300 transition-colors">
+                      <button onClick={remove(m)} className="text-[12px] text-red-400 hover:text-red-300 transition-colors">
                         {t('remove', 'Remove')}
                       </button>
                     ) : (

@@ -42,7 +42,6 @@ module.exports = {
         btnText: 'var(--new-btn-text)',
         btnPrimary: 'var(--new-btn-primary)',
         btnPrimaryAccent: 'var(--new-btn-primary-accent)',
-        dangerText: 'var(--new-danger-text)',
         ai: 'var(--new-ai-btn)',
         promo: 'var(--new-promo)',
         badge: 'var(--new-badge)',

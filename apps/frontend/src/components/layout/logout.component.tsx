@@ -57,7 +57,7 @@ export const LogoutComponent: FC<{ isIcon?: boolean }> = ({ isIcon }) => {
             />
           </svg>
         ) : (
-          <span className="text-dangerText">
+          <span className="text-red-400">
             {t('logout_from', 'Logout from')}
             {' Postmill'}
           </span>

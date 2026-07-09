@@ -84,7 +84,7 @@ const UrlClipModal: FC<{ onClose: () => void; onSubmit: (url: string) => void }>
         placeholder="https://example.com/clip.mp4"
         className={fieldInput}
       />
-      {err && <p className="text-xs text-dangerText">{err}</p>}
+      {err && <p className="text-xs text-red-400">{err}</p>}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onClose} className={toolbarBtn}>
           Cancel
@@ -303,14 +303,14 @@ export function MergeEditor() {
               </div>
             </div>
           )}
-          <button onClick={() => removeClip(selected!)} className="text-xs text-dangerText hover:text-red-300">
+          <button onClick={() => removeClip(selected!)} className="text-xs text-red-400 hover:text-red-300">
             Remove clip
           </button>
         </div>
       ) : (
         <p className="text-xs text-newTextColor/50">Select a clip in the strip to trim it or set its transition.</p>
       )}
-      {error && <p className="text-xs text-dangerText">{error}</p>}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 

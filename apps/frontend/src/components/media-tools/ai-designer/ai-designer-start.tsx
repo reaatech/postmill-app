@@ -268,7 +268,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                     <button
                       type="button"
                       onClick={() => removeCustomSize(s.id)}
-                      className="text-textColor/50 hover:text-dangerText"
+                      className="text-textColor/50 hover:text-red-400"
                       aria-label="Remove custom size"
                     >
                       ✕
@@ -376,7 +376,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                         )
                       )
                     }
-                    className="text-textColor/50 hover:text-dangerText"
+                    className="text-textColor/50 hover:text-red-400"
                     aria-label="Remove reference"
                   >
                     ✕

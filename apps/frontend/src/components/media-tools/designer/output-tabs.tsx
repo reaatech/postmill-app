@@ -316,7 +316,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                   onClick={(e) => handleRemove(e, i)}
                   title="Remove format"
                   aria-label="Remove format"
-                  className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[9px] text-dangerText hover:bg-red-500/20"
+                  className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[9px] text-red-400 hover:bg-red-500/20"
                 >
                   ×
                 </button>
@@ -388,7 +388,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                           closePopover();
                         }}
                         aria-label="Remove format"
-                        className="w-5 h-5 flex items-center justify-center rounded text-[10px] text-dangerText hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100"
+                        className="w-5 h-5 flex items-center justify-center rounded text-[10px] text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100"
                       >
                         ×
                       </button>

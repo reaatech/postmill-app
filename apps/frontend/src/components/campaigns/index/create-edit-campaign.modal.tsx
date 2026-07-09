@@ -225,7 +225,7 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
             <button
               type="button"
               onClick={() => removeGoal(idx)}
-              className="text-[12px] text-dangerText hover:text-red-300 px-[6px]"
+              className="text-[12px] text-red-400 hover:text-red-300 px-[6px]"
             >
               {t('remove', 'Remove')}
             </button>

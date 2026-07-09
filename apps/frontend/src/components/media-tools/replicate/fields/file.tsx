@@ -66,7 +66,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
       {label && (
         <label className="block text-xs text-newTextColor/70 mb-1">
           {label}
-          {required && <span className="text-dangerText ml-1">*</span>}
+          {required && <span className="text-red-400 ml-1">*</span>}
         </label>
       )}
       <div className="flex gap-2">
@@ -85,7 +85,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
           <button
             type="button"
             onClick={handleClear}
-            className="px-2 py-2 rounded-lg text-newTextColor/60 hover:text-dangerText transition-colors"
+            className="px-2 py-2 rounded-lg text-newTextColor/60 hover:text-red-400 transition-colors"
             aria-label="Clear file"
           >
             ✕

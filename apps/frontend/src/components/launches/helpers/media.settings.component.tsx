@@ -444,7 +444,7 @@ export const MediaComponentInner: FC<{
             {altTextLoading ? 'Generating...' : 'Generate Alt Text'}
           </button>
           {altTextError && (
-            <span className="text-[12px] text-dangerText">{altTextError}</span>
+            <span className="text-[12px] text-red-400">{altTextError}</span>
           )}
         </div>
       </div>

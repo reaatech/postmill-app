@@ -85,7 +85,7 @@ export const PanelItem: FC<{
         type="button"
         disabled={busy}
         onClick={() => onRemove(item.entityType as CampaignEntitySlug, item.id)}
-        className="text-[12px] text-newTableText hover:text-dangerText shrink-0 px-[6px] py-[2px] rounded-[4px] hover:bg-red-500/10 transition-colors disabled:opacity-40"
+        className="text-[12px] text-newTableText hover:text-red-400 shrink-0 px-[6px] py-[2px] rounded-[4px] hover:bg-red-500/10 transition-colors disabled:opacity-40"
         aria-label="Remove"
       >
         ×
@@ -189,7 +189,7 @@ export const AddItemsModal: FC<{
           </div>
         )}
         {error && (
-          <div className="text-center py-[24px] text-[13px] text-dangerText">
+          <div className="text-center py-[24px] text-[13px] text-red-400">
             {t('failed_to_load_entities', 'Failed to load entities')}
           </div>
         )}

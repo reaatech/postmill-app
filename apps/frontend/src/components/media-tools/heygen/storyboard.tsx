@@ -169,7 +169,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               <div className="flex items-center gap-[2px]">
                 <button type="button" aria-label="Move left" disabled={index === 0} onClick={() => moveScene(index, -1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">‹</button>
                 <button type="button" aria-label="Move right" disabled={index === scenes.length - 1} onClick={() => moveScene(index, 1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">›</button>
-                <button type="button" aria-label="Remove scene" disabled={scenes.length === 1} onClick={() => removeScene(scene.key)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-dangerText hover:bg-boxHover disabled:opacity-30">✕</button>
+                <button type="button" aria-label="Remove scene" disabled={scenes.length === 1} onClick={() => removeScene(scene.key)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-red-400 hover:bg-boxHover disabled:opacity-30">✕</button>
               </div>
             </div>
 
@@ -234,7 +234,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                     type="button"
                     aria-label="Clear background"
                     onClick={() => patchScene(scene.key, { background: undefined })}
-                    className="w-[28px] h-[32px] flex items-center justify-center rounded-[6px] text-newTextColor/50 hover:text-dangerText"
+                    className="w-[28px] h-[32px] flex items-center justify-center rounded-[6px] text-newTextColor/50 hover:text-red-400"
                   >
                     ✕
                   </button>

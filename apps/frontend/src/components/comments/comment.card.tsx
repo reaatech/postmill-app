@@ -208,7 +208,7 @@ export const CommentCard: FC<CommentCardProps> = ({
               aria-pressed={liked}
               className={`flex items-center gap-[3px] text-[11px] ${
                 liked ? 'text-red-500' : 'text-newTableText'
-              } hover:text-dangerText transition-colors`}
+              } hover:text-red-400 transition-colors`}
             >
               <HeartIcon filled={liked} />
               {likeCount > 0 && likeCount}

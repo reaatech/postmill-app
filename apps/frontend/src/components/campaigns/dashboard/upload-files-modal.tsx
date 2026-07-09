@@ -242,7 +242,7 @@ export const UploadFilesModal: FC<{
                     </span>
                   )}
                   {row.status === 'error' && (
-                    <span className="text-[12px] text-dangerText shrink-0">
+                    <span className="text-[12px] text-red-400 shrink-0">
                       {t('failed', 'Failed')}
                     </span>
                   )}

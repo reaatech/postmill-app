@@ -71,7 +71,7 @@ const VERSION_STYLES: Record<string, string> = {
   preview: 'bg-purple-900/20 text-purple-400',
   active: 'bg-green-900/20 text-green-400',
   deprecated: 'bg-amber-900/20 text-amber-600',
-  retired: 'bg-red-900/20 text-dangerText',
+  retired: 'bg-red-900/20 text-red-400',
 };
 
 const VERSION_LABEL: Record<string, string> = {
@@ -248,13 +248,13 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                 )}
                 {provider.versionStatus === 'retired' && (
                   <div className="mt-[6px] flex items-center gap-[8px] flex-wrap rounded-[8px] border border-red-500/40 bg-red-500/10 px-[10px] py-[6px]">
-                    <span className="text-[12px] text-dangerText">
+                    <span className="text-[12px] text-red-400">
                       Version {provider.version} is retired and no longer functional.
                       Reconfigure this provider to resume service.
                     </span>
                     <button
                       type="button"
-                      className="text-[12px] font-medium rounded-[6px] px-[10px] py-[3px] bg-red-500/20 text-dangerText hover:bg-red-500/30 transition-colors whitespace-nowrap"
+                      className="text-[12px] font-medium rounded-[6px] px-[10px] py-[3px] bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors whitespace-nowrap"
                       onClick={() => onConfigure(provider.identifier)}
                     >
                       Reconfigure
