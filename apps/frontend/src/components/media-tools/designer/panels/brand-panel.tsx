@@ -297,14 +297,14 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
   // loaded.
   if (brands === undefined) {
     return (
-      <div className="text-newTextColor/40 text-[12px] text-center py-8">
+      <div className="text-newTextColor/60 text-[12px] text-center py-8">
         Loading brand profiles…
       </div>
     );
   }
   if (brands.length === 0) {
     return (
-      <div className="text-newTextColor/40 text-[12px] text-center py-8">
+      <div className="text-newTextColor/60 text-[12px] text-center py-8">
         No brand profiles found. Create one in Settings &rarr; Brands.
       </div>
     );
@@ -318,7 +318,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
             Brand Profile
           </div>
           {saving && (
-            <span className="text-[11px] text-newTextColor/40">Saving…</span>
+            <span className="text-[11px] text-newTextColor/60">Saving…</span>
           )}
         </div>
         <select
@@ -362,7 +362,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
             />
           </button>
         </div>
-        <div className="text-[11px] text-newTextColor/50">
+        <div className="text-[11px] text-newTextColor/65">
           When on, only brand colors and fonts can be used.
         </div>
 
@@ -443,7 +443,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                       loading="lazy"
                     />
                   ) : (
-                    <span className="flex items-center justify-center w-full h-full text-[10px] text-newTextColor/40">
+                    <span className="flex items-center justify-center w-full h-full text-[10px] text-newTextColor/60">
                       ?
                     </span>
                   )}
@@ -453,13 +453,13 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </div>
         )}
 
-        <div className="text-[11px] text-newTextColor/40">Pick from files</div>
+        <div className="text-[11px] text-newTextColor/60">Pick from files</div>
         {filesLoading && !files ? (
           <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
         ) : filesError && !files ? (
           <PanelError message="Couldn't load files" onRetry={() => mutateFiles()} />
         ) : !files?.results?.length ? (
-          <div className="text-[12px] text-newTextColor/40 text-center py-2">
+          <div className="text-[12px] text-newTextColor/60 text-center py-2">
             No files found
           </div>
         ) : (
@@ -507,13 +507,13 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </span>
         </div>
 
-        <div className="text-[11px] text-newTextColor/40">Pick from video files</div>
+        <div className="text-[11px] text-newTextColor/60">Pick from video files</div>
         {filesLoading && !files ? (
           <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
         ) : filesError && !files ? (
           <PanelError message="Couldn't load files" onRetry={() => mutateFiles()} />
         ) : !files?.results?.length ? (
-          <div className="text-[12px] text-newTextColor/40 text-center py-2">
+          <div className="text-[12px] text-newTextColor/60 text-center py-2">
             No files found
           </div>
         ) : (
@@ -590,7 +590,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                 state.pushHistory();
                 toaster.show('Intro added to timeline', 'success');
               }}
-              className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-designerAccent hover:bg-designerAccent/10 disabled:opacity-40"
+              className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-btnPrimaryAccent hover:bg-designerAccent/10 disabled:opacity-40"
             >
               Apply intro
             </button>
@@ -621,7 +621,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                 state.pushHistory();
                 toaster.show('Outro added to timeline', 'success');
               }}
-              className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-designerAccent hover:bg-designerAccent/10 disabled:opacity-40"
+              className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-btnPrimaryAccent hover:bg-designerAccent/10 disabled:opacity-40"
             >
               Apply outro
             </button>
@@ -650,7 +650,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
             ))}
           </div>
           {!selectedElement && (
-            <div className="text-[11px] text-newTextColor/40">
+            <div className="text-[11px] text-newTextColor/60">
               Select an element to apply color
             </div>
           )}
@@ -681,7 +681,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
             ))}
           </div>
           {(!selectedElement || selectedElement.type !== 'text') && (
-            <div className="text-[11px] text-newTextColor/40">
+            <div className="text-[11px] text-newTextColor/60">
               Select a text element to apply font
             </div>
           )}
@@ -708,7 +708,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   className={`text-left flex-1 text-[13px] truncate ${
                     !selectedElement || selectedElement.type !== 'text'
                       ? 'text-textColor/60'
-                      : 'text-textColor hover:text-designerAccent cursor-pointer'
+                      : 'text-textColor hover:text-btnPrimaryAccent cursor-pointer'
                   }`}
                   style={{ fontFamily: `"${f.family}"` }}
                 >
@@ -748,7 +748,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         fontFamilies.length === 0 &&
         logoFileIds.length === 0 &&
         customFonts.length === 0 && (
-          <div className="text-newTextColor/40 text-[12px]">
+          <div className="text-newTextColor/60 text-[12px]">
             This brand has no palette, fonts, or logos configured yet.
           </div>
         )}

@@ -66,7 +66,7 @@ const ItemButton: FC<{ action: DesignerAction; onRun: () => void; indent?: boole
           : 'text-textColor hover:bg-studioBorder/30'
       )}
     >
-      <span className="w-[14px] shrink-0 text-designerAccent text-[12px]">
+      <span className="w-[14px] shrink-0 text-btnPrimaryAccent text-[12px]">
         {checked ? '✓' : ''}
       </span>
       <span className="flex-1 truncate">{actionLabel(action)}</span>

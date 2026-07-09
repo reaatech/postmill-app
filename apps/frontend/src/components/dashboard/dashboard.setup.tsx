@@ -120,7 +120,7 @@ export const DashboardSetup: FC = () => {
                 )}
               </div>
               <div className="flex flex-col min-w-0">
-                <span className={clsx('text-[12px]', done ? 'text-green-500 line-through' : 'text-textColor')}>{step.label}</span>
+                <span className={clsx('text-[12px]', done ? 'text-green-700 dark:text-green-400 line-through' : 'text-textColor')}>{step.label}</span>
                 <span className="text-[10px] text-newTableText truncate">{step.hint}</span>
               </div>
             </button>

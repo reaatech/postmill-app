@@ -122,7 +122,7 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
       ) : error && !data ? (
         (toaster.show('Couldn\'t load templates', 'warning'), <PanelError message="Couldn\'t load templates" onRetry={() => mutate()} />)
       ) : !data?.length ? (
-        <div className="text-[12px] text-newTextColor/40 text-center py-4">
+        <div className="text-[12px] text-newTextColor/60 text-center py-4">
           No templates yet
         </div>
       ) : (
@@ -137,7 +137,7 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
               </div>
               <div className="p-2">
                 <div className="text-[11px] text-textColor truncate">{template.name}</div>
-                <div className="text-[10px] text-newTextColor/40">
+                <div className="text-[10px] text-newTextColor/60">
                   {template.isSystem ? 'System' : 'Org'}
                 </div>
                 <button

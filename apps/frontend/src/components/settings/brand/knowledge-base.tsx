@@ -748,7 +748,7 @@ export const KnowledgeBase = () => {
                   <div key={src} className="flex items-center justify-between bg-newBgColorInner rounded-[8px] px-[12px] py-[6px] text-[13px]">
                     <code className="text-textColor">{src}</code>
                     <button
-                      className="text-red-500 hover:underline ml-[8px] text-[12px]"
+                      className="text-red-600 dark:text-red-500 hover:underline ml-[8px] text-[12px]"
                       onClick={() => setAutoIndexSources(autoIndexSources.filter((s) => s !== src))}
                     >
                       {t('remove', 'Remove')}
@@ -883,7 +883,7 @@ export const KnowledgeBase = () => {
               <span className="text-newTableText">{new Date(item.indexedDate).toLocaleDateString()}</span>
             )},
             { key: 'actions', header: t('actions', 'Actions'), align: 'right', render: (item: RagItem) => (
-              <button className="text-[12px] text-red-500 hover:underline" onClick={() => handleDelete(item.sourceType, item.sourceId)}>
+              <button className="text-[12px] text-red-600 dark:text-red-500 hover:underline" onClick={() => handleDelete(item.sourceType, item.sourceId)}>
                 {t('delete', 'Delete')}
               </button>
             )},

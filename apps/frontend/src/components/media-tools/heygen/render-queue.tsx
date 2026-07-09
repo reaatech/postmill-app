@@ -11,7 +11,7 @@ import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in
 const STATUS_META: Record<HeyGenJob['status'], { label: string; className: string }> = {
   pending: { label: 'Queued', className: 'text-amber-600 bg-amber-600/10' },
   processing: { label: 'Rendering', className: 'text-amber-600 bg-amber-600/10' },
-  completed: { label: 'Ready', className: 'text-green-400 bg-green-400/10' },
+  completed: { label: 'Ready', className: 'text-green-700 dark:text-green-400 bg-green-400/10' },
   failed: { label: 'Failed', className: 'text-dangerText bg-red-400/10' },
 };
 
@@ -61,7 +61,7 @@ export const RenderQueue: FC<{ jobs: HeyGenJob[] | undefined; isLoading: boolean
 
   if (!isLoading && (!jobs || jobs.length === 0)) {
     return (
-      <div className="text-[12px] text-newTextColor/40 px-[4px] py-[10px]">
+      <div className="text-[12px] text-newTextColor/60 px-[4px] py-[10px]">
         Your renders will appear here.
       </div>
     );

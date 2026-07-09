@@ -153,7 +153,7 @@ export const BrandAssets = ({
           />
           <button
             onClick={addColor}
-            className="text-[12px] text-btnPrimary hover:underline"
+            className="text-[12px] text-btnPrimaryAccent hover:underline"
           >
             {t('add_color', 'Add colour')}
           </button>

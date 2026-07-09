@@ -175,7 +175,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
           </div>
 
           {testResult && (
-            <div className={clsx('mt-[12px] p-[12px] rounded-[4px] text-[13px]', testResult.success ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-dangerText')}>
+            <div className={clsx('mt-[12px] p-[12px] rounded-[4px] text-[13px]', testResult.success ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-dangerText')}>
               {testResult.success
                 ? t('webhook_test_success', 'Webhook responded with status {status}', { status: String(testResult.status) })
                 : t('webhook_test_failed', 'Webhook test failed: {error}', { error: testResult.error || 'Unknown error' })}

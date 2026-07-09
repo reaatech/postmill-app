@@ -671,7 +671,7 @@ export const Filters = () => {
           <button
             type="button"
             onClick={chip.onClear}
-            className="text-[11px] font-[600] text-btnPrimary hover:underline"
+            className="text-[11px] font-[600] text-btnPrimaryAccent hover:underline"
           >
             {t('clear', 'Clear')}
           </button>

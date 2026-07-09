@@ -142,7 +142,7 @@ export const CampaignCommentsSection: FC<CampaignCommentsSectionProps> = ({
       {selected.size > 0 && (
         <div className="flex items-center gap-[12px] text-[12px] text-newTableText">
           <span>{t('selected', 'Selected')}: {selected.size}</span>
-          <button onClick={bulkMarkHandled} className="text-btnPrimary hover:underline">
+          <button onClick={bulkMarkHandled} className="text-btnPrimaryAccent hover:underline">
             {t('comment_inbox.mark_handled', 'Mark handled')}
           </button>
           <button onClick={() => setSelected(new Set())} className="hover:underline">

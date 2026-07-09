@@ -72,7 +72,7 @@ const NotificationRow: FC<{
               href={notification.link}
               target="_blank"
               rel="noreferrer"
-              className="text-[12px] text-btnPrimary hover:underline mt-[4px] inline-block"
+              className="text-[12px] text-btnPrimaryAccent hover:underline mt-[4px] inline-block"
             >
               {t('view', 'View')}
             </a>
@@ -83,7 +83,7 @@ const NotificationRow: FC<{
             <button
               type="button"
               onClick={() => onMarkRead(notification.id)}
-              className="text-[11px] text-btnPrimary hover:underline px-[6px] py-[2px]"
+              className="text-[11px] text-btnPrimaryAccent hover:underline px-[6px] py-[2px]"
               title={t('mark_as_read', 'Mark as read')}
             >
               {t('read', 'Read')}
@@ -92,7 +92,7 @@ const NotificationRow: FC<{
           <button
             type="button"
             onClick={() => onDelete(notification.id)}
-            className="text-[11px] text-red-500 hover:underline px-[6px] py-[2px]"
+            className="text-[11px] text-red-600 dark:text-red-500 hover:underline px-[6px] py-[2px]"
             title={t('delete', 'Delete')}
           >
             {t('delete', 'Delete')}
@@ -199,7 +199,7 @@ export const NotificationOpenComponent: FC<{
           <button
             type="button"
             onClick={markAllAsRead}
-            className="text-[12px] text-btnPrimary hover:underline"
+            className="text-[12px] text-btnPrimaryAccent hover:underline"
           >
             {t('mark_all_read', 'Mark all read')}
           </button>
@@ -232,7 +232,7 @@ export const NotificationOpenComponent: FC<{
         <a
           href="/user/me"
           onClick={onClose}
-          className="text-[12px] text-btnPrimary hover:underline"
+          className="text-[12px] text-btnPrimaryAccent hover:underline"
         >
           {t('notification_preferences', 'Notification preferences')}
         </a>

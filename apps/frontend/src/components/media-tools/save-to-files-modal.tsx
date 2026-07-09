@@ -136,7 +136,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
                 {providerInfo.type}
               </span>
             )}
-            <span className="text-[11px] text-newTextColor/40">{folder._count?.files || 0}</span>
+            <span className="text-[11px] text-newTextColor/60">{folder._count?.files || 0}</span>
           </button>
           {folder.children?.length ? renderFolderTree(folder.children, depth + 1) : null}
         </div>
@@ -165,7 +165,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
                   href="https://pixabay.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[#2B5CD3] hover:underline"
+                  className="text-btnPrimaryAccent hover:underline"
                 >
                   Pixabay
                 </a>

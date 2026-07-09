@@ -302,7 +302,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Font family (C2) — grouped with search */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="text-font-family" className="text-[11px] text-newTextColor/40">Font family</label>
+        <label htmlFor="text-font-family" className="text-[11px] text-newTextColor/60">Font family</label>
         <div className="relative" ref={fontWrapRef}>
           <button
             id="text-font-family"
@@ -383,7 +383,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Bold / Italic (C2) */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="text-style" className="text-[11px] text-newTextColor/40">Style</label>
+        <label htmlFor="text-style" className="text-[11px] text-newTextColor/60">Style</label>
         <SegmentedControl
           id="text-style"
           value={styleValue}
@@ -406,7 +406,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text-font-size" className="text-[11px] text-newTextColor/40">Size</label>
+          <label htmlFor="text-font-size" className="text-[11px] text-newTextColor/60">Size</label>
           <input
             id="text-font-size"
             type="number"
@@ -424,7 +424,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text-font-weight" className="text-[11px] text-newTextColor/40">Weight</label>
+          <label htmlFor="text-font-weight" className="text-[11px] text-newTextColor/60">Weight</label>
           <select
             id="text-font-weight"
             value={element.fontWeight || 400}
@@ -454,7 +454,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="text-align" className="text-[11px] text-newTextColor/40">Align</label>
+        <label htmlFor="text-align" className="text-[11px] text-newTextColor/60">Align</label>
         <SegmentedControl
           id="text-align"
           value={element.align || 'left'}
@@ -469,7 +469,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text-line-height" className="text-[11px] text-newTextColor/40">Line height</label>
+          <label htmlFor="text-line-height" className="text-[11px] text-newTextColor/60">Line height</label>
           <input
             id="text-line-height"
             type="number"
@@ -488,7 +488,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text-letter-spacing" className="text-[11px] text-newTextColor/40">
+          <label htmlFor="text-letter-spacing" className="text-[11px] text-newTextColor/60">
             Letter spacing
           </label>
           <input
@@ -509,7 +509,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Text path (C2) — Arc slider, Wave, Circle presets + custom SVG path */}
       <div className="flex flex-col gap-2">
-        <label htmlFor="text-path" className="text-[11px] text-newTextColor/40">Text Path</label>
+        <label htmlFor="text-path" className="text-[11px] text-newTextColor/60">Text Path</label>
         <SegmentedControl
           id="text-path"
           value={pathMode}

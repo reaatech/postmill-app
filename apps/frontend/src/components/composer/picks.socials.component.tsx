@@ -186,7 +186,7 @@ export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
             <div className="p-[12px] border-b border-newTextColor/10">
               <div className="relative">
                 <svg
-                  className="absolute left-[12px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-newTextColor/40"
+                  className="absolute left-[12px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-newTextColor/60"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

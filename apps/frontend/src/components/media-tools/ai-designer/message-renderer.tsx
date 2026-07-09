@@ -75,7 +75,7 @@ const MarkdownMessage: React.FC<{ md: string }> = ({ md }) => {
   return (
     <SafeContent
       content={html}
-      className="text-[14px] text-textColor max-w-none space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:ps-5 [&_ol]:ps-5 [&_code]:text-[13px] [&_code]:bg-boxHover [&_code]:rounded [&_code]:px-1 [&_a]:text-designerAccent [&_a]:underline"
+      className="text-[14px] text-textColor max-w-none space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:ps-5 [&_ol]:ps-5 [&_code]:text-[13px] [&_code]:bg-boxHover [&_code]:rounded [&_code]:px-1 [&_a]:text-btnPrimaryAccent [&_a]:underline"
     />
   );
 };
@@ -110,7 +110,7 @@ const MediaMessage: React.FC<{
             href={`/media/designer?designId=${encodeURIComponent(item.designId)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-designerAccent hover:underline"
+            className="text-[11px] text-btnPrimaryAccent hover:underline"
           >
             Open in Designer
           </a>

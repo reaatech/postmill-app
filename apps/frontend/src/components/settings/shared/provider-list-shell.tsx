@@ -60,17 +60,17 @@ export interface ProviderListShellProps {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  active: 'bg-green-900/20 text-green-400',
-  configured: 'bg-blue-900/20 text-blue-400',
-  enabled: 'bg-green-900/20 text-green-400',
+  active: 'bg-green-900/20 text-green-900 dark:text-green-400',
+  configured: 'bg-blue-900/20 text-blue-800 dark:text-blue-400',
+  enabled: 'bg-green-900/20 text-green-900 dark:text-green-400',
   mounted: 'bg-[#1a3a1a] text-textColor',
   disabled: 'bg-[#3a1a1a] text-[#f87171]',
 };
 
 const VERSION_STYLES: Record<string, string> = {
-  preview: 'bg-purple-900/20 text-purple-400',
-  active: 'bg-green-900/20 text-green-400',
-  deprecated: 'bg-amber-900/20 text-amber-600',
+  preview: 'bg-purple-900/20 text-purple-800 dark:text-purple-400',
+  active: 'bg-green-900/20 text-green-900 dark:text-green-400',
+  deprecated: 'bg-amber-900/20 text-amber-800 dark:text-amber-400',
   retired: 'bg-red-900/20 text-dangerText',
 };
 
@@ -145,7 +145,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                         <button
                           type="button"
                           onClick={() => onProviderNameClick(provider)}
-                          className="text-[14px] font-semibold truncate hover:text-btnPrimary hover:underline transition-colors text-left"
+                          className="text-[14px] font-semibold truncate hover:text-btnPrimaryAccent hover:underline transition-colors text-left"
                           title="What is this?"
                         >
                           {provider.name}
@@ -155,7 +155,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                     return href ? (
                       <Link
                         href={href}
-                        className="text-[14px] font-semibold truncate hover:text-btnPrimary hover:underline transition-colors"
+                        className="text-[14px] font-semibold truncate hover:text-btnPrimaryAccent hover:underline transition-colors"
                       >
                         {provider.name}
                       </Link>
@@ -167,7 +167,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                   })()}
                   {provider.featured && (
                     <span
-                      className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-500/15 text-amber-400 inline-flex items-center gap-[4px]"
+                      className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-500/15 text-amber-800 dark:text-amber-400 inline-flex items-center gap-[4px]"
                       title="Featured provider"
                     >
                       <svg
@@ -184,7 +184,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                   )}
                   {provider.verified === false && (
                     <span
-                      className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-900/20 text-amber-600"
+                      className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-900/20 text-amber-800 dark:text-amber-400"
                       title="Built without a live key — request shape unverified."
                     >
                       Beta
@@ -201,7 +201,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                     </span>
                   ))}
                   {provider.isActive && (
-                    <span className="text-[11px] bg-green-900/20 text-green-400 rounded-[4px] px-[8px] py-[2px]">
+                    <span className="text-[11px] bg-green-900/20 text-green-900 dark:text-green-400 rounded-[4px] px-[8px] py-[2px]">
                       Active
                     </span>
                   )}
@@ -237,7 +237,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                     </span>
                     <button
                       type="button"
-                      className="text-[12px] font-medium rounded-[6px] px-[10px] py-[3px] bg-amber-500/20 text-amber-600 hover:bg-amber-500/30 transition-colors whitespace-nowrap"
+                      className="text-[12px] font-medium rounded-[6px] px-[10px] py-[3px] bg-amber-500/20 text-amber-800 dark:text-amber-400 hover:bg-amber-500/30 transition-colors whitespace-nowrap"
                       onClick={() =>
                         (onUpgrade ?? onConfigure)(provider.identifier)
                       }
@@ -285,7 +285,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                   // Retired = non-functional: only allow reconfigure (banner) or remove.
                   provider.isConfigured && (
                     <button
-                      className="text-[12px] text-red-500 hover:underline"
+                      className="text-[12px] text-red-600 dark:text-red-500 hover:underline"
                       onClick={() => onRemove(provider.identifier)}
                     >
                       Remove
@@ -296,14 +296,14 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                 ) : (
                   <>
                     <button
-                      className="text-[12px] text-btnPrimary hover:underline"
+                      className="text-[12px] text-btnPrimaryAccent hover:underline"
                       onClick={() => onConfigure(provider.identifier)}
                     >
                       {provider.isConfigured ? 'Edit' : 'Configure'}
                     </button>
                     {provider.isConfigured && onSetActive && !provider.isActive && (
                       <button
-                        className="text-[12px] text-btnPrimary hover:underline"
+                        className="text-[12px] text-btnPrimaryAccent hover:underline"
                         onClick={() => onSetActive(provider.identifier)}
                       >
                         Set Active
@@ -324,7 +324,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                     )}
                     {provider.isConfigured && (
                       <button
-                        className="text-[12px] text-red-500 hover:underline"
+                        className="text-[12px] text-red-600 dark:text-red-500 hover:underline"
                         onClick={() => onRemove(provider.identifier)}
                       >
                         Remove

@@ -227,7 +227,7 @@ const AddOrEditSignature: FC<{
             <button
               type="button"
               onClick={() => setShowMedia(true)}
-              className="text-[12px] text-btnPrimary hover:underline"
+              className="text-[12px] text-btnPrimaryAccent hover:underline"
             >
               {t('replace', 'Replace')}
             </button>
@@ -564,7 +564,7 @@ export const SignaturesComponent: FC<{
                   {!!appendSignature && (
                     <button
                       onClick={applySignature(sig)}
-                      className="text-[12px] text-btnPrimary hover:underline"
+                      className="text-[12px] text-btnPrimaryAccent hover:underline"
                     >
                       {t('use', 'Use')}
                     </button>

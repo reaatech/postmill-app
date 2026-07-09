@@ -78,7 +78,7 @@ export function SetupStepper({
                   className={clsx(
                     'w-[26px] h-[26px] rounded-full flex items-center justify-center text-[12px] font-[600] border',
                     state === 'active' && 'bg-[#2B5CD3] border-[#2B5CD3] text-white',
-                    state === 'complete' && 'bg-transparent border-[#2B5CD3] text-[#2B5CD3]',
+                    state === 'complete' && 'bg-transparent border-[#2B5CD3] text-btnPrimaryAccent',
                     state === 'skipped' && 'bg-transparent border-newTableBorder text-newTableText',
                     state === 'upcoming' && 'bg-transparent border-newTableBorder text-newTableText'
                   )}

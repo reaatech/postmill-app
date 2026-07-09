@@ -270,7 +270,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               <button
                 onClick={handleTest}
                 disabled={testing}
-                className="px-[16px] py-[8px] rounded-[8px] bg-[#1a2a3a] text-[#60a5fa] text-[13px] hover:bg-[#2a3a4a] transition-colors disabled:opacity-50"
+                className="px-[16px] py-[8px] rounded-[8px] bg-[#1a2a3a] text-blue-700 dark:text-blue-400 text-[13px] hover:bg-[#2a3a4a] transition-colors disabled:opacity-50"
               >
                 {testing ? 'Testing...' : 'Test Connection'}
               </button>

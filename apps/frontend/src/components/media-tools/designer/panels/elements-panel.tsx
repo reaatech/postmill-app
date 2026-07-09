@@ -70,7 +70,7 @@ export const ElementsPanel: FC<ElementsPanelProps> = ({ store, onClose }) => {
           }
           className="flex flex-col items-center gap-2 p-4 rounded-lg border border-studioBorder bg-newBgColorInner hover:border-designerAccent hover:bg-studioBorder/10 transition-all"
         >
-          <div className="text-[24px] text-designerAccent">{shape.icon}</div>
+          <div className="text-[24px] text-btnPrimaryAccent">{shape.icon}</div>
           <div className="text-[11px] text-textColor">{shape.label}</div>
         </button>
       ))}

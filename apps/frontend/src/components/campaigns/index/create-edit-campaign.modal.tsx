@@ -193,7 +193,7 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
           <button
             type="button"
             onClick={addGoal}
-            className="text-[12px] text-btnPrimary hover:underline"
+            className="text-[12px] text-btnPrimaryAccent hover:underline"
           >
             {t('add_goal', 'Add goal')}
           </button>

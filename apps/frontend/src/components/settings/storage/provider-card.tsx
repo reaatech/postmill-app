@@ -129,7 +129,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
         </button>
         <button
           onClick={() => onTest(provider.id)}
-          className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#60a5fa] hover:bg-[#1a2a3a] transition-colors"
+          className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-blue-700 dark:text-blue-400 hover:bg-[#1a2a3a] transition-colors"
         >
           Test
         </button>

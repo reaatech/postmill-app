@@ -165,7 +165,7 @@ export const FileDetailsPanel: FC<{
                 role="button"
                 tabIndex={0}
                 aria-label="Edit name"
-                className="mt-[4px] text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate"
+                className="mt-[4px] text-[13px] text-textColor cursor-pointer hover:text-btnPrimaryAccent truncate"
                 onClick={() => setEditingName(true)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingName(true); } }}
               >
@@ -193,7 +193,7 @@ export const FileDetailsPanel: FC<{
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[12px] bg-[#2B5CD3]/15 text-[12px] text-[#2B5CD3]"
+                  className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[12px] bg-[#2B5CD3]/15 text-[12px] text-btnPrimaryAccent"
                 >
                   {tag}
                   <button

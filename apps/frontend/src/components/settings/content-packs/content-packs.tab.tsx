@@ -79,7 +79,7 @@ export const ContentPacksTab: React.FC = () => {
                 {t('postmill_default', 'Postmill (Default)')}
               </span>
               {isFreeActive && (
-                <span className="text-[10px] rounded-[4px] px-[6px] py-[2px] bg-green-900/20 text-green-400">
+                <span className="text-[10px] rounded-[4px] px-[6px] py-[2px] bg-green-900/20 text-green-900 dark:text-green-400">
                   {t('primary', 'Primary')}
                 </span>
               )}
@@ -94,7 +94,7 @@ export const ContentPacksTab: React.FC = () => {
         </div>
         {!isFreeActive && (
           <button
-            className="text-[12px] text-btnPrimary hover:underline"
+            className="text-[12px] text-btnPrimaryAccent hover:underline"
             onClick={handleUseFreeDefault}
           >
             {t('use_free_default', 'Use free default')}

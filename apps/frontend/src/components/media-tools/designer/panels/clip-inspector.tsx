@@ -690,7 +690,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
         {(clipTrackType === 'image' || clipTrackType === 'text') && (
           <button
             onClick={handleKenBurns}
-            className="w-full px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-designerAccent hover:bg-designerAccent/10"
+            className="w-full px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-btnPrimaryAccent hover:bg-designerAccent/10"
           >
             Ken Burns Preset
           </button>

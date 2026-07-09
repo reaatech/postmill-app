@@ -109,7 +109,7 @@ export const DefaultModelSelect: FC<{
         ))}
       </select>
       {/* native dropdown chevron */}
-      <div className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 text-newTextColor/50">
+      <div className="pointer-events-none absolute right-[12px] top-1/2 -translate-y-1/2 text-newTextColor/65">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
           <path
             d="M3 4.5L6 7.5L9 4.5"

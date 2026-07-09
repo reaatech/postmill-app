@@ -199,7 +199,7 @@ export const TimeTable: FC<{
         </div>
 
         {times.length === 0 ? (
-          <div className="text-center py-[32px] text-newTextColor/40 text-[14px] border border-dashed border-newTableBorder rounded-[12px]">
+          <div className="text-center py-[32px] text-newTextColor/60 text-[14px] border border-dashed border-newTableBorder rounded-[12px]">
             {t('no_time_slots', 'No time slots added yet')}
           </div>
         ) : (

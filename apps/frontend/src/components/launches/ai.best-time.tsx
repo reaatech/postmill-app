@@ -76,7 +76,7 @@ const AiBestTimeModal: FC<{ close: () => void }> = (props) => {
             className={clsx(
               'text-[11px] font-[600] px-[10px] py-[4px] rounded-[4px] w-fit',
               result.hasAnalyticsData
-                ? 'bg-green-400/10 text-green-400 border border-green-400/30'
+                ? 'bg-green-400/10 text-green-800 dark:text-green-400 border border-green-400/30'
                 : 'bg-yellow-400/10 text-amber-600 border border-yellow-400/30'
             )}
           >

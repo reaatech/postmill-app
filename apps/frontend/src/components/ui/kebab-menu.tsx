@@ -116,7 +116,7 @@ export const KebabMenu: FC<KebabMenuProps> = ({
               return <div key={`d-${i}`} className="my-[4px] border-t border-newTableBorder" />;
             }
             const it = item as Exclude<KebabMenuItem, { divider: true }>;
-            const cls = clsx(itemCls, it.danger ? 'text-red-500 hover:bg-red-500/10' : 'text-textColor');
+            const cls = clsx(itemCls, it.danger ? 'text-red-700 dark:text-red-400 hover:bg-red-500/10' : 'text-textColor');
             const itemKey = it.href || (typeof it.label === 'string' ? it.label : `item-${i}`);
             if (it.href) {
               return (

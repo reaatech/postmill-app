@@ -391,7 +391,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       ) : error && !data ? (
         <PanelError message="Couldn't load uploads" onRetry={() => mutate()} />
       ) : !data?.results?.length ? (
-        <div className="text-[12px] text-newTextColor/40 text-center py-4">
+        <div className="text-[12px] text-newTextColor/60 text-center py-4">
           No uploaded files found
         </div>
       ) : (
@@ -434,7 +434,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
       {audioFiles.length > 0 && (
         <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-          <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Audio</div>
+          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Audio</div>
           {audioFiles.map((file) => (
             <button
               key={file.id}
@@ -443,7 +443,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
             >
               <span className="text-[12px]">🔊</span>
               <span className="text-[11px] text-textColor truncate flex-1">{file.name}</span>
-              <span className="text-[10px] text-designerAccent">Add</span>
+              <span className="text-[10px] text-btnPrimaryAccent">Add</span>
             </button>
           ))}
         </div>
@@ -451,7 +451,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
       {stickerFiles.length > 0 && (
         <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-          <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Stickers</div>
+          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Stickers</div>
           <div className="grid grid-cols-3 gap-2">
             {stickerFiles.map((file) => (
               <button
@@ -474,16 +474,16 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
       {stockAudio && (
         <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-          <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Stock audio</div>
+          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Stock audio</div>
           {!stockAudio.configured ? (
-            <div className="text-[11px] text-newTextColor/40 space-y-1">
+            <div className="text-[11px] text-newTextColor/60 space-y-1">
               <p>Stock audio isn't configured.</p>
               <p>
                 Set <code className="text-textColor/60">JAMENDO_CLIENT_ID</code> to enable stock audio.
               </p>
             </div>
           ) : stockAudio.results?.length === 0 ? (
-            <div className="text-[11px] text-newTextColor/40">
+            <div className="text-[11px] text-newTextColor/60">
               No stock audio found
             </div>
           ) : (
@@ -496,7 +496,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
                 >
                   <span className="text-[12px]">🎵</span>
                   <span className="text-[11px] text-textColor truncate flex-1">{item.name}</span>
-                  <span className="text-[10px] text-designerAccent">Add</span>
+                  <span className="text-[10px] text-btnPrimaryAccent">Add</span>
                 </button>
               ))}
             </div>
@@ -505,7 +505,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       )}
 
       <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-        <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Upload audio</div>
+        <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Upload audio</div>
         <input
           type="file"
           accept="audio/*"
@@ -516,7 +516,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       </div>
 
       <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-        <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Upload sticker</div>
+        <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Upload sticker</div>
         <input
           type="file"
           accept="image/gif,image/webp"

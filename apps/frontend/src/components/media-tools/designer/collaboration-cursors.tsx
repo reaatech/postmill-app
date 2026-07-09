@@ -33,7 +33,7 @@ export const CollaborationCursors: React.FC<Props> = ({
   if (mode === 'video' && peers && durationMs) {
     return (
       <div className="absolute inset-0 pointer-events-none z-50">
-        <div className="absolute top-2 right-2 bg-green-500/20 border border-green-500/30 rounded px-2 py-0.5 text-xs text-green-400">
+        <div className="absolute top-2 right-2 bg-green-500/20 border border-green-500/30 rounded px-2 py-0.5 text-xs text-green-700 dark:text-green-400">
           {connectedCount} connected
         </div>
         {peers.map((peer, i) => (
@@ -66,7 +66,7 @@ export const CollaborationCursors: React.FC<Props> = ({
 
   return (
     <div className="absolute inset-0 pointer-events-none z-50">
-      <div className="absolute top-2 right-2 bg-green-500/20 border border-green-500/30 rounded px-2 py-0.5 text-xs text-green-400">
+      <div className="absolute top-2 right-2 bg-green-500/20 border border-green-500/30 rounded px-2 py-0.5 text-xs text-green-700 dark:text-green-400">
         {connectedCount} connected
       </div>
 

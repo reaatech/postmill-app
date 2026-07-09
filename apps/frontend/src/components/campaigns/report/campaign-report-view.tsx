@@ -10,6 +10,7 @@ import clsx from 'clsx';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
 import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
+import { readableTextColor } from '@gitroom/frontend/components/shared/readable-text-color';
 
 const stripHtml = (html?: string | null): string =>
   (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -293,16 +294,16 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
       `}</style>
 
       <div
-        className="rounded-[12px] p-[24px] text-textColor flex flex-col gap-[8px]"
-        style={{ backgroundColor: color }}
+        className="rounded-[12px] p-[24px] flex flex-col gap-[8px]"
+        style={{ backgroundColor: color, color: readableTextColor(color) }}
       >
         <h1 className="text-[28px] font-[600]">{campaign.name}</h1>
         <p className="text-[14px] opacity-90">
           {t('campaign_report', 'Campaign Report')} &bull; {dayjs().format('MMM D, YYYY')}
         </p>
-        {campaign.description && <p className="text-[13px] opacity-80 max-w-[720px]">{campaign.description}</p>}
+        {campaign.description && <p className="text-[13px] opacity-90 max-w-[720px]">{campaign.description}</p>}
         {(campaign.startDate || campaign.endDate) && (
-          <p className="text-[13px] opacity-80">
+          <p className="text-[13px] opacity-90">
             {campaign.startDate ? formatDate(campaign.startDate) : ''}
             {campaign.startDate && campaign.endDate ? ' — ' : ''}
             {campaign.endDate ? formatDate(campaign.endDate) : ''}
@@ -522,11 +523,11 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
 function statePillClass(state: string): string {
   switch (state?.toUpperCase()) {
     case 'PUBLISHED':
-      return 'bg-green-500/10 text-green-500';
+      return 'bg-green-500/10 text-green-700 dark:text-green-400';
     case 'QUEUE':
-      return 'bg-blue-500/10 text-blue-500';
+      return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
     case 'DRAFT':
-      return 'bg-amber-500/10 text-amber-500';
+      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
     default:
       return 'bg-newTableText/10 text-newTableText';
   }

@@ -237,7 +237,7 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
                   <button
                     type="button"
                     onClick={() => set({ status: DEFAULT_CAMPAIGN_FILTERS.status })}
-                    className="text-[11px] font-[600] text-[#2B5CD3] hover:underline"
+                    className="text-[11px] font-[600] text-btnPrimaryAccent hover:underline"
                   >
                     {t('clear', 'Clear')}
                   </button>
@@ -252,8 +252,8 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
                     className={clsx(
                       'flex-1 h-[42px] px-[12px] flex justify-center items-center rounded-[8px] transition-all cursor-pointer text-[14px] font-[500] border',
                       filters.status === o.value
-                        ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-[#2B5CD3]'
-                        : 'bg-newBgColorInner border-newTableBorder text-textColor hover:border-[#2B5CD3]/50 hover:text-[#2B5CD3]'
+                        ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-btnPrimaryAccent'
+                        : 'bg-newBgColorInner border-newTableBorder text-textColor hover:border-[#2B5CD3]/50 hover:text-btnPrimaryAccent'
                     )}
                   >
                     {o.label}
@@ -278,7 +278,7 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
                     <button
                       type="button"
                       onClick={() => set({ client: '' })}
-                      className="text-[11px] font-[600] text-[#2B5CD3] hover:underline"
+                      className="text-[11px] font-[600] text-btnPrimaryAccent hover:underline"
                     >
                       {t('clear', 'Clear')}
                     </button>
@@ -315,7 +315,7 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
                     <button
                       type="button"
                       onClick={() => set({ tags: [] })}
-                      className="text-[11px] font-[600] text-[#2B5CD3] hover:underline"
+                      className="text-[11px] font-[600] text-btnPrimaryAccent hover:underline"
                     >
                       {t('clear', 'Clear')}
                     </button>
@@ -332,8 +332,8 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
                         className={clsx(
                           'px-[12px] py-[6px] rounded-full text-[12px] border transition-all',
                           on
-                            ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-[#2B5CD3]'
-                            : 'bg-newBgColorInner border-newTableBorder text-newTableText hover:border-[#2B5CD3]/50 hover:text-[#2B5CD3]'
+                            ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-btnPrimaryAccent'
+                            : 'bg-newBgColorInner border-newTableBorder text-newTableText hover:border-[#2B5CD3]/50 hover:text-btnPrimaryAccent'
                         )}
                       >
                         {tag}

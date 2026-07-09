@@ -134,7 +134,7 @@ export const CommentComposer: FC<CommentComposerProps> = ({
             type="button"
             onClick={handleAiDraft}
             disabled={aiLoading || sending}
-            className="text-[12px] text-btnPrimary hover:underline disabled:opacity-50"
+            className="text-[12px] text-btnPrimaryAccent hover:underline disabled:opacity-50"
           >
             {aiLoading
               ? t('ai_drafting', '✨ Drafting...')
@@ -167,7 +167,7 @@ export const CommentComposer: FC<CommentComposerProps> = ({
               }
             }}
             disabled={aiLoading || sending}
-            className="text-[12px] text-btnPrimary hover:underline disabled:opacity-50"
+            className="text-[12px] text-btnPrimaryAccent hover:underline disabled:opacity-50"
           >
             {aiLoading
               ? t('summarizing', '📋 Summarizing...')

@@ -76,7 +76,7 @@ export const FilePreviewModal: FC<{
       )}
 
       <div className="flex items-center justify-between gap-[10px] flex-wrap">
-        <div className="text-[12px] text-newTextColor/50">
+        <div className="text-[12px] text-newTextColor/65">
           {(file.type || 'file')} · {fileSize(file.fileSize)}
         </div>
         <div className="flex items-center gap-[10px] flex-wrap">

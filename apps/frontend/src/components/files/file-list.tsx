@@ -110,7 +110,7 @@ export const FileList: FC<{
         return (
           <button
             type="button"
-            className="text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate max-w-[200px] text-left"
+            className="text-[13px] text-textColor cursor-pointer hover:text-btnPrimaryAccent truncate max-w-[200px] text-left"
             onDoubleClick={() => { setRenamingId(file.id); setRenamingName(file.name); }}
           >
             {file.originalName || file.name}

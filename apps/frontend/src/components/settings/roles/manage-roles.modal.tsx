@@ -141,7 +141,7 @@ export const ManageRolesModal: React.FC = () => {
                     {role.key}
                   </span>
                   {role.isSystem && (
-                    <span className="text-[11px] bg-blue-900/20 text-blue-400 rounded-[4px] px-[8px] py-[2px]">
+                    <span className="text-[11px] bg-blue-900/20 text-blue-800 dark:text-blue-400 rounded-[4px] px-[8px] py-[2px]">
                       {t('system_role', 'System')}
                     </span>
                   )}
@@ -159,7 +159,7 @@ export const ManageRolesModal: React.FC = () => {
               <div className="flex items-center gap-[8px] shrink-0">
                 <button
                   type="button"
-                  className="text-[12px] text-btnPrimary hover:underline"
+                  className="text-[12px] text-btnPrimaryAccent hover:underline"
                   onClick={() => openClone(role)}
                 >
                   {t('clone', 'Clone')}
@@ -168,14 +168,14 @@ export const ManageRolesModal: React.FC = () => {
                   <>
                     <button
                       type="button"
-                      className="text-[12px] text-btnPrimary hover:underline"
+                      className="text-[12px] text-btnPrimaryAccent hover:underline"
                       onClick={() => openEdit(role)}
                     >
                       {t('edit', 'Edit')}
                     </button>
                     <button
                       type="button"
-                      className="text-[12px] text-red-500 hover:underline"
+                      className="text-[12px] text-red-600 dark:text-red-500 hover:underline"
                       onClick={() => removeRole(role)}
                     >
                       {t('delete', 'Delete')}

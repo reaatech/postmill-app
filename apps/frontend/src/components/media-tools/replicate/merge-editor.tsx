@@ -31,7 +31,7 @@ const TRANSITION_OPTIONS = [
   { value: 'fadegrayscale', label: 'Fade Grayscale' },
 ];
 
-const fieldLabel = 'text-[10px] uppercase tracking-wider text-newTextColor/50';
+const fieldLabel = 'text-[10px] uppercase tracking-wider text-newTextColor/65';
 const fieldInput =
   'w-full px-2 py-1 rounded border border-studioBorder bg-newBgColor text-textColor text-xs focus:outline-none focus:border-designerAccent';
 
@@ -308,7 +308,7 @@ export function MergeEditor() {
           </button>
         </div>
       ) : (
-        <p className="text-xs text-newTextColor/50">Select a clip in the strip to trim it or set its transition.</p>
+        <p className="text-xs text-newTextColor/65">Select a clip in the strip to trim it or set its transition.</p>
       )}
       {error && <p className="text-xs text-dangerText">{error}</p>}
     </div>
@@ -317,7 +317,7 @@ export function MergeEditor() {
   return (
     <EditorShell title="Merge Videos" toolbar={toolbar} inspector={inspector} stageClassName="!items-stretch !justify-start flex-col">
       {clips.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-newTextColor/50 text-sm">
+        <div className="flex-1 flex items-center justify-center text-newTextColor/65 text-sm">
           Add up to 6 video clips to merge them with transitions.
         </div>
       ) : (
@@ -337,15 +337,15 @@ export function MergeEditor() {
                   <span className="text-2xl">🎬</span>
                   <span className="text-xs">Clip {idx + 1}</span>
                   {(clip.trimStart != null || clip.trimEnd != null) && (
-                    <span className="text-[10px] text-newTextColor/50">
+                    <span className="text-[10px] text-newTextColor/65">
                       {clip.trimStart ?? 0}s–{clip.trimEnd ?? '∞'}s
                     </span>
                   )}
                 </button>
                 {idx < clips.length - 1 && (
                   <div className="flex-shrink-0 flex flex-col items-center justify-center w-16 text-center">
-                    <span className="text-newTextColor/50 text-lg">⟶</span>
-                    <span className="text-[9px] text-newTextColor/50">{transitions[idx]?.type || 'fade'}</span>
+                    <span className="text-newTextColor/65 text-lg">⟶</span>
+                    <span className="text-[9px] text-newTextColor/65">{transitions[idx]?.type || 'fade'}</span>
                   </div>
                 )}
               </React.Fragment>

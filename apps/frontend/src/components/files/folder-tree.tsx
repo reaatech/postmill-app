@@ -211,7 +211,7 @@ export const FolderTree: FC<{
             </span>
           )}
 
-          <span className="text-[11px] text-newTextColor/40 group-hover:text-newTextColor/60">{folder._count?.files || 0}</span>
+          <span className="text-[11px] text-newTextColor/60 group-hover:text-newTextColor/60">{folder._count?.files || 0}</span>
         </div>
 
         {hasChildren && !isCollapsed && (

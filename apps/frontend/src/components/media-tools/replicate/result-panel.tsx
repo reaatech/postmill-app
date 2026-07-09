@@ -110,13 +110,13 @@ function DetailsCard() {
     <div className="mt-4 rounded-xl border border-studioBorder bg-newBgColorInner p-3">
       <div className="flex gap-6 mb-2">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-newTextColor/50">Model</div>
+          <div className="text-[10px] uppercase tracking-wider text-newTextColor/65">Model</div>
           <div className="text-sm text-textColor">{meta.modelName}</div>
         </div>
         {estimate && !estimate.approximate && (
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-newTextColor/50">Est. cost</div>
-            <div className="text-sm text-green-400">${estimate.usd.toFixed(4)}</div>
+            <div className="text-[10px] uppercase tracking-wider text-newTextColor/65">Est. cost</div>
+            <div className="text-sm text-green-700 dark:text-green-400">${estimate.usd.toFixed(4)}</div>
           </div>
         )}
       </div>
@@ -127,7 +127,7 @@ function DetailsCard() {
               typeof v === 'object' ? (v as any).url || (v as any).fileId || JSON.stringify(v) : String(v);
             return (
               <div key={k} className="text-[11px] text-newTextColor/70">
-                <span className="text-newTextColor/50">{k.replace(/_/g, ' ')}: </span>
+                <span className="text-newTextColor/65">{k.replace(/_/g, ' ')}: </span>
                 <span className="text-newTextColor/80">{display}</span>
               </div>
             );
@@ -222,7 +222,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-studioBorder py-20 text-center">
           <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
           <p className="text-newTextColor/70">Nothing generated yet</p>
-          <p className="text-xs text-newTextColor/50">Pick a model and configure it to get started.</p>
+          <p className="text-xs text-newTextColor/65">Pick a model and configure it to get started.</p>
         </div>
       </Frame>
     );
@@ -233,8 +233,8 @@ export function ResultPanel({ medium }: { medium: Medium }) {
     return (
       <Frame>
         <div className="flex flex-col gap-2">
-          <div className="text-xs text-newTextColor/50">
-            Example of <span className="text-designerAccent">{selectedModel.id}</span>
+          <div className="text-xs text-newTextColor/65">
+            Example of <span className="text-btnPrimaryAccent">{selectedModel.id}</span>
           </div>
           {selectedModel.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external provider asset
@@ -246,7 +246,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-studioBorder py-20">
               <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
-              <p className="text-xs text-newTextColor/50">No example available — generate to see output.</p>
+              <p className="text-xs text-newTextColor/65">No example available — generate to see output.</p>
             </div>
           )}
         </div>
@@ -261,7 +261,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-studioBorder py-20">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-designerAccent" />
           <p className="text-newTextColor/80">Generating your {medium}…</p>
-          <p className="text-xs text-newTextColor/50">
+          <p className="text-xs text-newTextColor/65">
             {medium === 'image' ? 'This usually takes 10–30 seconds.' : 'This can take a few minutes.'}
           </p>
           <ElapsedTimer />
@@ -281,13 +281,13 @@ export function ResultPanel({ medium }: { medium: Medium }) {
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-16 px-6">
           <p className="text-dangerText text-center">{error || 'Generation failed'}</p>
           {!isInputError && (
-            <p className="text-xs text-newTextColor/50 text-center max-w-sm">
+            <p className="text-xs text-newTextColor/65 text-center max-w-sm">
               If a generation fails for no clear reason, check your{' '}
               <a
                 href="https://replicate.com/account/billing"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-designerAccent underline"
+                className="text-btnPrimaryAccent underline"
               >
                 Replicate balance
               </a>{' '}
@@ -385,7 +385,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
                       artifactUrl: savedPaths[urls[0]] || urls[0],
                     })
                   }
-                  className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-designerAccent text-xs hover:bg-designerAccent/30 transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-btnPrimaryAccent text-xs hover:bg-designerAccent/30 transition-colors"
                 >
                   Open in Designer
                 </button>

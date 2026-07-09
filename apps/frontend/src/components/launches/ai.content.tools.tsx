@@ -302,7 +302,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                   </div>
                   <button
                     onClick={() => copyToClipboard(p.content)}
-                    className="text-[11px] text-[#2B5CD3] hover:underline"
+                    className="text-[11px] text-btnPrimaryAccent hover:underline"
                   >
                     {t('copy', 'Copy')}
                   </button>
@@ -311,7 +311,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                   {p.content}
                 </div>
                 {p.note && (
-                  <div className="text-[11px] text-newTextColor/50 mt-[4px]">
+                  <div className="text-[11px] text-newTextColor/65 mt-[4px]">
                     {p.note}
                   </div>
                 )}
@@ -331,7 +331,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                   </div>
                   <button
                     onClick={() => copyToClipboard(tr.text)}
-                    className="text-[11px] text-[#2B5CD3] hover:underline"
+                    className="text-[11px] text-btnPrimaryAccent hover:underline"
                   >
                     {t('copy', 'Copy')}
                   </button>
@@ -355,7 +355,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                   </div>
                   <button
                     onClick={() => copyToClipboard(v.content)}
-                    className="text-[11px] text-[#2B5CD3] hover:underline"
+                    className="text-[11px] text-btnPrimaryAccent hover:underline"
                   >
                     {t('copy', 'Copy')}
                   </button>

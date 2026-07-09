@@ -37,6 +37,9 @@
     --new-table-header: #1e1d1d;
     --new-table-text: #9c9c9c;
     --new-table-text-focused: #1d9bf0;
+    /* Semantic up/down metric colors — vibrant on dark surfaces (pass AA on dark). */
+    --positive: #32d583;
+    --negative: #f97066;
     --heading-accent: #4f9fe8;
     --heading-h1: #b3bdd0;
     --new-small-strips: #191818;
@@ -98,7 +101,11 @@
     --new-table-border: #e7e9eb;
     --new-table-header: #f5f7f9;
     --new-table-text: #595d63;
-    --new-table-text-focused: #1d9bf0;
+    --new-table-text-focused: #0e6ba8;
+    /* Semantic up/down metric colors — darkened for AA as text on light surfaces
+       (green-700 / red-700). White-on-solid and tint/border uses only gain contrast. */
+    --positive: #15803d;
+    --negative: #b91c1c;
     --heading-accent: #2f53a8;
     --heading-h1: var(--new-btn-primary);
     --new-small-strips: #191818;

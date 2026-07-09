@@ -64,7 +64,7 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
       <button
         type="button"
         onClick={choose}
-        className={`${inputClass} text-left ${display ? 'text-textColor' : 'text-newTextColor/50'}`}
+        className={`${inputClass} text-left ${display ? 'text-textColor' : 'text-newTextColor/65'}`}
       >
         {display ? <span className="truncate block">{display}</span> : `Choose ${field.accept}…`}
       </button>
@@ -72,7 +72,7 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
         <button
           type="button"
           onClick={() => onChange(undefined)}
-          className="px-[10px] rounded-[8px] text-newTextColor/50 hover:text-red-500 transition-colors"
+          className="px-[10px] rounded-[8px] text-newTextColor/65 hover:text-red-500 transition-colors"
           aria-label="Clear"
         >
           ✕
@@ -193,7 +193,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
             )}
 
             {field.help && field.type !== 'toggle' && (
-              <div className="text-[11px] text-newTextColor/45 mt-[5px]">{field.help}</div>
+              <div className="text-[11px] text-newTextColor/60 mt-[5px]">{field.help}</div>
             )}
           </div>
         );

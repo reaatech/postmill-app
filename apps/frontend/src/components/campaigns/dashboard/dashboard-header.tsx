@@ -33,7 +33,7 @@ const StatusBadge: FC<{ archived: boolean }> = ({ archived }) => {
     );
   }
   return (
-    <span className="text-[11px] bg-green-500/10 text-green-400 px-[8px] py-[2px] rounded-full">
+    <span className="text-[11px] bg-green-500/10 text-green-800 dark:text-green-400 px-[8px] py-[2px] rounded-full">
       {t('active', 'Active')}
     </span>
   );
@@ -135,7 +135,7 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
   const createdByElement = campaign.createdBy?.id ? (
     <Link
       href={`/profile/${campaign.createdBy.id}`}
-      className="text-btnPrimary underline"
+      className="text-btnPrimaryAccent underline"
     >
       {createdByName}
     </Link>

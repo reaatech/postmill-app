@@ -361,7 +361,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                       }}
                       className={`flex-1 text-left text-[12px] ${
                         i === currentOutput
-                          ? 'text-designerAccent font-medium'
+                          ? 'text-btnPrimaryAccent font-medium'
                           : 'text-textColor'
                       }`}
                     >
@@ -413,7 +413,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
             }
           }}
           aria-label="Add format"
-          className="shrink-0 flex items-center justify-center rounded-md border-2 border-dashed border-studioBorder text-textColor/50 hover:border-designerAccent hover:text-designerAccent text-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+          className="shrink-0 flex items-center justify-center rounded-md border-2 border-dashed border-studioBorder text-textColor/50 hover:border-designerAccent hover:text-btnPrimaryAccent text-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
           style={{ width: 40, height: THUMB_H }}
         >
           +
@@ -440,7 +440,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 ),
               );
             }}
-            className="w-full text-left px-2 py-1.5 rounded text-[11px] text-designerAccent hover:bg-designerAccent/10 mb-2 border border-designerAccent/30"
+            className="w-full text-left px-2 py-1.5 rounded text-[11px] text-btnPrimaryAccent hover:bg-designerAccent/10 mb-2 border border-designerAccent/30"
           >
             Recommended set (IG Post + Story + Linked + X)
           </button>
@@ -464,7 +464,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                             already
                               ? 'text-textColor/25 cursor-not-allowed'
                               : pendingFormats.has(p.id)
-                                ? 'text-designerAccent bg-designerAccent/10 cursor-pointer hover:bg-designerAccent/15'
+                                ? 'text-btnPrimaryAccent bg-designerAccent/10 cursor-pointer hover:bg-designerAccent/15'
                                 : 'text-textColor cursor-pointer hover:bg-studioBorder/10'
                           }`}
                         >

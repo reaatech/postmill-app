@@ -284,7 +284,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
                     ) : key.expiresAt && new Date(key.expiresAt) < new Date() ? (
                       <span className="text-amber-600">{t('expired', 'Expired')}</span>
                     ) : (
-                      <span className="text-green-400">{t('active', 'Active')}</span>
+                      <span className="text-green-700 dark:text-green-400">{t('active', 'Active')}</span>
                     )}
                   </td>
                   <td className="px-[16px] py-[12px] text-right">

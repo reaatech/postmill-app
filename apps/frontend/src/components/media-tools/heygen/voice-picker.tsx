@@ -36,7 +36,7 @@ export const VoicePicker: FC<VoicePickerProps> = ({ voices, selectedId, onSelect
         className="w-full h-[40px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[14px] text-textColor outline-none focus:border-[#2B5CD3]"
       />
       {filtered.length === 0 ? (
-        <div className="h-[200px] flex items-center justify-center text-[13px] text-newTextColor/50">
+        <div className="h-[200px] flex items-center justify-center text-[13px] text-newTextColor/65">
           {voices.length === 0 ? 'No voices available on this account' : `No voices match "${query}"`}
         </div>
       ) : (
@@ -50,7 +50,7 @@ export const VoicePicker: FC<VoicePickerProps> = ({ voices, selectedId, onSelect
             >
               <div className="flex-1 min-w-0">
                 <div className="text-[13px] text-textColor truncate">{v.name}</div>
-                <div className="text-[11px] text-newTextColor/50 truncate">
+                <div className="text-[11px] text-newTextColor/65 truncate">
                   {[v.language, v.gender].filter(Boolean).join(' · ')}
                   {v.emotionSupport ? ' · emotions' : ''}
                 </div>

@@ -24,14 +24,14 @@ const OPERATION_LABELS: Record<string, string> = {
 };
 
 const OPERATION_COLORS: Record<string, string> = {
-  image: 'bg-blue-500/20 text-blue-400',
+  image: 'bg-blue-500/20 text-blue-800 dark:text-blue-400',
   video: 'bg-red-500/20 text-dangerText',
-  tts: 'bg-green-500/20 text-green-400',
-  stt: 'bg-emerald-500/20 text-emerald-400',
-  upscale: 'bg-orange-500/20 text-orange-400',
-  'bg-remove': 'bg-pink-500/20 text-pink-400',
-  inpaint: 'bg-cyan-500/20 text-cyan-400',
-  embedding: 'bg-yellow-500/20 text-yellow-400',
+  tts: 'bg-green-500/20 text-green-800 dark:text-green-400',
+  stt: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400',
+  upscale: 'bg-orange-500/20 text-orange-800 dark:text-orange-400',
+  'bg-remove': 'bg-pink-500/20 text-pink-800 dark:text-pink-400',
+  inpaint: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400',
+  embedding: 'bg-yellow-500/20 text-yellow-800 dark:text-yellow-400',
 };
 
 interface ProviderCardProps {
@@ -53,9 +53,9 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
         <span
           className={`text-[11px] rounded-[4px] px-[8px] py-[3px] font-medium ${
             provider.enabled && provider.isConfigured
-              ? 'bg-green-500/20 text-green-400'
+              ? 'bg-green-500/20 text-green-800 dark:text-green-400'
               : provider.isConfigured
-                ? 'bg-yellow-500/20 text-yellow-400'
+                ? 'bg-yellow-500/20 text-yellow-800 dark:text-yellow-400'
                 : 'bg-newTableHeader text-newTableText'
           }`}
         >

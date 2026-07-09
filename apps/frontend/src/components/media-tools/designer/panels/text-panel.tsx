@@ -94,7 +94,7 @@ export const TextPanel: FC<TextPanelProps> = ({ store, onClose }) => {
         if (!presets.length) return null;
         return (
           <div key={category} className="flex flex-col gap-2">
-            <div className="text-[11px] text-newTextColor/40 uppercase tracking-wider">
+            <div className="text-[11px] text-newTextColor/60 uppercase tracking-wider">
               {CATEGORY_LABELS[category]}
             </div>
             <div className="flex flex-col gap-2">

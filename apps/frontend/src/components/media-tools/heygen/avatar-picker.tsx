@@ -31,7 +31,7 @@ export const AvatarPicker: FC<AvatarPickerProps> = ({ avatars, selectedId, onSel
         className="w-full h-[40px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[14px] text-textColor outline-none focus:border-[#2B5CD3]"
       />
       {filtered.length === 0 ? (
-        <div className="h-[200px] flex items-center justify-center text-[13px] text-newTextColor/50">
+        <div className="h-[200px] flex items-center justify-center text-[13px] text-newTextColor/65">
           {avatars.length === 0 ? 'No avatars available on this account' : `No avatars match "${query}"`}
         </div>
       ) : (
@@ -60,7 +60,7 @@ export const AvatarPicker: FC<AvatarPickerProps> = ({ avatars, selectedId, onSel
               </div>
               <div className="px-[8px] py-[6px] bg-newBgColorInner">
                 <div className="text-[12px] text-textColor truncate" title={a.name}>{a.name}</div>
-                {a.gender && <div className="text-[10px] text-newTextColor/50 capitalize">{a.gender}</div>}
+                {a.gender && <div className="text-[10px] text-newTextColor/65 capitalize">{a.gender}</div>}
               </div>
             </button>
           ))}

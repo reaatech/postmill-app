@@ -52,7 +52,7 @@ export interface ProviderRow<Meta = unknown> {
 
 export interface CapabilityMeta {
   label: string;
-  /** Tailwind classes for the badge, e.g. `bg-blue-500/20 text-blue-400`. */
+  /** Tailwind classes for the badge, e.g. `bg-blue-500/20 text-blue-800 dark:text-blue-400`. */
   color: string;
 }
 
