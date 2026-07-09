@@ -38,3 +38,65 @@ describe('OAuthRepository.findByAccessToken', () => {
     expect(hasFutureBranch).toBe(true);
   });
 });
+
+
+describe('OAuthRepository org-scoped mutations (TI-12)', () => {
+  const makeRepo = (overrides: any = {}) => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'app-1', organizationId: 'org-1' });
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const getAppByOrgId = vi.fn().mockResolvedValue({ id: 'app-1', organizationId: 'org-1' });
+    const oauthApp = {
+      model: {
+        oAuthApp: {
+          findFirst,
+          updateMany,
+        },
+      },
+    } as any;
+    const oauthAuth = { model: { oAuthAuthorization: {} } } as any;
+    const repo = new OAuthRepository(oauthApp, oauthAuth);
+    if (overrides.getAppByOrgId) {
+      repo.getAppByOrgId = overrides.getAppByOrgId;
+    }
+    return { repo, findFirst, updateMany, getAppByOrgId };
+  };
+
+  it('updateApp scopes the write by orgId', async () => {
+    const { repo, updateMany, getAppByOrgId } = makeRepo();
+    await repo.updateApp('org-1', { name: 'Updated' });
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'app-1', organizationId: 'org-1' },
+      data: { name: 'Updated' },
+    });
+  });
+
+  it('deleteApp scopes the soft-delete by orgId', async () => {
+    const { repo, updateMany } = makeRepo();
+    const result = await repo.deleteApp('org-1');
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'app-1', organizationId: 'org-1' },
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({ id: 'app-1' }));
+  });
+
+  it('updateClientSecret scopes the write by orgId', async () => {
+    const { repo, updateMany } = makeRepo();
+    await repo.updateClientSecret('org-1', 'new-secret');
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'app-1', organizationId: 'org-1' },
+      data: { clientSecret: 'new-secret' },
+    });
+  });
+
+  it('returns null when the org-scoped update affects no rows', async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'app-1', organizationId: 'org-1' });
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+    const oauthApp = {
+      model: { oAuthApp: { findFirst, updateMany } },
+    } as any;
+    const repo = new OAuthRepository(oauthApp, { model: { oAuthAuthorization: {} } } as any);
+    expect(await repo.updateApp('org-1', { name: 'Updated' })).toBeNull();
+  });
+});

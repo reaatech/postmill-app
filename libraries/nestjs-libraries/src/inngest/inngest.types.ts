@@ -91,6 +91,11 @@ export type InngestEvents = {
       op: 'design' | 'merge';
     };
   };
+  'media/poll-job': {
+    data: {
+      jobId: string;
+    };
+  };
   'agent/digest-org': {
     data: {
       organizationId: string;

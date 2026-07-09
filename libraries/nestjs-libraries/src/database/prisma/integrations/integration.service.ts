@@ -21,7 +21,7 @@ import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abst
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { uniq } from 'lodash';
+import { uniq, uniqBy } from 'lodash';
 import utc from 'dayjs/plugin/utc';
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -83,6 +83,71 @@ export class IntegrationService {
     mentions: { name: string; username: string; image: string }[]
   ) {
     return this._integrationRepository.insertMentions(platform, mentions);
+  }
+
+  /**
+   * Aggregate cached mentions with a live provider query. The live lookup is
+   * dispatched through the whitelisted `IntegrationManager.callTool` method
+   * (special `mention` function). Moved from IntegrationsController so the
+   * aggregation logic is reusable and testable outside the HTTP layer.
+   */
+  async getMentionsForQuery(
+    orgId: string,
+    integrationId: string,
+    query: string
+  ): Promise<{ id: string; image?: string; label: string }[] | { none: true }> {
+    const getIntegration = await this._integrationRepository.getIntegrationById(
+      orgId,
+      integrationId
+    );
+    if (!getIntegration) {
+      throw new Error('Invalid integration');
+    }
+
+    let newList: any[] | { none: true } = [];
+    try {
+      newList =
+        (await this._integrationManager.callTool(orgId, integrationId, 'mention', {
+          query,
+        })) || [];
+    } catch (err) {
+      this._logger.warn((err as Error)?.message ?? String(err));
+    }
+
+    if (!Array.isArray(newList) && newList?.none) {
+      return newList as { none: true };
+    }
+
+    const list = await this.getMentions(
+      getIntegration.providerIdentifier,
+      query
+    );
+
+    if (Array.isArray(newList) && newList.length) {
+      await this.insertMentions(
+        getIntegration.providerIdentifier,
+        newList
+          .map((p: any) => ({
+            name: p.label || '',
+            username: p.id || '',
+            image: p.image || '',
+            doNotCache: p.doNotCache || false,
+          }))
+          .filter((f: any) => f.name && !f.doNotCache)
+      );
+    }
+
+    return uniqBy(
+      [
+        ...list.map((p) => ({
+          id: p.username,
+          image: p.image,
+          label: p.name,
+        })),
+        ...(newList as any[]),
+      ],
+      (p) => p.id
+    ).filter((f) => f.label && f.id);
   }
 
   async setTimes(
@@ -231,8 +296,8 @@ export class IntegrationService {
     return list.filter((i) => i.refreshNeeded || i.disabled);
   }
 
-  updateNameAndUrl(id: string, name: string, url: string) {
-    return this._integrationRepository.updateNameAndUrl(id, name, url);
+  updateNameAndUrl(org: string, id: string, name: string, url: string) {
+    return this._integrationRepository.updateNameAndUrl(org, id, name, url);
   }
 
   getIntegrationById(org: string, id: string) {
@@ -288,8 +353,8 @@ export class IntegrationService {
     return this._integrationRepository.refreshNeeded(org, id);
   }
 
-  async setBetweenRefreshSteps(id: string) {
-    return this._integrationRepository.setBetweenRefreshSteps(id);
+  async setBetweenRefreshSteps(id: string, orgId: string) {
+    return this._integrationRepository.setBetweenRefreshSteps(orgId, id);
   }
 
   async refreshTokens() {
@@ -647,7 +712,7 @@ export class IntegrationService {
     totalRuns: number;
     currentRun: number;
   }) {
-    const getPlugById = await this._integrationRepository.getPlug(data.plugId);
+    const getPlugById = await this._integrationRepository.getPlugForSystem(data.plugId);
     if (!getPlugById) {
       return true;
     }

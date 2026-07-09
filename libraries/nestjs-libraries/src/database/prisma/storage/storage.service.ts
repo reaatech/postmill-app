@@ -42,6 +42,22 @@ export class StorageService {
     return rest;
   }
 
+  // Recursively coerce BigInt values to Number so service results are safe for
+  // JSON serialization without leaking the bigint type into controllers.
+  #stripBigInts(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'bigint') return Number(obj);
+    if (Array.isArray(obj)) return obj.map((v) => this.#stripBigInts(v));
+    if (typeof obj === 'object') {
+      const stripped: any = {};
+      for (const [k, v] of Object.entries(obj)) {
+        stripped[k] = this.#stripBigInts(v);
+      }
+      return stripped;
+    }
+    return obj;
+  }
+
   async #audit(
     action: string,
     orgId: string,
@@ -184,6 +200,39 @@ export class StorageService {
     return this.#sanitize(created);
   }
 
+  /**
+   * Create a storage config, test the connection, and roll back on failure.
+   * Returns a DTO-ready (BigInt-stripped, credential-sanitized) shape.
+   */
+  async createAndTestConfig(
+    orgId: string,
+    data: {
+      type: StorageProviderType;
+      name: string;
+      credentials?: Record<string, string>;
+      region?: string;
+      bucket?: string;
+      endpoint?: string;
+      publicUrl?: string;
+      quotaBytes?: bigint;
+      version?: string;
+    },
+    userId?: string
+  ) {
+    const created = await this.createConfig(orgId, data, userId);
+
+    const testResult = await this.testConnection(created.id, orgId);
+    if (!testResult.ok) {
+      await this.deleteConfig(created.id, orgId);
+      throw new HttpException(
+        `Connection test failed: ${testResult.error}`,
+        400
+      );
+    }
+
+    return this.#stripBigInts(created);
+  }
+
   #computeFingerprint(
     type: StorageProviderType,
     credentials?: Record<string, string>
@@ -286,7 +335,7 @@ export class StorageService {
     }
     // 6.5: await the audit write so the row is not dropped on process exit.
     await this.#audit('update', orgId, updated, userId);
-    return this.#sanitize(updated);
+    return this.#stripBigInts(this.#sanitize(updated));
   }
 
   async ensureLocalProvider(orgId: string) {
@@ -566,7 +615,7 @@ export class StorageService {
 
     const updated = await this.#getOrgScopedConfig(id, orgId);
     this.#audit('mount', orgId, updated);
-    return this.#sanitize(updated);
+    return this.#stripBigInts(this.#sanitize(updated));
   }
 
   async unmount(id: string, orgId: string) {
@@ -576,11 +625,11 @@ export class StorageService {
     }
 
     // Delete the auto-created root folder when empty, else detach it (#55).
-    await this._storageRepository.removeOrDetachMountFolders(id);
+    await this._storageRepository.removeOrDetachMountFolders(orgId, id);
 
     const updated = await this._storageRepository.update(orgId, id, { mounted: false });
     this.#audit('unmount', orgId, updated);
-    return this.#sanitize(updated);
+    return this.#stripBigInts(this.#sanitize(updated));
   }
 
   async getUsage(orgId: string): Promise<{
@@ -649,6 +698,43 @@ export class StorageService {
     const byFolder = await this._storageRepository.getUsageByFolder(orgId);
     const byProvider = await this._storageRepository.getUsageByProvider(orgId);
     return { byFolder, byProvider };
+  }
+
+  // DTO-ready variants that strip BigInt values before crossing the HTTP boundary.
+  async getUsageDto(orgId: string) {
+    const usage = await this.getUsage(orgId);
+    return {
+      totalBytes: Number(usage.totalBytes),
+      quotaBytes: Number(usage.quotaBytes),
+      providers: usage.providers.map((p) => ({
+        ...p,
+        usageBytes: p.usageBytes !== null ? Number(p.usageBytes) : null,
+      })),
+    };
+  }
+
+  async getQuotaStatusDto(orgId: string) {
+    const status = await this.getQuotaStatus(orgId);
+    return {
+      usedBytes: Number(status.usedBytes),
+      quotaBytes: Number(status.quotaBytes),
+      percentUsed: status.percentUsed,
+      warning: status.warning,
+    };
+  }
+
+  async getUsageBreakdownDto(orgId: string) {
+    const breakdown = await this.getUsageBreakdown(orgId);
+    return {
+      byFolder: breakdown.byFolder.map((f) => ({
+        ...f,
+        totalBytes: Number(f.totalBytes),
+      })),
+      byProvider: breakdown.byProvider.map((p) => ({
+        ...p,
+        totalBytes: Number(p.totalBytes),
+      })),
+    };
   }
 
   /**
@@ -760,8 +846,19 @@ export class StorageService {
     if (!config) {
       throw new HttpException('Provider not found', 404);
     }
+
+    // Validate cross-org / missing folder before persisting. `findFolder` is
+    // org-scoped and returns null for a missing or foreign folder; mirror the
+    // controller's 400-on-not-found behaviour.
+    if (folderId) {
+      const folder = await this._storageRepository.findFolder(folderId, orgId);
+      if (!folder) {
+        throw new HttpException('folderId does not belong to this organization', 400);
+      }
+    }
+
     const updated = await this._storageRepository.setDefaultFolder(providerId, folderId, orgId);
     await this.#audit('set-default-folder', orgId, config, userId);
-    return this.#sanitize(updated);
+    return this.#stripBigInts(this.#sanitize(updated));
   }
 }

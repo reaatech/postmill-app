@@ -1,4 +1,11 @@
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
@@ -6,6 +13,9 @@ import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/databas
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
+import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
+import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 
 @Injectable()
 export class OrgAiSettingsService {
@@ -16,6 +26,9 @@ export class OrgAiSettingsService {
     private _encryption: EncryptionService,
     private _resolution: ProviderResolutionService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
+    @Inject(forwardRef(() => AiDefaultsService))
+    private _defaultsService: AiDefaultsService,
+    private _defaultsSeed: DefaultsSeedService,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
   ) {}
 
@@ -128,6 +141,13 @@ export class OrgAiSettingsService {
       version?: string;
     },
   ) {
+    const adapter = this._resolveAdapter(identifier, data.version);
+    if (!adapter) {
+      throw new BadRequestException('Unknown provider');
+    }
+
+    await this._assertBaseURLSafe(data.credentials?.baseURL);
+
     const { version: requestedVersion, ...payload } = data;
     // 1.1: validate the (client-supplied or defaulted) version against the
     // lifecycle before pinning — a deprecated version rejects the write (400), a
@@ -170,8 +190,7 @@ export class OrgAiSettingsService {
     // step-1 gate clears without a separate "Make Primary" click. Scoped to a first-time
     // setup (see isFirstProvider above); an established org is never auto-activated.
     if (isFirstProvider && payload.credentials) {
-      const adapter = this._resolveAdapter(identifier, version);
-      if (adapter && this._hasRequiredCredentials(adapter, payload.credentials)) {
+      if (this._hasRequiredCredentials(adapter, payload.credentials)) {
         try {
           await this.setActive(orgId, identifier, version);
         } catch (err) {
@@ -179,6 +198,12 @@ export class OrgAiSettingsService {
         }
       }
     }
+
+    // Eagerly seed any unset model/media defaults now that a provider is available.
+    // Intentionally detached + non-fatal: seeding must never delay or fail the provider
+    // config response.
+    this._defaultsSeed.seedUnset(orgId).catch(() => undefined);
+    this._defaultsService.bustDefaultsCatalogCache(orgId);
 
     return result;
   }
@@ -200,7 +225,13 @@ export class OrgAiSettingsService {
       throw new Error(`Provider "${identifier}" is not fully configured. Fill in all required credential fields first.`);
     }
 
-    return this._repository.setActive(orgId, identifier, resolvedVersion);
+    const result = await this._repository.setActive(orgId, identifier, resolvedVersion);
+
+    // Eagerly seed any unset model/media defaults now that the active provider changed.
+    this._defaultsSeed.seedUnset(orgId).catch(() => undefined);
+    this._defaultsService.bustDefaultsCatalogCache(orgId);
+
+    return result;
   }
 
   async delete(orgId: string, identifier: string) {
@@ -211,10 +242,25 @@ export class OrgAiSettingsService {
     const result = await this._repository.delete(orgId, identifier, version);
     // 1.3a: evict the cached capability for the deleted config.
     this._resolution.invalidate('ai', identifier, orgId);
+    this._defaultsService.bustDefaultsCatalogCache(orgId);
     return result;
   }
 
-  async testConnection(orgId: string, identifier: string) {
+  async testConnection(
+    orgId: string,
+    identifier: string,
+    credentials?: Record<string, string>,
+  ) {
+    const adapter = this._resolveAdapter(identifier);
+    if (!adapter) {
+      throw new BadRequestException('Unknown provider');
+    }
+
+    if (credentials) {
+      await this._assertBaseURLSafe(credentials.baseURL);
+      return adapter.validateCredentials(credentials);
+    }
+
     // 1.4: resolve the pinned version so the test operates on the same row a
     // read would (stored row's version, else latest-active).
     const version = await this._getPinnedVersion(orgId, identifier);
@@ -223,12 +269,8 @@ export class OrgAiSettingsService {
       throw new Error(`Provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._resolveAdapter(identifier, config.version ?? version);
-    if (!adapter) {
-      throw new Error(`Unknown provider: ${identifier}`);
-    }
-
     const decrypted = this._decryptCredentials(config.credentials);
+    await this._assertBaseURLSafe(decrypted.baseURL);
     return adapter.validateCredentials(decrypted);
   }
 
@@ -243,6 +285,16 @@ export class OrgAiSettingsService {
     enabled?: boolean;
   }) {
     return this._repository.upsertBudget(orgId, data);
+  }
+
+  private async _assertBaseURLSafe(baseURL: string | undefined) {
+    if (typeof baseURL !== 'string' || !baseURL.trim()) return;
+    const safe = await isSafePublicHttpsUrl(baseURL);
+    if (!safe) {
+      throw new BadRequestException(
+        'Base URL must be a public HTTPS URL (private, loopback, and non-HTTPS hosts are not allowed)',
+      );
+    }
   }
 
   private _resolveVersion(identifier: string, version?: string): string {

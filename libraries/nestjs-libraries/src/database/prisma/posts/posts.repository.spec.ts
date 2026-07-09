@@ -144,6 +144,28 @@ describe('PostsRepository', () => {
       const where = tagsFindMany.mock.calls[0][0].where;
       expect(where.deletedAt).toBeNull();
       expect(where.orgId).toBe('org-1');
+
+      expect(tagsDeleteMany).toHaveBeenCalledWith({
+        where: {
+          post: {
+            id: 'post-1',
+            organizationId: 'org-1',
+          },
+        },
+      });
+      expect(postUpdate).toHaveBeenCalledWith({
+        where: {
+          id: 'post-1',
+          organizationId: 'org-1',
+        },
+        data: {
+          tags: {
+            createMany: {
+              data: [{ tagId: 'tag-1' }],
+            },
+          },
+        },
+      });
     });
   });
 });

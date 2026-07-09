@@ -6,27 +6,9 @@ import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/p
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.team.member.dto';
 import { ShortlinkPreferenceDto } from '@gitroom/nestjs-libraries/dtos/settings/shortlink-preference.dto';
+import { CreateTeamUserDto } from '@gitroom/nestjs-libraries/dtos/settings/create-team-user.dto';
 import { ApiTags } from '@nestjs/swagger';
-import { IsDefined, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
-
-class CreateTeamUserDto {
-  @IsDefined()
-  @IsEmail()
-  email!: string;
-
-  @IsDefined()
-  @IsString()
-  @MinLength(6)
-  password!: string;
-
-  @IsString()
-  role: 'USER' | 'ADMIN' = 'USER';
-
-  @IsOptional()
-  @IsString()
-  roleId?: string;
-}
 
 @ApiTags('Settings')
 @Controller('/settings')

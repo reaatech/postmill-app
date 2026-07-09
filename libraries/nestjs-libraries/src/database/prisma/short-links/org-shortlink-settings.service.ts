@@ -5,6 +5,7 @@ import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encrypti
 import { ShortLinkAdapter } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
 
 @Injectable()
 export class OrgShortLinkSettingsService {
@@ -52,6 +53,139 @@ export class OrgShortLinkSettingsService {
       defaultDomain: adapter.defaultDomain,
       setupNotes: adapter.setupNotes,
     }));
+  }
+
+  /**
+   * Resolve a short-link adapter through the kernel, throwing when the provider
+   * is unknown/retired.
+   */
+  requireAdapter(identifier: string, version?: string): ShortLinkAdapter {
+    const adapter = this._adapterFor(identifier, version);
+    if (!adapter) {
+      throw new BadRequestException('Unknown short-link provider');
+    }
+    return adapter;
+  }
+
+  // Deterministic, credential-derived fingerprint (server-side only). Undefined when
+  // no credentials are supplied so passthrough/empty configs aren't wrongly deduped.
+  computeAccountFingerprint(
+    identifier: string,
+    credentials?: Record<string, string>,
+    customDomain?: string,
+  ): string | undefined {
+    if (!credentials || Object.keys(credentials).length === 0) {
+      return undefined;
+    }
+    const canonical = Object.keys(credentials)
+      .sort()
+      .map((k) => `${k}=${credentials[k]}`)
+      .join('&');
+    return accountFingerprint(identifier, customDomain ?? '', canonical);
+  }
+
+  /**
+   * Upsert a short-link config, routing an existing row to an in-place update
+   * and a new row to a fingerprint-based create.
+   */
+  async upsertConfig(
+    orgId: string,
+    identifier: string,
+    data: {
+      credentials?: Record<string, string>;
+      customDomain?: string;
+      extraConfig?: Record<string, string>;
+      name?: string;
+      version?: string;
+    },
+  ) {
+    this.requireAdapter(identifier);
+
+    // PROVIDER_REMEDIATION 6.6: compute the fingerprint SERVER-SIDE with the shared
+    // util (as Storage does) and ignore any client-supplied `body.accountFingerprint`
+    // — a client-controlled value lets an attacker mint unlimited duplicate rows /
+    // defeat dedupe.
+    const accountFingerprint = this.computeAccountFingerprint(
+      identifier,
+      data.credentials,
+      data.customDomain,
+    );
+
+    // PROVIDER_REMEDIATION_02 §0.3: when a config already exists for this
+    // provider (the normal edit/rotate flow — the UI is single-config-per-
+    // provider), update THAT row in place. Routing a rotation through the
+    // fingerprint-`upsert` branch created a second inactive row with the new key
+    // while `getActive()` kept returning the old row with the *revoked* key. The
+    // explicit fingerprint-`create` path is reserved for a first save / an
+    // explicit "add another account" flow (no existing row).
+    const existingId = await this.getExistingConfigId(orgId, identifier);
+    if (existingId) {
+      await this.updateById(
+        orgId,
+        existingId,
+        {
+          credentials: data.credentials,
+          customDomain: data.customDomain,
+          extraConfig: data.extraConfig,
+          name: data.name,
+          accountFingerprint,
+          version: data.version,
+        },
+        identifier,
+      );
+      return { identifier, success: true };
+    }
+
+    await this.upsert(orgId, identifier, {
+      enabled: true,
+      credentials: data.credentials,
+      customDomain: data.customDomain,
+      extraConfig: data.extraConfig,
+      name: data.name,
+      accountFingerprint,
+      version: data.version,
+    });
+
+    return { identifier, success: true };
+  }
+
+  /**
+   * Row-id-targeted in-place update (rotation / rename / re-key of a specific
+   * account), computing the fingerprint server-side.
+   */
+  async updateConfigById(
+    orgId: string,
+    configId: string,
+    identifier: string,
+    data: {
+      credentials?: Record<string, string>;
+      customDomain?: string;
+      extraConfig?: Record<string, string>;
+      name?: string;
+      version?: string;
+    },
+  ) {
+    this.requireAdapter(identifier);
+
+    await this.updateById(
+      orgId,
+      configId,
+      {
+        credentials: data.credentials,
+        customDomain: data.customDomain,
+        extraConfig: data.extraConfig,
+        name: data.name,
+        accountFingerprint: this.computeAccountFingerprint(
+          identifier,
+          data.credentials,
+          data.customDomain,
+        ),
+        version: data.version,
+      },
+      identifier,
+    );
+
+    return { identifier, configId, success: true };
   }
 
   async getProviders(orgId: string) {
@@ -329,17 +463,27 @@ export class OrgShortLinkSettingsService {
     return { credentials, extraConfig };
   }
 
-  async testConnection(orgId: string, identifier: string) {
+  async testConnection(
+    orgId: string,
+    identifier: string,
+    credentials?: Record<string, string>,
+    customDomain?: string,
+  ) {
+    if (credentials) {
+      const adapter = this.requireAdapter(identifier);
+      return adapter.validateCredentials({
+        orgId,
+        credentials,
+        customDomain,
+      });
+    }
+
     const config = await this._repository.getByIdentifier(orgId, identifier);
     if (!config) {
       throw new Error(`Short-link provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._adapterFor(identifier, config.version ?? 'v1');
-    if (!adapter) {
-      throw new Error(`Unknown short-link provider: ${identifier}`);
-    }
-
+    const adapter = this.requireAdapter(identifier);
     const decrypted = this._decryptCredentials(config.credentials);
     return adapter.validateCredentials({
       orgId,

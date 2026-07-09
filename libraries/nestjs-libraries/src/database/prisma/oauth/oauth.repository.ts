@@ -78,13 +78,14 @@ export class OAuthRepository {
     if (!app) {
       return null;
     }
-    return this._oauthApp.model.oAuthApp.update({
-      where: { id: app.id },
+    const { count } = await this._oauthApp.model.oAuthApp.updateMany({
+      where: { id: app.id, organizationId: orgId },
       data,
-      include: {
-        picture: true,
-      },
     });
+    if (count === 0) {
+      return null;
+    }
+    return this.getAppByOrgId(orgId);
   }
 
   async deleteApp(orgId: string) {
@@ -97,12 +98,16 @@ export class OAuthRepository {
     if (!app) {
       return null;
     }
-    return this._oauthApp.model.oAuthApp.update({
-      where: { id: app.id },
+    const { count } = await this._oauthApp.model.oAuthApp.updateMany({
+      where: { id: app.id, organizationId: orgId },
       data: {
         deletedAt: new Date(),
       },
     });
+    if (count === 0) {
+      return null;
+    }
+    return { id: app.id, deletedAt: new Date() };
   }
 
   async updateClientSecret(orgId: string, newSecret: string) {
@@ -115,12 +120,16 @@ export class OAuthRepository {
     if (!app) {
       return null;
     }
-    return this._oauthApp.model.oAuthApp.update({
-      where: { id: app.id },
+    const { count } = await this._oauthApp.model.oAuthApp.updateMany({
+      where: { id: app.id, organizationId: orgId },
       data: {
         clientSecret: newSecret,
       },
     });
+    if (count === 0) {
+      return null;
+    }
+    return { id: app.id };
   }
 
   createAuthorization(data: {

@@ -224,7 +224,16 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
     codeVerifier: string;
     refresh?: string;
   }) {
-    const body = JSON.parse(Buffer.from(params.code, 'base64').toString());
+    let body: { apiKey: string };
+    try {
+      const parsed = JSON.parse(Buffer.from(params.code, 'base64').toString());
+      if (!parsed || typeof parsed !== 'object' || typeof parsed.apiKey !== 'string' || !parsed.apiKey.trim()) {
+        throw new Error('Invalid callback');
+      }
+      body = parsed;
+    } catch (err) {
+      return 'Invalid credentials';
+    }
     try {
       const {
         data: {

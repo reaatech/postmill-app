@@ -76,7 +76,10 @@ export class RefreshIntegrationService {
   }
 
   public async setBetweenSteps(integration: Integration, cause = '') {
-    await this._integrationService.setBetweenRefreshSteps(integration.id);
+    await this._integrationService.setBetweenRefreshSteps(
+      integration.id,
+      integration.organizationId
+    );
     await this._integrationService.informAboutRefreshError(
       integration.organizationId,
       integration,

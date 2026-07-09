@@ -26,8 +26,27 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
   editor = 'normal' as const;
   dto = MeweDto;
 
-  private getMeweHost(instanceUrl?: string) {
-    return instanceUrl || 'https://mewe.com';
+  private _resolveBaseUrl(instanceUrl?: string): string {
+    const base = (instanceUrl || 'https://mewe.com').trim().replace(/\/+$/, '');
+    let parsed: URL;
+    try {
+      parsed = new URL(base);
+    } catch {
+      throw new Error(
+        `Invalid MeWe instance URL: "${base}" is not a valid URL.`
+      );
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new Error(
+        `Invalid MeWe instance URL: "${base}" must use HTTPS.`
+      );
+    }
+    if (!parsed.hostname) {
+      throw new Error(
+        `Invalid MeWe instance URL: "${base}" has no hostname.`
+      );
+    }
+    return base;
   }
 
   private authHeaders(apiToken: string, appId: string, apiKey: string) {
@@ -88,7 +107,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
-    const instanceUrl = clientInformation?.instanceUrl || 'https://mewe.com';
+    const instanceUrl = this._resolveBaseUrl(clientInformation?.instanceUrl);
     return {
       url:
         `${instanceUrl}/login` +
@@ -110,11 +129,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     const loginRequestToken = params.code;
     const appId = clientInformation?.client_id || '';
     const apiKey = clientInformation?.client_secret || '';
-    const instanceUrl = clientInformation?.instanceUrl || 'https://mewe.com';
-
-    if (!instanceUrl.startsWith('https://')) {
-      return 'Invalid MeWe instance URL: only HTTPS is allowed.';
-    }
+    const instanceUrl = this._resolveBaseUrl(clientInformation?.instanceUrl);
 
     if (!loginRequestToken) {
       return 'No login request token received. Please try again.';
@@ -194,7 +209,10 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     try {
       const appId = getOrgCredential(integration.organizationId, 'mewe', 'clientId') || '';
       const apiKey = getOrgCredential(integration.organizationId, 'mewe', 'clientSecret') || '';
-      const instanceUrl = getOrgCredential(integration.organizationId, 'mewe', 'redirectUri') || 'https://mewe.com';
+      const instanceUrl = this._resolveBaseUrl(
+        getOrgCredential(integration.organizationId, 'mewe', 'redirectUri')
+      );
+      const instanceOrigin = new URL(instanceUrl).origin;
       const allGroups: any[] = [];
       let nextUrl: string | null = `${instanceUrl}/api/dev/groups`;
       let pages = 0;
@@ -212,7 +230,13 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
 
         const data = await response.json();
         allGroups.push(...(data.groups || []));
-        nextUrl = data.nextPage ? `${instanceUrl}${data.nextPage}` : null;
+        if (data.nextPage) {
+          const candidate = new URL(data.nextPage, instanceUrl).toString();
+          const candidateOrigin = new URL(candidate).origin;
+          nextUrl = candidateOrigin === instanceOrigin ? candidate : null;
+        } else {
+          nextUrl = null;
+        }
       }
 
       return allGroups.map((group: any) => ({
@@ -273,7 +297,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     const groupId = firstPost.settings.group;
     const appId = clientInformation?.client_id || '';
     const apiKey = clientInformation?.client_secret || '';
-    const instanceUrl = clientInformation?.instanceUrl || 'https://mewe.com';
+    const instanceUrl = this._resolveBaseUrl(clientInformation?.instanceUrl);
 
     // Upload photos if present (exclude videos)
     const imageMedia =
@@ -294,7 +318,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     const postUrl =
       postType === 'timeline'
         ? `${instanceUrl}/api/dev/me/post`
-        : `${instanceUrl}/api/dev/group/${groupId}/post`;
+        : `${instanceUrl}/api/dev/group/${encodeURIComponent(groupId)}/post`;
 
     // MeWe post endpoint may return 204 (no content); this.fetch handles SSRF/VPN.
     const postResponse = await this.fetch(postUrl, {
@@ -314,7 +338,10 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
 
     const postId = makeId(12);
 
-    const releaseURL = postType === 'timeline' ? `https://mewe.com/${integration.profile}/posts` : `https://mewe.com/group/${firstPost.settings.group}`;
+    const releaseURL =
+      postType === 'timeline'
+        ? `https://mewe.com/${encodeURIComponent(integration.profile || '')}/posts`
+        : `https://mewe.com/group/${encodeURIComponent(firstPost.settings.group || '')}`;
 
     return [
       {

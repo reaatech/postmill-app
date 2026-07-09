@@ -119,7 +119,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
     resolution = { resolveShortLink: mockResolveShortLink };
 
     activity = new AnalyticsActivity(
-      {} as any, // _analyticsRepository
+      {} as any, // _analyticsService
       {} as any, // _integrationManager
       {} as any, // _orgProviderConfigManager
       {} as any, // _organizationService
@@ -130,6 +130,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
       shortLinkSettingsService as any,
       resolution as any,
       {} as any, // _emailLogService
+      {} as any, // _notificationService
     );
   });
 

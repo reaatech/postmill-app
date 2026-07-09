@@ -176,9 +176,9 @@ export class StorageRepository {
     });
   }
 
-  async removeOrDetachMountFolders(providerId: string) {
+  async removeOrDetachMountFolders(orgId: string, providerId: string) {
     const folders = await this._folder.model.fileFolder.findMany({
-      where: { storageProviderId: providerId },
+      where: { organizationId: orgId, storageProviderId: providerId },
       include: { _count: { select: { files: true, children: true } } },
     });
     const emptyIds = folders
@@ -190,12 +190,12 @@ export class StorageRepository {
 
     if (emptyIds.length) {
       await this._folder.model.fileFolder.deleteMany({
-        where: { id: { in: emptyIds } },
+        where: { id: { in: emptyIds }, organizationId: orgId },
       });
     }
     if (nonEmptyIds.length) {
       await this._folder.model.fileFolder.updateMany({
-        where: { id: { in: nonEmptyIds } },
+        where: { id: { in: nonEmptyIds }, organizationId: orgId },
         data: { storageProviderId: null },
       });
     }
@@ -319,6 +319,13 @@ export class StorageRepository {
     return this._folder.model.fileFolder.findFirst({
       where: { id, organizationId: orgId },
       select: { id: true, parentId: true, storageProviderId: true, organizationId: true },
+    });
+  }
+
+  // Direct folder lookup scoped to an org.
+  findFolder(id: string, orgId: string) {
+    return this._folder.model.fileFolder.findFirst({
+      where: { id, organizationId: orgId },
     });
   }
 }

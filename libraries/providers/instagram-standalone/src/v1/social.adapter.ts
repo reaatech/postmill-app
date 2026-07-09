@@ -52,6 +52,69 @@ export class InstagramStandaloneProvider
     return 2200;
   }
 
+  private _buildRedirectUri(pathSuffix: string): string {
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    if (!frontendUrl) {
+      throw new Error(
+        `FRONTEND_URL is not configured (provider: ${this.identifier})`
+      );
+    }
+    if (!frontendUrl.toLowerCase().startsWith('https://')) {
+      throw new Error(
+        `FRONTEND_URL must use HTTPS for OAuth redirects (provider: ${this.identifier})`
+      );
+    }
+    const redirectUri = `${frontendUrl.replace(/\/+$/, '')}${pathSuffix}`;
+    if (!this._isAllowedReturnUrl(redirectUri)) {
+      throw new Error(
+        `OAuth redirect URI ${redirectUri} is not allowed for provider ${this.identifier}. Add the origin to INTEGRATION_RETURN_URL_ALLOWLIST or set a secure FRONTEND_URL.`
+      );
+    }
+    return redirectUri;
+  }
+
+  private _isAllowedReturnUrl(url: string): boolean {
+    if (!url || typeof url !== 'string' || !url.toLowerCase().startsWith('https://')) {
+      return false;
+    }
+    try {
+      const parsed = new URL(url);
+      if (parsed.username || parsed.password) {
+        return false;
+      }
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname === '[::1]' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        hostname.endsWith('.lan') ||
+        /^10\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^169\.254\./.test(hostname)
+      ) {
+        return false;
+      }
+      const origin = parsed.origin.toLowerCase().replace(/\/+$/, '');
+      const allowlist = (process.env.INTEGRATION_RETURN_URL_ALLOWLIST || '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase().replace(/\/+$/, ''))
+        .filter(Boolean);
+      if (allowlist.includes(origin)) {
+        return true;
+      }
+      const frontendOrigin = (process.env.FRONTEND_URL || '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+      return origin === frontendOrigin;
+    } catch {
+      return false;
+    }
+  }
+
   override async checkValidity(
     [firstPost]: Array<ValidityMedia[]>,
     settings: any
@@ -122,11 +185,7 @@ export class InstagramStandaloneProvider
         `https://www.instagram.com/oauth/authorize?enable_fb_login=0&client_id=${
           clientInformation?.client_id || ''
         }&redirect_uri=${encodeURIComponent(
-          `${
-            process?.env.FRONTEND_URL?.indexOf('https') == -1
-              ? `https://redirectmeto.com/${process?.env.FRONTEND_URL}`
-              : `${process?.env.FRONTEND_URL}`
-          }/integrations/social/instagram-standalone`
+          this._buildRedirectUri('/integrations/social/instagram-standalone')
         )}&response_type=code&scope=${encodeURIComponent(
           this.scopes.join(',')
         )}` + `&state=${state}`,
@@ -149,11 +208,7 @@ export class InstagramStandaloneProvider
     formData.append('grant_type', 'authorization_code');
     formData.append(
       'redirect_uri',
-      `${
-        process?.env.FRONTEND_URL?.indexOf('https') == -1
-          ? `https://redirectmeto.com/${process?.env.FRONTEND_URL}`
-          : `${process?.env.FRONTEND_URL}`
-      }/integrations/social/instagram-standalone`
+      this._buildRedirectUri('/integrations/social/instagram-standalone')
     );
     formData.append('code', params.code);
 

@@ -19,6 +19,35 @@ const mockResponse = (body: any) =>
 const encodeCookies = (cookies: Record<string, string>) =>
   Buffer.from(JSON.stringify(cookies)).toString('base64');
 
+describe('SkoolProvider.authenticate (S-19)', () => {
+  it('rejects malformed base64/JSON', async () => {
+    const provider = new SkoolProvider();
+    const result = await provider.authenticate({
+      code: 'not-base64!!!',
+      codeVerifier: 'x',
+    });
+    expect(result).toBe('Invalid cookie data');
+  });
+
+  it('rejects missing client_id', async () => {
+    const provider = new SkoolProvider();
+    const result = await provider.authenticate({
+      code: encodeCookies({ auth_token: 'tok-1' }),
+      codeVerifier: 'x',
+    });
+    expect(result).toBe('Missing required cookies: client_id');
+  });
+
+  it('rejects missing auth_token', async () => {
+    const provider = new SkoolProvider();
+    const result = await provider.authenticate({
+      code: encodeCookies({ client_id: 'cid-1' }),
+      codeVerifier: 'x',
+    });
+    expect(result).toBe('Missing required cookies: auth_token');
+  });
+});
+
 describe('SkoolProvider (S-02)', () => {
   it('routes authenticate through this.fetch()', async () => {
     const provider = new SkoolProvider();

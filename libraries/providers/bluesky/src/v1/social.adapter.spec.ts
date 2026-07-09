@@ -53,6 +53,19 @@ vi.mock('@atproto/api', () => ({
     }
     async login(args: any) {
       h.loginArgs.push(args);
+      return {
+        data: {
+          accessJwt: 'access-jwt',
+          refreshJwt: 'refresh-jwt',
+          handle: 'me.bsky.social',
+          did: 'did:plc:abc',
+        },
+      };
+    }
+    async getProfile() {
+      return {
+        data: { displayName: 'User', handle: 'me.bsky.social', avatar: '' },
+      };
     }
     async post(record: any) {
       h.postArgs.push(record);
@@ -136,6 +149,71 @@ beforeEach(() => {
     readOrFetch: (async () => Buffer.from('x')) as any,
     safeFetch: safeFetch as any,
   } as any);
+});
+
+const encodeCallback = (payload: Record<string, unknown>) =>
+  Buffer.from(JSON.stringify(payload)).toString('base64');
+
+describe('BlueskyProvider.authenticate (S-19)', () => {
+  it('accepts a valid callback payload', async () => {
+    const provider = new BlueskyProvider();
+    const result = await provider.authenticate({
+      code: encodeCallback({
+        service: 'https://bsky.social',
+        identifier: 'me.bsky.social',
+        password: 'app-password',
+      }),
+      codeVerifier: 'x',
+    });
+    if (typeof result === 'string') {
+      throw new Error(`Expected object, got: ${result}`);
+    }
+    expect(result.username).toBe('me.bsky.social');
+  });
+
+  it('rejects non-https service', async () => {
+    const provider = new BlueskyProvider();
+    const result = await provider.authenticate({
+      code: encodeCallback({
+        service: 'http://bsky.social',
+        identifier: 'me.bsky.social',
+        password: 'app-password',
+      }),
+      codeVerifier: 'x',
+    });
+    expect(result).toBe('Invalid credentials');
+  });
+
+  it('rejects localhost service', async () => {
+    const provider = new BlueskyProvider();
+    const result = await provider.authenticate({
+      code: encodeCallback({
+        service: 'https://localhost',
+        identifier: 'me.bsky.social',
+        password: 'app-password',
+      }),
+      codeVerifier: 'x',
+    });
+    expect(result).toBe('Invalid credentials');
+  });
+
+  it('rejects malformed base64/JSON', async () => {
+    const provider = new BlueskyProvider();
+    const result = await provider.authenticate({
+      code: 'not-base64!!!',
+      codeVerifier: 'x',
+    });
+    expect(result).toBe('Invalid credentials');
+  });
+
+  it('rejects missing required fields', async () => {
+    const provider = new BlueskyProvider();
+    const result = await provider.authenticate({
+      code: encodeCallback({ service: 'https://bsky.social' }),
+      codeVerifier: 'x',
+    });
+    expect(result).toBe('Invalid credentials');
+  });
 });
 
 describe('BlueskyProvider remediation', () => {

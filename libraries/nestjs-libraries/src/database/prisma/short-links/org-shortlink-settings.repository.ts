@@ -77,7 +77,7 @@ export class OrgShortLinkSettingsRepository {
     const existing = await this.getByIdentifier(orgId, identifier);
     if (existing) {
       return this._orgShortLinkConfig.model.orgShortLinkConfig.update({
-        where: { id: existing.id },
+        where: { id: existing.id, organizationId: orgId },
         data,
       });
     }

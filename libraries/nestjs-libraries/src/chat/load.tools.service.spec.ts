@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockLanguageModelFn = vi.fn().mockResolvedValue({ id: 'agent-model' });
+const mockDoGenerate = vi.fn().mockResolvedValue({ text: 'generated' });
+const mockDoStream = vi.fn().mockResolvedValue({ stream: new ReadableStream() });
+const mockGovernedLanguageModelFn = vi.fn().mockResolvedValue({
+  id: 'agent-model',
+  doGenerate: mockDoGenerate,
+  doStream: mockDoStream,
+});
 
 const mockModuleRefGet = vi.fn();
 
 vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
   AIModelProvider: class {
-    languageModel = mockLanguageModelFn;
+    governedLanguageModel = mockGovernedLanguageModelFn;
   },
 }));
 
@@ -237,7 +243,7 @@ describe('LoadToolsService', () => {
       });
     });
 
-    it('passes a function-form model that calls languageModel("agent")', async () => {
+    it('passes a function-form model that calls governedLanguageModel("agent")', async () => {
       vi.spyOn(service, 'loadTools').mockResolvedValue({});
 
       const agent = await service.agent();
@@ -246,26 +252,30 @@ describe('LoadToolsService', () => {
 
       const result = await agent.model();
 
-      expect(aiModelProvider.languageModel).toHaveBeenCalledWith('agent', undefined);
-      expect(result).toEqual({ id: 'agent-model' });
+      expect(aiModelProvider.governedLanguageModel).toHaveBeenCalledWith('agent', undefined);
+      expect(result).toEqual({
+        id: 'agent-model',
+        doGenerate: expect.any(Function),
+        doStream: expect.any(Function),
+      });
     });
 
-    it('calls languageModel with "agent" scope on each invocation', async () => {
+    it('calls governedLanguageModel with "agent" scope on each invocation', async () => {
       vi.spyOn(service, 'loadTools').mockResolvedValue({});
-      mockLanguageModelFn.mockClear();
+      mockGovernedLanguageModelFn.mockClear();
 
       const agent = await service.agent();
 
       await agent.model();
       await agent.model();
 
-      expect(aiModelProvider.languageModel).toHaveBeenCalledTimes(2);
-      expect(aiModelProvider.languageModel).toHaveBeenCalledWith('agent', undefined);
+      expect(aiModelProvider.governedLanguageModel).toHaveBeenCalledTimes(2);
+      expect(aiModelProvider.governedLanguageModel).toHaveBeenCalledWith('agent', undefined);
     });
 
-    it('passes organization id from request context to the model resolver', async () => {
+    it('passes organization id from request context to the governed model resolver', async () => {
       vi.spyOn(service, 'loadTools').mockResolvedValue({});
-      mockLanguageModelFn.mockClear();
+      mockGovernedLanguageModelFn.mockClear();
 
       const agent = await service.agent();
       const requestContext = new Map();
@@ -273,7 +283,21 @@ describe('LoadToolsService', () => {
 
       await agent.model({ requestContext });
 
-      expect(aiModelProvider.languageModel).toHaveBeenCalledWith('agent', 'org-123');
+      expect(aiModelProvider.governedLanguageModel).toHaveBeenCalledWith('agent', 'org-123');
+    });
+
+    it('preserves the governed model doGenerate/doStream contract for Mastra', async () => {
+      vi.spyOn(service, 'loadTools').mockResolvedValue({});
+
+      const agent = await service.agent();
+      const model = await agent.model();
+
+      expect(typeof model.doGenerate).toBe('function');
+      expect(typeof model.doStream).toBe('function');
+
+      const result = await model.doGenerate({ prompt: 'hi' });
+      expect(mockDoGenerate).toHaveBeenCalledWith({ prompt: 'hi' });
+      expect(result).toEqual({ text: 'generated' });
     });
 
     it('has an instructions property that is a function', async () => {
@@ -467,7 +491,7 @@ describe('LoadToolsService', () => {
       expect(agent.tools).toBe(mockTools);
       expect(agent.agents).toBeUndefined();
       await agent.model();
-      expect(aiModelProvider.languageModel).toHaveBeenCalledWith('agent', undefined);
+      expect(aiModelProvider.governedLanguageModel).toHaveBeenCalledWith('agent', undefined);
     });
 
     it('builds supervisor with only integrationList/groupList as direct tools by default', async () => {
@@ -499,7 +523,7 @@ describe('LoadToolsService', () => {
         ops: expect.any(Object),
       });
       await agent.model();
-      expect(aiModelProvider.languageModel).toHaveBeenCalledWith('utility', undefined);
+      expect(aiModelProvider.governedLanguageModel).toHaveBeenCalledWith('utility', undefined);
     });
   });
 

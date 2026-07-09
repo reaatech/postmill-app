@@ -8,6 +8,11 @@ import { readResponseCapped } from '@gitroom/nestjs-libraries/utils/capped-strea
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
 import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
 
+export interface ImportFromPathResult {
+  buffer: Buffer;
+  fileSize: number;
+}
+
 // NOTE (6.3): `image/svg+xml` is intentionally NOT allowed. Iconify serves icons
 // as raw SVG, and SVG is an active document (it can carry <script>/onload/xlink
 // payloads) served from our own origin — importing it verbatim would be stored
@@ -338,6 +343,37 @@ export class FileService {
 
   async getTrashed(org: string) {
     return this._fileRepository.getTrashedFiles(org);
+  }
+
+  /**
+   * Validate a client-supplied storage path belongs to the org and read the object.
+   * Throws HttpException(400) when the path does not match an org-owned prefix and
+   * HttpException(404) when the object cannot be read.
+   */
+  async importFromPath(
+    orgId: string,
+    filePath: string,
+    folderId?: string | null,
+  ): Promise<ImportFromPathResult> {
+    const prefixes = await this._storageService.getOrgStoragePublicPrefixes(orgId);
+    const matchesPrefix = prefixes.some((prefix) => filePath.startsWith(prefix));
+    if (!matchesPrefix) {
+      throw new HttpException('Invalid storage path', 400);
+    }
+
+    const adapter = await this._storageService.resolveAdapterForFolder(
+      folderId,
+      orgId,
+    );
+    try {
+      const buffer = await adapter.readFile(filePath);
+      return { buffer, fileSize: buffer.length };
+    } catch (err) {
+      this._logger.warn(
+        `save-media path probe failed for org=${orgId}: ${(err as Error).message}`
+      );
+      throw new HttpException('Storage object not found', 404);
+    }
   }
 
   // ── Import from URL ──────────────────────────────────────────

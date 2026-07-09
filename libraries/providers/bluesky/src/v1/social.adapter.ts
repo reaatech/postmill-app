@@ -33,8 +33,45 @@ import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validatio
 import { Rules } from '@gitroom/provider-kernel';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { safeFetch } from '@gitroom/provider-kernel';
+import net from 'node:net';
 
 import { metadata as providerMetadata } from './metadata';
+
+// S-19: validate decoded callback payload before use.
+function validateBlueskyCallback(value: unknown): { service: string; identifier: string; password: string } {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Invalid callback');
+  }
+  const body = value as Record<string, unknown>;
+  if (
+    typeof body.service !== 'string' ||
+    typeof body.identifier !== 'string' ||
+    typeof body.password !== 'string' ||
+    !body.service.trim() ||
+    !body.identifier.trim() ||
+    !body.password.trim()
+  ) {
+    throw new Error('Invalid callback');
+  }
+  let url: URL;
+  try {
+    url = new URL(body.service);
+  } catch {
+    throw new Error('Invalid service URL');
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error('Service URL must use HTTPS');
+  }
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost' || net.isIP(hostname)) {
+    throw new Error('Invalid service hostname');
+  }
+  return {
+    service: body.service,
+    identifier: body.identifier,
+    password: body.password,
+  };
+}
 async function reduceImageBySize(url: string, maxSizeKB = 976) {
   try {
     // Routed through safeFetch so the image download is validated as a public
@@ -260,7 +297,13 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
     codeVerifier: string;
     refresh?: string;
   }) {
-    const body = JSON.parse(Buffer.from(params.code, 'base64').toString());
+    let body: { service: string; identifier: string; password: string };
+    try {
+      body = validateBlueskyCallback(JSON.parse(Buffer.from(params.code, 'base64').toString()));
+    } catch (err) {
+      this.logger.warn('Bluesky callback validation failed');
+      return 'Invalid credentials';
+    }
 
     try {
       // Known proxy gap: the @atproto/api BskyAgent owns its own HTTP client and

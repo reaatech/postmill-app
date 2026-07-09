@@ -40,6 +40,7 @@ import { ExtractContentService } from '@gitroom/nestjs-libraries/openai/extract.
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
+import { ShortLinkOAuthService } from '@gitroom/nestjs-libraries/short-linking/short-link-oauth.service';
 import { AuthProviderRepository } from '@gitroom/nestjs-libraries/database/prisma/auth-providers/auth-provider.repository';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
@@ -83,6 +84,8 @@ import { PgVectorStoreAdapter } from '@gitroom/nestjs-libraries/ai/rag/pgvector.
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
+import { ProviderCatalogService } from '@gitroom/nestjs-libraries/providers/provider-catalog.service';
+import { ProviderHealthService } from '@gitroom/nestjs-libraries/providers/provider-health.service';
 import { MultipartUploadRepository } from '@gitroom/nestjs-libraries/database/prisma/media/multipart-upload.repository';
 import { MultipartUploadService } from '@gitroom/nestjs-libraries/database/prisma/media/multipart-upload.service';
 import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.repository';
@@ -123,6 +126,13 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
 import { AuthContextResolver } from '@gitroom/nestjs-libraries/auth/auth-context.resolver';
 import { DashboardService } from '@gitroom/nestjs-libraries/dashboard/dashboard.service';
 import { DashboardBriefService } from '@gitroom/nestjs-libraries/dashboard/dashboard-brief.service';
+import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { AnalyticsOverviewService } from '@gitroom/nestjs-libraries/analytics/analytics-overview.service';
+import { AnalyticsDetailService } from '@gitroom/nestjs-libraries/analytics/analytics-detail.service';
+import { AnalyticsInsightsService } from '@gitroom/nestjs-libraries/analytics/analytics-insights.service';
+import { AnalyticsExportService } from '@gitroom/nestjs-libraries/analytics/analytics-export.service';
+import { AnalyticsLiveFallbackService } from '@gitroom/nestjs-libraries/analytics/analytics-live-fallback';
+import { AnalyticsShareService } from '@gitroom/nestjs-libraries/analytics/analytics-share.service';
 
 @Global()
 @Module({
@@ -218,6 +228,7 @@ import { DashboardBriefService } from '@gitroom/nestjs-libraries/dashboard/dashb
     EmailAdapterRegistry,
     OrgShortLinkSettingsService,
     OrgShortLinkSettingsRepository,
+    ShortLinkOAuthService,
     AuthProviderRepository,
     OrgMediaProviderSettingsService,
     OrgMediaProviderSettingsRepository,
@@ -246,6 +257,15 @@ import { DashboardBriefService } from '@gitroom/nestjs-libraries/dashboard/dashb
     AuthContextResolver,
     DashboardService,
     DashboardBriefService,
+    AnalyticsService,
+    AnalyticsOverviewService,
+    AnalyticsDetailService,
+    AnalyticsInsightsService,
+    AnalyticsExportService,
+    AnalyticsLiveFallbackService,
+    AnalyticsShareService,
+    ProviderCatalogService,
+    ProviderHealthService,
     {
       provide: 'RBAC_SEED_ON_INIT',
       useFactory: (seeder: RbacSeeder, backfill: BackfillService) => {

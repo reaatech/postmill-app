@@ -412,10 +412,10 @@ describe('AiSettingsRepository', () => {
   });
 
   describe('upsertBrandProfile', () => {
-    it('updates existing default brand', async () => {
+    it('updates existing default brand scoped by org', async () => {
       const existing = { id: 'brand-1', organizationId: 'org1', name: 'Default' };
       mockBrandProfile.findFirst.mockResolvedValue(existing);
-      mockBrandProfile.update.mockResolvedValue({ ...existing, instructions: 'Be helpful' });
+      mockBrandProfile.updateMany.mockResolvedValue({ count: 1 });
 
       const data = { instructions: 'Be helpful', language: 'en', enabled: true };
       const result = await repository.upsertBrandProfile('org1', data);
@@ -423,8 +423,8 @@ describe('AiSettingsRepository', () => {
       expect(mockBrandProfile.findFirst).toHaveBeenCalledWith({
         where: { organizationId: 'org1', isDefault: true },
       });
-      expect(mockBrandProfile.update).toHaveBeenCalledWith({
-        where: { id: 'brand-1' },
+      expect(mockBrandProfile.updateMany).toHaveBeenCalledWith({
+        where: { id: 'brand-1', organizationId: 'org1' },
         data,
       });
       expect(result.instructions).toBe('Be helpful');

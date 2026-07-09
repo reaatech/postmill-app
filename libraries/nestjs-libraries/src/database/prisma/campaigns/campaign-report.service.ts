@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import dayjs from 'dayjs';
+import { Response } from 'express';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
 import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
@@ -7,6 +9,7 @@ import { ENTITY_ENUM_TO_SLUG } from '@gitroom/nestjs-libraries/database/prisma/c
 import { campaignReportHtml } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-report.html';
 import { computeGoalProgress } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-goal-progress';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
+import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import type { CampaignEntityType, State } from '@prisma/client';
 
 // Pre-computed campaign analytics, composed by the controller (from AnalyticsService)
@@ -54,6 +57,7 @@ export class CampaignReportService {
     private _campaignItemResolver: CampaignItemResolverRepository,
     private _postsService: PostsService,
     private _socialCommentsService: SocialCommentsService,
+    private _analyticsService: AnalyticsService,
   ) {}
 
   // Resolve a share token to the campaign's identity so the controller can
@@ -238,5 +242,80 @@ export class CampaignReportService {
     } finally {
       await browser.close();
     }
+  }
+
+  /**
+   * Compose campaign analytics (post-snapshot trend + per-channel breakdown) for
+   * a report. Non-fatal: a failure yields `undefined` so the caller can build a
+   * report without the analytics block rather than failing the whole request.
+   */
+  async computeAnalytics(
+    organizationId: string,
+    campaignId: string
+  ): Promise<CampaignReportAnalytics | undefined> {
+    try {
+      const to = dayjs().format('YYYY-MM-DD');
+      const from = dayjs().subtract(90, 'day').format('YYYY-MM-DD');
+      const campaign = await this._campaignsRepository.findById(
+        campaignId,
+        organizationId
+      );
+      if (!campaign) {
+        return undefined;
+      }
+      const overview = await this._analyticsService.getOverview(
+        { id: organizationId } as any,
+        from,
+        to,
+        [],
+        false,
+        { campaignIds: [campaignId] }
+      );
+      return {
+        series: overview.series,
+        byChannel: overview.byChannel,
+        window: { from, to },
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Build and dispatch a campaign report in the requested format.
+   * `res` is required for csv/pdf downloads; json returns the body directly.
+   */
+  async dispatchReport(
+    id: string,
+    organizationId: string,
+    format: 'json' | 'csv' | 'pdf',
+    res?: Response
+  ): Promise<any> {
+    if (format === 'csv') {
+      const csv = await this.toCsv(id, organizationId);
+      if (res) {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="campaign-${id}.csv"`
+        );
+      }
+      return csv;
+    }
+
+    if (format === 'pdf') {
+      const pdf = await this.toPdf(id, organizationId);
+      if (res) {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename="campaign-${id}.pdf"`
+        );
+      }
+      return pdf;
+    }
+
+    const analytics = await this.computeAnalytics(organizationId, id);
+    return this.toJson(id, organizationId, analytics);
   }
 }

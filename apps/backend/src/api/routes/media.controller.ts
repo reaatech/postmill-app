@@ -40,7 +40,6 @@ import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BadRequestException } from '@nestjs/common';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
-import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiDefaultsService, DefaultNotConfiguredError } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
@@ -64,57 +63,13 @@ export class MediaController {
     private _budgetService: BudgetService
   ) {}
 
-  private async _assertBudget(orgId: string) {
-    const budgetCheck = await this._budgetService.checkBudget('media', orgId);
-    if (!budgetCheck.allowed) {
-      throw new HttpException(
-        { error: 'AI budget exceeded', detail: budgetCheck.reason },
-        HttpStatus.TOO_MANY_REQUESTS
-      );
-    }
-  }
-
-  private async _urlToBase64Image(url: string): Promise<string> {
-    if (url.startsWith('data:image/')) return url;
-    const res = await safeFetch(url);
-    if (!res.ok) throw new Error(`Image download failed (${res.status})`);
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const mime = res.headers.get('content-type')?.split(';')[0] || 'image/png';
-    return `data:${mime};base64,${buffer.toString('base64')}`;
-  }
-
-  private async _saveUrlToFile(orgId: string, url: string, namePrefix: string): Promise<{ id: string; path: string; name: string }> {
-    const adapter = await this._storageService.getLocalAdapterForOrg(orgId, true);
-    let buffer: Buffer;
-    let ext = 'png';
-    if (url.startsWith('data:')) {
-      const commaIdx = url.indexOf(',');
-      const header = url.slice(5, commaIdx);
-      const payload = url.slice(commaIdx + 1);
-      const isBase64 = header.endsWith(';base64');
-      const mime = isBase64 ? header.slice(0, -7) : header;
-      buffer = isBase64 ? Buffer.from(payload, 'base64') : Buffer.from(decodeURIComponent(payload), 'utf-8');
-      ext = mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png';
-    } else {
-      const res = await safeFetch(url);
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
-      buffer = Buffer.from(await res.arrayBuffer());
-      const ct = res.headers.get('content-type')?.split(';')[0] || '';
-      ext = ct === 'image/jpeg' ? 'jpg' : ct === 'image/webp' ? 'webp' : 'png';
-    }
-    const path = await adapter.writeBuffer(buffer, `image/${ext === 'png' ? 'png' : ext === 'jpg' ? 'jpeg' : 'webp'}`);
-    const fileName = `${namePrefix}-${Date.now()}.${ext}`;
-    const saved = await this._fileService.saveFile(orgId, fileName, path, fileName);
-    return { id: saved.id, path: saved.path, name: saved.name };
-  }
-
   @Post('/generate-video')
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   async generateVideo(
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateVideoDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     const total = await this._subscriptionService.checkCredits(org);
     if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
       return false;
@@ -160,19 +115,7 @@ export class MediaController {
   @Get('/video-options')
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   async getVideoOptions(@GetOrgFromRequest() org: Organization) {
-    const categories = ['text-to-video', 'image-to-video', 'video-to-video', 'video-upscale', 'video-background', 'video-avatar'];
-    const options: Record<string, any> = {};
-    for (const category of categories) {
-      try {
-        // Use the media defaults resolver to list candidates for the category.
-        // The frontend can decide which video generators are available.
-        const resolved = await this._defaultsResolution.resolve('media', category, org.id);
-        options[category] = { available: !!resolved };
-      } catch {
-        options[category] = { available: false };
-      }
-    }
-    return options;
+    return this._aiMediaService.getVideoOptions(org.id);
   }
 
   // Single source of truth for "which media tools can this org actually use". Consumed by
@@ -235,7 +178,7 @@ export class MediaController {
     @Body('prompt') prompt: string,
     isPicturePrompt = false
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     const total = await this._subscriptionService.checkCredits(org);
     if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
       return false;
@@ -250,7 +193,7 @@ export class MediaController {
         );
       }
       const url = await this._aiDefaults.textToImage(org.id, finalPrompt);
-      const dataUrl = await this._urlToBase64Image(url);
+      const dataUrl = await this._aiMediaService.urlToBase64Image(url);
       return { output: dataUrl };
     } catch (err) {
       if (err instanceof DefaultNotConfiguredError) {
@@ -272,7 +215,7 @@ export class MediaController {
       return false;
     }
     const output = (image as { output: string }).output;
-    return this._saveUrlToFile(org.id, output, 'generated');
+    return this._aiMediaService.saveUrlToFile(org.id, output, 'generated');
   }
 
   @Post('/remove-background')
@@ -282,7 +225,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: RemoveBackgroundDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     return { url: await this._aiMediaService.removeBackground(body.imageUrl, { orgId: org.id }) };
   }
@@ -294,7 +237,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: InpaintImageDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     return {
       url: await this._aiMediaService.inpaintImage(
@@ -313,7 +256,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpscaleImageDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     return { url: await this._aiMediaService.upscaleImage(body.imageUrl, { orgId: org.id, scale: body.scale }) };
   }
@@ -325,7 +268,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: ImageToImageDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     try {
       return { url: await this._aiDefaults.imageToImage(org.id, body.prompt, body.imageUrl) };
@@ -344,7 +287,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpscaleVideoDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     try {
       const result = await this._aiDefaults.videoUpscale(org.id, body.videoUrl);
@@ -364,7 +307,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: RemoveVideoBackgroundDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     try {
       const result = await this._aiDefaults.videoBackground(org.id, body.videoUrl);
@@ -384,7 +327,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoToVideoDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     try {
       const result = await this._aiDefaults.videoToVideo(org.id, body.prompt, body.videoUrl);
@@ -403,7 +346,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateMusicDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     const total = await this._subscriptionService.checkCredits(org);
     if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
       return false;
@@ -425,7 +368,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateAvatarDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     const total = await this._subscriptionService.checkCredits(org);
     if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
       return false;
@@ -447,7 +390,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateSlideDto
   ) {
-    await this._assertBudget(org.id);
+    await this._aiMediaService.checkMediaBudget(org.id);
     const total = await this._subscriptionService.checkCredits(org);
     if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
       return false;
@@ -490,25 +433,7 @@ export class MediaController {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
-
-    const ext = file.originalname.split('.').pop()?.toLowerCase();
-    const allowedExts = new Set(['ttf', 'otf', 'woff2']);
-    if (!ext || !allowedExts.has(ext)) {
-      throw new BadRequestException('Invalid font file. Accepted: .ttf, .otf, .woff2');
-    }
-
-    const adapter = await this._storageService.getLocalAdapterForOrg(org.id, true);
-    const uploaded = await adapter.uploadFile(file);
-
-    const fontEntry = {
-      family: file.originalname.replace(/\.[^./\\]*$/, ''),
-      fileId: uploaded.filename || uploaded.originalname,
-      path: uploaded.path,
-      weights: [400],
-    };
-
-    const fonts = await this._brandsService.addCustomFont(org.id, fontEntry);
-    return { fonts, uploaded: fontEntry };
+    return this._aiMediaService.uploadFont(org.id, file);
   }
 
   @Delete('/fonts/:fileId')
@@ -527,19 +452,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Query('provider') provider?: string,
   ) {
-    const cacheKey = `media:voices:${org.id}:${provider || '_default'}`;
-    const cached = await ioRedis.get(cacheKey);
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch {
-        // Fall through to fresh fetch if cache value is corrupt.
-      }
-    }
-
-    const voices = await this._aiMediaService.listVoices(org.id, { provider });
-    await ioRedis.set(cacheKey, JSON.stringify(voices), 'EX', 60);
-    return voices;
+    return this._aiMediaService.listVoicesCached(org.id, provider);
   }
 
   @Post('/text-to-speech')
@@ -553,13 +466,8 @@ export class MediaController {
     if (!text?.trim()) {
       throw new BadRequestException('Text is required');
     }
-    await this._assertBudget(org.id);
-    const buffer = await this._aiMediaService.textToSpeech(text, { orgId: org.id, voice });
-    const adapter = await this._storageService.getLocalAdapterForOrg(org.id, true);
-    const fileName = `voiceover-${Date.now()}.mp3`;
-    const path = await adapter.writeBuffer(Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer, 'base64'), 'audio/mpeg');
-    const saved = await this._fileService.saveFile(org.id, fileName, path, fileName);
-    return { id: saved.id, path: saved.path, name: saved.name };
+    await this._aiMediaService.checkMediaBudget(org.id);
+    return this._aiMediaService.textToSpeechAndSave(text, { orgId: org.id, voice });
   }
 
   @Post('/speech-to-text')

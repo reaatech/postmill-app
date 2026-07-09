@@ -96,13 +96,17 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
     refresh?: string;
   }) {
     try {
-      const cookies: Record<string, string> = JSON.parse(
+      const parsed = JSON.parse(
         Buffer.from(params.code, 'base64').toString()
       );
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Invalid callback');
+      }
+      const cookies = parsed as Record<string, unknown>;
 
       const missing = this.extensionCookies
         .map((c) => c.name)
-        .filter((name) => !cookies[name]);
+        .filter((name) => typeof cookies[name] !== 'string' || !(cookies[name] as string).trim());
 
       if (missing.length > 0) {
         return `Missing required cookies: ${missing.join(', ')}`;
@@ -112,7 +116,7 @@ export class SkoolProvider extends SocialAbstract implements SocialProvider {
         await this.fetch('https://api2.skool.com/self', {
           method: 'GET',
           headers: {
-            Cookie: `auth_token=${cookies.auth_token}; client_id=${cookies.client_id}`,
+            Cookie: `auth_token=${cookies.auth_token as string}; client_id=${cookies.client_id as string}`,
           },
         })
       ).json();

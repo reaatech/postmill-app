@@ -764,7 +764,10 @@ export class RagService implements OnModuleInit, OnModuleDestroy {
     content: string;
   }): void {
     this.indexContent(params).catch((err) => {
-      this._logger.error(`[RAG] indexContent failed for ${params.sourceType}:${params.sourceId}`, err);
+      this._logger.error(
+        `[RAG] indexContent failed for ${params.sourceType}:${params.sourceId}`,
+        { error: (err as Error).message },
+      );
     });
   }
 

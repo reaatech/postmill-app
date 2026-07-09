@@ -10,6 +10,7 @@
 
 import type * as http from 'node:http';
 
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import type { MCPServerOAuthConfig, TokenValidationResult } from './oauth-types';
 import {
   generateProtectedResourceMetadata,
@@ -191,11 +192,10 @@ export function createIntrospectionValidator(
         headers['Authorization'] = `Basic ${credentials}`;
       }
 
-      // Intentionally a bare fetch, NOT safeFetch: introspectionEndpoint is the
-      // operator-configured IdP token-introspection URL (set when the MCP server's OAuth
-      // config is created), not per-request user input, and is commonly a self-hosted /
-      // private-network IdP that safeFetch's public-only check would reject.
-      const response = await fetch(introspectionEndpoint, {
+      // Routed through safeFetch so the operator-configured introspection endpoint
+      // gets SSRF/DNS-rebinding protection. Self-hosted/private-network IdPs remain
+      // reachable when the admin explicitly allowlists them via SSRF_ALLOWED_PRIVATE_CIDRS.
+      const response = await safeFetch(introspectionEndpoint, {
         method: 'POST',
         headers,
         body: new URLSearchParams({

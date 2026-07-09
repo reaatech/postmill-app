@@ -91,7 +91,7 @@ vi.mock('googleapis', () => {
   };
 });
 
-process.env.FRONTEND_URL = 'http://localhost:5000';
+process.env.FRONTEND_URL = 'https://app.example.com';
 
 import { RefreshTokenError, BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors';
 import { DribbbleProvider } from './dribbble.provider';

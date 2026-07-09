@@ -34,6 +34,10 @@ function makeService(overrides: any = {}) {
     copyAllToCampaign: vi.fn().mockResolvedValue(undefined),
     ...overrides.campaignItems,
   };
+  const campaignTagService = {
+    copyTags: vi.fn().mockResolvedValue(undefined),
+    ...overrides.campaignTagService,
+  };
   const campaignItemResolver = {
     resolveBatch: vi
       .fn()
@@ -68,6 +72,7 @@ function makeService(overrides: any = {}) {
   const service = new CampaignsService(
     campaignsRepository as any,
     campaignItems as any,
+    campaignTagService as any,
     campaignItemResolver as any,
     audit as any,
     postsService as any,
@@ -75,7 +80,7 @@ function makeService(overrides: any = {}) {
     socialCommentsService as any,
     fileService as any
   );
-  return { service, campaignsRepository, campaignItems, postsService, usersService, audit };
+  return { service, campaignsRepository, campaignItems, campaignTagService, postsService, usersService, audit };
 }
 
 describe('CampaignsService', () => {
@@ -137,6 +142,30 @@ describe('CampaignsService', () => {
       'org1',
       expect.objectContaining({ name: 'Renamed', goals: undefined })
     );
+  });
+
+  it('rejects create when endDate is not after startDate', async () => {
+    const { service, campaignsRepository } = makeService();
+    await expect(
+      service.create({
+        organizationId: 'org1',
+        name: 'Launch',
+        startDate: new Date('2024-02-01'),
+        endDate: new Date('2024-01-01'),
+      })
+    ).rejects.toThrow('endDate must be after startDate');
+    expect(campaignsRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects update when endDate equals startDate', async () => {
+    const { service, campaignsRepository } = makeService();
+    await expect(
+      service.update('c1', 'org1', {
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-01-01'),
+      })
+    ).rejects.toThrow('endDate must be after startDate');
+    expect(campaignsRepository.update).not.toHaveBeenCalled();
   });
 
   it('strips shareToken/shareEnabled from single get', async () => {

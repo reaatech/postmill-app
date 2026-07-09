@@ -101,11 +101,12 @@ export class SocialCommentsRepository {
     });
   }
 
-  getComments(postId: string, cursor?: string, limit: number = 50) {
+  getComments(orgId: string, postId: string, cursor?: string, limit: number = 50) {
     return this._socialComment.model.socialComment.findMany({
       where: {
         postId,
         deletedAt: null,
+        post: { organizationId: orgId },
         ...(cursor ? { platformCreatedAt: { lt: new Date(cursor) } } : {}),
       },
       orderBy: [{ platformCreatedAt: 'desc' }, { id: 'desc' }],
@@ -169,9 +170,9 @@ export class SocialCommentsRepository {
     });
   }
 
-  getActiveCommentIds(postId: string) {
+  getActiveCommentIds(postId: string, orgId: string) {
     return this._socialComment.model.socialComment.findMany({
-      where: { postId, deletedAt: null },
+      where: { postId, deletedAt: null, post: { organizationId: orgId } },
       select: { id: true, platformCommentId: true },
     });
   }
@@ -239,9 +240,9 @@ export class SocialCommentsRepository {
     return !!member;
   }
 
-  async countComments(postId: string): Promise<number> {
+  async countComments(postId: string, orgId: string): Promise<number> {
     return this._socialComment.model.socialComment.count({
-      where: { postId, deletedAt: null },
+      where: { postId, deletedAt: null, post: { organizationId: orgId } },
     });
   }
 
@@ -255,12 +256,13 @@ export class SocialCommentsRepository {
     });
   }
 
-  async getUnreadCount(userId: string, postId: string) {
+  async getUnreadCount(userId: string, postId: string, orgId: string) {
     const readState = await this.getReadState(userId, postId);
     const where: any = {
       postId,
       deletedAt: null,
       isOwn: false,
+      post: { organizationId: orgId },
     };
     if (readState) {
       where.platformCreatedAt = { gt: readState.lastReadAt };

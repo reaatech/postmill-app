@@ -82,7 +82,7 @@ describe('IntegrationService — plug credential cache warming (v3.7.1 §4.6)', 
     };
 
     integrationRepository = {
-      getPlug: vi.fn().mockResolvedValue({
+      getPlugForSystem: vi.fn().mockResolvedValue({
         id: 'plug-1',
         plugFunction: 'autoRepostPost',
         data: JSON.stringify([{ name: 'likesAmount', value: '10' }]),

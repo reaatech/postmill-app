@@ -13,34 +13,66 @@ import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin
 
 const GUARDS_METADATA = '__guards__';
 
-function makeKernel(overrides: Record<string, any> = {}) {
-  return {
-    listManifests: vi.fn().mockReturnValue([]),
-    getHealth: vi.fn(),
-    get: vi.fn(),
-    ...overrides,
-  };
-}
+const mockBuildCatalog = vi.fn();
+const mockBuildHealth = vi.fn();
+const mockFeaturedList = vi.fn();
+const mockFeaturedUpsert = vi.fn();
+const mockFeaturedReorder = vi.fn();
+const mockFeaturedRemove = vi.fn();
 
-function makeFeatured(overrides: Record<string, any> = {}) {
-  return {
-    getFeaturedKeyed: vi.fn().mockResolvedValue(new Map()),
-    list: vi.fn(),
-    ...overrides,
-  };
-}
+vi.mock('@gitroom/nestjs-libraries/providers/provider-catalog.service', () => ({
+  ProviderCatalogService: class {
+    buildCatalog = mockBuildCatalog;
+  },
+}));
+
+vi.mock('@gitroom/nestjs-libraries/providers/provider-health.service', () => ({
+  ProviderHealthService: class {
+    buildHealth = mockBuildHealth;
+  },
+}));
+
+vi.mock(
+  '@gitroom/nestjs-libraries/database/prisma/featured-providers/featured-provider.service',
+  () => ({
+    FeaturedProviderService: class {
+      list = mockFeaturedList;
+      upsert = mockFeaturedUpsert;
+      reorder = mockFeaturedReorder;
+      remove = mockFeaturedRemove;
+    },
+  }),
+);
+
+import { ProviderCatalogService } from '@gitroom/nestjs-libraries/providers/provider-catalog.service';
+import { ProviderHealthService } from '@gitroom/nestjs-libraries/providers/provider-health.service';
+import { FeaturedProviderService } from '@gitroom/nestjs-libraries/database/prisma/featured-providers/featured-provider.service';
 
 const superAdmin = { id: 'a1', isSuperAdmin: true } as any;
 
+function makeCatalogService() {
+  return { buildCatalog: mockBuildCatalog } as unknown as ProviderCatalogService;
+}
+
+function makeHealthService() {
+  return { buildHealth: mockBuildHealth } as unknown as ProviderHealthService;
+}
+
+function makeFeaturedService() {
+  return {
+    list: mockFeaturedList,
+    upsert: mockFeaturedUpsert,
+    reorder: mockFeaturedReorder,
+    remove: mockFeaturedRemove,
+  } as unknown as FeaturedProviderService;
+}
+
 describe('ProvidersController', () => {
-  let kernel: ReturnType<typeof makeKernel>;
-  let featured: ReturnType<typeof makeFeatured>;
   let controller: ProvidersController;
 
   beforeEach(() => {
-    kernel = makeKernel();
-    featured = makeFeatured();
-    controller = new ProvidersController(kernel as any, featured as any);
+    vi.clearAllMocks();
+    controller = new ProvidersController(makeCatalogService());
   });
 
   // PROVIDER_REMEDIATION 3.3: invalid ?domain= must fail closed with 400, not fall
@@ -48,47 +80,52 @@ describe('ProvidersController', () => {
   describe('catalog domain validation (3.3)', () => {
     it('throws BadRequestException for an unknown domain', async () => {
       await expect(controller.catalog('bogus')).rejects.toThrow(BadRequestException);
-      expect(kernel.listManifests).not.toHaveBeenCalled();
+      expect(mockBuildCatalog).not.toHaveBeenCalled();
     });
 
-    it('accepts a valid domain and scopes the kernel call', async () => {
+    it('accepts a valid domain and scopes the catalog service call', async () => {
+      mockBuildCatalog.mockResolvedValue([]);
       await controller.catalog('ai');
-      expect(kernel.listManifests).toHaveBeenCalledWith('ai');
-      expect(featured.getFeaturedKeyed).toHaveBeenCalledWith('ai');
+      expect(mockBuildCatalog).toHaveBeenCalledWith('ai');
     });
 
     it('accepts an omitted domain (full catalog)', async () => {
+      mockBuildCatalog.mockResolvedValue([]);
       await controller.catalog(undefined);
-      expect(kernel.listManifests).toHaveBeenCalledWith(undefined);
+      expect(mockBuildCatalog).toHaveBeenCalledWith(undefined);
     });
   });
 });
 
 describe('AdminProvidersController', () => {
+  let controller: AdminProvidersController;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    controller = new AdminProvidersController(
+      makeHealthService(),
+      makeFeaturedService(),
+    );
+  });
+
   // PROVIDER_REMEDIATION 4.6: health is kernel-owned; the handler must read
   // kernel.getHealth, NOT a `.health` field mutated onto the provider module.
-  it('reads per-version health from kernel.getHealth (4.6)', () => {
+  it('reads per-version health from the health service (4.6)', () => {
     const sentinel = { successCount: 7, errorCount: 1, consecutiveErrors: 0 };
-    const kernel = makeKernel({
-      listManifests: vi
-        .fn()
-        .mockReturnValue([{ domain: 'ai', providerId: 'openai', version: 'v1', status: 'active' }]),
-      getHealth: vi.fn().mockReturnValue(sentinel),
-      // If the handler wrongly used `mod.health`, this decoy would surface instead.
-      get: vi.fn().mockReturnValue({ health: { successCount: -999 } }),
-    });
-    const controller = new AdminProvidersController(kernel as any, makeFeatured() as any);
+    mockBuildHealth.mockReturnValue([
+      { domain: 'ai', providerId: 'openai', version: 'v1', status: 'active', health: sentinel },
+    ]);
 
     const result = controller.health(superAdmin, undefined);
 
-    expect(kernel.getHealth).toHaveBeenCalledWith('ai', 'openai', 'v1');
+    expect(mockBuildHealth).toHaveBeenCalledWith(undefined);
+    expect(result).toHaveLength(1);
     expect(result[0].health).toBe(sentinel);
-    expect(kernel.get).not.toHaveBeenCalled();
   });
 
   it('validates ?domain= on health too (3.3)', () => {
-    const controller = new AdminProvidersController(makeKernel() as any, makeFeatured() as any);
     expect(() => controller.health(superAdmin, 'bogus')).toThrow(BadRequestException);
+    expect(mockBuildHealth).not.toHaveBeenCalled();
   });
 
   // PROVIDER_REMEDIATION 3.2 + 6.2: SuperAdminGuard is the class-level guard; the
@@ -102,6 +139,38 @@ describe('AdminProvidersController', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, AdminProvidersController) || [];
     const names = guards.map((g: any) => (typeof g === 'function' ? g.name : ''));
     expect(names).not.toContain('PoliciesGuard');
+  });
+
+  describe('featured providers', () => {
+    it('lists featured providers', () => {
+      mockFeaturedList.mockReturnValue([]);
+      controller.listFeatured(superAdmin, 'ai');
+      expect(mockFeaturedList).toHaveBeenCalledWith('ai');
+    });
+
+    it('upserts a featured provider', () => {
+      controller.upsertFeatured(superAdmin, {
+        domain: 'ai',
+        providerId: 'openai',
+        sortOrder: 5,
+      } as FeaturedProviderDto);
+      expect(mockFeaturedUpsert).toHaveBeenCalledWith('ai', 'openai', 5);
+    });
+
+    it('reorders featured providers', () => {
+      controller.reorderFeatured(superAdmin, {
+        domain: 'ai',
+        entries: [{ providerId: 'openai', sortOrder: 1 }],
+      } as any);
+      expect(mockFeaturedReorder).toHaveBeenCalledWith('ai', [
+        { providerId: 'openai', sortOrder: 1 },
+      ]);
+    });
+
+    it('removes a featured provider', () => {
+      controller.removeFeatured(superAdmin, { domain: 'ai', providerId: 'openai' } as any);
+      expect(mockFeaturedRemove).toHaveBeenCalledWith('ai', 'openai');
+    });
   });
 });
 

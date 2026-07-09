@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { randomBytes } from 'crypto';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
@@ -11,6 +11,11 @@ import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encrypti
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { BudgetService } from './budget.service';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -218,6 +223,9 @@ export class AiMediaService {
     @Optional() private _encryptionService?: EncryptionService,
     @Optional() private _moduleRef?: ModuleRef,
     @Optional() private _budget?: BudgetService,
+    @Optional() private _storageService?: StorageService,
+    @Optional() private _fileService?: FileService,
+    @Optional() private _brandsService?: BrandsService,
   ) {}
 
   async getJob(id: string, orgId: string) {
@@ -555,6 +563,148 @@ export class AiMediaService {
     }
 
     return { operations, tools };
+  }
+
+  // ── Controller-delegated media utilities (A-20) ──
+
+  async checkMediaBudget(orgId: string): Promise<void> {
+    const check = await this._budget?.checkBudget('media', orgId);
+    if (check && !check.allowed) {
+      throw new HttpException(
+        { error: 'AI budget exceeded', detail: check.reason },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+  }
+
+  async getVideoOptions(orgId: string): Promise<Record<string, { available: boolean }>> {
+    const categories = [
+      'text-to-video',
+      'image-to-video',
+      'video-to-video',
+      'video-upscale',
+      'video-background',
+      'video-avatar',
+    ];
+    const options: Record<string, { available: boolean }> = {};
+    for (const category of categories) {
+      try {
+        const resolved = await this._defaultsResolution?.resolve('media', category, orgId);
+        options[category] = { available: !!resolved };
+      } catch {
+        options[category] = { available: false };
+      }
+    }
+    return options;
+  }
+
+  async urlToBase64Image(url: string): Promise<string> {
+    if (url.startsWith('data:image/')) return url;
+    const res = await safeFetch(url);
+    if (!res.ok) throw new Error(`Image download failed (${res.status})`);
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const mime = res.headers.get('content-type')?.split(';')[0] || 'image/png';
+    return `data:${mime};base64,${buffer.toString('base64')}`;
+  }
+
+  async saveUrlToFile(
+    orgId: string,
+    url: string,
+    namePrefix: string,
+  ): Promise<{ id: string; path: string; name: string }> {
+    if (!this._storageService || !this._fileService) {
+      throw new Error('Storage/file services are not available');
+    }
+    const adapter = await this._storageService.getLocalAdapterForOrg(orgId, true);
+    let buffer: Buffer;
+    let ext = 'png';
+    if (url.startsWith('data:')) {
+      const commaIdx = url.indexOf(',');
+      const header = url.slice(5, commaIdx);
+      const payload = url.slice(commaIdx + 1);
+      const isBase64 = header.endsWith(';base64');
+      const mime = isBase64 ? header.slice(0, -7) : header;
+      buffer = isBase64 ? Buffer.from(payload, 'base64') : Buffer.from(decodeURIComponent(payload), 'utf-8');
+      ext = mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png';
+    } else {
+      const res = await safeFetch(url);
+      if (!res.ok) throw new Error(`Download failed (${res.status})`);
+      buffer = Buffer.from(await res.arrayBuffer());
+      const ct = res.headers.get('content-type')?.split(';')[0] || '';
+      ext = ct === 'image/jpeg' ? 'jpg' : ct === 'image/webp' ? 'webp' : 'png';
+    }
+    const path = await adapter.writeBuffer(
+      buffer,
+      `image/${ext === 'png' ? 'png' : ext === 'jpg' ? 'jpeg' : 'webp'}`,
+    );
+    const fileName = `${namePrefix}-${Date.now()}.${ext}`;
+    const saved = await this._fileService.saveFile(orgId, fileName, path, fileName);
+    return { id: saved.id, path: saved.path, name: saved.name };
+  }
+
+  async listVoicesCached(
+    orgId: string,
+    provider?: string,
+  ): Promise<Array<{ id: string; label: string; previewUrl?: string }>> {
+    const cacheKey = `media:voices:${orgId}:${provider || '_default'}`;
+    const cached = await ioRedis.get(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch {
+        // Fall through to fresh fetch if cache value is corrupt.
+      }
+    }
+
+    const voices = await this.listVoices(orgId, { provider });
+    await ioRedis.set(cacheKey, JSON.stringify(voices), 'EX', 60);
+    return voices;
+  }
+
+  async uploadFont(
+    orgId: string,
+    file: Express.Multer.File,
+  ): Promise<{ fonts: any[]; uploaded: { family: string; fileId: string; path: string; weights: number[] } }> {
+    if (!this._storageService || !this._brandsService) {
+      throw new Error('Storage/brands services are not available');
+    }
+
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+    const allowedExts = new Set(['ttf', 'otf', 'woff2']);
+    if (!ext || !allowedExts.has(ext)) {
+      throw new BadRequestException('Invalid font file. Accepted: .ttf, .otf, .woff2');
+    }
+
+    const adapter = await this._storageService.getLocalAdapterForOrg(orgId, true);
+    const uploaded = await adapter.uploadFile(file);
+
+    const fontEntry = {
+      family: file.originalname.replace(/\.[^./\\]*$/, ''),
+      fileId: uploaded.filename || uploaded.originalname,
+      path: uploaded.path,
+      weights: [400],
+    };
+
+    const fonts = await this._brandsService.addCustomFont(orgId, fontEntry);
+    return { fonts, uploaded: fontEntry };
+  }
+
+  async textToSpeechAndSave(
+    text: string,
+    options: { orgId: string; voice?: string },
+  ): Promise<{ id: string; path: string; name: string }> {
+    if (!this._storageService || !this._fileService) {
+      throw new Error('Storage/file services are not available');
+    }
+    const buffer = await this.textToSpeech(text, options);
+    const adapter = await this._storageService.getLocalAdapterForOrg(options.orgId, true);
+    const fileName = `voiceover-${Date.now()}.mp3`;
+    const path = await adapter.writeBuffer(
+      Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer, 'base64'),
+      'audio/mpeg',
+    );
+    const saved = await this._fileService.saveFile(options.orgId, fileName, path, fileName);
+    return { id: saved.id, path: saved.path, name: saved.name };
   }
 
   private async _safeGetEnabledProviders(orgId: string) {
@@ -965,19 +1115,7 @@ export class AiMediaService {
     prompt: string,
     options?: { orgId?: string; userId?: string; sourceUrl?: string; category?: string },
   ): Promise<string> {
-    try {
-      return await this._startAsyncJob('video', prompt, options);
-    } catch (err) {
-      // Only degrade to a static image when no video provider is configured.
-      // Actual provider failures are surfaced to the caller so a video request
-      // never silently returns an image URL.
-      if (err instanceof CapabilityNotAvailable) {
-        this._logger.warn('Video generation not available — falling back to image');
-        const model = await this._aiModelProvider.imageModel('utility', options?.orgId);
-        return model.generate(prompt, { size: '1024x1024' });
-      }
-      throw err;
-    }
+    return this._startAsyncJob('video', prompt, options);
   }
 
   generateAudio(

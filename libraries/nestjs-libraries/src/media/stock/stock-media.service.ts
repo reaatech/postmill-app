@@ -7,6 +7,24 @@ import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/p
 import type { ContentPackCapability as ContentPackCapabilityInstance } from '@gitroom/provider-kernel';
 import { ContentPackDailyCapError } from './content-packs/content-pack.interface';
 import type { ContentPackCapability } from './content-packs/content-pack.interface';
+
+// 0.4: the frontend sends a SINGULAR media kind (`photo`/`video`/…), but content
+// pack capabilities are PLURAL (`photos`/`videos`/…). Map + validate so the
+// mint-then-ingest path actually resolves a pack capability instead of 500-ing.
+export const CONTENT_PACK_CAPABILITY_MAP: Record<string, ContentPackCapability> = {
+  photo: 'photos',
+  photos: 'photos',
+  image: 'photos',
+  vector: 'vectors',
+  vectors: 'vectors',
+  video: 'videos',
+  videos: 'videos',
+  sticker: 'stickers',
+  stickers: 'stickers',
+  icon: 'icons',
+  icons: 'icons',
+  audio: 'audio',
+};
 import {
   StockAudioItem,
   StockIconItem,
@@ -463,6 +481,31 @@ export class StockMediaService {
       throw new Error('No active content pack');
     }
     return resolved.capability.resolveDownload(id, capability as any);
+  }
+
+  /**
+   * Mint a licensed download URL for a content-pack asset. Validates the client
+   * type against the pack capability map and resolves the download through the
+   * org's active content pack. Throws on unsupported type or mint failure.
+   */
+  async importContentPackAsset(
+    orgId: string,
+    source: string,
+    downloadLocation: string,
+    type?: string,
+  ): Promise<{ url: string; capability: ContentPackCapability }> {
+    const capability = CONTENT_PACK_CAPABILITY_MAP[(type || 'photos').toLowerCase()];
+    if (!capability) {
+      throw new Error(`Unsupported content pack type: ${type}`);
+    }
+
+    const licensedUrl = await this.resolveContentPackDownload(
+      orgId,
+      downloadLocation,
+      capability,
+    );
+
+    return { url: licensedUrl, capability };
   }
 
   // ── Download triggers ──────────────────────────────────────

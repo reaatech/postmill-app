@@ -19,6 +19,7 @@ import {
 import { createCommentsCollection, createCommentsSyncOrg } from './comments-collection';
 import { createMissingPostFinder } from './missing-post-finder';
 import { createMediaJobsPoll } from './media-jobs-poll';
+import { createMediaJobsPollJob } from './media-jobs-poll-job';
 import { createMediaRender } from './media-render';
 import { createSendEmail } from './send-email';
 import {
@@ -59,6 +60,7 @@ export const createFunctions = (activities: InngestActivities) => [
   createCommentsSyncOrg(activities.commentsActivity),
   createMissingPostFinder(activities.postActivity, activities.inngestRunService),
   createMediaJobsPoll(activities.mediaJobsActivity, activities.inngestRunService),
+  createMediaJobsPollJob(activities.mediaJobsActivity),
   createMediaRender(activities.mediaJobsActivity),
   createSendEmail(activities.emailActivity),
   createDigestEmailDaily(activities.digestActivity),

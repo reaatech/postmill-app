@@ -143,6 +143,9 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
   }) {
     try {
       const body = JSON.parse(Buffer.from(params.code, 'base64').toString());
+      if (!body || typeof body !== 'object' || typeof body.password !== 'string' || !body.password.trim()) {
+        throw new Error('Invalid callback');
+      }
 
       const pubkey = getPublicKey(
         Uint8Array.from(

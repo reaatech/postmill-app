@@ -14,8 +14,70 @@ import slugify from 'slugify';
 import { Tool } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
+import net from 'node:net';
 
 import { metadata as providerMetadata } from './metadata';
+
+// S-12: validate callback URL before interpolating it into API calls.
+function validateListmonkUrl(value: unknown): { ok: true; base: string } | { ok: false; error: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, error: 'Invalid URL' };
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { ok: false, error: 'Invalid URL' };
+  }
+  if (url.protocol !== 'https:') {
+    return { ok: false, error: 'URL must use HTTPS' };
+  }
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost') {
+    return { ok: false, error: 'Invalid hostname' };
+  }
+  if (net.isIP(hostname)) {
+    return { ok: false, error: 'IP addresses are not allowed' };
+  }
+  const base = url.toString().replace(/\/$/, '');
+  return { ok: true, base };
+}
+
+function assertListmonkBody(body: unknown): { url: string; username: string; password: string } {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Invalid credentials');
+  }
+  const record = body as Record<string, unknown>;
+  if (
+    typeof record.url !== 'string' ||
+    typeof record.username !== 'string' ||
+    typeof record.password !== 'string' ||
+    !record.url.trim() ||
+    !record.username.trim() ||
+    !record.password.trim()
+  ) {
+    throw new Error('Invalid credentials');
+  }
+  const validation = validateListmonkUrl(record.url);
+  if ('error' in validation) {
+    throw new Error(validation.error);
+  }
+  return {
+    url: validation.base,
+    username: record.username,
+    password: record.password,
+  };
+}
+
+function parseListmonkCallback(token: string): { url: string; username: string; password: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(token, 'base64').toString());
+  } catch {
+    throw new Error('Invalid credentials');
+  }
+  return assertListmonkBody(parsed);
+}
 export class ListmonkProvider extends SocialAbstract implements SocialProvider {
   private readonly logger = new Logger(ListmonkProvider.name);
   override maxConcurrentJob = 100; // ListMonk has moderate rate limits
@@ -80,8 +142,13 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     codeVerifier: string;
     refresh?: string;
   }) {
-    const body: { url: string; username: string; password: string } =
-      JSON.parse(Buffer.from(params.code, 'base64').toString());
+    let body: { url: string; username: string; password: string };
+    try {
+      body = parseListmonkCallback(params.code);
+    } catch (err) {
+      this.logger.warn('Listmonk callback validation failed');
+      return 'Invalid credentials';
+    }
 
     try {
       const basic = Buffer.from(body.username + ':' + body.password).toString(
@@ -120,10 +187,11 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     internalId: string,
     integration: Integration
   ) {
-    const body: { url: string; username: string; password: string } =
+    const body = assertListmonkBody(
       JSON.parse(
         AuthService.fixedDecryption(integration.customInstanceDetails!)
-      );
+      )
+    );
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(
       'base64'
@@ -147,10 +215,11 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     internalId: string,
     integration: Integration
   ) {
-    const body: { url: string; username: string; password: string } =
+    const body = assertListmonkBody(
       JSON.parse(
         AuthService.fixedDecryption(integration.customInstanceDetails!)
-      );
+      )
+    );
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(
       'base64'
@@ -176,10 +245,11 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     postDetails: PostDetails<ListmonkDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
-    const body: { url: string; username: string; password: string } =
+    const body = assertListmonkBody(
       JSON.parse(
         AuthService.fixedDecryption(integration.customInstanceDetails!)
-      );
+      )
+    );
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(
       'base64'

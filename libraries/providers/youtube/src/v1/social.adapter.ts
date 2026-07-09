@@ -26,6 +26,16 @@ import { Integration } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 
 import { metadata as providerMetadata } from './metadata';
+
+// S-17 / known proxy gap: the googleapis SDK creates its own Gaxios/OAuth2 HTTP
+// clients and does not expose a hook that accepts an undici Dispatcher. The
+// per-channel VPN dispatcher returned by SocialAbstract.fetch() (via
+// getVpnDispatcher()) therefore cannot be applied to YouTube OAuth token calls or
+// to youtube/v3, youtubeAnalytics/v2, or oauth2/v2 API calls. SSRF protection is
+// still present for fixed *.googleapis.com hosts via normal TCP routing; the gap
+// is specifically per-channel VPN egress. Closing it would require a custom
+// Gaxios adapter/fetchImplementation that translates GaxiosOptions into undici
+// requests with the active dispatcher.
 let _clientAndYoutube: {
   client: OAuth2Client;
   youtube: (newClient: OAuth2Client) => ReturnType<typeof google.youtube>;

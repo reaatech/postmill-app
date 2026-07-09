@@ -144,16 +144,20 @@ export class AiSettingsRepository {
 
   async upsertBrandProfile(
     organizationId: string,
-    data: { instructions?: string; language?: string; enabled?: boolean; platformInstructions?: Record<string, string> },
+    data: Record<string, unknown>,
   ) {
     const existing = await this._aiBrandProfile.model.aIBrandProfile.findFirst({
       where: { organizationId, isDefault: true },
     });
     if (existing) {
-      return this._aiBrandProfile.model.aIBrandProfile.update({
-        where: { id: existing.id },
+      const { count } = await this._aiBrandProfile.model.aIBrandProfile.updateMany({
+        where: { id: existing.id, organizationId },
         data,
       });
+      if (count === 0) {
+        return null;
+      }
+      return { ...existing, ...data };
     }
     return this._aiBrandProfile.model.aIBrandProfile.create({
       data: { organizationId, ...data, isDefault: true, name: 'Default Brand' },

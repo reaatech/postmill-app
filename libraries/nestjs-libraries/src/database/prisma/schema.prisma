@@ -366,6 +366,7 @@ model AnalyticsAnomaly {
 
   @@unique([integrationId, metric, date])
   @@index([organizationId, createdAt])
+  @@index([ruleId])
 }
 
 // User-defined alert rules (7.3). integrationId null = any channel. Evaluated
@@ -542,6 +543,9 @@ model Post {
   @@index([integrationId])
   @@index([commentCount])
   @@index([organizationId, state, publishDate])
+  @@index([releaseId])
+  @@index([approvedById])
+  @@index([brandId])
 }
 
 model SocialComment {
@@ -583,6 +587,7 @@ model SocialComment {
   @@index([status])
   @@index([assigneeId])
   @@index([organizationId, platformCreatedAt])
+  @@index([authorId])
 }
 
 model PostCommentRead {
@@ -795,6 +800,7 @@ model FileFolder {
 
   @@index([organizationId])
   @@index([parentId])
+  @@index([storageProviderId])
 }
 
 // ── v3.6.0: Storage provider config (per-tenant) ──
@@ -841,6 +847,7 @@ model StorageProviderConfig {
   @@index([organizationId])
   @@index([organizationId, mounted])
   @@index([organizationId, type, version])
+  @@index([defaultFolderId])
 }
 
 // ── v3.6.0: Per-tenant channel provider OAuth credentials (replaces ProviderConfiguration) ──
@@ -1402,6 +1409,8 @@ model MediaProviderConfig {
   @@unique([organizationId, identifier, version])
   @@index([organizationId])
   @@index([organizationId, isActive])
+  @@index([storageProviderId])
+  @@index([storageRootFolderId])
 }
 
 // ── v3.9.0: Per-organization VPN provider config ──
@@ -1538,6 +1547,7 @@ model AIMediaJob {
   @@index([status, createdAt])
   @@index([userId, createdAt])
   @@index([provider, createdAt])
+  @@index([folderId])
 }
 
 // Org prompt library — user-created reusable prompts
@@ -1713,6 +1723,7 @@ model Campaign {
 
   @@index([organizationId])
   @@index([deletedAt])
+  @@index([createdById])
 }
 
 // Jira-style internal "Discussion" thread on a campaign: org members post rich-HTML
@@ -1741,6 +1752,8 @@ model CampaignNote {
   @@index([campaignId, deletedAt])
   @@index([organizationId])
   @@index([parentId])
+  @@index([createdById])
+  @@index([resolvedById])
 }
 
 model CampaignNoteReaction {

@@ -32,6 +32,17 @@ function makeService() {
       name: data.name,
     })),
   };
+  const fileService = {
+    findFoldersByParent: mediaRepository.findFoldersByParent,
+    createFolder: mediaRepository.createFolder,
+    getFolder: vi.fn().mockResolvedValue({ id: 'folder-1' }),
+  };
+  const storageService = {
+    getProviderConfigs: vi.fn().mockResolvedValue([{ id: 'sp-1' }, { id: '__virtual_local__' }]),
+  };
+  const defaultsSeed = {
+    seedUnset: vi.fn().mockResolvedValue(undefined),
+  };
   const credentialLink = {
     syncFromMediaProvider: vi.fn().mockResolvedValue(undefined),
   };
@@ -48,13 +59,15 @@ function makeService() {
     repository as never,
     encryption as never,
     resolution as never,
-    mediaRepository as never,
+    fileService as never,
+    storageService as never,
+    defaultsSeed as never,
     kernel as never,
     credentialLink as never,
     orgAiRepository as never,
   );
 
-  return { service, repository, encryption, kernel, resolution, mediaRepository, credentialLink, orgAiRepository };
+  return { service, repository, encryption, kernel, resolution, fileService, storageService, defaultsSeed, credentialLink, orgAiRepository };
 }
 
 describe('OrgMediaProviderSettingsService', () => {
@@ -157,12 +170,12 @@ describe('OrgMediaProviderSettingsService', () => {
     });
 
     it('ensures the 5-folder typed tree when a storage binding is saved (§11.5)', async () => {
-      const { service, mediaRepository } = makeService();
+      const { service, fileService } = makeService();
       await service.upsert('org-1', 'fal', {
         storageProviderId: 'sp-1',
         storageRootFolderId: 'root-1',
       });
-      const created = mediaRepository.createFolder.mock.calls.map((c) => c[1].name);
+      const created = fileService.createFolder.mock.calls.map((c) => c[1].name);
       expect(created.sort()).toEqual(['audio', 'documents', 'images', 'other', 'video']);
     });
   });
@@ -313,8 +326,8 @@ describe('OrgMediaProviderSettingsService', () => {
 
   describe('getStandardFolderId', () => {
     it('creates missing folders and resolves the typed folder id', async () => {
-      const { service, mediaRepository } = makeService();
-      mediaRepository.findFoldersByParent
+      const { service, fileService } = makeService();
+      fileService.findFoldersByParent
         .mockResolvedValueOnce([]) // ensure pass
         .mockResolvedValueOnce([
           { id: 'f-video', name: 'video' },

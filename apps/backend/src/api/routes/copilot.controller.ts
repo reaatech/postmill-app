@@ -36,6 +36,8 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
+import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 
 export type ChannelsContext = {
@@ -55,6 +57,8 @@ export class CopilotController {
     private _mastraService: MastraService,
     private _aiModelProvider: AIModelProvider,
     private _budgetService: BudgetService,
+    private _guardrails: GuardrailService,
+    private _telemetry: TelemetryService,
     private _featureFlagsService: FeatureFlagsService,
   ) {}
 
@@ -99,6 +103,11 @@ export class CopilotController {
       throw new HttpException('AI is not configured for this organization. Go to Settings → AI to configure a provider.', HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
+    const rawAdapter = await this._buildRawServiceAdapter(resolved);
+    return this._wrapServiceAdapter(rawAdapter, orgId, resolved.providerId, resolved.modelId);
+  }
+
+  private async _buildRawServiceAdapter(resolved: any) {
     const isOpenAICompatible = resolved.adapter.identifier === 'openai' ||
       resolved.adapter.identifier === 'gateway' ||
       resolved.adapter.credentialFields.some((f: any) => f.key === 'baseURL');
@@ -177,6 +186,56 @@ export class CopilotController {
       model: resolved.modelId,
       openai: new OpenAI({ apiKey, baseURL: resolved.creds.baseURL || undefined }) as any,
     });
+  }
+
+  /**
+   * Wraps a CopilotKit service adapter so every `process()` call runs input
+   * guardrails and is recorded in a telemetry span. Output guardrails are
+   * intentionally omitted here: CopilotKit streams token-by-token to the client,
+   * so intercepting the full response would require wrapping the runtime event
+   * source in a provider-specific way; the Mastra/agent path uses the governed
+   * model wrapper (AIModelProvider.governedLanguageModel) which does apply both
+   * input and output guardrails.
+   */
+  private _wrapServiceAdapter(
+    adapter: any,
+    orgId: string | undefined,
+    providerId: string,
+    modelId: string,
+  ): any {
+    const originalProcess = adapter.process.bind(adapter);
+    return new Proxy(adapter, {
+      get: (target, prop, receiver) => {
+        if (prop === 'process') {
+          return async (request: any) => {
+            const inputText = this._extractCopilotInputText(request.messages);
+            if (inputText) {
+              await this._guardrails.checkInput(inputText, { orgId });
+            }
+            return this._telemetry.startSpan(
+              'copilot.generate',
+              async (span) => {
+                span.setAttribute(TelemetryService.ATTR_GEN_AI_SYSTEM, providerId);
+                span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, modelId);
+                if (orgId) span.setAttribute('ai.organizationId', orgId);
+                return originalProcess(request);
+              },
+              { 'ai.scope': 'agent' },
+            );
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+  }
+
+  private _extractCopilotInputText(messages: any[] | undefined): string {
+    if (!Array.isArray(messages)) return '';
+    return messages
+      .filter((m: any) => typeof m.isTextMessage === 'function' && m.isTextMessage())
+      .map((m: any) => m.content)
+      .filter((content: any) => typeof content === 'string')
+      .join('\n');
   }
 
   // CopilotKit fires a runtime-info handshake to /copilot/{chat,agent} as soon as

@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { DefaultsResolutionService } from './defaults-resolution.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
@@ -35,6 +40,7 @@ export class AiDefaultsService {
     private _settingsValidator: DefaultsSettingsValidator,
     private _providerResolution: ProviderResolutionService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
+    @Inject(forwardRef(() => OrgAiSettingsService))
     private _orgAiSettings: OrgAiSettingsService,
   ) {}
 

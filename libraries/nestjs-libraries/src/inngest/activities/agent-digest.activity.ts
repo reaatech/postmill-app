@@ -4,6 +4,7 @@ import { RequestContext } from '@mastra/core/di';
 import { Organization } from '@prisma/client';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
@@ -20,6 +21,19 @@ const DIGEST_TITLE = 'Weekly agent brief ready';
 const DIGEST_MESSAGE =
   "Your agent has drafted a next-week plan based on last week's performance.";
 
+const parseEnvInt = (key: string, fallback: number): number => {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const parsed = parseInt(raw, 10);
+  return Number.isNaN(parsed) || parsed <= 0 ? fallback : parsed;
+};
+
+// Headless digest runs are bounded so a stuck tool loop / slow provider cannot
+// hold the Inngest step indefinitely. The model itself is governed (guardrails,
+// budget, telemetry, usage) via AIModelProvider.governedLanguageModel.
+const DIGEST_MAX_STEPS = parseEnvInt('AGENT_DIGEST_MAX_STEPS', 10);
+const DIGEST_TIMEOUT_MS = parseEnvInt('AGENT_DIGEST_TIMEOUT_MS', 5 * 60 * 1000);
+
 export interface AgentDigestResult {
   threadId: string;
   notified: boolean;
@@ -33,6 +47,7 @@ export interface AgentDigestResult {
 @Injectable()
 export class AgentDigestActivity {
   private readonly _logger = new Logger(AgentDigestActivity.name);
+  private _digestTimeoutMs = DIGEST_TIMEOUT_MS;
 
   constructor(
     private _preferenceService: NotificationPreferenceService,
@@ -41,6 +56,7 @@ export class AgentDigestActivity {
     private _notificationService: NotificationService,
     private _organizationService: OrganizationService,
     private _aiModelProvider: AIModelProvider,
+    private _telemetryService: TelemetryService,
   ) {}
 
   async generate(orgId: string): Promise<AgentDigestResult> {
@@ -85,14 +101,38 @@ export class AgentDigestActivity {
     const digestPrompt = this._buildDigestPrompt();
 
     const mastra = await this._mastraService.mastra();
-    await mastra.getAgent('postmill').generate(digestPrompt, {
-      memory: {
-        resource: orgId,
-        thread: threadId,
-      },
-      requestContext,
-      maxSteps: 20,
-    });
+    try {
+      await this._telemetryService.startSpan(
+        'agent.digest.generate',
+        async (span) => {
+          span.setAttribute('ai.organizationId', orgId);
+          span.setAttribute('ai.threadId', threadId);
+
+          await this._withTimeout(
+            mastra.getAgent('postmill').generate(digestPrompt, {
+              memory: {
+                resource: orgId,
+                thread: threadId,
+              },
+              requestContext,
+              maxSteps: DIGEST_MAX_STEPS,
+            }),
+            this._digestTimeoutMs,
+            `Agent digest generation timed out after ${this._digestTimeoutMs}ms`,
+          );
+        },
+        { 'ai.scope': 'agent' },
+      );
+    } catch (err) {
+      const message = (err as Error).message;
+      if (message.includes('timed out')) {
+        this._logger.warn(`Agent digest for ${orgId} timed out`);
+        return { threadId, notified: false, skipped: true, reason: 'timeout' };
+      }
+      // Other errors surface so Inngest retry semantics apply; guardrail/budget
+      // violations from the governed model are thrown by the wrapper.
+      throw err;
+    }
 
     return { threadId, notified: false, title: DIGEST_TITLE, message: DIGEST_MESSAGE };
   }
@@ -119,6 +159,15 @@ export class AgentDigestActivity {
     }
 
     return { threadId, notified: true };
+  }
+
+  private _withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    const timeout = new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error(message)), ms);
+      // Prevent the timer from keeping the process awake in tests / short-lived workers.
+      if (timer.unref) timer.unref();
+    });
+    return Promise.race([promise, timeout]);
   }
 
   private _buildRequestContext(organization: Organization): RequestContext<AgentDigestContext> {

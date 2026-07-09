@@ -4,6 +4,10 @@ import dayjs from 'dayjs';
 import { Organization } from '@prisma/client';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { AnalyticsOverviewService } from './analytics-overview.service';
+import {
+  AnalyticsShareConfig,
+  validateAnalyticsShareConfig,
+} from '@gitroom/nestjs-libraries/dtos/analytics/analytics-share-config.dto';
 
 // 7.6 — org-level public share dashboard.
 //
@@ -13,11 +17,6 @@ import { AnalyticsOverviewService } from './analytics-overview.service';
 // rotates the token, invalidating any previously-shared link. The public report
 // is an EXPLICIT WHITELIST — that whitelist IS the security boundary (no ids, no
 // org metadata, no integrationId ever cross it).
-
-export interface AnalyticsShareConfig {
-  integrations?: string[];
-  rangePreset?: string;
-}
 
 // Rolling-range presets → a from/to pair resolved at read time so a shared link
 // always shows a live trailing window.
@@ -42,11 +41,12 @@ export class AnalyticsShareService {
 
   // Mint (or rotate) the share token and enable sharing. Upsert on the unique
   // organizationId, so a re-mint rotates the token in place.
-  async mintShare(orgId: string, config: AnalyticsShareConfig) {
+  async mintShare(orgId: string, rawConfig: unknown) {
+    const config = validateAnalyticsShareConfig(rawConfig ?? {});
     const token = randomBytes(32).toString('hex');
     return this._analyticsRepository.upsertShare(orgId, {
       token,
-      config: (config ?? {}) as Record<string, unknown>,
+      config: config as Record<string, unknown>,
       enabled: true,
     });
   }

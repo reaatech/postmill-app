@@ -1,5 +1,16 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
+import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
+import { GuardrailViolation } from '@gitroom/nestjs-libraries/ai/governance/errors';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { isCuid } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
+import { GetInboxDto } from '@gitroom/nestjs-libraries/dtos/social-comments/get-inbox.dto';
+import { Organization, User } from '@prisma/client';
+import { isUUID } from 'class-validator';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.repository';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
@@ -47,7 +58,180 @@ export class SocialCommentsService {
     private _integrationService: IntegrationService,
     private _webhooksService: WebhooksService,
     private _orgProviderConfigManager: OrgProviderConfigManager,
+    private _guardrails: GuardrailService,
   ) {}
+
+  // The org's output guardrail is ALWAYS enforced on outward replies — enforcement
+  // decided by the caller is not enforcement. It is a no-op for orgs with no output
+  // chain. A block-mode chain throws GuardrailViolation → mapped to 422 so the HITL
+  // card can show the reason instead of a raw 500 (3.1).
+  private async _guardOutbound(
+    message: string,
+    org: Organization,
+    user: User,
+  ): Promise<string> {
+    try {
+      return await this._guardrails.checkOutput(message, {
+        orgId: org.id,
+        userId: user.id,
+      });
+    } catch (e) {
+      if (e instanceof GuardrailViolation) {
+        throw new UnprocessableEntityException(e.message);
+      }
+      throw e;
+    }
+  }
+
+  // Optional idempotency for the two outward-dispatching reply routes. A client
+  // (the agent HITL card, or any retry after an ambiguous timeout) sends the same
+  // X-Idempotency-Key so a retry cannot double-dispatch an outward comment.
+  //
+  // Contract: the key is claimed with SET NX right before dispatch and RELEASED
+  // if the dispatch throws — so a definite failure (provider error) is retryable,
+  // while a *successful* dispatch keeps the key so an ambiguous
+  // client-timeout-after-success still dedups. Guardrail validation runs BEFORE the
+  // claim, so a blocked message never burns a slot. Best-effort throughout: a Redis
+  // outage fails OPEN (proceeds without dedup), matching the shared
+  // IdempotencyFactory. Absent key → always proceed (unchanged). (3.2)
+  private async _withIdempotency<T>(
+    orgId: string,
+    key: string | undefined,
+    dispatch: () => Promise<T>,
+  ): Promise<T | { duplicate: true }> {
+    if (!(await this._claimIdempotencyKey(orgId, key))) {
+      return { duplicate: true };
+    }
+    try {
+      return await dispatch();
+    } catch (e) {
+      // Dispatch failed → release the claim so a legitimate same-key retry can
+      // re-attempt instead of getting a false "duplicate" success. (Residual: a DB
+      // write failing right after a successful outward post could let one retry
+      // re-post — inherent to receipt-time dedup; the shared response-replay
+      // IdempotencyFactory is the fuller fix if this ever matters.)
+      await this._releaseIdempotencyKey(orgId, key);
+      throw e;
+    }
+  }
+
+  private async _claimIdempotencyKey(
+    orgId: string,
+    key: string | undefined,
+  ): Promise<boolean> {
+    if (!key) return true;
+    try {
+      const res = await ioRedis.set(
+        `idem:${orgId}:${key}`,
+        '1',
+        'EX',
+        86400,
+        'NX'
+      );
+      return res === 'OK';
+    } catch (e) {
+      // Redis outage → fail open (proceed without dedup), never fail the reply.
+      return true;
+    }
+  }
+
+  private async _releaseIdempotencyKey(
+    orgId: string,
+    key: string | undefined
+  ) {
+    if (!key) return;
+    try {
+      await ioRedis.del(`idem:${orgId}:${key}`);
+    } catch {
+      // best-effort — a stale key just expires at the 24h TTL
+    }
+  }
+
+  /**
+   * Parse and validate the raw inbox query DTO into the internal filter shape.
+   * Moved from the controller so validation lives next to the repository contract.
+   */
+  parseInboxFilters(query: GetInboxDto): InboxFilterOptions {
+    if (
+      query.status &&
+      !(VALID_COMMENT_STATUSES as readonly string[]).includes(query.status)
+    ) {
+      throw new BadRequestException(
+        `Invalid status: ${query.status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`
+      );
+    }
+
+    if (query.assigneeId && !isCuid(query.assigneeId)) {
+      throw new BadRequestException('Invalid assigneeId');
+    }
+
+    // integrationId/campaignId accept a single id or a comma-separated list
+    // (multi-select filter). A lone value stays byte-for-byte compatible
+    // (splits to a 1-element array).
+    const campaignIds = query.campaignId
+      ? query.campaignId
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    for (const id of campaignIds) {
+      if (!isUUID(id)) throw new BadRequestException('Invalid campaignId');
+    }
+
+    const integrationIds = query.integrationId
+      ? query.integrationId
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+    for (const id of integrationIds) {
+      if (!isCuid(id)) throw new BadRequestException('Invalid integrationId');
+    }
+
+    return {
+      status: query.status,
+      assigneeId: query.assigneeId,
+      cursor: query.cursor,
+      unreadOnly: query.unreadOnly,
+      campaignIds,
+      integrationIds,
+      limit: query.limit,
+    };
+  }
+
+  // Guarded outward-dispatch wrappers used by the controller. The guardrail runs
+  // deterministically before the idempotency claim, and idempotency wraps the
+  // actual provider dispatch.
+  async addComment(
+    orgId: string,
+    userId: string,
+    postId: string,
+    message: string,
+    org: Organization,
+    user: User,
+    idempotencyKey?: string,
+  ): Promise<SocialCommentDTO | { duplicate: true }> {
+    const guarded = await this._guardOutbound(message, org, user);
+    return this._withIdempotency(orgId, idempotencyKey, () =>
+      this.replyToPost(orgId, userId, postId, guarded)
+    );
+  }
+
+  async replyToCommentGuarded(
+    orgId: string,
+    userId: string,
+    postId: string,
+    commentId: string,
+    message: string,
+    org: Organization,
+    user: User,
+    idempotencyKey?: string,
+  ): Promise<SocialCommentDTO | { duplicate: true }> {
+    const guarded = await this._guardOutbound(message, org, user);
+    return this._withIdempotency(orgId, idempotencyKey, () =>
+      this.replyToComment(orgId, userId, postId, commentId, guarded)
+    );
+  }
 
   private async refreshTokenIfExpired(
     integration: { token: string; tokenExpiration?: Date | null; organizationId: string } & Integration,
@@ -75,13 +259,13 @@ export class SocialCommentsService {
       return { comments: [], nextCursor: undefined, unreadCount: 0 };
     }
 
-    const comments = await this._socialCommentsRepository.getComments(postId, cursor);
+    const comments = await this._socialCommentsRepository.getComments(orgId, postId, cursor);
     const hasMore = comments.length > 50;
     const items = hasMore ? comments.slice(0, 50) : comments;
     const nextCursor = hasMore && items.length
       ? items[items.length - 1].platformCreatedAt.toISOString()
       : undefined;
-    const unreadCount = await this._socialCommentsRepository.getUnreadCount(userId, postId);
+    const unreadCount = await this._socialCommentsRepository.getUnreadCount(userId, postId, orgId);
 
     return { comments: items, nextCursor, unreadCount };
   }
@@ -237,7 +421,7 @@ export class SocialCommentsService {
     }
 
     return {
-      unreadCount: await this._socialCommentsRepository.getUnreadCount(userId, postId),
+      unreadCount: await this._socialCommentsRepository.getUnreadCount(userId, postId, orgId),
     };
   }
 
@@ -404,14 +588,14 @@ export class SocialCommentsService {
     // Reconcile on-platform deletions only when we have the authoritative full
     // set; otherwise we'd soft-delete comments we simply didn't page to.
     if (fullySynced) {
-      const existing = await this._socialCommentsRepository.getActiveCommentIds(post.id);
+      const existing = await this._socialCommentsRepository.getActiveCommentIds(post.id, orgId);
       const toDelete = existing
         .filter((c) => !syncedIds.has(c.platformCommentId))
         .map((c) => c.id);
       await this._socialCommentsRepository.softDeleteCommentsByIds(toDelete, orgId);
     }
 
-    const count = await this._socialCommentsRepository.countComments(post.id);
+    const count = await this._socialCommentsRepository.countComments(post.id, orgId);
     await this._postsService.updateCommentCount(post.id, count, orgId);
   }
 

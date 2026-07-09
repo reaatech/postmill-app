@@ -275,7 +275,7 @@ ${brandVoice}${currentView}
         description: 'Agent that helps manage and schedule social media posts for users',
         instructions: this._flatInstructions.bind(this),
         model: (context: any) =>
-          this._aiModelProvider.languageModel(
+          this._aiModelProvider.governedLanguageModel(
             'agent',
             resolveOrgIdFromModelContext(context),
           ),
@@ -301,7 +301,7 @@ ${brandVoice}${currentView}
       description: 'Supervisor agent that routes intent to domain specialists',
       instructions: this._supervisorInstructions.bind(this),
       model: (context: any) =>
-        this._aiModelProvider.languageModel(
+        this._aiModelProvider.governedLanguageModel(
           'utility',
           resolveOrgIdFromModelContext(context),
         ),

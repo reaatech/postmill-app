@@ -7,8 +7,70 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { Integration } from '@prisma/client';
 import dayjs from 'dayjs';
 import { safeFetch } from '@gitroom/provider-kernel';
+import net from 'node:net';
 
 import { metadata as providerMetadata } from './metadata';
+
+// S-13: validate callback instance URL before interpolating it into API calls.
+function validatePeerTubeInstance(value: unknown): { ok: true; base: string } | { ok: false; error: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, error: 'Invalid instance URL' };
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { ok: false, error: 'Invalid instance URL' };
+  }
+  if (url.protocol !== 'https:') {
+    return { ok: false, error: 'Instance URL must use HTTPS' };
+  }
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost') {
+    return { ok: false, error: 'Invalid hostname' };
+  }
+  if (net.isIP(hostname)) {
+    return { ok: false, error: 'IP addresses are not allowed' };
+  }
+  const base = url.toString().replace(/\/$/, '');
+  return { ok: true, base };
+}
+
+function assertPeerTubeBody(body: unknown): { instance: string; username: string; password: string } {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Invalid credentials');
+  }
+  const record = body as Record<string, unknown>;
+  if (
+    typeof record.instance !== 'string' ||
+    typeof record.username !== 'string' ||
+    typeof record.password !== 'string' ||
+    !record.instance.trim() ||
+    !record.username.trim() ||
+    !record.password.trim()
+  ) {
+    throw new Error('Invalid credentials');
+  }
+  const validation = validatePeerTubeInstance(record.instance);
+  if ('error' in validation) {
+    throw new Error(validation.error);
+  }
+  return {
+    instance: validation.base,
+    username: record.username,
+    password: record.password,
+  };
+}
+
+function parsePeerTubeCallback(token: string): { instance: string; username: string; password: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(token, 'base64').toString());
+  } catch {
+    throw new Error('Invalid credentials');
+  }
+  return assertPeerTubeBody(parsed);
+}
 export class PeerTubeProvider extends SocialAbstract implements SocialProvider {
   identifier = 'peertube';
   name = 'PeerTube';
@@ -71,10 +133,13 @@ export class PeerTubeProvider extends SocialAbstract implements SocialProvider {
   }
 
   async authenticate(params: { code: string; codeVerifier: string }) {
-    const { instance, username, password } = JSON.parse(
-      Buffer.from(params.code, 'base64').toString()
-    );
-    const base = instance.replace(/\/$/, '');
+    let parsed: { instance: string; username: string; password: string };
+    try {
+      parsed = parsePeerTubeCallback(params.code);
+    } catch (err) {
+      return 'Invalid PeerTube credentials';
+    }
+    const { instance: base, username, password } = parsed;
     const accessToken = await this.login(base, username, password);
     const me = await (
       await this.fetch(`${base}/api/v1/users/me`, {
@@ -102,10 +167,10 @@ export class PeerTubeProvider extends SocialAbstract implements SocialProvider {
   }
 
   private creds(integration: Integration) {
-    const { instance, username, password } = JSON.parse(
-      AuthService.fixedDecryption(integration.customInstanceDetails!)
+    const { instance, username, password } = assertPeerTubeBody(
+      JSON.parse(AuthService.fixedDecryption(integration.customInstanceDetails!))
     );
-    return { base: instance.replace(/\/$/, ''), username, password };
+    return { base: instance, username, password };
   }
 
   async post(

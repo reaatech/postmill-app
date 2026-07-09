@@ -841,7 +841,7 @@ describe('AiSettingsService', () => {
   });
 
   describe('upsertBrandProfile', () => {
-    it('delegates to repository', async () => {
+    it('delegates valid data to repository', async () => {
       const data = { instructions: 'Be helpful', language: 'en' };
       mockRepo.upsertBrandProfile.mockReturnValue({ organizationId: 'org1', ...data });
 
@@ -849,6 +849,36 @@ describe('AiSettingsService', () => {
 
       expect(mockRepo.upsertBrandProfile).toHaveBeenCalledWith('org1', data);
       expect(result.instructions).toBe('Be helpful');
+    });
+
+    it('validates JSON columns and rejects invalid shapes', async () => {
+      const data = {
+        instructions: 'Be helpful',
+        logoFileIds: 'not-an-array',
+      };
+
+      await expect(service.upsertBrandProfile('org1', data)).rejects.toThrow();
+      expect(mockRepo.upsertBrandProfile).not.toHaveBeenCalled();
+    });
+
+    it('accepts full brand profile JSON shapes', async () => {
+      const data = {
+        instructions: 'Be concise',
+        platformInstructions: { x: 'short' },
+        languageProfiles: { en: { instructions: 'English', overrides: { x: 'tweet' } } },
+        logoFileIds: ['file-1'],
+        palette: [{ name: 'Primary', hex: '#2B5CD3' }],
+        fontFamilies: [{ name: 'Inter', fallback: 'sans-serif' }],
+        customFonts: [{ fileId: 'font-1', family: 'Custom' }],
+        enforcement: { tone: 'friendly' },
+        assets: [{ fileId: 'asset-1', url: 'https://example.com/a.png', caption: 'Logo' }],
+      };
+      mockRepo.upsertBrandProfile.mockReturnValue({ organizationId: 'org1', ...data });
+
+      const result = await service.upsertBrandProfile('org1', data);
+
+      expect(mockRepo.upsertBrandProfile).toHaveBeenCalledWith('org1', data);
+      expect(result.platformInstructions).toEqual({ x: 'short' });
     });
   });
 
