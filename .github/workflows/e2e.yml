@@ -1,0 +1,142 @@
+---
+# E2E Regression Gate — boots the FULL stack (backend + frontend, prod build) against ephemeral
+# Postgres+Redis, seeds deterministic test data, and runs the Playwright audit suite.
+#
+# Gating: the deterministic regression specs (93 titles, 94 setup-RBAC, 95 contrast) must pass.
+# Non-gating (informational, uploaded as artifacts): the full route crawl (40), interaction
+# exercise (46), and axe a11y scan (92) — these flag issues without failing the build so the
+# report stays visible without blocking on known/triaged debt.
+#
+# Runs against a PRODUCTION frontend build (next build + next start) — routes are precompiled, so
+# there's no webpack-compile memory/latency in CI, and it mirrors what actually ships.
+
+name: E2E Regression Gate
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postmill-local
+          POSTGRES_PASSWORD: postmill-local-pwd
+          POSTGRES_DB: postmill-db-local
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postmill-local"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postmill-local:postmill-local-pwd@localhost:5432/postmill-db-local
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-e2e-not-a-real-secret
+      FRONTEND_URL: http://localhost:4200
+      MAIN_URL: http://localhost:4200
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:3000
+      BACKEND_INTERNAL_URL: http://localhost:3000
+      # High throttle so the crawl/exercise sweeps don't self-429 (global limit is 600/hour).
+      API_LIMIT: '1000000'
+      PORT: '3000'
+      # e2e persona creds (match scripts/seed-test-data.js).
+      E2E_ADMIN_EMAIL: test@test.com
+      E2E_ADMIN_PASSWORD: Test123!
+      E2E_MEMBER_EMAIL: jordan@acme.test
+      E2E_MEMBER_PASSWORD: Test123!
+      E2E_FREE_EMAIL: jordan@acme.test
+      E2E_FREE_PASSWORD: Test123!
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          run_install: false
+
+      - name: Install native dependencies for node-canvas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev build-essential g++ libpixman-1-dev
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations to the ephemeral DB
+        run: pnpm run prisma-migrate-deploy-safe
+
+      - name: Seed deterministic test data
+        run: node scripts/seed-test-data.js
+
+      - name: Build backend + frontend
+        run: |
+          pnpm run build:backend
+          pnpm --filter ./apps/frontend exec next build
+
+      - name: Start backend (:3000) and frontend (:4200)
+        run: |
+          node apps/backend/dist/apps/backend/src/main.js > backend.log 2>&1 &
+          (cd apps/frontend && pnpm exec next start -p 4200 > ../../frontend.log 2>&1 &)
+          # Wait for both to bind (backend answers 401 unauth on /user/self; frontend 307 → /auth).
+          for i in $(seq 1 45); do
+            be=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/user/self || true)
+            fe=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4200/ || true)
+            if [ "$be" != "000" ] && [ "$fe" != "000" ]; then echo "up (be=$be fe=$fe)"; break; fi
+            sleep 2
+          done
+
+      - name: Install Playwright browser
+        working-directory: e2e
+        run: |
+          npm ci || npm install
+          npx playwright install --with-deps chromium
+
+      - name: Authenticate personas
+        working-directory: e2e
+        run: npx playwright test --config playwright.audit.config.ts --project=setup
+
+      - name: Regression specs (GATING)
+        working-directory: e2e
+        run: |
+          npx playwright test --config playwright.audit.config.ts --project=admin --project=member \
+            tests/93-metadata-titles.spec.ts tests/94-setup-rbac.spec.ts tests/95-contrast.spec.ts
+
+      - name: Crawl + exercise + a11y (informational, non-gating)
+        working-directory: e2e
+        continue-on-error: true
+        run: |
+          npx playwright test --config playwright.audit.config.ts --project=admin \
+            tests/40-crawl-all-routes.spec.ts tests/46-exercise-interactions.spec.ts tests/92-a11y.spec.ts
+
+      - name: Upload audit results + logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-audit-results
+          path: |
+            e2e/results-*.json
+            e2e/playwright-report/**
+            backend.log
+            frontend.log
