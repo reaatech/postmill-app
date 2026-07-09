@@ -27,6 +27,15 @@ export default defineConfig({
   use: {
     ...base.use,
     baseURL: process.env.E2E_BASE || 'http://localhost:4200',
+    launchOptions: {
+      // CI (GitHub Actions) resolves `localhost` to ::1 (IPv6) first, but the backend
+      // (`app.listen(port)`) binds IPv4 only — so Chromium's login fetch to
+      // http://localhost:3000 gets net::ERR_CONNECTION_REFUSED and auth.setup times out.
+      // Pin localhost → 127.0.0.1 in the browser's resolver so it reaches the backend.
+      // URLs and cookies stay `localhost` (cookie Domain derives from FRONTEND_URL), so
+      // nothing else changes. Harmless locally (localhost is already IPv4-reachable).
+      args: ['--host-resolver-rules=MAP localhost 127.0.0.1'],
+    },
   },
   projects: [
     { name: 'setup', testMatch: '**/auth.setup.ts' },
