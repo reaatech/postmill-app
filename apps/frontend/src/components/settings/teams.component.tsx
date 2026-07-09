@@ -12,6 +12,7 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { Select } from '@gitroom/react/form/select';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.team.member.dto';
+import { CreateTeamUserDto } from '@gitroom/nestjs-libraries/dtos/settings/create-team-user.dto';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import copy from 'copy-to-clipboard';
@@ -28,10 +29,11 @@ const CreateUserForm = ({ onDone }: { onDone: () => void }) => {
   const toast = useToaster();
   const t = useT();
   const { data: rolesList } = useRoles();
-  const form = useForm({ values: { email: '', password: '', roleId: '' }, mode: 'onChange' });
+  const resolver = useMemo(() => classValidatorResolver(CreateTeamUserDto), []);
+  const form = useForm({ values: { email: '', password: '', roleId: '' }, resolver, mode: 'onChange' });
 
   const submit = useCallback(async (values: { email: string; password: string; roleId: string }) => {
-    await fetch('/settings/team/create-user', {
+    const res = await fetch('/settings/team/create-user', {
       method: 'POST',
       body: JSON.stringify({
         email: values.email,
@@ -39,6 +41,14 @@ const CreateUserForm = ({ onDone }: { onDone: () => void }) => {
         ...(values.roleId ? { roleId: values.roleId } : {}),
       }),
     });
+    // Guard the success path — the shared fetch does not throw on 4xx, so an unconditional
+    // success toast + onDone() previously fired even on a 400 (spurious "created", swallowed error).
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as any));
+      const msg = Array.isArray(body?.message) ? body.message.join(', ') : body?.message;
+      toast.show(msg || t('create_user_failed', 'Failed to create user'), 'warning');
+      return;
+    }
     toast.show(t('user_created', 'User created successfully'), 'success');
     onDone();
   }, [fetch, toast, t, onDone]);

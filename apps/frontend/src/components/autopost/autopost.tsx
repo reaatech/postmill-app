@@ -114,6 +114,10 @@ const AddOrEditAutopost: FC<{ data?: any; reload: () => void }> = ({ data, reloa
 
   const sendTest = useCallback(async () => {
     const u = form.getValues('url');
+    if (!u || !u.trim()) {
+      toast.show(t('enter_rss_url', 'Enter an RSS feed URL first'), 'warning');
+      return;
+    }
     try {
       const { success, url: newUrl } = await (await fetch(`/autopost/send?url=${encodeURIComponent(u)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
