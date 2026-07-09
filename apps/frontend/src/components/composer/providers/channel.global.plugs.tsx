@@ -238,28 +238,48 @@ const PlugItem: FC<{
     [data?.id, fetch, mutate, toaster]
   );
   return (
-    <div
-      onClick={() => addPlug(data)}
-      className="w-full rounded-[8px] border border-newTableBorder bg-newTableHeader hover:bg-newTableBorder cursor-pointer p-[15px] flex flex-col gap-[10px]"
-    >
-      <div className="flex items-center gap-[10px]">
+    <div className="w-full rounded-[8px] border border-newTableBorder bg-newTableHeader hover:bg-newTableBorder p-[15px] relative">
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => addPlug(data)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            addPlug(data);
+          }
+        }}
+        className="flex flex-col gap-[10px] cursor-pointer pr-14"
+      >
         <div className="text-[16px] flex-1">{plug.title}</div>
-        {!!data && (
-          <div onClick={(e) => e.stopPropagation()}>
-            <Slider
-              value={activated ? 'on' : 'off'}
-              onChange={changeActivated}
-              fill={true}
-            />
-          </div>
-        )}
+        <div className="flex-1 text-[12px] text-newTableText">
+          {plug.description}
+        </div>
       </div>
-      <div className="flex-1 text-[12px] text-newTableText">
-        {plug.description}
-      </div>
-      <div>
-        <Button>{!data ? t('set_plug', 'Set Plug') : t('edit_plug', 'Edit Plug')}</Button>
-      </div>
+      {!!data && (
+        <button
+          type="button"
+          aria-label={activated ? 'Deactivate plug' : 'Activate plug'}
+          className="absolute top-[15px] right-[15px] bg-transparent border-0 p-0 m-0 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            changeActivated(activated ? 'off' : 'on');
+          }}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              changeActivated(activated ? 'off' : 'on');
+            }
+          }}
+        >
+          <Slider
+            value={activated ? 'on' : 'off'}
+            onChange={() => {}}
+            fill={true}
+          />
+        </button>
+      )}
     </div>
   );
 };

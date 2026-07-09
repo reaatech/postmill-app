@@ -3,6 +3,11 @@
 import { FC, useState, useCallback, useEffect } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
+interface PollOption {
+  id: string;
+  value: string;
+}
+
 interface PollData {
   options: string[];
   duration: number;
@@ -25,12 +30,20 @@ export const PollBuilder: FC<PollBuilderProps> = ({
 }) => {
   const t = useT();
   const [isActive, setIsActive] = useState(!!value);
-  const [options, setOptions] = useState<string[]>(value?.options || ['', '']);
+  const [options, setOptions] = useState<PollOption[]>(() => {
+    const initial = value?.options || ['', ''];
+    return initial.map((value) => ({
+      id: crypto.randomUUID(),
+      value,
+    }));
+  });
   const [duration, setDuration] = useState(value?.duration || 24);
 
   useEffect(() => {
     if (isActive) {
-      const validOptions = options.filter((o) => o.trim().length > 0);
+      const validOptions = options
+        .map((o) => o.value)
+        .filter((o) => o.trim().length > 0);
       if (validOptions.length >= minOptions) {
         onChange({ options: validOptions, duration });
       }
@@ -47,27 +60,22 @@ export const PollBuilder: FC<PollBuilderProps> = ({
     }
   }, [isActive]);
 
-  const handleOptionChange = useCallback(
-    (index: number, text: string) => {
-      setOptions((prev) => {
-        const next = [...prev];
-        next[index] = text;
-        return next;
-      });
-    },
-    []
-  );
+  const handleOptionChange = useCallback((id: string, text: string) => {
+    setOptions((prev) =>
+      prev.map((option) => (option.id === id ? { ...option, value: text } : option))
+    );
+  }, []);
 
   const addOption = useCallback(() => {
     if (options.length < maxOptions) {
-      setOptions((prev) => [...prev, '']);
+      setOptions((prev) => [...prev, { id: crypto.randomUUID(), value: '' }]);
     }
   }, [options.length, maxOptions]);
 
   const removeOption = useCallback(
-    (index: number) => {
+    (id: string) => {
       if (options.length > minOptions) {
-        setOptions((prev) => prev.filter((_, i) => i !== index));
+        setOptions((prev) => prev.filter((option) => option.id !== id));
       }
     },
     [options.length, minOptions]
@@ -99,18 +107,18 @@ export const PollBuilder: FC<PollBuilderProps> = ({
       {isActive && (
         <div className="mt-[12px] flex flex-col gap-[8px]">
           {options.map((option, i) => (
-            <div key={i} className="flex items-center gap-[6px]">
+            <div key={option.id} className="flex items-center gap-[6px]">
               <input
                 className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-[13px] text-textColor flex-1"
-                value={option}
-                onChange={(e) => handleOptionChange(i, e.target.value)}
+                value={option.value}
+                onChange={(e) => handleOptionChange(option.id, e.target.value)}
                 placeholder={t('poll_option_placeholder', `Option ${i + 1}...`)}
                 maxLength={100}
                 aria-label={t('poll_option_aria', 'Poll option {{index}}', { index: i + 1 })}
               />
               {options.length > minOptions && (
                 <button
-                  onClick={() => removeOption(i)}
+                  onClick={() => removeOption(option.id)}
                   className="text-red-500 text-[18px] leading-none hover:opacity-80"
                   aria-label={t('remove_option', 'Remove option')}
                 >

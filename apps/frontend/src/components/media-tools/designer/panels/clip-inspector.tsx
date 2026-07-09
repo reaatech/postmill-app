@@ -82,31 +82,65 @@ const MiniKeyframeTimeline: FC<{
   totalMs: number;
   onAdd: (prop: string, tMs: number) => void;
   onMove: (oldTMs: number, newTMs: number) => void;
-}> = ({ keyframes, totalMs, onAdd, onMove }) => {
+  onRemove: (tMs: number) => void;
+}> = ({ keyframes, totalMs, onAdd, onMove, onRemove }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { setDragging, justDraggedRef } = useKeyframeDrag(ref, totalMs, onMove);
+  const [keyboardMs, setKeyboardMs] = useState(0);
+  const step = Math.max(1, Math.round(totalMs * 0.01));
   return (
     <div
       ref={ref}
-      className="relative h-5 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden cursor-crosshair"
+      role="slider"
+      tabIndex={0}
+      aria-valuemin={0}
+      aria-valuemax={Math.round(totalMs)}
+      aria-valuenow={Math.round(keyboardMs)}
+      aria-label="Keyframe timeline"
+      className="relative h-5 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden cursor-crosshair focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
       onClick={(e) => {
         if (justDraggedRef.current) return; // ignore the click that follows a drag
         if (!ref.current) return;
         const rect = ref.current.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
         const tMs = Math.round(pct * totalMs);
+        setKeyboardMs(tMs);
         onAdd('x', tMs);
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          e.preventDefault();
+          const delta = e.key === 'ArrowLeft' ? -step : step;
+          setKeyboardMs((prev) => Math.max(0, Math.min(totalMs, prev + delta)));
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          onAdd('x', keyboardMs);
+        }
+      }}
     >
-      {keyframes.map((kf, ki) => (
+      {keyframes.map((kf) => (
         <div
-          key={ki}
-          className="absolute top-0 bottom-0 w-0.5 bg-designerAccent cursor-ew-resize"
+          key={`${kf.tMs}-${Object.keys(kf.props).sort().join('-')}`}
+          role="button"
+          tabIndex={0}
+          aria-label={`Keyframe at ${Math.round(kf.tMs)}ms`}
+          className="absolute top-0 bottom-0 w-0.5 bg-designerAccent cursor-ew-resize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
           style={{ left: `${(kf.tMs / totalMs) * 100}%` }}
           title={`Keyframe at ${kf.tMs}ms`}
           onMouseDown={(e) => {
             e.stopPropagation();
             setDragging({ oldTMs: kf.tMs, startX: e.clientX });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+              e.preventDefault();
+              const step = Math.max(1, Math.round(totalMs * 0.01));
+              const delta = e.key === 'ArrowLeft' ? -step : step;
+              onMove(kf.tMs, Math.max(0, Math.min(totalMs, kf.tMs + delta)));
+            } else if (e.key === 'Enter') {
+              e.preventDefault();
+              onRemove(kf.tMs);
+            }
           }}
         />
       ))}
@@ -126,6 +160,7 @@ const KeyframePropRow: FC<{
 }> = ({ prop, clip, keyframes, totalMs, onAdd, onMove, onRemove, onEase }) => {
   const ref = useRef<HTMLDivElement>(null);
   const { setDragging, justDraggedRef } = useKeyframeDrag(ref, totalMs, onMove);
+  const [keyboardMs, setKeyboardMs] = useState(0);
   const propKeyframes = keyframes.filter((kf) => kf.props[prop] !== undefined);
   const currentVal =
     prop === 'x' ? (clip.x ?? 0)
@@ -135,6 +170,7 @@ const KeyframePropRow: FC<{
     : prop === 'rotation' ? (clip.rotation ?? 0)
     : prop === 'opacity' ? (clip.opacity ?? 1)
     : 0;
+  const step = Math.max(1, Math.round(totalMs * 0.01));
 
   return (
     <div className="space-y-1">
@@ -146,20 +182,40 @@ const KeyframePropRow: FC<{
       </div>
       <div
         ref={ref}
-        className="relative h-3 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden"
+        role="slider"
+        tabIndex={0}
+        aria-valuemin={0}
+        aria-valuemax={Math.round(totalMs)}
+        aria-valuenow={Math.round(keyboardMs)}
+        aria-label={`${prop} keyframe timeline`}
+        className="relative h-3 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
         onClick={(e) => {
           if (justDraggedRef.current) return; // ignore the click that follows a drag
           if (!ref.current) return;
           const rect = ref.current.getBoundingClientRect();
           const pct = (e.clientX - rect.left) / rect.width;
           const tMs = Math.round(pct * totalMs);
+          setKeyboardMs(tMs);
           onAdd(prop, tMs);
         }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            const delta = e.key === 'ArrowLeft' ? -step : step;
+            setKeyboardMs((prev) => Math.max(0, Math.min(totalMs, prev + delta)));
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            onAdd(prop, keyboardMs);
+          }
+        }}
       >
-        {propKeyframes.map((kf, ki) => (
+        {propKeyframes.map((kf) => (
           <div
-            key={ki}
-            className="absolute top-0 bottom-0 w-2 h-2 rounded-full bg-designerAccent -translate-x-1/2 -translate-y-1/2 top-1/2 cursor-pointer hover:scale-125 transition-transform"
+            key={kf.tMs}
+            role="button"
+            tabIndex={0}
+            aria-label={`${prop} keyframe at ${Math.round(kf.tMs)}ms`}
+            className="absolute top-0 bottom-0 w-2 h-2 rounded-full bg-designerAccent -translate-x-1/2 -translate-y-1/2 top-1/2 cursor-pointer hover:scale-125 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
             style={{ left: `${(kf.tMs / totalMs) * 100}%` }}
             title={`${prop}: ${kf.props[prop]} at ${kf.tMs}ms`}
             onMouseDown={(e) => {
@@ -170,6 +226,17 @@ const KeyframePropRow: FC<{
               e.stopPropagation();
               if (justDraggedRef.current) return; // a drag ends in a click — don't delete
               onRemove(kf.tMs, prop);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                const step = Math.max(1, Math.round(totalMs * 0.01));
+                const delta = e.key === 'ArrowLeft' ? -step : step;
+                onMove(kf.tMs, Math.max(0, Math.min(totalMs, kf.tMs + delta)));
+              } else if (e.key === 'Enter') {
+                e.preventDefault();
+                onRemove(kf.tMs, prop);
+              }
             }}
           />
         ))}
@@ -635,6 +702,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
           totalMs={totalMs}
           onAdd={handleAddKeyframe}
           onMove={handleMoveKeyframe}
+          onRemove={handleRemoveKeyframe}
         />
 
         {/* Per-property keyframe controls */}

@@ -37,7 +37,7 @@ export const InstagramCollaboratorsTags: FC<{
         },
       });
     },
-    [tagValue]
+    [tagValue, name, onChange]
   );
   const onAddition = useCallback(
     (newTag: any) => {
@@ -53,7 +53,7 @@ export const InstagramCollaboratorsTags: FC<{
         },
       });
     },
-    [tagValue]
+    [tagValue, name, onChange]
   );
 
   const suggestionsArray = useMemo(() => {

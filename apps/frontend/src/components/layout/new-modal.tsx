@@ -11,7 +11,9 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
+  useRef,
 } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { useHotkeys } from 'react-hotkeys-hook';
@@ -104,12 +106,79 @@ export const useModals = () => {
   } satisfies ModalManagerInterface;
 };
 
+const FOCUSABLE_SELECTORS =
+  'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+function useModalFocusTrap(enabled: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const focusableRef = useRef<HTMLElement[]>([]);
+  const firstRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const container = ref.current;
+    if (!container) return;
+
+    const updateFocusable = () => {
+      const focusable = Array.from(
+        container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTORS)
+      ).filter(
+        (el) =>
+          !(el as HTMLButtonElement | HTMLInputElement).disabled &&
+          el.offsetParent !== null
+      );
+      focusableRef.current = focusable;
+      firstRef.current = focusable[0] ?? container;
+    };
+
+    updateFocusable();
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    // Focus the first focusable element (fall back to the dialog container).
+    firstRef.current?.focus();
+
+    const handler = (e: KeyboardEvent) => {
+      const focusable = focusableRef.current;
+      if (e.key !== 'Tab' || focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    container.addEventListener('keydown', handler);
+
+    const observer = new MutationObserver(updateFocusable);
+    observer.observe(container, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+
+    return () => {
+      container.removeEventListener('keydown', handler);
+      observer.disconnect();
+      previouslyFocused?.focus();
+    };
+  }, [enabled]);
+
+  return ref;
+}
+
 export const Component: FC<{
   closeModal: (id: string) => void;
   zIndex: number;
   isLast: boolean;
   modal: { id: string } & OpenModalInterface;
 }> = memo(function Component({ isLast, modal, closeModal, zIndex }) {
+  const titleId = useId();
+  const focusRef = useModalFocusTrap(true);
   const decision = useDecisionModal();
   const closeModalFunction = useCallback(async () => {
     if (modal.askClose) {
@@ -141,12 +210,17 @@ export const Component: FC<{
   if (modal.removeLayout) {
     return (
       <div
+        ref={focusRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modal.title ? titleId : undefined}
+        tabIndex={-1}
         style={{ zIndex }}
         className={clsx(
           !modal.fullScreen
             ? 'pb-[50px] min-w-full min-h-full'
             : 'w-full h-full',
-          'fixed flex left-0 top-0 bg-popup backdrop-blur-sm transition-all animate-fadeIn overflow-y-auto text-newTextColor',
+          'fixed flex left-0 top-0 bg-popup backdrop-blur-sm transition-all animate-fadeIn overflow-y-auto text-newTextColor outline-none',
           !isLast && '!overflow-hidden'
         )}
       >
@@ -177,10 +251,15 @@ export const Component: FC<{
   return (
     <CurrentModalContext.Provider value={{ id: modal.id }}>
       <div
+        ref={focusRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={modal.title ? titleId : undefined}
+        tabIndex={-1}
         onClick={closeModalFunction}
         style={{ zIndex }}
         className={clsx(
-          'fixed flex left-0 top-0 min-w-full min-h-full bg-popup backdrop-blur-sm transition-all animate-fadeIn overflow-y-auto text-newTextColor',
+          'fixed flex left-0 top-0 min-w-full min-h-full bg-popup backdrop-blur-sm transition-all animate-fadeIn overflow-y-auto text-newTextColor outline-none',
           !modal.fullScreen && 'pb-[50px]'
         )}
       >
@@ -223,7 +302,7 @@ export const Component: FC<{
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center">
-                <div className="text-[24px] font-[600] flex-1">
+                <div id={titleId} className="text-[24px] font-[600] flex-1">
                   {modal.title}
                 </div>
                 {typeof modal.withCloseButton === 'undefined' ||

@@ -20,30 +20,30 @@ export const BotPicture: FC<{
   canChangeNickName: boolean;
   mutate: () => void;
 }> = (props) => {
+  const { integration, canChangeProfilePicture, canChangeNickName, mutate } =
+    props;
   const t = useT();
   const modal = useModals();
   const toast = useToaster();
-  const [nick, setNickname] = useState(props.integration.name);
-  const [picture, setPicture] = useState(
-    props.integration.picture || '/no-picture.jpg'
-  );
+  const [nick, setNickname] = useState(integration.name);
+  const [picture, setPicture] = useState(integration.picture || '/no-picture.jpg');
   const [pickerOpen, setPickerOpen] = useState(false);
   const fetch = useFetch();
   const submitForm: FormEventHandler<HTMLFormElement> = useCallback(
     async (e) => {
       e.preventDefault();
-      await fetch(`/integrations/${props.integration.id}/nickname`, {
+      await fetch(`/integrations/${integration.id}/nickname`, {
         method: 'POST',
         body: JSON.stringify({
           name: nick,
           picture,
         }),
       });
-      props.mutate();
+      mutate();
       toast.show(t('updated', 'Updated'), 'success');
       modal.closeAll();
     },
-    [nick, picture, props.mutate, props.integration.id]
+    [nick, picture, mutate, integration.id, fetch, modal, t, toast]
   );
   const handleSelect = useCallback((item: MediaSelectorItem) => {
     setPickerOpen(false);
@@ -75,7 +75,7 @@ export const BotPicture: FC<{
 
       <div className="mt-[16px]">
         <form onSubmit={submitForm} className="gap-[50px] flex flex-col">
-          {props.canChangeProfilePicture && (
+          {canChangeProfilePicture && (
             <div className="flex items-center gap-[20px]">
               {/* eslint-disable-next-line @next/next/no-img-element -- external bot avatar */}
               <img
@@ -88,7 +88,7 @@ export const BotPicture: FC<{
               </Button>
             </div>
           )}
-          {props.canChangeNickName && (
+          {canChangeNickName && (
             <Input
               value={nick}
               onChange={(e) => setNickname(e.target.value)}

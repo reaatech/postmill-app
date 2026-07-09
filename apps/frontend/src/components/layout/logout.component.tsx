@@ -30,10 +30,14 @@ export const LogoutComponent: FC<{ isIcon?: boolean }> = ({ isIcon }) => {
       }
       window.location.href = '/';
     }
-  }, []);
+  }, [fetch, isSecured, t]);
   return (
     <>
-      <div className="cursor-pointer" onClick={logout}>
+      <button
+        type="button"
+        className="cursor-pointer bg-transparent border-none p-0 m-0 text-left"
+        onClick={logout}
+      >
         {isIcon ? (
           <svg
             width="24"
@@ -58,7 +62,7 @@ export const LogoutComponent: FC<{ isIcon?: boolean }> = ({ isIcon }) => {
             {' Postmill'}
           </span>
         )}
-      </div>
+      </button>
     </>
   );
 };

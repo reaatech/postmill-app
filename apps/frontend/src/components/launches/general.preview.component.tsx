@@ -1,3 +1,5 @@
+'use client';
+
 import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import clsx from 'clsx';
@@ -46,7 +48,7 @@ export const GeneralPreviewComponent: FC<{
       }) +
       `</mark>`;
 
-    return { text: finalValue, images: p.image };
+    return { text: finalValue, images: p.image, id: p.id };
   });
 
   return (
@@ -54,7 +56,7 @@ export const GeneralPreviewComponent: FC<{
       <div className="w-full h-full relative flex flex-col">
         {renderContent.map((value, index) => (
           <div
-            key={`tweet_${index}`}
+            key={value.id ?? `tweet_${index}`}
             style={{}}
             className={clsx(
               `flex gap-[8px] relative`,

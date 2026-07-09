@@ -34,7 +34,7 @@ export const MediumTags: FC<{
         },
       });
     },
-    [tagValue]
+    [tagValue, name, onChange]
   );
   const onAddition = useCallback(
     (newTag: any) => {
@@ -50,7 +50,7 @@ export const MediumTags: FC<{
         },
       });
     },
-    [tagValue]
+    [tagValue, name, onChange]
   );
 
   const suggestionsArray = useMemo(() => {

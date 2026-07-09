@@ -33,7 +33,7 @@ export const HashnodeTags: FC<{
         },
       });
     },
-    [tagValue]
+    [tagValue, name, onChange]
   );
   const onAddition = useCallback(
     (newTag: any) => {
@@ -49,11 +49,11 @@ export const HashnodeTags: FC<{
         },
       });
     },
-    [tagValue]
+    [tagValue, name, onChange]
   );
   useEffect(() => {
     customFunc.get('tags').then((data) => setTags(data));
-  }, []);
+  }, [customFunc]);
   const err =
     form && form.errors[props?.name!]
       ? (form?.errors?.[props?.name!]?.message as string)

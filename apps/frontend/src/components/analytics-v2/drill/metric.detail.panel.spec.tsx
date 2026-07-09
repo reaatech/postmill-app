@@ -4,8 +4,8 @@ import { render, screen } from '@testing-library/react';
 import { MetricDetailPanel } from './metric.detail.panel';
 import { MetricDetailResponse } from '../utils';
 
-vi.mock('../hooks/useMetricDrill', () => ({
-  useMetricDrill: () => ({ data: undefined as MetricDetailResponse | undefined }),
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT: () => (_k: string, d: string) => d,
 }));
 
 vi.mock('../charts/area.chart', () => ({
