@@ -776,6 +776,7 @@ export const Filters = () => {
           Always mounted so it can slide in/out; pointer-events off when closed. */}
       <div
         aria-hidden={!drawerOpen}
+        inert={!drawerOpen}
         className={clsx(
           'fixed inset-0 z-[210] flex justify-end',
           !drawerOpen && 'pointer-events-none'

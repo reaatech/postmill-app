@@ -156,6 +156,7 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
       {/* Right-side filter drawer */}
       <div
         aria-hidden={!sheetOpen}
+        inert={!sheetOpen}
         className={clsx(
           'fixed inset-0 z-[210] flex justify-end',
           !sheetOpen && 'pointer-events-none'
