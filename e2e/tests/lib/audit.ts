@@ -1,6 +1,20 @@
 import type { Page, Request, Response, ConsoleMessage } from '@playwright/test';
 
-const BASE = 'https://postiz.reaatech.com';
+// Locally the frontend (:4200) calls the backend (:3000) DIRECTLY, cross-origin, with NO
+// `/api/` prefix (e.g. GET http://localhost:3000/dashboard/summary). The old `/api/`-only
+// filter missed every backend response. We now treat any response whose origin is the
+// backend origin (or any `/api/*` path, for the upload proxy) as an API call to audit.
+const BACKEND_ORIGIN = process.env.E2E_BACKEND_ORIGIN || 'http://localhost:3000';
+const BASE = process.env.E2E_BASE || 'http://localhost:4200';
+
+function isApiUrl(url: string): boolean {
+  if (url.includes('/api/')) return true;
+  try {
+    return new URL(url).origin === new URL(BACKEND_ORIGIN).origin;
+  } catch {
+    return false;
+  }
+}
 
 export interface ApiCall {
   method: string;
@@ -33,11 +47,13 @@ export class PageAuditor {
 
   private onResponse = (res: Response) => {
     const url = res.url();
-    if (!url.includes('/api/')) return;
+    if (!isApiUrl(url)) return;
     const u = new URL(url);
+    // Keep the `/api/`-relative shape when present; otherwise use the backend path as-is.
+    const path = url.includes('/api/') ? u.pathname.replace(/^.*\/api\//, '/api/') : u.pathname;
     this.apiCalls.push({
       method: res.request().method(),
-      url: u.pathname.replace(/^.*\/api\//, '/api/'),
+      url: path,
       status: res.status(),
       query: u.search ? u.search.slice(1, 200) : undefined,
     });
@@ -53,10 +69,13 @@ export class PageAuditor {
 
   private onRequestFailed = (req: Request) => {
     const u = req.url();
-    const sameOrigin =
-      (u.startsWith('http://') || u.startsWith('https://')) &&
-      new URL(u).origin === new URL(BASE).origin;
-    if (sameOrigin || u.includes('/api/')) {
+    let sameOrigin = false;
+    try {
+      sameOrigin = new URL(u).origin === new URL(BASE).origin;
+    } catch {
+      /* non-absolute URL */
+    }
+    if (sameOrigin || isApiUrl(u)) {
       this.failedRequests.push(`${req.method()} ${u.replace(BASE, '')} (${req.failure()?.errorText || 'failed'})`);
     }
   };

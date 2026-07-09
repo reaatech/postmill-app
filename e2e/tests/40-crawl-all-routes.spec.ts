@@ -2,6 +2,8 @@ import { test } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ROUTES, BASE } from './lib/routes';
+
+const PERSONA = () => test.info().project.name || 'admin';
 import { PageAuditor } from './lib/audit';
 import { inventory, actionableSummary, brokenImages, mainTextLength } from './lib/crawl';
 
@@ -15,7 +17,9 @@ import { inventory, actionableSummary, brokenImages, mainTextLength } from './li
  * asserted-fatal, so one run catalogs the whole app; a 429 throttle marks the run contaminated.
  */
 test('crawl every route and diagnose', async ({ page }) => {
-  test.setTimeout(180_000);
+  // Local webpack compiles each route on first visit (~3-8s each) → the full 109-route
+  // sweep needs a generous budget on the cold run; subsequent runs reuse compiled routes.
+  test.setTimeout(45 * 60_000);
   const auditor = new PageAuditor(page).attach();
   const findings: any[] = [];
   let throttled = false;
@@ -37,8 +41,9 @@ test('crawl every route and diagnose', async ({ page }) => {
     }
 
     f.httpStatus = httpStatus;
+    f.persona = PERSONA();
     f.finalUrl = page.url().replace(BASE, '');
-    f.redirectedToAuth = /\/auth\//.test(page.url());
+    f.redirectedToAuth = /\/auth\//.test(page.url()) && !route.publicRoute;
 
     const [items, textLen, broken] = await Promise.all([
       inventory(page),
@@ -58,7 +63,13 @@ test('crawl every route and diagnose', async ({ page }) => {
 
     // ---- Diagnostic flags ----
     if (auditor.hadThrottle()) { f.flags.push('THROTTLED_429 (results unreliable)'); throttled = true; }
-    if (f.redirectedToAuth) f.flags.push('REDIRECTED_TO_AUTH');
+    // A memberGated route redirecting to auth/dashboard for a non-admin persona is EXPECTED
+    // RBAC hiding, not a defect — record it informationally instead of flagging.
+    if (f.redirectedToAuth && route.memberGated && PERSONA() !== 'admin') {
+      f.rbacHidden = true;
+    } else if (f.redirectedToAuth) {
+      f.flags.push('REDIRECTED_TO_AUTH');
+    }
     if (httpStatus >= 400) f.flags.push(`HTTP_${httpStatus}`);
     if (route.expectsContent && textLen < 40 && !f.redirectedToAuth) f.flags.push(`NEAR_EMPTY (textLen=${textLen})`);
     if (route.minActionables && summary.visible < route.minActionables && !f.redirectedToAuth) {
@@ -71,12 +82,14 @@ test('crawl every route and diagnose', async ({ page }) => {
     if (clientErrors.length) f.flags.push(`API_4XX (${clientErrors.map((e) => e.status + ' ' + e.url).join(', ')})`);
     if (snap.pageErrors.length) f.flags.push(`PAGE_ERRORS (${snap.pageErrors.length})`);
 
-    await page.screenshot({ path: `crawl-${route.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png` }).catch(() => {});
+    const shotDir = path.join(__dirname, '../crawl-shots', PERSONA());
+    fs.mkdirSync(shotDir, { recursive: true });
+    await page.screenshot({ path: path.join(shotDir, `${route.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`) }).catch(() => {});
     findings.push(f);
   }
 
   auditor.detach();
-  fs.writeFileSync(path.join(__dirname, '../results-crawl.json'), JSON.stringify({ throttled, findings }, null, 2));
+  fs.writeFileSync(path.join(__dirname, `../results-crawl-${PERSONA()}.json`), JSON.stringify({ persona: PERSONA(), throttled, findings }, null, 2));
 
   // Human summary
   console.log('\n================ ROUTE CRAWL DIAGNOSTICS ================');
