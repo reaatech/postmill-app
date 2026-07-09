@@ -307,7 +307,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[#2B5CD3] hover:underline"
+                      className="text-[#2B5CD3] underline"
                     >
                       {vector.author}
                     </a>

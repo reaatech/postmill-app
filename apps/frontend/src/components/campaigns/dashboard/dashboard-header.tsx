@@ -135,7 +135,7 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
   const createdByElement = campaign.createdBy?.id ? (
     <Link
       href={`/profile/${campaign.createdBy.id}`}
-      className="text-btnPrimary hover:underline"
+      className="text-btnPrimary underline"
     >
       {createdByName}
     </Link>

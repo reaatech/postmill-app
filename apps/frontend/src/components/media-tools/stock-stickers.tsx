@@ -239,7 +239,7 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[#2B5CD3] hover:underline"
+                      className="text-[#2B5CD3] underline"
                     >
                       {sticker.author}
                     </a>

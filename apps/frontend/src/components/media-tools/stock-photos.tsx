@@ -316,7 +316,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={e => e.stopPropagation()}
-                      className="text-btnPrimary hover:underline"
+                      className="text-btnPrimary underline"
                     >
                       {photo.author}
                     </a>

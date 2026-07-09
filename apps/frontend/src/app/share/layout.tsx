@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+export const metadata = { title: { default: 'Postmill', template: '%s' } };
 import '../global.scss';
 import { ReactNode } from 'react';
 import { Plus_Jakarta_Sans } from 'next/font/google';
