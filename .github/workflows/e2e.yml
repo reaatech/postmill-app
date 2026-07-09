@@ -51,6 +51,10 @@ jobs:
       MAIN_URL: http://localhost:4200
       NEXT_PUBLIC_BACKEND_URL: http://localhost:3000
       BACKEND_INTERNAL_URL: http://localhost:3000
+      # Bind the backend on IPv4 (0.0.0.0). Node's default `listen(port)` binds
+      # IPv6-only on the runner, so Chromium (which prefers 127.0.0.1) got
+      # net::ERR_CONNECTION_REFUSED on every backend fetch → auth.setup timed out.
+      BACKEND_LISTEN_HOST: 0.0.0.0
       # High throttle so the crawl/exercise sweeps don't self-429 (global limit is 600/hour).
       API_LIMIT: '1000000'
       PORT: '3000'
