@@ -15,8 +15,70 @@ import slugify from 'slugify';
 import { Tool } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
+import net from 'node:net';
 
 import { metadata as providerMetadata } from './metadata';
+
+// S-10: validate callback URL before interpolating it into API calls.
+function validatePublicHttpsUrl(value: unknown): { ok: true; base: string } | { ok: false; error: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, error: 'Invalid URL' };
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { ok: false, error: 'Invalid URL' };
+  }
+  if (url.protocol !== 'https:') {
+    return { ok: false, error: 'URL must use HTTPS' };
+  }
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost') {
+    return { ok: false, error: 'Invalid hostname' };
+  }
+  // Reject literal private/loopback IPs. Public hostnames resolve through normal
+  // DNS and are still protected by the SSRF dispatcher at connect time.
+  const ipVersion = net.isIP(hostname);
+  if (ipVersion) {
+    return { ok: false, error: 'IP addresses are not allowed' };
+  }
+  // Normalize base URL by stripping a trailing slash so paths don't double up.
+  const base = url.toString().replace(/\/$/, '');
+  return { ok: true, base };
+}
+
+function parseWordPressCallback(token: string): { domain: string; username: string; password: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(token, 'base64').toString());
+  } catch {
+    throw new Error('Invalid credentials');
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid credentials');
+  }
+  const body = parsed as Record<string, unknown>;
+  if (
+    typeof body.domain !== 'string' ||
+    typeof body.username !== 'string' ||
+    typeof body.password !== 'string' ||
+    !body.domain.trim() ||
+    !body.username.trim() ||
+    !body.password.trim()
+  ) {
+    throw new Error('Invalid credentials');
+  }
+  const validation = validatePublicHttpsUrl(body.domain);
+  if ('error' in validation) {
+    throw new Error(validation.error);
+  }
+  return {
+    domain: validation.base,
+    username: body.username,
+    password: body.password,
+  };
+}
 export class WordpressProvider
   extends SocialAbstract
   implements SocialProvider
@@ -95,11 +157,13 @@ export class WordpressProvider
     codeVerifier: string;
     refresh?: string;
   }) {
-    const body = JSON.parse(Buffer.from(params.code, 'base64').toString()) as {
-      domain: string;
-      username: string;
-      password: string;
-    };
+    let body: { domain: string; username: string; password: string };
+    try {
+      body = parseWordPressCallback(params.code);
+    } catch (err) {
+      this.logger.warn('WordPress callback validation failed');
+      return 'Invalid credentials';
+    }
     try {
       const auth = Buffer.from(`${body.username}:${body.password}`).toString(
         'base64'
@@ -146,11 +210,7 @@ export class WordpressProvider
     dataSchema: [],
   })
   async postTypes(token: string) {
-    const body = JSON.parse(Buffer.from(token, 'base64').toString()) as {
-      domain: string;
-      username: string;
-      password: string;
-    };
+    const body = parseWordPressCallback(token);
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(
       'base64'
@@ -194,11 +254,7 @@ export class WordpressProvider
     integration: Integration
   ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
-      const body = JSON.parse(Buffer.from(accessToken, 'base64').toString()) as {
-        domain: string;
-        username: string;
-        password: string;
-      };
+      const body = parseWordPressCallback(accessToken);
       const auth = Buffer.from(`${body.username}:${body.password}`).toString('base64');
 
       let url = `${body.domain}/wp-json/wp/v2/comments?post=${postId}&per_page=50&orderby=date&order=asc`;
@@ -246,11 +302,7 @@ export class WordpressProvider
     integration: Integration
   ): Promise<SocialCommentDTO> {
     try {
-      const body = JSON.parse(Buffer.from(accessToken, 'base64').toString()) as {
-        domain: string;
-        username: string;
-        password: string;
-      };
+      const body = parseWordPressCallback(accessToken);
       const auth = Buffer.from(`${body.username}:${body.password}`).toString('base64');
 
       const response = await this.fetch(`${body.domain}/wp-json/wp/v2/comments`, {
@@ -308,11 +360,7 @@ export class WordpressProvider
     postDetails: PostDetails<WordpressDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
-    const body = JSON.parse(Buffer.from(accessToken, 'base64').toString()) as {
-      domain: string;
-      username: string;
-      password: string;
-    };
+    const body = parseWordPressCallback(accessToken);
 
     const auth = Buffer.from(`${body.username}:${body.password}`).toString(
       'base64'

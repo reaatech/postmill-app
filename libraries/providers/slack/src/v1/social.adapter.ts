@@ -34,6 +34,69 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
     return 400000;
   }
 
+  private _buildRedirectUri(pathSuffix: string): string {
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    if (!frontendUrl) {
+      throw new Error(
+        `FRONTEND_URL is not configured (provider: ${this.identifier})`
+      );
+    }
+    if (!frontendUrl.toLowerCase().startsWith('https://')) {
+      throw new Error(
+        `FRONTEND_URL must use HTTPS for OAuth redirects (provider: ${this.identifier})`
+      );
+    }
+    const redirectUri = `${frontendUrl.replace(/\/+$/, '')}${pathSuffix}`;
+    if (!this._isAllowedReturnUrl(redirectUri)) {
+      throw new Error(
+        `OAuth redirect URI ${redirectUri} is not allowed for provider ${this.identifier}. Add the origin to INTEGRATION_RETURN_URL_ALLOWLIST or set a secure FRONTEND_URL.`
+      );
+    }
+    return redirectUri;
+  }
+
+  private _isAllowedReturnUrl(url: string): boolean {
+    if (!url || typeof url !== 'string' || !url.toLowerCase().startsWith('https://')) {
+      return false;
+    }
+    try {
+      const parsed = new URL(url);
+      if (parsed.username || parsed.password) {
+        return false;
+      }
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname === '[::1]' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        hostname.endsWith('.lan') ||
+        /^10\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^169\.254\./.test(hostname)
+      ) {
+        return false;
+      }
+      const origin = parsed.origin.toLowerCase().replace(/\/+$/, '');
+      const allowlist = (process.env.INTEGRATION_RETURN_URL_ALLOWLIST || '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase().replace(/\/+$/, ''))
+        .filter(Boolean);
+      if (allowlist.includes(origin)) {
+        return true;
+      }
+      const frontendOrigin = (process.env.FRONTEND_URL || '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+      return origin === frontendOrigin;
+    } catch {
+      return false;
+    }
+  }
+
   async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
     return {
       refreshToken: '',
@@ -52,11 +115,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
       url: `https://slack.com/oauth/v2/authorize?client_id=${
         clientInformation?.client_id || ''
       }&redirect_uri=${encodeURIComponent(
-        `${
-          process?.env?.FRONTEND_URL?.indexOf('https') === -1
-            ? 'https://redirectmeto.com/'
-            : ''
-        }${process?.env?.FRONTEND_URL}/integrations/social/slack`
+        this._buildRedirectUri('/integrations/social/slack')
       )}&scope=channels:read,chat:write,users:read,groups:read,channels:join,chat:write.customize&state=${state}`,
       codeVerifier: makeId(10),
       state,
@@ -81,11 +140,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
           client_id: clientInformation?.client_id || '',
           client_secret: clientInformation?.client_secret || '',
           code: params.code,
-          redirect_uri: `${
-            process?.env?.FRONTEND_URL?.indexOf('https') === -1
-              ? 'https://redirectmeto.com/'
-              : ''
-          }${process?.env?.FRONTEND_URL}/integrations/social/slack${
+          redirect_uri: `${this._buildRedirectUri('/integrations/social/slack')}${
             params.refresh ? `?refresh=${params.refresh}` : ''
           }`,
         }),

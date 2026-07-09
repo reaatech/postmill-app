@@ -10,6 +10,7 @@ import { MediaJobsActivity } from './activities/media-jobs.activity';
 import { DigestActivity } from './activities/digest.activity';
 import { CampaignActivity } from './activities/campaign.activity';
 import { RetentionActivity } from './activities/retention.activity';
+import { RetentionRepository } from '@gitroom/nestjs-libraries/database/prisma/retention/retention.repository';
 import { AgentDigestActivity } from './activities/agent-digest.activity';
 import { InngestService } from './inngest.service';
 import { InngestRunService } from './inngest-run.service';
@@ -27,6 +28,7 @@ import { InngestRunService } from './inngest-run.service';
     DigestActivity,
     CampaignActivity,
     RetentionActivity,
+    RetentionRepository,
     AgentDigestActivity,
     InngestRunService,
     InngestService,
@@ -42,6 +44,7 @@ import { InngestRunService } from './inngest-run.service';
     DigestActivity,
     CampaignActivity,
     RetentionActivity,
+    RetentionRepository,
     AgentDigestActivity,
     InngestRunService,
     InngestService,

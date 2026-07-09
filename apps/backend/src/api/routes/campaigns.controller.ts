@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -24,164 +23,34 @@ import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/ca
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { CampaignReportService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-report.service';
 import { CampaignNoteService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-note.service';
-import { CampaignItemDto } from '@gitroom/nestjs-libraries/dtos/campaigns/campaign-item.dto';
-import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
-import { CopyCampaignDto } from '@gitroom/nestjs-libraries/dtos/campaigns/copy-campaign.dto';
-import { PromoteDraftsDto } from '@gitroom/nestjs-libraries/dtos/campaigns/promote-drafts.dto';
-import { CampaignGoalDto } from '@gitroom/nestjs-libraries/dtos/campaigns/campaign-goals.dto';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import {
-  AuthorizationActions,
-  Sections,
-} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsArray, ValidateNested, ArrayMaxSize, MaxLength, IsUUID } from 'class-validator';
-import { Type } from 'class-transformer';
-import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import {
   validateDateRange,
   validateToGteFrom,
   validateWindowCap,
 } from '@gitroom/nestjs-libraries/analytics/date-range.validation';
-
-class CreateCampaignDto {
-  @IsString()
-  name!: string;
-
-  @IsOptional()
-  @IsString()
-  color?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  utmEnabled?: boolean;
-
-  @IsOptional()
-  @IsString()
-  client?: string;
-
-  @IsOptional()
-  @IsString()
-  project?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(30)
-  @IsString({ each: true })
-  @MaxLength(40, { each: true })
-  tags?: string[];
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CampaignGoalDto)
-  goals?: CampaignGoalDto[];
-}
-
-class UpdateCampaignDto {
-  @IsOptional()
-  @IsString()
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  color?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-
-  @IsOptional()
-  @IsBoolean()
-  archived?: boolean;
-
-  @IsOptional()
-  @IsBoolean()
-  utmEnabled?: boolean;
-
-  @IsOptional()
-  @IsString()
-  client?: string;
-
-  @IsOptional()
-  @IsString()
-  project?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(30)
-  @IsString({ each: true })
-  @MaxLength(40, { each: true })
-  tags?: string[];
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CampaignGoalDto)
-  goals?: CampaignGoalDto[];
-}
+import { CampaignItemDto } from '@gitroom/nestjs-libraries/dtos/campaigns/campaign-item.dto';
+import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
+import { CopyCampaignDto } from '@gitroom/nestjs-libraries/dtos/campaigns/copy-campaign.dto';
+import { PromoteDraftsDto } from '@gitroom/nestjs-libraries/dtos/campaigns/promote-drafts.dto';
+import { CampaignGoalDto } from '@gitroom/nestjs-libraries/dtos/campaigns/campaign-goals.dto';
+import { CreateCampaignDto } from '@gitroom/nestjs-libraries/dtos/campaigns/create-campaign.dto';
+import { UpdateCampaignDto } from '@gitroom/nestjs-libraries/dtos/campaigns/update-campaign.dto';
+import { CreateCampaignNoteDto } from '@gitroom/nestjs-libraries/dtos/campaigns/create-campaign-note.dto';
+import { UpdateCampaignNoteDto } from '@gitroom/nestjs-libraries/dtos/campaigns/update-campaign-note.dto';
+import { NotePinDto } from '@gitroom/nestjs-libraries/dtos/campaigns/note-pin.dto';
+import { NoteResolveDto } from '@gitroom/nestjs-libraries/dtos/campaigns/note-resolve.dto';
+import { NoteReactionDto } from '@gitroom/nestjs-libraries/dtos/campaigns/note-reaction.dto';
+import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import {
+  AuthorizationActions,
+  Sections,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 // J2 — hard cap for the campaigns list (default page size == max).
 const CAMPAIGNS_MAX_LIMIT = 100;
 
 @ApiTags('Campaigns')
-class CreateCampaignNoteDto {
-  @IsString()
-  @MaxLength(20000)
-  content!: string;
-
-  @IsOptional()
-  @IsUUID()
-  parentId?: string;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(50)
-  @IsUUID('all', { each: true })
-  mentions?: string[];
-}
-
-class UpdateCampaignNoteDto {
-  @IsString()
-  @MaxLength(20000)
-  content!: string;
-}
-
-class NotePinDto {
-  @IsBoolean()
-  pinned!: boolean;
-}
-
-class NoteResolveDto {
-  @IsBoolean()
-  resolved!: boolean;
-}
-
-class NoteReactionDto {
-  @IsString()
-  @MaxLength(16)
-  emoji!: string;
-}
-
 @Controller('/campaigns')
 export class CampaignsController {
   constructor(
@@ -190,9 +59,6 @@ export class CampaignsController {
     private _postsService: PostsService,
     private _reportService: CampaignReportService,
     private _noteService: CampaignNoteService,
-    // Controller composition (1.5): AnalyticsService is provided only in
-    // api.module.ts (no nestjs-libraries module exports it), so CampaignsService
-    // must not inject it. The controller composes the two services instead.
     private _analyticsService: AnalyticsService,
   ) {}
 
@@ -249,9 +115,6 @@ export class CampaignsController {
     @GetUserFromRequest() user: User,
     @Body() body: CreateCampaignDto,
   ) {
-    if (body.startDate && body.endDate && new Date(body.endDate) <= new Date(body.startDate)) {
-      throw new BadRequestException('endDate must be after startDate');
-    }
     return this._campaignsService.create({
       organizationId: org.id,
       name: body.name,
@@ -276,9 +139,6 @@ export class CampaignsController {
     @Param('id') id: string,
     @Body() body: UpdateCampaignDto,
   ) {
-    if (body.startDate && body.endDate && new Date(body.endDate) <= new Date(body.startDate)) {
-      throw new BadRequestException('endDate must be after startDate');
-    }
     return this._campaignsService.update(id, org.id, {
       name: body.name,
       color: body.color,
@@ -367,37 +227,7 @@ export class CampaignsController {
     @Query('format') format: 'json' | 'csv' | 'pdf' = 'json',
     @Res({ passthrough: true }) res: Response,
   ) {
-    if (format === 'csv') {
-      const csv = await this._reportService.toCsv(id, org.id);
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="campaign-${id}.csv"`);
-      return csv;
-    }
-    if (format === 'pdf') {
-      const pdf = await this._reportService.toPdf(id, org.id);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="campaign-${id}.pdf"`);
-      return pdf;
-    }
-    const analytics = await this.computeCampaignAnalytics(org, id);
-    return this._reportService.toJson(id, org.id, analytics);
-  }
-
-  // Compose campaign analytics (post-snapshot trend + per-channel breakdown) for
-  // the report — controller composition (AnalyticsService is not injected into
-  // CampaignReportService). Non-fatal: a failure yields a report without the
-  // analytics block rather than failing the whole report.
-  private async computeCampaignAnalytics(org: Organization, id: string) {
-    try {
-      const to = dayjs().format('YYYY-MM-DD');
-      const from = dayjs().subtract(90, 'day').format('YYYY-MM-DD');
-      const overview = await this._analyticsService.getOverview(org, from, to, [], false, {
-        campaignIds: [id],
-      });
-      return { series: overview.series, byChannel: overview.byChannel, window: { from, to } };
-    } catch {
-      return undefined;
-    }
+    return this._reportService.dispatchReport(id, org.id, format, res);
   }
 
   @Post('/:id/copy')

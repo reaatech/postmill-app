@@ -1,26 +1,14 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OrgAiSettingsController } from './org-ai-settings.controller';
-import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
-
-const mockRedisKeys = vi.fn();
-const mockRedisDel = vi.fn();
-
-vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
-  ioRedis: {
-    get: vi.fn(),
-    set: vi.fn(),
-    del: (...args: any[]) => mockRedisDel(...args),
-    keys: (...args: any[]) => mockRedisKeys(...args),
-  },
-}));
 
 const mockOrgAiUpsert = vi.fn();
 const mockOrgAiSetActive = vi.fn();
 const mockOrgAiGetActiveProvider = vi.fn();
 const mockOrgAiGetProviders = vi.fn();
 const mockOrgAiDelete = vi.fn();
+const mockOrgAiTestConnection = vi.fn();
 
 vi.mock(
   '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service',
@@ -31,25 +19,22 @@ vi.mock(
       getActiveProvider = mockOrgAiGetActiveProvider;
       getProviders = mockOrgAiGetProviders;
       delete = mockOrgAiDelete;
+      testConnection = mockOrgAiTestConnection;
     },
   }),
 );
 
 const mockDefaultsServiceListProviders = vi.fn();
 const mockDefaultsServiceGetProviderConfigSummary = vi.fn();
-const mockDefaultsServiceResolveAdapter = vi.fn();
-const mockDefaultsServiceBustCache = vi.fn();
 const mockDefaultsServiceGetModelDefaults = vi.fn();
 const mockDefaultsServiceSetModelDefault = vi.fn();
 const mockDefaultsServiceClearModelDefault = vi.fn();
 const mockDefaultsServiceGetModelDefaultsCatalog = vi.fn();
 
-function makeDefaultsService(seedService?: DefaultsSeedService): AiDefaultsService {
+function makeDefaultsService(): AiDefaultsService {
   return {
     listProviders: mockDefaultsServiceListProviders,
     getProviderConfigSummary: mockDefaultsServiceGetProviderConfigSummary,
-    resolveAdapter: mockDefaultsServiceResolveAdapter,
-    bustDefaultsCatalogCache: mockDefaultsServiceBustCache,
     getModelDefaults: mockDefaultsServiceGetModelDefaults,
     setModelDefault: mockDefaultsServiceSetModelDefault,
     clearModelDefault: mockDefaultsServiceClearModelDefault,
@@ -57,34 +42,12 @@ function makeDefaultsService(seedService?: DefaultsSeedService): AiDefaultsServi
   } as unknown as AiDefaultsService;
 }
 
-const mockOrganizationGetAllIds = vi.fn();
-vi.mock(
-  '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service',
-  () => ({
-    OrganizationService: class {
-      getAllIds = mockOrganizationGetAllIds;
-    },
-  }),
-);
-
 const org = { id: 'org-1' } as any;
 
-function stubAdapter(identifier = 'openai') {
-  return {
-    identifier,
-    name: 'OpenAI',
-    type: 'direct',
-    credentialFields: [{ key: 'apiKey', required: true }],
-    capabilities: { text: true },
-    validateCredentials: vi.fn(),
-  };
-}
-
-function makeController(seedService?: DefaultsSeedService) {
+function makeController() {
   return new OrgAiSettingsController(
     new (OrgAiSettingsService as any)(),
-    makeDefaultsService(seedService),
-    seedService ?? (new (DefaultsSeedService as any)() as DefaultsSeedService),
+    makeDefaultsService(),
   );
 }
 
@@ -95,11 +58,8 @@ describe('OrgAiSettingsController — provider config + cache invalidation', () 
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDefaultsServiceResolveAdapter.mockReturnValue(stubAdapter());
     mockOrgAiUpsert.mockResolvedValue({ identifier: 'openai' });
     mockOrgAiSetActive.mockResolvedValue({ isActive: true });
-    mockRedisKeys.mockResolvedValue([]);
-    mockRedisDel.mockResolvedValue(0);
   });
 
   it('listProviders delegates to AiDefaultsService', async () => {
@@ -121,49 +81,49 @@ describe('OrgAiSettingsController — provider config + cache invalidation', () 
     expect(result).toEqual({ active: null, providers: [] });
   });
 
-  it('upsertConfig validates provider and busts catalog cache', async () => {
+  it('upsertConfig delegates to OrgAiSettingsService with defaulted enabled flag (A-22)', async () => {
     controller = makeController();
     const result = await controller.upsertConfig(org, 'openai', {
       credentials: { apiKey: 'sk-test' },
     });
 
     expect(result).toEqual({ identifier: 'openai', success: true });
-    expect(mockDefaultsServiceResolveAdapter).toHaveBeenCalledWith('openai', undefined);
-    expect(mockOrgAiUpsert).toHaveBeenCalled();
-    expect(mockDefaultsServiceBustCache).toHaveBeenCalledWith('org-1');
+    expect(mockOrgAiUpsert).toHaveBeenCalledWith('org-1', 'openai', {
+      enabled: true,
+      credentials: { apiKey: 'sk-test' },
+      defaultModel: undefined,
+      reasoningModel: undefined,
+      version: undefined,
+    });
   });
 
-  it('setActive busts catalog cache', async () => {
+  it('setActive delegates to OrgAiSettingsService', async () => {
     controller = makeController();
     const result = await controller.setActive(org, 'openai');
 
     expect(result).toEqual({ identifier: 'openai', isActive: true });
     expect(mockOrgAiSetActive).toHaveBeenCalledWith('org-1', 'openai', undefined);
-    expect(mockDefaultsServiceBustCache).toHaveBeenCalledWith('org-1');
   });
 
-  it('deleteConfig busts catalog cache', async () => {
+  it('deleteConfig delegates to OrgAiSettingsService', async () => {
     controller = makeController();
     const result = await controller.deleteConfig(org, 'openai');
 
     expect(result).toEqual({ success: true });
     expect(mockOrgAiDelete).toHaveBeenCalledWith('org-1', 'openai');
-    expect(mockDefaultsServiceBustCache).toHaveBeenCalledWith('org-1');
   });
 
-  it('keeps the config call successful even if seeding throws', async () => {
-    const seedService = {
-      seedUnset: vi.fn().mockRejectedValue(new Error('seed failed')),
-      seedAllOrgs: vi.fn(),
-    } as unknown as DefaultsSeedService;
-
-    controller = makeController(seedService);
-    const result = await controller.upsertConfig(org, 'openai', {
-      credentials: { apiKey: 'sk-test' },
+  it('testConnection delegates candidate credentials to OrgAiSettingsService (A-22)', async () => {
+    mockOrgAiTestConnection.mockResolvedValue({ valid: true });
+    controller = makeController();
+    const result = await controller.testConnection(org, 'openai', {
+      credentials: { apiKey: 'candidate' },
     });
 
-    expect(result).toEqual({ identifier: 'openai', success: true });
-    expect(seedService.seedUnset).toHaveBeenCalledWith('org-1');
+    expect(mockOrgAiTestConnection).toHaveBeenCalledWith('org-1', 'openai', {
+      apiKey: 'candidate',
+    });
+    expect(result).toEqual({ valid: true });
   });
 });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AIModelProvider } from './ai-model.provider';
-import { BudgetExceeded } from './governance/errors';
+import { BadRequestException } from '@nestjs/common';
+import { BudgetExceeded, GuardrailViolation } from './governance/errors';
 import { createChaosEngine, createStandardInjectors, TimeoutInjector } from '@reaatech/agent-chaos-core';
 
 // AI SDK V2 result shape: text lives in a `content` array of parts, and usage uses
@@ -852,6 +853,7 @@ describe('AIModelProvider', () => {
       });
 
       expect(budget.checkBudget).toHaveBeenCalledWith('utility', 'org-123');
+      expect(guardrails.checkInput).toHaveBeenCalledWith('Hello', { orgId: 'org-123' });
       expect(telemetry.startSpan).toHaveBeenCalled();
       expect(guardrails.checkOutput).toHaveBeenCalled();
       expect(health.recordSuccess).toHaveBeenCalledWith('openai');
@@ -872,9 +874,37 @@ describe('AIModelProvider', () => {
       });
 
       expect(budget.checkBudget).toHaveBeenCalledWith('utility', 'org-123');
+      expect(guardrails.checkInput).toHaveBeenCalledWith('Extract data', { orgId: 'org-123' });
       expect(telemetry.startSpan).toHaveBeenCalled();
       expect(guardrails.checkOutput).toHaveBeenCalled();
       expect(health.recordSuccess).toHaveBeenCalledWith('openai');
+    });
+
+    it('rejects with BadRequestException when modelId is omitted', async () => {
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      await expect(
+        provider.generateTextWithModel('org-123', 'openai', 'v1', undefined as any, { prompt: 'Hello' }),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        provider.generateObjectWithModel('org-123', 'openai', 'v1', undefined as any, { prompt: 'JSON' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects with GuardrailViolation when input guardrails reject', async () => {
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+      (guardrails.checkInput as any).mockRejectedValueOnce(new GuardrailViolation('blocked prompt'));
+
+      await expect(
+        provider.generateTextWithModel('org-123', 'openai', 'v1', 'gpt-4.1', { prompt: 'bad prompt' }),
+      ).rejects.toThrow(GuardrailViolation);
+
+      expect(mockDoGenerate).not.toHaveBeenCalled();
     });
 
     it('rejects with BudgetExceeded when budget check disallows text generation', async () => {
@@ -923,6 +953,57 @@ describe('AIModelProvider', () => {
       ).rejects.toThrow(BudgetExceeded);
 
       expect(createLanguageModel).not.toHaveBeenCalled();
+    });
+
+    it('resolves credentials via latest active version when no version is passed (PV-03)', async () => {
+      mockGetByIdentifier.mockImplementation((_orgId: string, _id: string, v?: string) => {
+        // Simulate OrgAiSettingsService: when version is omitted the service resolves
+        // the org's pinned v2 row; a hardcoded v1 default would return null.
+        if (v === 'v2' || v === undefined) {
+          return { credentials: { apiKey: 'v2-key' } };
+        }
+        return null;
+      });
+
+      const creds = await (provider as any)._credentialsForProvider('org-123', 'openai');
+
+      expect(creds).toEqual({ apiKey: 'v2-key' });
+      expect(mockGetByIdentifier).toHaveBeenCalledWith('org-123', 'openai', undefined);
+    });
+  });
+
+  describe('governedLanguageModel', () => {
+    it('returns a proxy whose doGenerate runs governance and records usage', async () => {
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      const governed = await provider.governedLanguageModel('agent', 'org-123');
+      const result = await governed.doGenerate({
+        prompt: [{ role: 'user', content: [{ type: 'text', text: 'Hello' }] }],
+      });
+
+      expect(result.content?.[0]?.text).toBe('Generated response');
+      expect(budget.checkBudget).toHaveBeenCalledWith('agent', 'org-123');
+      expect(guardrails.checkInput).toHaveBeenCalledWith('Hello', { orgId: 'org-123' });
+      expect(guardrails.checkOutput).toHaveBeenCalledWith('Generated response', { orgId: 'org-123' });
+      expect(health.recordSuccess).toHaveBeenCalledWith('openai');
+      expect(budget.recordSpend).toHaveBeenCalled();
+    });
+
+    it('proxy doGenerate rejects when the input guardrails reject', async () => {
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+      (guardrails.checkInput as any).mockRejectedValueOnce(new GuardrailViolation('blocked'));
+
+      const governed = await provider.governedLanguageModel('agent', 'org-123');
+
+      await expect(
+        governed.doGenerate({
+          prompt: [{ role: 'user', content: [{ type: 'text', text: 'bad' }] }],
+        }),
+      ).rejects.toThrow(GuardrailViolation);
     });
   });
 });

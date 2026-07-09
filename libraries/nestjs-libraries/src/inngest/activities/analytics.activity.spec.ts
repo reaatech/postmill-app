@@ -78,6 +78,7 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import type { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import type { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import type { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
+import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 
 type Mocked<T> = T & { [K in keyof T]: T[K] extends (...args: any[]) => any ? ReturnType<typeof vi.fn> : T[K] };
 
@@ -164,8 +165,22 @@ describe('AnalyticsActivity', () => {
       markProbeFailed: vi.fn().mockResolvedValue(undefined),
     };
 
-    activity = new AnalyticsActivity(
+    const analyticsService = new AnalyticsService(
       analyticsRepository as any,
+      {
+        getActiveProvider: vi.fn().mockResolvedValue(null),
+      } as unknown as OrgShortLinkSettingsService,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      webhooksService as any,
+      notificationService as any,
+    );
+
+    activity = new AnalyticsActivity(
+      analyticsService,
       integrationManager as any,
       providerConfigManager as any,
       organizationService as any,

@@ -5,7 +5,6 @@ import {
   ToolMessage,
 } from '@langchain/core/messages';
 import { END, START, StateGraph } from '@langchain/langgraph';
-import { TavilySearch } from '@langchain/tavily';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import dayjs from 'dayjs';
@@ -45,14 +44,6 @@ const fenceResearch = (research?: string): string | undefined => {
 
 // Bound the generator's fan-outs so the model can't drive unbounded image spend.
 const MAX_GENERATED_ITEMS = 10;
-
-const tools = !process.env.TAVILY_API_KEY
-  ? ((): any[] => {
-      logger.warn('TAVILY_API_KEY not set — web search will be unavailable for agent');
-      return [];
-    })()
-  : [new TavilySearch({ maxResults: 3 })];
-const toolNode = new ToolNode(tools);
 
 interface WorkflowChannelsState {
   messages: BaseMessage[];
@@ -179,7 +170,9 @@ export class AgentGraphService {
             costUsd: 0,
           });
         } catch (err) {
-          this._logger.warn(`generator spend recording failed: ${err}`);
+          this._logger.warn(
+            `generator spend recording failed: ${(err as Error)?.message}`
+          );
         }
       },
     };
@@ -212,9 +205,16 @@ export class AgentGraphService {
     return this._aiModelProvider.langchainModel('generator', orgId);
   }
 
+  private async _getTools(_orgId: string): Promise<any[]> {
+    // Web-search tools are no longer resolved from a deployment env key.
+    // They should be resolved per-org through AIModelProvider/OrgAiSettingsService;
+    // until that wiring exists, the agent runs with an empty tool set.
+    return [];
+  }
+
   async startCall(state: WorkflowChannelsState) {
     const model = await this._getModel(state.orgId);
-    const runTools = model.bindTools(tools);
+    const runTools = model.bindTools(await this._getTools(state.orgId));
     const response = await ChatPromptTemplate.fromTemplate(
       PROMPT_CONSTANTS.agentStartCall(dayjs().format())
     )
@@ -395,7 +395,9 @@ export class AgentGraphService {
         });
         newContent.push({ ...p, image });
       } catch (err) {
-        this._logger.warn(`Image generation failed for a generated post: ${err}`);
+        this._logger.warn(
+          `Image generation failed for a generated post: ${(err as Error)?.message}`
+        );
         newContent.push({ ...p, image: undefined });
       }
     }
@@ -429,7 +431,9 @@ export class AgentGraphService {
 
           all.push({ ...p, image: uploadWithId });
         } catch (err) {
-          this._logger.error(`Failed to upload picture: ${err}`);
+          this._logger.error(
+            `Failed to upload picture: ${(err as Error)?.message}`
+          );
           all.push(p);
         }
       } else {
@@ -471,10 +475,11 @@ export class AgentGraphService {
       modelId: cfg?.modelId ?? 'generator',
     };
 
+    const tools = await this._getTools(orgId);
     const state = AgentGraphService.state();
     const workflow = state
       .addNode('agent', this.startCall.bind(this))
-      .addNode('research', toolNode)
+      .addNode('research', new ToolNode(tools))
       .addNode('save-research', this.saveResearch.bind(this))
       .addNode('find-category', this.findCategories.bind(this))
       .addNode('find-topic', this.findTopic.bind(this))

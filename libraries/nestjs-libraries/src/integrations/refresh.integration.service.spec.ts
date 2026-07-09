@@ -119,7 +119,10 @@ describe('RefreshIntegrationService', () => {
   describe('setBetweenSteps', () => {
     it('calls setBetweenRefreshSteps and informAboutRefreshError', async () => {
       await service.setBetweenSteps(mockIntegration as any, 'error cause');
-      expect(mockIntegrationService.setBetweenRefreshSteps).toHaveBeenCalledWith('integration-1');
+      expect(mockIntegrationService.setBetweenRefreshSteps).toHaveBeenCalledWith(
+        'integration-1',
+        'org-1'
+      );
       expect(mockIntegrationService.informAboutRefreshError).toHaveBeenCalledWith(
         'org-1',
         mockIntegration,

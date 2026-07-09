@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AiDefaultsService } from './ai-defaults.service';
+import { bustDefaultsCatalogCache as mockBustCache } from './defaults-cache';
+
+vi.mock('./defaults-cache', () => ({
+  bustDefaultsCatalogCache: vi.fn(),
+}));
 import { DefaultsResolutionService } from './defaults-resolution.service';
 import { AIModelProvider } from '../ai-model.provider';
 import { AiMediaService } from '../governance/media.service';
@@ -479,6 +484,11 @@ describe('AiDefaultsService', () => {
         throw new Error('not found');
       });
       expect(service.resolveAdapter('unknown')).toBeUndefined();
+    });
+
+    it('bustDefaultsCatalogCache delegates to the standalone helper', () => {
+      service.bustDefaultsCatalogCache('org-1');
+      expect(mockBustCache).toHaveBeenCalledWith('org-1');
     });
   });
 });

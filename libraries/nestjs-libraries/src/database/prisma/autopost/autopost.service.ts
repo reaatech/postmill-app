@@ -61,6 +61,7 @@ export class AutopostService {
     private _integrationService: IntegrationService,
     @Inject(forwardRef(() => PostsService))
     private _postsService: PostsService,
+    @Inject(forwardRef(() => AIModelProvider))
     private _aiModelProvider: AIModelProvider,
     private _aiMediaService: AiMediaService
   ) {}

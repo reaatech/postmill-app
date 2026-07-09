@@ -375,11 +375,10 @@ describe('AiMediaService', () => {
   // ── Async generation (§11.2) ──
 
   describe('generateVideo', () => {
-    it('falls back to image generation when no media provider is configured', async () => {
+    it('throws CapabilityNotAvailable when no video provider is configured', async () => {
       const service = bareService();
-      const result = await service.generateVideo('a sunset');
-      expect(result).toBe('https://cdn.example.com/image.png');
-      expect(mockImageModel).toHaveBeenCalledWith('utility', undefined);
+      await expect(service.generateVideo('a sunset')).rejects.toThrow(CapabilityNotAvailable);
+      expect(mockImageModel).not.toHaveBeenCalled();
     });
 
     it('creates a tracked AIMediaJob, passes the webhook URL, and returns the job id', async () => {
@@ -452,15 +451,14 @@ describe('AiMediaService', () => {
       await expect(service.generateVideo('a sunset', { orgId: 'org-1' })).rejects.toThrow('down');
     });
 
-    it('submits untracked when there is no org context', async () => {
+    it('throws CapabilityNotAvailable when there is no org context', async () => {
       const adapter = makeAdapter('luma', { video: true });
       const { service, lifecycle, orgSettings } = setup([adapter]);
-      // _resolveForOperation requires an orgId — without one there are no candidates
-      // and the image fallback applies.
-      const result = await service.generateVideo('a sunset');
+      // _resolveForOperation requires an orgId — without one there are no candidates.
+      await expect(service.generateVideo('a sunset')).rejects.toThrow(CapabilityNotAvailable);
       expect(orgSettings.getEnabledProviders).not.toHaveBeenCalled();
       expect(lifecycle.createPendingJob).not.toHaveBeenCalled();
-      expect(result).toBe('https://cdn.example.com/image.png');
+      expect(mockImageModel).not.toHaveBeenCalled();
     });
   });
 

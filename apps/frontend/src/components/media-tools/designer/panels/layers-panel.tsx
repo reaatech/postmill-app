@@ -90,7 +90,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
         store.getState().pushHistory();
       }
     },
-    [store, currentOutput]
+    [getCurrentChildren, store]
   );
 
   const toggleLock = useCallback(
@@ -103,7 +103,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
         store.getState().pushHistory();
       }
     },
-    [store, currentOutput]
+    [getCurrentChildren, store]
   );
 
   // Reorder via the store action, which replaces ONLY the current output's
@@ -176,7 +176,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
           break;
       }
     },
-    [editingId, store, currentOutput, selectElement, startRename]
+    [editingId, selectElement, startRename, getCurrentChildren]
   );
 
   if (!elements.length) {
@@ -214,6 +214,13 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
             aria-label={`Layer ${elementLabel(el)}`}
             onClick={() => {
               if (!isEditing) {
+                selectElement(el.id);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (isEditing) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
                 selectElement(el.id);
               }
             }}

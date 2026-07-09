@@ -45,6 +45,69 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     return 2000;
   }
 
+  private _buildRedirectUri(pathSuffix: string): string {
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    if (!frontendUrl) {
+      throw new Error(
+        `FRONTEND_URL is not configured (provider: ${this.identifier})`
+      );
+    }
+    if (!frontendUrl.toLowerCase().startsWith('https://')) {
+      throw new Error(
+        `FRONTEND_URL must use HTTPS for OAuth redirects (provider: ${this.identifier})`
+      );
+    }
+    const redirectUri = `${frontendUrl.replace(/\/+$/, '')}${pathSuffix}`;
+    if (!this._isAllowedReturnUrl(redirectUri)) {
+      throw new Error(
+        `OAuth redirect URI ${redirectUri} is not allowed for provider ${this.identifier}. Add the origin to INTEGRATION_RETURN_URL_ALLOWLIST or set a secure FRONTEND_URL.`
+      );
+    }
+    return redirectUri;
+  }
+
+  private _isAllowedReturnUrl(url: string): boolean {
+    if (!url || typeof url !== 'string' || !url.toLowerCase().startsWith('https://')) {
+      return false;
+    }
+    try {
+      const parsed = new URL(url);
+      if (parsed.username || parsed.password) {
+        return false;
+      }
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname === '[::1]' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        hostname.endsWith('.lan') ||
+        /^10\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^169\.254\./.test(hostname)
+      ) {
+        return false;
+      }
+      const origin = parsed.origin.toLowerCase().replace(/\/+$/, '');
+      const allowlist = (process.env.INTEGRATION_RETURN_URL_ALLOWLIST || '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase().replace(/\/+$/, ''))
+        .filter(Boolean);
+      if (allowlist.includes(origin)) {
+        return true;
+      }
+      const frontendOrigin = (process.env.FRONTEND_URL || '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+      return origin === frontendOrigin;
+    } catch {
+      return false;
+    }
+  }
+
   override async checkValidity(
     items: Array<ValidityMedia[]>
   ): Promise<string | true> {
@@ -319,11 +382,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         'https://www.tiktok.com/v2/auth/authorize/' +
         `?client_key=${clientInformation?.client_id || ''}` +
         `&redirect_uri=${encodeURIComponent(
-          `${
-            process?.env?.FRONTEND_URL?.indexOf('https') === -1
-              ? 'https://redirectmeto.com/'
-              : ''
-          }${process?.env?.FRONTEND_URL}/integrations/social/tiktok`
+          this._buildRedirectUri('/integrations/social/tiktok')
         )}` +
         `&state=${state}` +
         `&response_type=code` +
@@ -344,11 +403,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       code: params.code,
       grant_type: 'authorization_code',
       code_verifier: params.codeVerifier,
-      redirect_uri: `${
-        process?.env?.FRONTEND_URL?.indexOf('https') === -1
-          ? 'https://redirectmeto.com/'
-          : ''
-      }${process?.env?.FRONTEND_URL}/integrations/social/tiktok`,
+      redirect_uri: this._buildRedirectUri('/integrations/social/tiktok'),
     };
 
     const tokenResponse = await this.fetch(

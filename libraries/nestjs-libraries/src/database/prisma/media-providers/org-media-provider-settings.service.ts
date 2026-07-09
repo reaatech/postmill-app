@@ -1,12 +1,17 @@
-import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
+import { forwardRef, Injectable, Logger, Optional, Inject, HttpException } from '@nestjs/common';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { MediaProviderAdapter } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 
 const STANDARD_FOLDERS = ['documents', 'audio', 'images', 'video', 'other'];
 
@@ -51,6 +56,9 @@ export class OrgMediaProviderSettingsService {
     private _encryption: EncryptionService,
     private _resolution: ProviderResolutionService,
     private _fileService: FileService,
+    private _storageService: StorageService,
+    @Inject(forwardRef(() => DefaultsSeedService))
+    private _defaultsSeed: DefaultsSeedService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
     // layering: sanctioned leaf-read of OrgAiSettingsRepository (OrgAiSettingsService
@@ -73,6 +81,206 @@ export class OrgMediaProviderSettingsService {
       });
     }
     return out;
+  }
+
+  // Resolve a media adapter through the kernel; throws when the provider is unknown.
+  private _requireAdapter(identifier: string): MediaProviderAdapter {
+    try {
+      return this._resolution.resolveMedia(identifier);
+    } catch {
+      throw new HttpException('Unknown media provider', 400);
+    }
+  }
+
+  /**
+   * Resolve a media adapter for an inline connection test. Returns null for an
+   * unknown provider so the controller can map to its preferred status code.
+   */
+  testConnectionAdapter(identifier: string): MediaProviderAdapter | null {
+    try {
+      return this._resolution.resolveMedia(identifier);
+    } catch {
+      return null;
+    }
+  }
+
+  private _bustDefaultsCatalogCache(orgId: string): void {
+    // Best-effort cache invalidation; never fail the request if Redis is down.
+    try {
+      const prefix = `settings:content:media-defaults:catalog:${orgId}:`;
+      ioRedis
+        .keys(`${prefix}*`)
+        .then((keys) => {
+          if (keys.length) ioRedis.del(...keys);
+        })
+        .catch(() => undefined);
+    } catch {}
+  }
+
+  private async _assertStorageOwnership(
+    orgId: string,
+    storageProviderId: string,
+    storageRootFolderId?: string,
+  ): Promise<void> {
+    // `getProviderConfigs` is org-scoped (findByOrg) and includes the synthetic
+    // `__virtual_local__` id for the default local provider.
+    const configs = await this._storageService.getProviderConfigs(orgId);
+    if (!configs.some((c) => c.id === storageProviderId)) {
+      throw new HttpException(
+        'storageProviderId does not belong to this organization',
+        400,
+      );
+    }
+
+    if (storageRootFolderId) {
+      // `getFolder` throws (404) when the folder is missing or owned by another org;
+      // normalise that (and only that) to a 400 for a bad write payload. A non-404
+      // infra failure (DB outage, transient Prisma error) must propagate as 5xx —
+      // it is not the user's bad input.
+      try {
+        await this._fileService.getFolder(orgId, storageRootFolderId);
+      } catch (err) {
+        // `getFolder` throws `HttpException('Folder not found', 404)` for the
+        // ownership/not-found case; anything else is infra and must propagate.
+        if (!(err instanceof HttpException) || err.getStatus() !== 404) throw err;
+        throw new HttpException(
+          'storageRootFolderId does not belong to this organization',
+          400,
+        );
+      }
+    }
+  }
+
+  /**
+   * Static catalog metadata for every registered media provider.
+   */
+  listProviderMetadata() {
+    const seen = new Set<string>();
+    const out: {
+      identifier: string;
+      name: string;
+      capabilities: unknown;
+      credentialFields: unknown;
+    }[] = [];
+    for (const manifest of this._kernel.listManifests('media')) {
+      if (seen.has(manifest.providerId)) continue;
+      seen.add(manifest.providerId);
+      out.push({
+        identifier: manifest.providerId,
+        name: manifest.displayName,
+        capabilities: manifest.capabilities,
+        credentialFields: manifest.credentialFields ?? null,
+      });
+    }
+    return out;
+  }
+
+  /**
+   * Upsert a media provider config with SSRF validation on baseURL and cache
+   * invalidation for the media-defaults catalog.
+   */
+  async upsertConfig(
+    orgId: string,
+    identifier: string,
+    data: {
+      credentials?: Record<string, string>;
+      version?: string;
+      enabled?: boolean;
+    },
+  ) {
+    this._requireAdapter(identifier);
+
+    // 3.2 (review): the same write-time SSRF gate as the AI settings route. For
+    // openai/minimax these credentials are MIRRORED verbatim into the org's
+    // AIOrgProviderConfig (§11.4 live-link), where a private `baseURL` would be
+    // fetched by the AI-SDK's global dispatcher — the exact hole 3.2 closed on
+    // the AI route must not stay open through the media side door.
+    const baseURL = data.credentials?.baseURL;
+    if (
+      typeof baseURL === 'string' &&
+      baseURL.trim() &&
+      !(await isSafePublicHttpsUrl(baseURL))
+    ) {
+      throw new HttpException(
+        'Base URL must be a public HTTPS URL (private, loopback, and non-HTTPS hosts are not allowed)',
+        400,
+      );
+    }
+
+    // OpenAI/MiniMax credentials live-link to the AI surface inside the service (§11.4).
+    // `enabled` defaults to true (configuring enables); the kit's On/Off toggle sends
+    // an explicit `{ enabled: false }` with no credentials to disable without clearing them.
+    await this.upsert(orgId, identifier, {
+      enabled: data.enabled ?? true,
+      credentials: data.credentials,
+      version: data.version,
+    });
+
+    // Eagerly seed any unset model/media defaults now that a media provider is available.
+    this._defaultsSeed.seedUnset(orgId).catch(() => undefined);
+    this._bustDefaultsCatalogCache(orgId);
+
+    return { identifier, success: true };
+  }
+
+  /**
+   * Bind a media provider to a storage provider + root folder, validating
+   * org ownership of both before writing.
+   */
+  async setStorage(
+    orgId: string,
+    identifier: string,
+    data: {
+      storageProviderId: string;
+      storageRootFolderId?: string;
+    },
+  ) {
+    this._requireAdapter(identifier);
+
+    // PROVIDER_REMEDIATION 3.6: validate the storage provider + root folder belong to
+    // this org at WRITE time. Cross-org use is otherwise blocked only at job completion
+    // (no leak, but the failure is deferred until after a paid render).
+    await this._assertStorageOwnership(
+      orgId,
+      data.storageProviderId,
+      data.storageRootFolderId,
+    );
+
+    await this.upsert(orgId, identifier, {
+      storageProviderId: data.storageProviderId,
+      storageRootFolderId: data.storageRootFolderId,
+    });
+
+    this._bustDefaultsCatalogCache(orgId);
+    return { identifier, success: true };
+  }
+
+  /**
+   * Mark a provider Primary and invalidate the media-defaults catalog cache.
+   */
+  async setActiveWithDefaults(
+    orgId: string,
+    identifier: string,
+    version?: string,
+  ) {
+    this._requireAdapter(identifier);
+
+    const result = await this.setActive(orgId, identifier, version);
+
+    // Eagerly seed any unset model/media defaults now that the primary media provider changed.
+    this._defaultsSeed.seedUnset(orgId).catch(() => undefined);
+    this._bustDefaultsCatalogCache(orgId);
+
+    return { identifier, success: true, isActive: result.isActive };
+  }
+
+  /**
+   * Delete a media config and invalidate the media-defaults catalog cache.
+   */
+  async deleteConfig(orgId: string, identifier: string) {
+    await this.delete(orgId, identifier);
+    this._bustDefaultsCatalogCache(orgId);
+    return { success: true };
   }
 
   async getProviders(orgId: string) {
@@ -317,7 +525,19 @@ export class OrgMediaProviderSettingsService {
     return false;
   }
 
-  async testConnection(orgId: string, identifier: string) {
+  async testConnection(
+    orgId: string,
+    identifier: string,
+    credentials?: Record<string, string>,
+  ) {
+    if (credentials) {
+      const adapter = this._resolution.resolveMedia(identifier, {
+        credentials,
+        orgId,
+      });
+      return this.#runAdapterTest(adapter, credentials);
+    }
+
     // §6.2: version-agnostic read so a v2-pinned row is testable (getByIdentifier's v1
     // default would report an otherwise-configured provider as "not configured").
     const config = await this._repository.findAnyByIdentifier(orgId, identifier);
@@ -325,21 +545,25 @@ export class OrgMediaProviderSettingsService {
       throw new Error(`Media provider "${identifier}" not configured for this organization`);
     }
 
-    const decrypted = this._decryptCredentials(config.credentials);
+    const testCredentials = this._decryptCredentials(config.credentials);
     const adapter = this._resolution.resolveMedia(identifier, {
       version: config.version,
-      credentials: decrypted,
+      credentials: testCredentials,
       orgId,
     });
 
+    return this.#runAdapterTest(adapter, testCredentials);
+  }
+
+  async #runAdapterTest(adapter: MediaProviderAdapter, credentials: Record<string, string>) {
     try {
       // Prefer the adapter's own auth check; only image-capable providers can be
       // verified via generateImage. Without either, the key can't be actively tested.
       if (adapter.testConnection) {
-        return await adapter.testConnection({ credentials: decrypted });
+        return await adapter.testConnection({ credentials });
       }
       if (adapter.capabilities.image) {
-        await adapter.generateImage('test', { credentials: decrypted });
+        await adapter.generateImage('test', { credentials });
         return { ok: true, message: 'Connection successful' };
       }
       return { ok: true, message: 'Credentials saved (no live connection test for this provider)' };

@@ -6,11 +6,9 @@ import {
   Param,
   Post,
   Put,
-  HttpException,
   Query,
   UseGuards,
   ForbiddenException,
-  BadRequestException,
 } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
@@ -54,7 +52,7 @@ export class StorageController {
     @GetUserFromRequest() user: User,
     @Body() body: CreateStorageConfigDto
   ) {
-    const created = await this._storageService.createConfig(
+    return this._storageService.createAndTestConfig(
       org.id,
       {
         type: body.type,
@@ -70,17 +68,6 @@ export class StorageController {
       },
       user.id
     );
-
-    const testResult = await this._storageService.testConnection(created.id, org.id);
-    if (!testResult.ok) {
-      await this._storageService.deleteConfig(created.id, org.id);
-      throw new HttpException(
-        `Connection test failed: ${testResult.error}`,
-        400
-      );
-    }
-
-    return this.#stripBigInts(created);
   }
 
   @Put('/:id')
@@ -91,23 +78,21 @@ export class StorageController {
     @Param('id') id: string,
     @Body() body: UpdateStorageConfigDto
   ) {
-    return this.#stripBigInts(
-      await this._storageService.updateConfig(
-        id,
-        org.id,
-        {
-          name: body.name,
-          credentials: body.credentials,
-          region: body.region,
-          bucket: body.bucket,
-          endpoint: body.endpoint,
-          publicUrl: body.publicUrl,
-          quotaBytes:
-            body.quotaBytes !== undefined ? BigInt(body.quotaBytes) : undefined,
-          version: body.version,
-        },
-        user.id
-      )
+    return this._storageService.updateConfig(
+      id,
+      org.id,
+      {
+        name: body.name,
+        credentials: body.credentials,
+        region: body.region,
+        bucket: body.bucket,
+        endpoint: body.endpoint,
+        publicUrl: body.publicUrl,
+        quotaBytes:
+          body.quotaBytes !== undefined ? BigInt(body.quotaBytes) : undefined,
+        version: body.version,
+      },
+      user.id
     );
   }
 
@@ -137,9 +122,7 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
   ) {
-    return this.#stripBigInts(
-      await this._storageService.mount(id, org.id)
-    );
+    return this._storageService.mount(id, org.id);
   }
 
   @Post('/:id/unmount')
@@ -148,9 +131,7 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
   ) {
-    return this.#stripBigInts(
-      await this._storageService.unmount(id, org.id)
-    );
+    return this._storageService.unmount(id, org.id);
   }
 
   @Get('/:sourceId/migrate-preview')
@@ -185,27 +166,13 @@ export class StorageController {
   @Get('/usage')
   @RequirePermission('storage-config', 'manage')
   async getUsage(@GetOrgFromRequest() org: Organization) {
-    const usage = await this._storageService.getUsage(org.id);
-    return {
-      totalBytes: Number(usage.totalBytes),
-      quotaBytes: Number(usage.quotaBytes),
-      providers: usage.providers.map((p) => ({
-        ...p,
-        usageBytes: p.usageBytes !== null ? Number(p.usageBytes) : null,
-      })),
-    };
+    return this._storageService.getUsageDto(org.id);
   }
 
   @Get('/quota-status')
   @RequirePermission('storage-config', 'manage')
   async getQuotaStatus(@GetOrgFromRequest() org: Organization) {
-    const status = await this._storageService.getQuotaStatus(org.id);
-    return {
-      usedBytes: Number(status.usedBytes),
-      quotaBytes: Number(status.quotaBytes),
-      percentUsed: status.percentUsed,
-      warning: status.warning,
-    };
+    return this._storageService.getQuotaStatusDto(org.id);
   }
 
   @Put('/quota/:orgId')
@@ -225,17 +192,7 @@ export class StorageController {
   @Get('/usage-breakdown')
   @RequirePermission('storage-config', 'manage')
   async getUsageBreakdown(@GetOrgFromRequest() org: Organization) {
-    const breakdown = await this._storageService.getUsageBreakdown(org.id);
-    return {
-      byFolder: breakdown.byFolder.map((f) => ({
-        ...f,
-        totalBytes: Number(f.totalBytes),
-      })),
-      byProvider: breakdown.byProvider.map((p) => ({
-        ...p,
-        totalBytes: Number(p.totalBytes),
-      })),
-    };
+    return this._storageService.getUsageBreakdownDto(org.id);
   }
 
   @Get('/audit-log')
@@ -272,41 +229,11 @@ export class StorageController {
     @Body() body: SetDefaultFolderDto
   ) {
     const folderId = body.folderId || null;
-
-    // Validate cross-org / missing folder before persisting (mirror
-    // MediaProviderController._assertStorageOwnership). `getFolder` throws
-    // `HttpException('Folder not found', 404)` for the ownership/not-found case;
-    // anything else is infra and must propagate.
-    if (folderId) {
-      try {
-        await this._fileService.getFolder(org.id, folderId);
-      } catch (err) {
-        if (!(err instanceof HttpException) || err.getStatus() !== 404) throw err;
-        throw new BadRequestException(
-          'folderId does not belong to this organization'
-        );
-      }
-    }
-
     return this._storageService.setDefaultFolderForProvider(
       id,
       folderId,
       org.id,
       user.id
     );
-  }
-
-  #stripBigInts(obj: any): any {
-    if (obj === null || obj === undefined) return obj;
-    if (typeof obj === 'bigint') return Number(obj);
-    if (Array.isArray(obj)) return obj.map((v) => this.#stripBigInts(v));
-    if (typeof obj === 'object') {
-      const stripped: any = {};
-      for (const [k, v] of Object.entries(obj)) {
-        stripped[k] = this.#stripBigInts(v);
-      }
-      return stripped;
-    }
-    return obj;
   }
 }

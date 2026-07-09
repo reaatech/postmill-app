@@ -6,6 +6,7 @@ import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider'
 import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 import { Organization } from '@prisma/client';
 
 describe('AgentDigestActivity', () => {
@@ -44,6 +45,10 @@ describe('AgentDigestActivity', () => {
     resolveConfigForScope: vi.fn().mockResolvedValue({ providerId: 'openai' }),
   } as unknown as AIModelProvider;
 
+  const telemetryService = {
+    startSpan: vi.fn().mockImplementation(async (_name, fn) => fn({ setAttribute: vi.fn() })),
+  } as unknown as TelemetryService;
+
   beforeEach(() => {
     vi.clearAllMocks();
     activity = new AgentDigestActivity(
@@ -53,6 +58,7 @@ describe('AgentDigestActivity', () => {
       notificationService,
       organizationService,
       aiModelProvider,
+      telemetryService,
     );
   });
 
@@ -107,6 +113,16 @@ describe('AgentDigestActivity', () => {
       expect(notificationService.notify).not.toHaveBeenCalled();
     });
 
+    it('wraps generation in a telemetry span', async () => {
+      await activity.generate('org-1');
+
+      expect(telemetryService.startSpan).toHaveBeenCalledWith(
+        'agent.digest.generate',
+        expect.any(Function),
+        { 'ai.scope': 'agent' },
+      );
+    });
+
     it('runs the agent with headless context and returns the digest payload', async () => {
       const result = await activity.generate('org-1');
 
@@ -129,7 +145,12 @@ describe('AgentDigestActivity', () => {
 
       expect(options.memory.resource).toBe('org-1');
       expect(options.memory.thread).toBe(result.threadId);
-      expect(options.maxSteps).toBe(20);
+      expect(options.maxSteps).toBe(10);
+      expect(telemetryService.startSpan).toHaveBeenCalledWith(
+        'agent.digest.generate',
+        expect.any(Function),
+        { 'ai.scope': 'agent' },
+      );
 
       const requestContext = options.requestContext;
       expect(JSON.parse(requestContext.get('organization'))).toEqual({
@@ -144,6 +165,17 @@ describe('AgentDigestActivity', () => {
 
       // generate never notifies — that is a separate step.
       expect(notificationService.notify).not.toHaveBeenCalled();
+    });
+
+    it('returns a non-fatal timeout skip when generation does not finish in time', async () => {
+      (activity as any)._digestTimeoutMs = 50;
+      vi.mocked(mockGenerate).mockImplementation(() => new Promise(() => {}));
+
+      const result = await activity.generate('org-1');
+
+      expect(result.skipped).toBe(true);
+      expect(result.reason).toBe('timeout');
+      expect(result.notified).toBe(false);
     });
   });
 

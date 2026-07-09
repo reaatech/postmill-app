@@ -1,73 +1,18 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
-
-const mockGetActiveProvider = vi.fn();
-const mockGetProviders = vi.fn();
-const mockListProviderMetadata = vi.fn();
-const mockUpsert = vi.fn();
-const mockUpdateById = vi.fn();
-const mockGetExistingConfigId = vi.fn();
-const mockSetActive = vi.fn();
-const mockDelete = vi.fn();
-const mockTestConnection = vi.fn();
-const mockGetConfigForProvider = vi.fn();
-const mockGetPinnedVersion = vi.fn();
-
-vi.mock(
-  '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service',
-  () => ({
-    OrgShortLinkSettingsService: class {
-      getActiveProvider = mockGetActiveProvider;
-      getProviders = mockGetProviders;
-      listProviderMetadata = mockListProviderMetadata;
-      upsert = mockUpsert;
-      updateById = mockUpdateById;
-      getExistingConfigId = mockGetExistingConfigId;
-      setActive = mockSetActive;
-      delete = mockDelete;
-      deleteById = mockDelete;
-      testConnection = mockTestConnection;
-      getConfigForProvider = mockGetConfigForProvider;
-      getPinnedVersion = mockGetPinnedVersion;
-    },
-  }),
-);
-
-const mockResolveShortLink = vi.fn();
-
-vi.mock('@gitroom/nestjs-libraries/providers/provider-resolution.service', () => ({
-  ProviderResolutionService: class {
-    resolveShortLink = mockResolveShortLink;
-  },
-}));
-
-const mockIsAllowedReturnUrl = vi.fn();
-
-vi.mock('@gitroom/nestjs-libraries/security/return-url.validator', () => ({
-  isAllowedReturnUrl: (url: string) => mockIsAllowedReturnUrl(url),
-}));
-
-const mockRedisGet = vi.fn();
-const mockRedisSet = vi.fn();
-const mockRedisDel = vi.fn();
-
-vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
-  ioRedis: {
-    get: (...args: any[]) => mockRedisGet(...args),
-    set: (...args: any[]) => mockRedisSet(...args),
-    del: (...args: any[]) => mockRedisDel(...args),
-  },
-}));
-
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+} from '@nestjs/common';
 import { OrgShortLinkSettingsController } from './org-shortlink-settings.controller';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
-import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { ShortLinkOAuthService } from '@gitroom/nestjs-libraries/short-linking/short-link-oauth.service';
 import type { ShortLinkAdapter } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
 
 const org = { id: 'org-1' } as any;
 
-function stubAdapter(overrides: Record<string, any> = {}) {
+function stubAdapter(overrides: Record<string, any> = {}): ShortLinkAdapter {
   return {
     identifier: 'bitly',
     name: 'Bitly',
@@ -92,21 +37,42 @@ function stubAdapter(overrides: Record<string, any> = {}) {
   };
 }
 
+function stubService(overrides: Record<string, any> = {}) {
+  return {
+    getActiveProvider: vi.fn().mockResolvedValue(null),
+    getProviders: vi.fn().mockResolvedValue([]),
+    listProviderMetadata: vi.fn().mockReturnValue([]),
+    upsertConfig: vi.fn().mockResolvedValue({ identifier: 'bitly', success: true }),
+    updateConfigById: vi.fn().mockResolvedValue({ identifier: 'bitly', configId: 'cfg-1', success: true }),
+    setActive: vi.fn().mockResolvedValue({ isActive: true }),
+    delete: vi.fn().mockResolvedValue({}),
+    testConnection: vi.fn().mockResolvedValue({ ok: true }),
+    getPinnedVersion: vi.fn().mockResolvedValue('v1'),
+    getConfigForProvider: vi.fn().mockResolvedValue(null),
+    getExistingConfigId: vi.fn().mockResolvedValue(null),
+    requireAdapter: vi.fn(),
+    ...overrides,
+  } as unknown as OrgShortLinkSettingsService;
+}
+
+function stubOAuth(overrides: Record<string, any> = {}) {
+  return {
+    getOAuthUrl: vi.fn().mockResolvedValue({ url: 'https://oauth.example', state: 'state-123' }),
+    oauthCallback: vi.fn().mockResolvedValue({ identifier: 'bitly', success: true }),
+    ...overrides,
+  } as unknown as ShortLinkOAuthService;
+}
+
 describe('OrgShortLinkSettingsController', () => {
   let controller: OrgShortLinkSettingsController;
+  let service: ReturnType<typeof stubService>;
+  let oauth: ReturnType<typeof stubOAuth>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetPinnedVersion.mockResolvedValue('v1');
-    // 0.3: default to "no existing config" so the identifier-route falls to the
-    // fingerprint-create `upsert` branch (first save / add-account). Tests that
-    // exercise the rotation-in-place path override this to return a row id.
-    mockGetExistingConfigId.mockResolvedValue(null);
-
-    controller = new OrgShortLinkSettingsController(
-      new (OrgShortLinkSettingsService as any)(),
-      new (ProviderResolutionService as any)(),
-    );
+    service = stubService();
+    oauth = stubOAuth();
+    controller = new OrgShortLinkSettingsController(service, oauth);
   });
 
   // ---------------------------------------------------------------------------
@@ -125,16 +91,16 @@ describe('OrgShortLinkSettingsController', () => {
           setupNotes: 'Get your API key from Bitly dashboard',
         },
       ];
-      mockListProviderMetadata.mockReturnValue(meta);
+      service.listProviderMetadata.mockReturnValue(meta);
 
       const result = await controller.listProviders();
 
-      expect(mockListProviderMetadata).toHaveBeenCalledOnce();
+      expect(service.listProviderMetadata).toHaveBeenCalledOnce();
       expect(result).toEqual(meta);
     });
 
     it('returns empty array when no adapters registered', async () => {
-      mockListProviderMetadata.mockReturnValue([]);
+      service.listProviderMetadata.mockReturnValue([]);
 
       const result = await controller.listProviders();
 
@@ -146,23 +112,23 @@ describe('OrgShortLinkSettingsController', () => {
   // GET /config
   // ---------------------------------------------------------------------------
   describe('GET /config', () => {
-    it('returns active provider without credentials', async () => {
+    it('returns active provider without credentials or extraConfig', async () => {
       const active = {
         identifier: 'bitly',
         name: 'Bitly',
-        credentials: 'encrypted-secret',
+        credentials: 'secret',
         customDomain: 'short.myco.com',
         extraConfig: { plan: 'business' },
         enabled: true,
         isActive: true,
       };
-      mockGetActiveProvider.mockResolvedValue(active);
-      mockGetProviders.mockResolvedValue([]);
+      service.getActiveProvider.mockResolvedValue(active);
+      service.getProviders.mockResolvedValue([]);
 
       const result = await controller.getConfig(org);
 
-      expect(mockGetActiveProvider).toHaveBeenCalledWith('org-1');
-      expect(mockGetProviders).toHaveBeenCalledWith('org-1');
+      expect(service.getActiveProvider).toHaveBeenCalledWith('org-1');
+      expect(service.getProviders).toHaveBeenCalledWith('org-1');
       expect(result.active).not.toHaveProperty('credentials');
       expect(result.active).not.toHaveProperty('extraConfig');
       expect(result.active).toEqual({
@@ -175,8 +141,8 @@ describe('OrgShortLinkSettingsController', () => {
     });
 
     it('returns null active when no active provider', async () => {
-      mockGetActiveProvider.mockResolvedValue(null);
-      mockGetProviders.mockResolvedValue([]);
+      service.getActiveProvider.mockResolvedValue(null);
+      service.getProviders.mockResolvedValue([]);
 
       const result = await controller.getConfig(org);
 
@@ -185,8 +151,8 @@ describe('OrgShortLinkSettingsController', () => {
     });
 
     it('returns all provider configs', async () => {
-      mockGetActiveProvider.mockResolvedValue(null);
-      mockGetProviders.mockResolvedValue([
+      service.getActiveProvider.mockResolvedValue(null);
+      service.getProviders.mockResolvedValue([
         { identifier: 'bitly', enabled: true, isActive: false },
         { identifier: 'rebrandly', enabled: false, isActive: false },
       ]);
@@ -207,114 +173,41 @@ describe('OrgShortLinkSettingsController', () => {
       extraConfig: { plan: 'enterprise' },
     };
 
-    it('throws BadRequestException for unknown provider identifier', async () => {
-      mockResolveShortLink.mockImplementation(() => { throw new Error('not found'); });
-
-      await expect(
-        controller.upsertConfig(org, 'nonexistent', body as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('upserts config and returns success', async () => {
-      const adapter = stubAdapter();
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockUpsert.mockResolvedValue({});
-
+    it('delegates upsert to the service and returns success', async () => {
       const result = await controller.upsertConfig(org, 'bitly', body as any);
 
-      expect(mockResolveShortLink).toHaveBeenCalledWith('bitly');
-      expect(mockUpsert).toHaveBeenCalledWith('org-1', 'bitly', {
-        enabled: true,
-        credentials: body.credentials,
-        customDomain: body.customDomain,
-        extraConfig: body.extraConfig,
-        // PROVIDER_REMEDIATION 6.6: fingerprint is now computed server-side.
-        accountFingerprint: expect.any(String),
-        version: undefined,
-      });
+      expect(service.upsertConfig).toHaveBeenCalledWith('org-1', 'bitly', body);
       expect(result).toEqual({ identifier: 'bitly', success: true });
     });
 
-    // 0.3: when a config already exists for the provider, a credentialed save is a
-    // ROTATION → update the existing row in place (NOT a fingerprint-create that
-    // strands the active row on the revoked key).
-    it('updates the existing row in place on rotation instead of creating a duplicate', async () => {
-      const adapter = stubAdapter();
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockGetExistingConfigId.mockResolvedValue('cfg-1');
-      mockUpdateById.mockResolvedValue({});
-
-      const result = await controller.upsertConfig(org, 'bitly', body as any);
-
-      expect(mockGetExistingConfigId).toHaveBeenCalledWith('org-1', 'bitly');
-      expect(mockUpdateById).toHaveBeenCalledWith(
-        'org-1',
-        'cfg-1',
-        {
-          credentials: body.credentials,
-          customDomain: body.customDomain,
-          extraConfig: body.extraConfig,
-          name: undefined,
-          accountFingerprint: expect.any(String),
-          version: undefined,
-        },
-        // F9: the service cross-checks the row belongs to this provider.
-        'bitly',
-      );
-      expect(mockUpsert).not.toHaveBeenCalled();
-      expect(result).toEqual({ identifier: 'bitly', success: true });
-    });
-
-    it('passes explicit version to upsert', async () => {
-      const adapter = stubAdapter();
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockUpsert.mockResolvedValue({});
-
+    it('passes explicit version to upsertConfig', async () => {
       const result = await controller.upsertConfig(org, 'bitly', {
         ...body,
         version: 'v2',
       } as any);
 
-      expect(mockUpsert).toHaveBeenCalledWith('org-1', 'bitly', {
-        enabled: true,
-        credentials: body.credentials,
-        customDomain: body.customDomain,
-        extraConfig: body.extraConfig,
-        accountFingerprint: expect.any(String),
+      expect(service.upsertConfig).toHaveBeenCalledWith('org-1', 'bitly', {
+        ...body,
         version: 'v2',
       });
       expect(result).toEqual({ identifier: 'bitly', success: true });
     });
+  });
 
-    // PROVIDER_REMEDIATION 6.6: the fingerprint is derived server-side and any
-    // client-supplied `accountFingerprint` is ignored (prevents duplicate-row minting).
-    it('ignores a client-supplied accountFingerprint and computes it server-side', async () => {
-      const adapter = stubAdapter();
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockUpsert.mockResolvedValue({});
+  // ---------------------------------------------------------------------------
+  // PUT /config/:identifier/:configId
+  // ---------------------------------------------------------------------------
+  describe('PUT /config/:identifier/:configId', () => {
+    const body = {
+      credentials: { apiKey: 'rotated-key' },
+      customDomain: 'short.myco.com',
+    };
 
-      await controller.upsertConfig(org, 'bitly', {
-        credentials: { apiKey: 'test-key' },
-        customDomain: 'short.myco.com',
-        accountFingerprint: 'client-forged-value',
-      } as any);
+    it('delegates the rotation update to the service and returns success', async () => {
+      const result = await controller.updateConfigById(org, 'bitly', 'cfg-1', body as any);
 
-      const passed = mockUpsert.mock.calls[0][2];
-      expect(passed.accountFingerprint).toEqual(expect.any(String));
-      expect(passed.accountFingerprint).not.toBe('client-forged-value');
-    });
-
-    it('leaves the fingerprint undefined when no credentials are provided', async () => {
-      const adapter = stubAdapter();
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockUpsert.mockResolvedValue({});
-
-      await controller.upsertConfig(org, 'bitly', {
-        customDomain: 'short.myco.com',
-      } as any);
-
-      const passed = mockUpsert.mock.calls[0][2];
-      expect(passed.accountFingerprint).toBeUndefined();
+      expect(service.updateConfigById).toHaveBeenCalledWith('org-1', 'cfg-1', 'bitly', body);
+      expect(result).toEqual({ identifier: 'bitly', configId: 'cfg-1', success: true });
     });
   });
 
@@ -323,29 +216,25 @@ describe('OrgShortLinkSettingsController', () => {
   // ---------------------------------------------------------------------------
   describe('POST /config/:identifier/set-active', () => {
     it('sets active provider and returns result', async () => {
-      mockSetActive.mockResolvedValue({ isActive: true });
+      const result = await controller.setActive(org, 'bitly', {} as any);
 
-      const result = await controller.setActive(org, 'bitly', {});
-
-      expect(mockSetActive).toHaveBeenCalledWith('org-1', 'bitly', undefined);
+      expect(service.setActive).toHaveBeenCalledWith('org-1', 'bitly', undefined);
       expect(result).toEqual({ identifier: 'bitly', isActive: true });
     });
 
     it('passes explicit version to setActive', async () => {
-      mockSetActive.mockResolvedValue({ isActive: true });
+      const result = await controller.setActive(org, 'bitly', { version: 'v2' } as any);
 
-      const result = await controller.setActive(org, 'bitly', { version: 'v2' });
-
-      expect(mockSetActive).toHaveBeenCalledWith('org-1', 'bitly', 'v2');
+      expect(service.setActive).toHaveBeenCalledWith('org-1', 'bitly', 'v2');
       expect(result).toEqual({ identifier: 'bitly', isActive: true });
     });
 
     it('wraps service errors in BadRequestException', async () => {
-      mockSetActive.mockRejectedValue(new Error('Not configured'));
+      service.setActive.mockRejectedValue(new Error('Not configured'));
 
-      await expect(
-        controller.setActive(org, 'bitly', {}),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.setActive(org, 'bitly', {} as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -353,8 +242,10 @@ describe('OrgShortLinkSettingsController', () => {
   // POST /config/:identifier/test
   // ---------------------------------------------------------------------------
   describe('POST /config/:identifier/test', () => {
-    it('throws BadRequestException for unknown provider', async () => {
-      mockResolveShortLink.mockImplementation(() => { throw new Error('not found'); });
+    it('throws BadRequestException when the service rejects an unknown provider', async () => {
+      service.testConnection.mockImplementation(() => {
+        throw new BadRequestException('Unknown short-link provider');
+      });
 
       await expect(
         controller.testConnection(org, 'nonexistent', {} as any),
@@ -362,56 +253,54 @@ describe('OrgShortLinkSettingsController', () => {
     });
 
     it('validates inline credentials when provided in body', async () => {
-      const adapter = stubAdapter();
-      adapter.validateCredentials.mockResolvedValue({ ok: true });
-      mockResolveShortLink.mockReturnValue(adapter);
-
       const body = { credentials: { apiKey: 'direct-key' } };
       const result = await controller.testConnection(org, 'bitly', body as any);
 
-      expect(adapter.validateCredentials).toHaveBeenCalledWith({
-        orgId: 'org-1',
-        credentials: { apiKey: 'direct-key' },
-        customDomain: undefined,
-      });
+      expect(service.testConnection).toHaveBeenCalledWith(
+        'org-1',
+        'bitly',
+        { apiKey: 'direct-key' },
+        undefined,
+      );
       expect(result).toEqual({ ok: true });
     });
 
-    it('tests connection from stored config when no inline credentials', async () => {
-      mockResolveShortLink.mockReturnValue(stubAdapter());
-      mockTestConnection.mockResolvedValue({ ok: true });
+    it('wraps inline credential validation errors in HttpException', async () => {
+      service.testConnection.mockRejectedValue(new Error('Blocked URL'));
 
+      await expect(
+        controller.testConnection(org, 'bitly', { credentials: { apiKey: 'x' } } as any),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('tests connection from stored config when no inline credentials', async () => {
       const result = await controller.testConnection(org, 'bitly', {} as any);
 
-      expect(mockTestConnection).toHaveBeenCalledWith('org-1', 'bitly');
+      expect(service.testConnection).toHaveBeenCalledWith('org-1', 'bitly', undefined, undefined);
       expect(result).toEqual({ ok: true });
     });
 
     it('wraps stored-config test errors in HttpException', async () => {
-      mockResolveShortLink.mockReturnValue(stubAdapter());
-      mockTestConnection.mockRejectedValue(new Error('Connection failed'));
+      service.testConnection.mockRejectedValue(new Error('Connection failed'));
 
-      await expect(
-        controller.testConnection(org, 'bitly', {} as any),
-      ).rejects.toThrow(Error);
+      await expect(controller.testConnection(org, 'bitly', {} as any)).rejects.toThrow(
+        HttpException,
+      );
     });
 
     it('validates credentials with customDomain from body', async () => {
-      const adapter = stubAdapter();
-      adapter.validateCredentials.mockResolvedValue({ ok: true });
-      mockResolveShortLink.mockReturnValue(adapter);
-
       const body = {
         credentials: { apiKey: 'key' },
         customDomain: 'links.example.com',
       };
       await controller.testConnection(org, 'bitly', body as any);
 
-      expect(adapter.validateCredentials).toHaveBeenCalledWith({
-        orgId: 'org-1',
-        credentials: { apiKey: 'key' },
-        customDomain: 'links.example.com',
-      });
+      expect(service.testConnection).toHaveBeenCalledWith(
+        'org-1',
+        'bitly',
+        { apiKey: 'key' },
+        'links.example.com',
+      );
     });
   });
 
@@ -420,11 +309,9 @@ describe('OrgShortLinkSettingsController', () => {
   // ---------------------------------------------------------------------------
   describe('DELETE /config/:identifier', () => {
     it('deletes config and returns success', async () => {
-      mockDelete.mockResolvedValue({});
-
       const result = await controller.deleteConfig(org, 'bitly');
 
-      expect(mockDelete).toHaveBeenCalledWith('org-1', 'bitly');
+      expect(service.delete).toHaveBeenCalledWith('org-1', 'bitly');
       expect(result).toEqual({ success: true });
     });
   });
@@ -433,94 +320,31 @@ describe('OrgShortLinkSettingsController', () => {
   // POST /config/:identifier/oauth/url
   // ---------------------------------------------------------------------------
   describe('POST /config/:identifier/oauth/url', () => {
-    it('throws BadRequestException for unknown provider', async () => {
-      mockResolveShortLink.mockImplementation(() => { throw new Error('not found'); });
-
-      await expect(
-        controller.getOAuthUrl(org, 'nonexistent', { redirectUri: 'https://app.example.com/oauth/callback' } as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws BadRequestException when provider does not support OAuth', async () => {
-      const adapter = stubAdapter();
-      mockResolveShortLink.mockReturnValue(adapter);
-
-      await expect(
-        controller.getOAuthUrl(org, 'bitly', { redirectUri: 'https://app.example.com/oauth/callback' } as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws ForbiddenException for disallowed redirect URI', async () => {
-      const adapter = stubAdapter({
-        oauth: {
-          authorizeUrl: vi.fn(),
-          exchangeCode: vi.fn(),
-        },
-      });
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockIsAllowedReturnUrl.mockReturnValue(false);
-
-      await expect(
-        controller.getOAuthUrl(org, 'bitly', { redirectUri: 'https://evil.com/steal' } as any),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('returns OAuth URL and state for valid redirect URI', async () => {
-      mockGetConfigForProvider.mockResolvedValue(null);
-      mockRedisSet.mockResolvedValue('OK');
-      const adapter = stubAdapter({
-        oauth: {
-          authorizeUrl: vi.fn().mockReturnValue('https://bitly.com/oauth/authorize?client_id=abc'),
-          exchangeCode: vi.fn(),
-        },
-      });
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockIsAllowedReturnUrl.mockReturnValue(true);
+    it('resolves pinned version and delegates to the OAuth service', async () => {
+      service.getPinnedVersion.mockResolvedValue('v2');
 
       const result = await controller.getOAuthUrl(org, 'bitly', {
         redirectUri: 'https://app.example.com/oauth/callback',
       } as any);
 
-      expect(mockIsAllowedReturnUrl).toHaveBeenCalledWith('https://app.example.com/oauth/callback');
-      expect(mockGetConfigForProvider).toHaveBeenCalledWith('org-1', 'bitly');
-      expect(adapter.oauth!.authorizeUrl).toHaveBeenCalledWith(
-        { orgId: 'org-1', credentials: {}, extraConfig: undefined },
-        expect.any(String),
+      expect(service.getPinnedVersion).toHaveBeenCalledWith('org-1', 'bitly');
+      expect(oauth.getOAuthUrl).toHaveBeenCalledWith(
+        'org-1',
+        'bitly',
         'https://app.example.com/oauth/callback',
-        expect.any(String),
+        'v2',
       );
-      expect(result).toHaveProperty('url');
-      expect(result).toHaveProperty('state');
-      expect(typeof result.state).toBe('string');
-      expect(result.state.length).toBeGreaterThanOrEqual(32);
+      expect(result).toEqual({ url: 'https://oauth.example', state: 'state-123' });
     });
 
-    it('stores codeVerifier in Redis with proper TTL', async () => {
-      mockGetConfigForProvider.mockResolvedValue(null);
-      mockRedisSet.mockResolvedValue('OK');
-      const adapter = stubAdapter({
-        oauth: {
-          authorizeUrl: vi.fn().mockReturnValue('https://bitly.com/oauth/authorize'),
-          exchangeCode: vi.fn(),
-        },
-      });
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockIsAllowedReturnUrl.mockReturnValue(true);
+    it('propagates OAuth service errors', async () => {
+      oauth.getOAuthUrl.mockRejectedValue(new ForbiddenException('Invalid redirect URI'));
 
-      const result = await controller.getOAuthUrl(org, 'bitly', {
-        redirectUri: 'https://app.example.com/oauth/callback',
-      } as any);
-
-      expect(mockRedisSet).toHaveBeenCalledWith(
-        expect.stringMatching(/^shortlink:oauth:org-1:.+$/),
-        expect.any(String),
-        'EX',
-        600,
-      );
-      const stored = JSON.parse(mockRedisSet.mock.calls[0][1]);
-      expect(stored).toHaveProperty('codeVerifier');
-      expect(stored).toHaveProperty('redirectUri', 'https://app.example.com/oauth/callback');
-      expect(stored).toHaveProperty('identifier', 'bitly');
+      await expect(
+        controller.getOAuthUrl(org, 'bitly', {
+          redirectUri: 'https://evil.com/steal',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -528,134 +352,37 @@ describe('OrgShortLinkSettingsController', () => {
   // POST /config/:identifier/oauth/callback
   // ---------------------------------------------------------------------------
   describe('POST /config/:identifier/oauth/callback', () => {
-    it('throws BadRequestException for unknown provider', async () => {
-      mockResolveShortLink.mockImplementation(() => { throw new Error('not found'); });
-
-      await expect(
-        controller.oauthCallback(org, 'nonexistent', {
-          code: 'auth-code',
-          redirectUri: 'https://app.example.com/oauth/callback',
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws BadRequestException when provider does not support OAuth', async () => {
-      mockResolveShortLink.mockReturnValue(stubAdapter());
-
-      await expect(
-        controller.oauthCallback(org, 'bitly', {
-          code: 'auth-code',
-          redirectUri: 'https://app.example.com/oauth/callback',
-        } as any),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('throws ForbiddenException for disallowed redirect URI', async () => {
-      mockResolveShortLink.mockReturnValue(
-        stubAdapter({
-          oauth: { authorizeUrl: vi.fn(), exchangeCode: vi.fn() },
-        }),
-      );
-      mockIsAllowedReturnUrl.mockReturnValue(false);
-
-      await expect(
-        controller.oauthCallback(org, 'bitly', {
-          code: 'auth-code',
-          redirectUri: 'https://evil.com/steal',
-        } as any),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('throws ForbiddenException when OAuth state is missing from Redis', async () => {
-      mockGetConfigForProvider.mockResolvedValue(null);
-      mockRedisGet.mockResolvedValue(null);
-      mockIsAllowedReturnUrl.mockReturnValue(true);
-
-      await expect(
-        controller.oauthCallback(org, 'bitly', {
-          code: 'code123',
-          state: 'unknown-state',
-          redirectUri: 'https://app.example.com/oauth/callback',
-        } as any),
-      ).rejects.toThrow(ForbiddenException);
-
-      expect(mockRedisGet).toHaveBeenCalledWith('shortlink:oauth:org-1:unknown-state');
-      expect(mockRedisDel).toHaveBeenCalledWith('shortlink:oauth:org-1:unknown-state');
-    });
-
-    it('throws ForbiddenException when OAuth state identifier mismatches', async () => {
-      mockGetConfigForProvider.mockResolvedValue(null);
-      mockRedisGet.mockResolvedValue(JSON.stringify({
-        codeVerifier: 'test-verifier',
-        redirectUri: 'https://app.example.com/oauth/callback',
-        identifier: 'other-provider',
-      }));
-      mockIsAllowedReturnUrl.mockReturnValue(true);
-
-      await expect(
-        controller.oauthCallback(org, 'bitly', {
-          code: 'code123',
-          state: 'known-state',
-          redirectUri: 'https://app.example.com/oauth/callback',
-        } as any),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('throws ForbiddenException when redirectUri mismatches stored state', async () => {
-      mockGetConfigForProvider.mockResolvedValue(null);
-      mockRedisGet.mockResolvedValue(JSON.stringify({
-        codeVerifier: 'test-verifier',
-        redirectUri: 'https://app.example.com/oauth/callback',
-        identifier: 'bitly',
-      }));
-      mockIsAllowedReturnUrl.mockReturnValue(true);
-
-      await expect(
-        controller.oauthCallback(org, 'bitly', {
-          code: 'code123',
-          state: 'known-state',
-          redirectUri: 'https://different.example.com/callback',
-        } as any),
-      ).rejects.toThrow(ForbiddenException);
-    });
-
-    it('exchanges code with codeVerifier and upserts config', async () => {
-      const adapter = stubAdapter({
-        oauth: {
-          authorizeUrl: vi.fn(),
-          exchangeCode: vi.fn().mockResolvedValue({ accessToken: 'oauth-token' }),
-        },
-      });
-      mockGetConfigForProvider.mockResolvedValue(null);
-      mockRedisGet.mockResolvedValue(JSON.stringify({
-        codeVerifier: 'test-verifier',
-        redirectUri: 'https://app.example.com/oauth/callback',
-        identifier: 'bitly',
-      }));
-      mockResolveShortLink.mockReturnValue(adapter);
-      mockIsAllowedReturnUrl.mockReturnValue(true);
-      mockUpsert.mockResolvedValue({});
+    it('resolves pinned version and delegates to the OAuth service', async () => {
+      service.getPinnedVersion.mockResolvedValue('v2');
 
       const result = await controller.oauthCallback(org, 'bitly', {
-        code: 'auth-code-123',
-        state: 'known-state',
+        code: 'auth-code',
+        state: 'state-123',
         redirectUri: 'https://app.example.com/oauth/callback',
       } as any);
 
-      expect(mockRedisGet).toHaveBeenCalledWith('shortlink:oauth:org-1:known-state');
-      expect(mockRedisDel).toHaveBeenCalledWith('shortlink:oauth:org-1:known-state');
-      expect(adapter.oauth!.exchangeCode).toHaveBeenCalledWith(
-        'auth-code-123',
+      expect(service.getPinnedVersion).toHaveBeenCalledWith('org-1', 'bitly');
+      expect(oauth.oauthCallback).toHaveBeenCalledWith(
+        'org-1',
+        'bitly',
+        'auth-code',
+        'state-123',
         'https://app.example.com/oauth/callback',
-        { orgId: 'org-1', credentials: {}, extraConfig: undefined },
-        'test-verifier',
+        'v2',
       );
-      expect(mockUpsert).toHaveBeenCalledWith('org-1', 'bitly', {
-        enabled: true,
-        credentials: { accessToken: 'oauth-token' },
-        version: 'v1',
-      });
       expect(result).toEqual({ identifier: 'bitly', success: true });
+    });
+
+    it('propagates OAuth service errors', async () => {
+      oauth.oauthCallback.mockRejectedValue(new ForbiddenException('OAuth state mismatch'));
+
+      await expect(
+        controller.oauthCallback(org, 'bitly', {
+          code: 'auth-code',
+          state: 'state-123',
+          redirectUri: 'https://app.example.com/oauth/callback',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 });

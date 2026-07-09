@@ -20,9 +20,6 @@ function makeController(overrides: {
   getFolder?: any;
 } = {}) {
   const orgMedia = { upsert: vi.fn().mockResolvedValue({}) };
-  const defaultsSeed = { seedUnset: vi.fn().mockResolvedValue(undefined) };
-  const kernel = { listManifests: vi.fn().mockReturnValue([]) };
-  const resolution = { resolveMedia: vi.fn().mockReturnValue({ identifier: 'openai' }) };
   const storageService = {
     getProviderConfigs: vi
       .fn()
@@ -32,15 +29,30 @@ function makeController(overrides: {
     getFolder:
       overrides.getFolder ?? vi.fn().mockResolvedValue({ id: 'folder-1', organizationId: 'org-1' }),
   };
-  const controller = new MediaProviderController(
-    orgMedia as any,
-    defaultsSeed as any,
-    kernel as any,
-    resolution as any,
-    storageService as any,
-    fileService as any,
-  );
-  return { controller, orgMedia, storageService, fileService };
+  const orgMediaProviderSettings = {
+    setStorage: vi.fn(async (orgId: string, identifier: string, data: any) => {
+      const configs = await storageService.getProviderConfigs(orgId);
+      if (!configs.some((c: any) => c.id === data.storageProviderId)) {
+        throw new BadRequestException(
+          'storageProviderId does not belong to this organization',
+        );
+      }
+      if (data.storageRootFolderId) {
+        try {
+          await fileService.getFolder(orgId, data.storageRootFolderId);
+        } catch (err) {
+          if (!(err instanceof HttpException) || err.getStatus() !== 404) throw err;
+          throw new BadRequestException(
+            'storageRootFolderId does not belong to this organization',
+          );
+        }
+      }
+      await orgMedia.upsert(orgId, identifier, data);
+      return { identifier, success: true };
+    }),
+  };
+  const controller = new MediaProviderController(orgMediaProviderSettings as any);
+  return { controller, orgMedia, storageService, fileService, orgMediaProviderSettings };
 }
 
 // PROVIDER_REMEDIATION 3.6: validate storageProviderId + storageRootFolderId belong to

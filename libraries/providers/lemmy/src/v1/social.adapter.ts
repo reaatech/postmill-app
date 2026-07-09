@@ -16,8 +16,72 @@ import { LemmySettingsDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
+import net from 'node:net';
 
 import { metadata as providerMetadata } from './metadata';
+
+// S-11: validate callback service URL before interpolating it into API calls.
+function validateLemmyService(value: unknown): { ok: true; base: string } | { ok: false; error: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, error: 'Invalid service URL' };
+  }
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return { ok: false, error: 'Invalid service URL' };
+  }
+  if (url.protocol !== 'https:') {
+    return { ok: false, error: 'Service URL must use HTTPS' };
+  }
+  const hostname = url.hostname.toLowerCase();
+  if (!hostname || hostname === 'localhost') {
+    return { ok: false, error: 'Invalid hostname' };
+  }
+  // Reject literal private/loopback IPs. Public hostnames are still protected by
+  // the SSRF dispatcher at connect time.
+  if (net.isIP(hostname)) {
+    return { ok: false, error: 'IP addresses are not allowed' };
+  }
+  const base = url.toString().replace(/\/$/, '');
+  return { ok: true, base };
+}
+
+function assertLemmyBody(body: unknown): { service: string; identifier: string; password: string } {
+  if (!body || typeof body !== 'object') {
+    throw new Error('Invalid credentials');
+  }
+  const record = body as Record<string, unknown>;
+  if (
+    typeof record.service !== 'string' ||
+    typeof record.identifier !== 'string' ||
+    typeof record.password !== 'string' ||
+    !record.service.trim() ||
+    !record.identifier.trim() ||
+    !record.password.trim()
+  ) {
+    throw new Error('Invalid credentials');
+  }
+  const validation = validateLemmyService(record.service);
+  if ('error' in validation) {
+    throw new Error(validation.error);
+  }
+  return {
+    service: validation.base,
+    identifier: record.identifier,
+    password: record.password,
+  };
+}
+
+function parseLemmyCallback(token: string): { service: string; identifier: string; password: string } {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(token, 'base64').toString());
+  } catch {
+    throw new Error('Invalid credentials');
+  }
+  return assertLemmyBody(parsed);
+}
 export class LemmyProvider extends SocialAbstract implements SocialProvider {
   private readonly logger = new Logger(LemmyProvider.name);
   override maxConcurrentJob = 3; // Lemmy instances typically have moderate limits
@@ -97,7 +161,13 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
     codeVerifier: string;
     refresh?: string;
   }) {
-    const body = JSON.parse(Buffer.from(params.code, 'base64').toString());
+    let body: { service: string; identifier: string; password: string };
+    try {
+      body = parseLemmyCallback(params.code);
+    } catch (err) {
+      this.logger.warn('Lemmy callback validation failed');
+      return 'Invalid credentials';
+    }
 
     const load = await safeFetch(body.service + '/api/v3/user/login', {
       body: JSON.stringify({
@@ -144,9 +214,10 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
   }
 
   private async getJwtAndService(integration: Integration): Promise<{ jwt: string; service: string }> {
-    const body = JSON.parse(
+    const stored = JSON.parse(
       AuthService.fixedDecryption(integration.customInstanceDetails!)
     );
+    const body = assertLemmyBody(stored);
 
     const { jwt } = await (
       await safeFetch(body.service + '/api/v3/user/login', {

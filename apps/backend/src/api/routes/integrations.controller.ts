@@ -12,7 +12,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -29,7 +29,7 @@ import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/camp
 import { ConnectProviderDto } from '@gitroom/nestjs-libraries/dtos/integrations/connect-provider.dto';
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
-import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+
 import { UpdateProviderSettingsDto } from '@gitroom/nestjs-libraries/dtos/integrations/update-provider-settings.dto';
 import { ChannelIdBodyDto } from '@gitroom/nestjs-libraries/dtos/integrations/channel-id-body.dto';
 import { PlugActivationDto } from '@gitroom/nestjs-libraries/dtos/integrations/plug-activation.dto';
@@ -41,37 +41,26 @@ import { ParseCuidPipe } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
 import { MoltbookRegisterDto } from '@gitroom/nestjs-libraries/dtos/integrations/moltbook-register.dto';
 import { MoltbookStatusQueryDto } from '@gitroom/nestjs-libraries/dtos/integrations/moltbook-status-query.dto';
 
-import { timer } from '@gitroom/helpers/utils/timer';
+
 import { TelegramProvider } from '@gitroom/provider-telegram';
 import { MoltbookProvider } from '@gitroom/provider-moltbook';
 import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { uniqBy } from 'lodash';
+
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
 export class IntegrationsController {
-  private readonly _logger = new Logger(IntegrationsController.name);
   constructor(
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _postService: PostsService,
-    private _refreshIntegrationService: RefreshIntegrationService,
     private _campaignsService: CampaignsService
   ) {}
-
-  // Drop the cached integrations list after a mutation that changes it.
-  private async _invalidateIntegrationsList(orgId: string) {
-    try {
-      await ioRedis.del(`integrations:list:${orgId}`);
-    } catch {
-      /* redis down — the 60s TTL still bounds staleness */
-    }
-  }
 
   @Post('/provider/:id/connect')
   @RequirePermission('channels', 'create')
@@ -95,7 +84,7 @@ export class IntegrationsController {
       id,
       body
     );
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
     return result;
   }
 
@@ -121,7 +110,7 @@ export class IntegrationsController {
       id,
       body.group
     );
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
     return result;
   }
 
@@ -137,73 +126,13 @@ export class IntegrationsController {
       id,
       body.name
     );
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
     return result;
   }
 
   @Get('/list')
   async getIntegrationList(@GetOrgFromRequest() org: Organization) {
-    // Hit on every composer/calendar render — cache for 60s (non-blocking
-    // ioRedis get/set EX, never blocking commands; mutations below del the key).
-    const cacheKey = `integrations:list:${org.id}`;
-    try {
-      const cached = await ioRedis.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch {
-      /* cache miss / redis down — fall through to recompute */
-    }
-
-    const result = {
-      integrations: (await Promise.all(
-        (
-          await this._integrationService.getIntegrationsList(org.id)
-        ).map(async (p) => {
-          // Use the unchecked lookup so already-connected channels keep
-          // rendering even if an admin disabled the provider for new
-          // connections (the gated getSocialIntegration would throw here and
-          // take down the entire channel list for the org).
-          const findIntegration = this._integrationManager.getSocialIntegrationUnchecked(
-            p.providerIdentifier
-          );
-          if (!findIntegration) {
-            return null;
-          }
-          return {
-            name: p.name,
-            id: p.id,
-            internalId: p.internalId,
-            disabled: p.disabled,
-            editor: findIntegration.editor,
-            stripLinks: !!findIntegration?.stripLinks?.(),
-            picture: p.picture || '/no-picture.jpg',
-            identifier: p.providerIdentifier,
-            inBetweenSteps: p.inBetweenSteps,
-            refreshNeeded: p.refreshNeeded,
-            isCustomFields: !!findIntegration.customFields,
-            ...(findIntegration.customFields
-              ? { customFields: await findIntegration.customFields() }
-              : {}),
-            display: p.profile,
-            type: p.type,
-            time: JSON.parse(p.postingTimes),
-            changeProfilePicture: !!findIntegration?.changeProfilePicture,
-            changeNickName: !!findIntegration?.changeNickname,
-            customer: p.customer,
-            additionalSettings: p.additionalSettings || '[]',
-          };
-        })
-      )).filter(Boolean),
-    };
-
-    try {
-      await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', 60);
-    } catch {
-      /* redis down — serve uncached */
-    }
-
-    return result;
+    return this._integrationManager.getIntegrationListResponse(org.id);
   }
 
   @Post('/:id/settings')
@@ -218,7 +147,7 @@ export class IntegrationsController {
       id,
       body.additionalSettings
     );
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
   }
   @Post('/:id/nickname')
   @RequirePermission('channels', 'update')
@@ -260,11 +189,12 @@ export class IntegrationsController {
       : { name: '' };
 
     const result = await this._integrationService.updateNameAndUrl(
+      org.id,
       id,
       name,
       url
     );
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
     return result;
   }
 
@@ -296,62 +226,30 @@ export class IntegrationsController {
     }
 
     try {
-      const getExternalUrl = integrationProvider.externalUrl
-        ? {
-            ...(await integrationProvider.externalUrl(externalUrl)),
-            instanceUrl: externalUrl,
-          }
-        : undefined;
-
       const clientInformation = await this._integrationManager.requireClientInformation(
         integration,
         org.id,
         config || undefined
       );
 
-      const { codeVerifier, state, url } =
-        await integrationProvider.generateAuthUrl(clientInformation);
+      // Campaign-scoped connect/invite: verify ownership before trusting the id.
+      const validatedCampaign =
+        campaign && (await this._campaignsService.get(campaign, org.id))
+          ? campaign
+          : undefined;
 
-      // Bind the chosen named credential config to this connection so the callback
-      // (and later refresh/publish) use that config's own auth.
-      if (config) {
-        await ioRedis.set(`config:${state}`, config, 'EX', 3600);
+      if (redirectUrl && !isAllowedReturnUrl(redirectUrl)) {
+        throw new Error('Invalid redirect URL');
       }
 
-      if (refresh) {
-        await ioRedis.set(`refresh:${state}`, refresh, 'EX', 3600);
-      }
-
-      if (onboarding === 'true') {
-        await ioRedis.set(`onboarding:${state}`, 'true', 'EX', 3600);
-      }
-
-      // Campaign-scoped connect/invite: bind the campaign so the callback auto-tags
-      // the new channel onto it. Verify ownership before trusting the id.
-      if (campaign) {
-        const owned = await this._campaignsService.get(campaign, org.id);
-        if (owned) {
-          await ioRedis.set(`campaign:${state}`, campaign, 'EX', 3600);
-        }
-      }
-
-      if (redirectUrl) {
-        if (!isAllowedReturnUrl(redirectUrl)) {
-          throw new Error('Invalid redirect URL');
-        }
-        await ioRedis.set(`redirect:${state}`, redirectUrl, 'EX', 3600);
-      }
-
-      await ioRedis.set(`organization:${state}`, org.id, 'EX', 3600);
-      await ioRedis.set(`login:${state}`, codeVerifier, 'EX', 3600);
-      await ioRedis.set(
-        `external:${state}`,
-        JSON.stringify(getExternalUrl),
-        'EX',
-        3600
-      );
-
-      return { url };
+      return this._integrationManager.generateAuthUrl(integration, org.id, clientInformation, {
+        externalUrl,
+        configId: config || undefined,
+        refresh,
+        onboarding: onboarding === 'true',
+        campaign: validatedCampaign,
+        redirectUrl,
+      });
     } catch (err) {
       return { err: true };
     }
@@ -373,55 +271,11 @@ export class IntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
   ) {
-    const getIntegration = await this._integrationService.getIntegrationById(
+    return this._integrationService.getMentionsForQuery(
       org.id,
-      body.id
-    );
-    if (!getIntegration) {
-      throw new Error('Invalid integration');
-    }
-
-    let newList: any[] | { none: true } = [];
-    try {
-      newList = (await this.functionIntegration(org, body)) || [];
-    } catch (err) {
-      this._logger.warn((err as Error)?.message ?? String(err));
-    }
-
-    if (!Array.isArray(newList) && newList?.none) {
-      return newList;
-    }
-
-    const list = await this._integrationService.getMentions(
-      getIntegration.providerIdentifier,
+      body.id,
       body?.data?.query
     );
-
-    if (Array.isArray(newList) && newList.length) {
-      await this._integrationService.insertMentions(
-        getIntegration.providerIdentifier,
-        newList
-          .map((p: any) => ({
-            name: p.label || '',
-            username: p.id || '',
-            image: p.image || '',
-            doNotCache: p.doNotCache || false,
-          }))
-          .filter((f: any) => f.name && !f.doNotCache)
-      );
-    }
-
-    return uniqBy(
-      [
-        ...list.map((p) => ({
-          id: p.username,
-          image: p.image,
-          label: p.name,
-        })),
-        ...(newList as any[]),
-      ],
-      (p) => p.id
-    ).filter((f) => f.label && f.id);
   }
 
   @Post('/function')
@@ -430,72 +284,12 @@ export class IntegrationsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
   ): Promise<any> {
-    const getIntegration = await this._integrationService.getIntegrationById(
+    return this._integrationManager.callTool(
       org.id,
-      body.id
+      body.id,
+      body.name,
+      body.data
     );
-    if (!getIntegration) {
-      throw new Error('Invalid integration');
-    }
-
-    const integrationProvider = await this._integrationManager.getSocialIntegration(
-      getIntegration.providerIdentifier,
-      org.id
-    );
-    if (!integrationProvider) {
-      throw new Error('Invalid provider');
-    }
-
-    // POSTS-23/24: allow-list callable provider methods. Tool-decorated methods
-    // plus the non-tool `mention` helper are the only legitimate dynamic-dispatch
-    // targets for this route.
-    const tools = this._integrationManager.getAllTools();
-    const allowedMethods = new Set([
-      ...(tools[integrationProvider.identifier] || []).map((t) => t.methodName),
-      'mention',
-    ]);
-    if (!allowedMethods.has(body.name)) {
-      throw new BadRequestException(`Unknown provider function: ${body.name}`);
-    }
-
-    // @ts-ignore
-    if (integrationProvider[body.name]) {
-      try {
-        // @ts-ignore
-        const load = await integrationProvider[body.name](
-          getIntegration.token,
-          body.data,
-          getIntegration.internalId,
-          getIntegration
-        );
-
-        return load;
-      } catch (err) {
-        if (err instanceof RefreshToken) {
-          const data = await this._refreshIntegrationService.refresh(
-            getIntegration
-          );
-
-          if (!data) {
-            return;
-          }
-
-          const { accessToken } = data;
-
-          if (accessToken) {
-            if (integrationProvider.refreshWait) {
-              await timer(10000);
-            }
-            return this.functionIntegration(org, body);
-          }
-
-          return false;
-        }
-
-        return false;
-      }
-    }
-    throw new Error('Function not found');
   }
 
   @Post('/disable')
@@ -505,7 +299,7 @@ export class IntegrationsController {
     @Body() body: ChannelIdBodyDto
   ) {
     const result = await this._integrationService.disableChannel(org.id, body.id);
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
     return result;
   }
 
@@ -521,7 +315,7 @@ export class IntegrationsController {
       org?.subscription?.totalChannels || pricing.FREE.channel,
       body.id
     );
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
     return result;
   }
 
@@ -542,7 +336,7 @@ export class IntegrationsController {
     }
 
     const result = await this._integrationService.deleteChannel(org.id, body.id);
-    await this._invalidateIntegrationsList(org.id);
+    await this._integrationManager.invalidateIntegrationListCache(org.id);
     return result;
   }
 

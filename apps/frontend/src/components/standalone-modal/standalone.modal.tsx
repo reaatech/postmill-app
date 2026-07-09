@@ -14,14 +14,14 @@ export const StandaloneModal: FC = () => {
 
   const load = useCallback(async (path: string) => {
     return (await (await fetch(path)).json()).integrations;
-  }, []);
+  }, [fetch]);
 
   const loadDate = useCallback(async () => {
     if (params.platform === 'all') {
       return newDayjs().utc().format('YYYY-MM-DDTHH:mm:ss');
     }
     return (await (await fetch('/posts/find-slot')).json()).date;
-  }, []);
+  }, [fetch, params.platform]);
 
   const {
     isLoading,

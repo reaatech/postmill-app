@@ -66,7 +66,7 @@ export const SettingsModal: FC<{
     });
     modal.closeAll();
     onClose();
-  }, [values, integration]);
+  }, [values, integration, fetch, modal, onClose]);
   return (
     <div>
       <div className="mt-[16px]">

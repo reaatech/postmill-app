@@ -4,8 +4,6 @@ import {
   Controller,
   Delete,
   Get,
-  HttpException,
-  HttpStatus,
   Param,
   Post,
   Put,
@@ -16,10 +14,8 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
-import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { SetDefaultModelDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/default-model.dto';
-import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import {
   UpsertOrgAiConfigDto,
@@ -34,7 +30,6 @@ export class OrgAiSettingsController {
   constructor(
     private _orgAiSettings: OrgAiSettingsService,
     private _defaultsService: AiDefaultsService,
-    private _defaultsSeed: DefaultsSeedService,
   ) {}
 
   @Get('/providers')
@@ -56,25 +51,6 @@ export class OrgAiSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: UpsertOrgAiConfigDto,
   ) {
-    const adapter = this._defaultsService.resolveAdapter(identifier, body.version);
-    if (!adapter) throw new BadRequestException('Unknown provider');
-
-    // 3.2: validate a custom Base URL at CONFIG WRITE. The read primitive
-    // (listModels / validateCredentials) already routes through SafeFetchPort,
-    // but the model traffic POSTs to the org baseURL via the AI-SDK's global
-    // fetch — the same SSRF class one call deeper. Rejecting a private / non-HTTPS
-    // baseURL before it is persisted closes that at the source.
-    const baseURL = body.credentials?.baseURL;
-    if (
-      typeof baseURL === 'string' &&
-      baseURL.trim() &&
-      !(await isSafePublicHttpsUrl(baseURL))
-    ) {
-      throw new BadRequestException(
-        'Base URL must be a public HTTPS URL (private, loopback, and non-HTTPS hosts are not allowed)',
-      );
-    }
-
     await this._orgAiSettings.upsert(org.id, identifier, {
       // Configuring defaults to enabled; the kit's On/Off toggle PUTs an explicit
       // `{ enabled: false }` to disable without clearing credentials (mirrors the
@@ -86,12 +62,6 @@ export class OrgAiSettingsController {
       reasoningModel: body.reasoningModel,
       version: body.version,
     });
-
-    // Eagerly seed any unset model/media defaults now that a provider is available.
-    // Intentionally detached + non-fatal: seeding must never delay or fail the provider
-    // config response (the .catch swallows errors, which the seed service also logs).
-    this._defaultsSeed.seedUnset(org.id).catch(() => undefined);
-    this._defaultsService.bustDefaultsCatalogCache(org.id);
 
     return { identifier, success: true };
   }
@@ -105,11 +75,6 @@ export class OrgAiSettingsController {
   ) {
     try {
       const result = await this._orgAiSettings.setActive(org.id, identifier, body.version);
-
-      // Eagerly seed any unset model/media defaults now that the active provider changed.
-      this._defaultsSeed.seedUnset(org.id).catch(() => undefined);
-      this._defaultsService.bustDefaultsCatalogCache(org.id);
-
       return { identifier, isActive: result.isActive };
     } catch (err) {
       throw new BadRequestException((err as Error).message);
@@ -124,29 +89,11 @@ export class OrgAiSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: ProviderTestConnectionDto,
   ) {
-    const adapter = this._defaultsService.resolveAdapter(identifier);
-    if (!adapter) throw new BadRequestException('Unknown provider');
-
-    if (body.credentials) {
-      // 3.1: validateCredentials returns { ok:false } for a transport failure
-      // (typo'd Base URL → ENOTFOUND/etc.), but PROPAGATES an SSRF / URL-safety
-      // rejection (a private/non-public baseURL). Map that propagation to a 400
-      // so the candidate-credentials branch can never surface an unhandled 500.
-      try {
-        return await adapter.validateCredentials(body.credentials);
-      } catch (err) {
-        throw new BadRequestException((err as Error).message);
-      }
-    }
-
-    try {
-      return await this._orgAiSettings.testConnection(org.id, identifier);
-    } catch (err) {
-      throw new HttpException(
-        (err as Error).message,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return this._orgAiSettings.testConnection(
+      org.id,
+      identifier,
+      body.credentials,
+    );
   }
 
   @Delete('/config/:identifier')
@@ -156,7 +103,6 @@ export class OrgAiSettingsController {
     @Param('identifier') identifier: string,
   ) {
     await this._orgAiSettings.delete(org.id, identifier);
-    this._defaultsService.bustDefaultsCatalogCache(org.id);
     return { success: true };
   }
 

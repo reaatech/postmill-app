@@ -16,11 +16,6 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
-import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
-import {
-  ContentPackMeta,
-  manifestToContentPackMeta,
-} from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import {
@@ -34,36 +29,21 @@ import {
 export class ContentPackController {
   constructor(
     private _orgContentPackSettings: OrgContentPackSettingsService,
-    private _resolution: ProviderResolutionService
   ) {}
 
   @Get('/providers')
   @RequirePermission('media-config', 'manage')
   async listProviders() {
-    return this.#listMeta().map((meta) => ({
-      identifier: meta.identifier,
-      name: meta.name,
-      capabilities: meta.capabilities,
-      credentialFields: meta.credentialFields,
-    }));
+    return this._orgContentPackSettings.listProviderMetadata();
   }
 
   @Get('/config')
   @RequirePermission('media-config', 'manage')
   async getConfig(@GetOrgFromRequest() org: Organization) {
     const providers = await this._orgContentPackSettings.getProviders(org.id);
-    const active = await this._orgContentPackSettings.getActive(org.id);
-    // Never return decrypted credentials to the client.
-    const activeMeta = active ? this.#meta(active.identifier) : undefined;
-    const safeActive = active
-      ? {
-          identifier: active.identifier,
-          name: activeMeta?.name || active.identifier,
-          capabilities: activeMeta?.capabilities || [],
-        }
-      : null;
+    const active = await this._orgContentPackSettings.getActiveProviderMetadata(org.id);
     return {
-      active: safeActive,
+      active,
       providers,
     };
   }
@@ -75,7 +55,8 @@ export class ContentPackController {
     @Param('identifier') identifier: string,
     @Body() body: UpsertContentPackConfigDto
   ) {
-    if (!this.#meta(identifier)) {
+    const meta = this._orgContentPackSettings.getProviderMetadata(identifier);
+    if (!meta) {
       throw new BadRequestException('Unknown content pack provider');
     }
 
@@ -116,27 +97,21 @@ export class ContentPackController {
     @Param('identifier') identifier: string,
     @Body() body: ProviderTestConnectionDto
   ) {
-    const meta = this.#meta(identifier);
+    const meta = this._orgContentPackSettings.getProviderMetadata(identifier);
     if (!meta) {
       throw new BadRequestException('Unknown content pack provider');
     }
 
-    if (body.credentials?.apiKey) {
-      try {
-        const pack = this._resolution.resolveContentPack(identifier, {
-          credentials: body.credentials,
-          orgId: org.id,
-        });
-        const result = await pack.search(meta.capabilities[0], 'test', 1);
-        return { ok: true, message: 'Connection successful', result };
-      } catch (err) {
-        return { ok: false, message: (err as Error).message };
-      }
-    }
-
     try {
-      return await this._orgContentPackSettings.testConnection(org.id, identifier);
+      return await this._orgContentPackSettings.testConnection(
+        org.id,
+        identifier,
+        body.credentials?.apiKey ? body.credentials : undefined,
+      );
     } catch (err) {
+      if (err instanceof HttpException) {
+        throw err;
+      }
       throw new HttpException((err as Error).message, HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
@@ -149,15 +124,5 @@ export class ContentPackController {
   ) {
     await this._orgContentPackSettings.delete(org.id, identifier);
     return { success: true };
-  }
-
-  #listMeta(): ContentPackMeta[] {
-    return this._resolution
-      .listManifests('contentpack')
-      .map(manifestToContentPackMeta);
-  }
-
-  #meta(identifier: string): ContentPackMeta | undefined {
-    return this.#listMeta().find((m) => m.identifier === identifier);
   }
 }

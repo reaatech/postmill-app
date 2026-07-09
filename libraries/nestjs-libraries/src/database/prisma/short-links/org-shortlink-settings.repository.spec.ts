@@ -124,7 +124,7 @@ describe('OrgShortLinkSettingsRepository', () => {
       });
     });
 
-    it('updates existing entry when found', async () => {
+    it('updates existing entry when found scoped by org', async () => {
       const existing = { id: 'c1', organizationId: orgId, identifier };
       const data = { enabled: true, credentials: 'encrypted' };
       config.model.orgShortLinkConfig.findFirst.mockResolvedValue(existing);
@@ -133,7 +133,7 @@ describe('OrgShortLinkSettingsRepository', () => {
       await repo.upsert(orgId, identifier, data);
 
       expect(config.model.orgShortLinkConfig.update).toHaveBeenCalledWith({
-        where: { id: 'c1' },
+        where: { id: 'c1', organizationId: orgId },
         data,
       });
     });

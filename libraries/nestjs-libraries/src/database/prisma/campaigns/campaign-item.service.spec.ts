@@ -6,6 +6,7 @@ function makeService(overrides: any = {}) {
   const items = {
     tag: vi.fn().mockResolvedValue({}),
     setPostCampaign: vi.fn().mockResolvedValue({}),
+    copyAllToCampaign: vi.fn().mockResolvedValue(0),
     deleteExpired: vi.fn().mockResolvedValue({ count: 0 }),
     ...overrides.items,
   };
@@ -85,5 +86,37 @@ describe('CampaignTagService.tagItem', () => {
       expect(items.deleteExpired).toHaveBeenCalledWith(30, expect.any(Date));
       expect(result).toEqual({ deleted: 5 });
     });
+  });
+});
+
+
+describe('CampaignTagService.copyTags', () => {
+  it('verifies target campaign ownership before copying', async () => {
+    const { service, items, campaigns } = makeService({
+      campaigns: {
+        findById: vi.fn().mockImplementation((id: string) =>
+          id === 'target' ? { id: 'target', organizationId: 'org1', name: 'Target' } : null
+        ),
+      },
+    });
+
+    const result = await service.copyTags('org1', 'source', 'target', 'u1');
+
+    expect(campaigns.findById).toHaveBeenCalledWith('target', 'org1');
+    expect(items.copyAllToCampaign).toHaveBeenCalledWith('source', 'target', 'org1', 'u1');
+    expect(result).toBe(0);
+  });
+
+  it('rejects copying to a campaign owned by another org', async () => {
+    const { service, items } = makeService({
+      campaigns: {
+        findById: vi.fn().mockResolvedValue(null),
+      },
+    });
+
+    await expect(service.copyTags('org1', 'source', 'foreign-target', 'u1')).rejects.toBeInstanceOf(
+      NotFoundException
+    );
+    expect(items.copyAllToCampaign).not.toHaveBeenCalled();
   });
 });

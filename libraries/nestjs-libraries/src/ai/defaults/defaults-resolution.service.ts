@@ -1,5 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { OrgDefaultModelRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-default-model.repository';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
@@ -34,6 +33,7 @@ export class DefaultsResolutionService {
 
   constructor(
     private _repository: OrgDefaultModelRepository,
+    @Inject(forwardRef(() => OrgAiSettingsService))
     private _orgAiSettings: OrgAiSettingsService,
     private _orgMediaSettings: OrgMediaProviderSettingsService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
@@ -49,18 +49,35 @@ export class DefaultsResolutionService {
     const candidates = await this._candidates(domain, category, orgId);
 
     // 1) Stored row wins if the provider is still enabled and the stored model
-    // still exists in the provider's *currently configured* version catalog.
-    // The stored version is provenance only; we follow the org's current version.
+    // still exists in the provider's catalog. The stored version is honored (v4
+    // provider-framework pinning); if it is retired/unknown we fall back to the
+    // latest active version and mark the default source: 'auto' so the UI can
+    // prompt for re-selection.
     if (row) {
       const candidate = candidates.find((c) => c.providerId === row.providerId);
-      if (candidate && (await this._modelExists(candidate, row.model, category, orgId))) {
-        return {
-          providerId: row.providerId,
-          version: candidate.version,
-          model: row.model ?? undefined,
-          settings: row.settings ? this._parseJson(row.settings) : undefined,
-          source: 'stored',
-        };
+      if (candidate) {
+        const storedVersion = row.version ?? candidate.version;
+        let resolvedVersion = storedVersion;
+        let source: ResolvedDefault['source'] = 'stored';
+
+        const storedMod = this._kernel.get(domain, row.providerId, storedVersion);
+        if (!storedMod || storedMod.manifest?.status === 'retired') {
+          resolvedVersion =
+            this._kernel.latestActive(domain, row.providerId)?.manifest.version ??
+            candidate.version;
+          source = 'auto';
+        }
+
+        const resolvedCandidate = { ...candidate, version: resolvedVersion };
+        if (await this._modelExists(resolvedCandidate, row.model, category, orgId)) {
+          return {
+            providerId: row.providerId,
+            version: resolvedVersion,
+            model: row.model ?? undefined,
+            settings: row.settings ? this._parseJson(row.settings) : undefined,
+            source,
+          };
+        }
       }
     }
 

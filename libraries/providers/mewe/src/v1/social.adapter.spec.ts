@@ -134,12 +134,12 @@ describe('MeweProvider authenticate / post / upload SSRF guard (B-02)', () => {
 
   it('rejects an HTTP instanceUrl during authentication', async () => {
     const provider = new MeweProvider();
-    const result = await provider.authenticate(
-      { code: 'code', codeVerifier: 'verifier' },
-      makeClientInfo({ instanceUrl: 'http://internal.local' })
-    );
-
-    expect(result).toBe('Invalid MeWe instance URL: only HTTPS is allowed.');
+    await expect(
+      provider.authenticate(
+        { code: 'code', codeVerifier: 'verifier' },
+        makeClientInfo({ instanceUrl: 'http://internal.local' })
+      )
+    ).rejects.toThrow('Invalid MeWe instance URL:');
   });
 
   it('routes authentication calls through this.fetch()', async () => {
@@ -197,6 +197,34 @@ describe('MeweProvider authenticate / post / upload SSRF guard (B-02)', () => {
     );
     expect(fetchSpy).toHaveBeenCalledWith(
       'https://mewe.com/api/dev/me/post',
+      expect.objectContaining({ method: 'POST' }),
+      'mewe-post'
+    );
+  });
+
+  it('URL-encodes the group id when posting to a group', async () => {
+    const provider = new MeweProvider();
+    const fetchSpy = vi.spyOn(provider as any, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: 'photo-1' }),
+    } as any);
+
+    await provider.post(
+      'id',
+      'access-token',
+      [
+        {
+          message: 'hello',
+          settings: { postType: 'group', group: 'group/with slash' },
+          media: [],
+        } as any,
+      ],
+      { organizationId: 'org-1', id: 'int-1' } as any,
+      makeClientInfo()
+    );
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://mewe.com/api/dev/group/group%2Fwith%20slash/post',
       expect.objectContaining({ method: 'POST' }),
       'mewe-post'
     );

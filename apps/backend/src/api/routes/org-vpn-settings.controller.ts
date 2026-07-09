@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -44,13 +43,6 @@ export class OrgVpnSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: UpsertVpnConfigDto,
   ) {
-    if (
-      body.regions !== undefined &&
-      (!Array.isArray(body.regions) ||
-        body.regions.some((r) => typeof r !== 'string'))
-    ) {
-      throw new BadRequestException('regions must be an array of strings');
-    }
     await this._orgVpnConfig.upsert(org.id, identifier, body);
     return { identifier, success: true };
   }

@@ -40,6 +40,20 @@ describe('AnalyticsShareService (7.6)', () => {
     expect(first.token).not.toBe(second.token);
   });
 
+  it('mintShare rejects unknown config keys', async () => {
+    await expect(
+      service.mintShare('org-1', { rangePreset: '7d', badKey: true } as any),
+    ).rejects.toThrow();
+    expect(repo.upsertShare).not.toHaveBeenCalled();
+  });
+
+  it('mintShare rejects invalid rangePreset values', async () => {
+    await expect(
+      service.mintShare('org-1', { rangePreset: '1y' } as any),
+    ).rejects.toThrow();
+    expect(repo.upsertShare).not.toHaveBeenCalled();
+  });
+
   it('buildPublicReport returns null for an unknown token', async () => {
     repo.getShareByToken.mockResolvedValue(null);
     expect(await service.buildPublicReport('nope')).toBeNull();

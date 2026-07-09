@@ -15,6 +15,7 @@ import { AnalyticsDetailService } from '@gitroom/nestjs-libraries/analytics/anal
 import { AnalyticsInsightsService } from '@gitroom/nestjs-libraries/analytics/analytics-insights.service';
 import { AnalyticsExportService } from '@gitroom/nestjs-libraries/analytics/analytics-export.service';
 import { AnalyticsShareService } from '@gitroom/nestjs-libraries/analytics/analytics-share.service';
+import { MediaStreamService } from '@gitroom/nestjs-libraries/media/stream/media-stream.service';
 import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { IntegrationsController } from '@gitroom/backend/api/routes/integrations.controller';
@@ -201,6 +202,7 @@ const authenticatedController = [
     SessionCleanupService,
     HealthService,
     AiDesignerGateway,
+    MediaStreamService,
   ],
   get exports() {
     return [...this.imports, ...this.providers];

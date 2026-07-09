@@ -235,30 +235,59 @@ export const Designer: FC<DesignerProps> = ({
   const brandFonts = useBrandFonts();
   const storeRef = useRef<ReturnType<typeof createDesignerStore> | null>(null);
 
+  // Destructure to keep dependency arrays primitive and avoid stale closures
+  // when the parent passes a new object reference for the same asset.
+  const {
+    url: initialAssetUrl,
+    source: initialAssetSource,
+    downloadLocation: initialAssetDownloadLocation,
+    author: initialAssetAuthor,
+    authorUrl: initialAssetAuthorUrl,
+    width: initialAssetWidth,
+    height: initialAssetHeight,
+  } = initialAsset || {};
+  const {
+    width: captionWidth,
+    height: captionHeight,
+  } = initialCaptionVideo || {};
+
   const store = useMemo(() => {
     let w = width || 1080;
     let h = height || 1080;
-    if (initialAsset?.width && initialAsset?.height) {
-      w = initialAsset.width;
-      h = initialAsset.height;
+    if (initialAssetWidth && initialAssetHeight) {
+      w = initialAssetWidth;
+      h = initialAssetHeight;
     }
-    if (initialCaptionVideo?.width && initialCaptionVideo?.height) {
-      w = initialCaptionVideo.width;
-      h = initialCaptionVideo.height;
+    if (captionWidth && captionHeight) {
+      w = captionWidth;
+      h = captionHeight;
     }
-    const attribution: DesignerAttribution | undefined = initialAsset?.url
+    const attribution: DesignerAttribution | undefined = initialAssetUrl
       ? {
-          source: initialAsset.source,
-          url: initialAsset.url,
-          downloadLocation: initialAsset.downloadLocation,
-          author: initialAsset.author,
-          authorUrl: initialAsset.authorUrl,
+          source: initialAssetSource,
+          url: initialAssetUrl,
+          downloadLocation: initialAssetDownloadLocation,
+          author: initialAssetAuthor,
+          authorUrl: initialAssetAuthorUrl,
         }
       : undefined;
     const s = createDesignerStore(w, h, attribution, fetch);
     storeRef.current = s;
     return s;
-  }, []);
+  }, [
+    width,
+    height,
+    initialAssetUrl,
+    initialAssetSource,
+    initialAssetDownloadLocation,
+    initialAssetAuthor,
+    initialAssetAuthorUrl,
+    initialAssetWidth,
+    initialAssetHeight,
+    captionWidth,
+    captionHeight,
+    fetch,
+  ]);
 
   const designName = store((s) => s.designName);
   const currentDesignId = store((s) => s.designId);
@@ -283,7 +312,7 @@ export const Designer: FC<DesignerProps> = ({
   // render, tearing down and rebuilding the socket + Y.Doc on every keystroke/drag.
   const onRemoteDoc = useCallback((remoteDoc: any) => {
     store.getState().setDoc(migrateDoc(remoteDoc));
-  }, []);
+  }, [store]);
   const onConnectedChange = useCallback((count: number) => {
     setConnectedCount(count);
   }, []);
@@ -308,11 +337,12 @@ export const Designer: FC<DesignerProps> = ({
     onPeerTimeline,
     onPeerImage,
   });
+  const { sendUpdate } = collabData;
 
   useEffect(() => {
     if (!collabEnabled || !currentDesignId) return;
-    collabData.sendUpdate(doc);
-  }, [doc, collabEnabled, currentDesignId, collabData.sendUpdate]);
+    sendUpdate(doc);
+  }, [doc, collabEnabled, currentDesignId, sendUpdate]);
 
   // Let the canvas image loader use the authenticated proxy for cross-origin
   // hosts (stock images) that don't send CORS headers (otherwise blank canvas).
@@ -374,7 +404,7 @@ export const Designer: FC<DesignerProps> = ({
         })
         .catch(() => {});
     }
-  }, [designId]);
+  }, [designId, fetch, store]);
 
   const [debouncedDoc] = useDebounce(doc, 2000);
 

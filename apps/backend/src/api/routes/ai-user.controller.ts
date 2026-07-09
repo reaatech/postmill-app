@@ -45,11 +45,40 @@ class UpsertBrandProfileDto {
   language?: string;
 
   @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  slug?: string;
+
+  @IsOptional()
   @IsBoolean()
   enabled?: boolean;
 
   @IsOptional()
   platformInstructions?: Record<string, string>;
+
+  @IsOptional()
+  languageProfiles?: Record<string, { instructions?: string; overrides?: Record<string, string> }>;
+
+  @IsOptional()
+  logoFileIds?: string[];
+
+  @IsOptional()
+  palette?: Array<{ name?: string; hex?: string }>;
+
+  @IsOptional()
+  fontFamilies?: Array<{ name?: string; fallback?: string }>;
+
+  @IsOptional()
+  customFonts?: Array<{ fileId: string; family?: string }>;
+
+  @IsOptional()
+  enforcement?: Record<string, unknown>;
+
+  @IsOptional()
+  assets?: Array<{ fileId: string; url?: string; caption?: string }>;
 }
 
 class ComplianceCheckDto {

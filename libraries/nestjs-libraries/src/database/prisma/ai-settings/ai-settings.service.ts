@@ -6,6 +6,10 @@ import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.inte
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/provider-kernel.token';
 import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
+import {
+  UpsertBrandProfileData,
+  validateBrandProfileData,
+} from './brand-profile.schema';
 
 @Injectable()
 export class AiSettingsService {
@@ -485,11 +489,12 @@ export class AiSettingsService {
     return this._repository.getBrandProfile(organizationId, brandId);
   }
 
-  upsertBrandProfile(
-    organizationId: string,
-    data: { instructions?: string; language?: string; enabled?: boolean; platformInstructions?: Record<string, string> },
-  ) {
-    return this._repository.upsertBrandProfile(organizationId, data);
+  async upsertBrandProfile(organizationId: string, data: unknown) {
+    const validated = validateBrandProfileData(data);
+    return this._repository.upsertBrandProfile(
+      organizationId,
+      validated as UpsertBrandProfileData,
+    );
   }
 
   // ── AIPromptTemplate ──

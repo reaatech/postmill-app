@@ -51,7 +51,12 @@ const mockPorts = (): void =>
 describe('TiktokProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('FRONTEND_URL', 'https://app.example.com');
     mockPorts();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   describe('POLL-01: publish-status polling is bounded', () => {

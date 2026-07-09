@@ -30,10 +30,14 @@ export class OrgVpnConfigRepository {
   ) {
     const existing = await this.getByIdentifier(orgId, identifier);
     if (existing) {
-      return this._prisma.orgVpnConfig.update({
-        where: { id: existing.id },
+      const { count } = await this._prisma.orgVpnConfig.updateMany({
+        where: { id: existing.id, organizationId: orgId },
         data,
       });
+      if (count === 0) {
+        return null;
+      }
+      return this.getByIdentifier(orgId, identifier);
     }
     return this._prisma.orgVpnConfig.create({
       data: { organizationId: orgId, identifier, version, ...data },

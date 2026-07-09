@@ -8,5 +8,12 @@
     "@gitroom/provider-kernel": "workspace:*",
     "@sendgrid/mail": "8.0.0",
     "@sendgrid/eventwebhook": "8.0.0"
+  },
+  "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=22.12.0 <23.0.0"
+  },
+  "scripts": {
+    "test": "vitest run"
   }
 }

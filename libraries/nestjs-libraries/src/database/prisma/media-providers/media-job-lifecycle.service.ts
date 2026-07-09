@@ -541,11 +541,11 @@ export class MediaJobLifecycleService {
 
   // ── Polling sweep entrypoint (Temporal activity) ──
 
-  async processPendingJobs(limit = 100): Promise<{ processed: number; completed: number; failed: number }> {
-    // §3.1 crash-recovery: recover jobs stranded mid-completion (stuck in `landing`) before
-    // the sweep runs, so the reclaimed rows are re-driven in this same pass. The cutoff is
-    // far beyond the worst-case completeJob (bounded download + storage write), so a job on
-    // the normal fast path is never reclaimed.
+  // §3.1 crash-recovery: recover jobs stranded mid-completion (stuck in `landing`) before
+  // the sweep runs, so the reclaimed rows are re-driven in this same pass. The cutoff is
+  // far beyond the worst-case completeJob (bounded download + storage write), so a job on
+  // the normal fast path is never reclaimed.
+  async reclaimStaleLandingJobs(): Promise<number> {
     try {
       const reclaimed = await this._aiSettings.reclaimStaleLandingJobs(
         new Date(Date.now() - LANDING_STALE_MS),
@@ -553,9 +553,15 @@ export class MediaJobLifecycleService {
       if (reclaimed > 0) {
         this._logger.warn(`Reclaimed ${reclaimed} media job(s) stranded in 'landing'`);
       }
+      return reclaimed;
     } catch (err) {
       this._logger.warn(`Stale-landing reclaim failed: ${(err as Error).message}`);
+      return 0;
     }
+  }
+
+  async processPendingJobs(limit = 100): Promise<{ processed: number; completed: number; failed: number }> {
+    await this.reclaimStaleLandingJobs();
 
     const jobs = await this._aiSettings.getPendingMediaJobs(limit);
     let completed = 0;

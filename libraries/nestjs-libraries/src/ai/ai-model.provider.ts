@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import * as Sentry from '@sentry/nestjs';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import {
@@ -156,7 +156,7 @@ export class AIModelProvider {
   private async _credentialsForProvider(
     orgId: string,
     providerId: string,
-    version = 'v1',
+    version?: string,
   ): Promise<Record<string, string> | null> {
     const config = await this._orgAiSettings.getByIdentifier(orgId, providerId, version);
     return config?.credentials ?? null;
@@ -437,6 +437,19 @@ export class AIModelProvider {
     );
   }
 
+  async governedLanguageModel(
+    scope: AIScope,
+    orgId?: string,
+    options?: ReasoningOptions,
+  ): Promise<LanguageModel> {
+    const raw = await this.languageModel(scope, orgId, options);
+    const config = await this.resolveConfigForScope(scope, orgId);
+    if (!config) {
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
+    }
+    return this._wrapModelWithGovernance(raw, config, scope, orgId);
+  }
+
   async langchainModel(scope: AIScope, orgId?: string, options?: ReasoningOptions): Promise<BaseChatModel> {
     return this._withFallback(
       async (config) => {
@@ -626,6 +639,22 @@ export class AIModelProvider {
       .filter((p: any) => p?.type === 'text' && typeof p.text === 'string')
       .map((p: any) => p.text)
       .join('');
+  }
+
+  private _extractInputText(args: { prompt?: string; messages?: any[] }): string {
+    if (args.prompt) return args.prompt;
+    if (!args.messages) return '';
+    return args.messages
+      .map((m: any) => {
+        if (typeof m.content === 'string') return m.content;
+        if (Array.isArray(m.content)) {
+          return m.content
+            .map((c: any) => (typeof c.text === 'string' ? c.text : ''))
+            .join('');
+        }
+        return '';
+      })
+      .join('\n');
   }
 
   private async _recordUsage(args: {
@@ -898,7 +927,11 @@ export class AIModelProvider {
       throw new Error(`AI provider adapter "${providerId}" is not registered.`);
     }
 
-    const effectiveModel = modelId || adapter.defaultModelId || 'gpt-4.1';
+    if (!modelId || modelId.trim().length === 0) {
+      throw new BadRequestException('modelId is required');
+    }
+
+    const effectiveModel = modelId;
 
     return this._telemetry.startSpan(
       'ai.generateTextWithModel',
@@ -912,13 +945,16 @@ export class AIModelProvider {
           throw new BudgetExceeded(check.reason ?? 'AI budget exceeded', 'utility', orgId);
         }
 
+        const rawInput = this._extractInputText(args);
+        const checkedInput = await this._guardrails.checkInput(rawInput, { orgId });
+
         const model = adapter.createLanguageModel(creds, effectiveModel, {
           temperature: args.temperature,
         });
 
         let promptPayload = args.messages;
         if (!promptPayload) {
-          const content: any[] = [{ type: 'text', text: args.prompt || '' }];
+          const content: any[] = [{ type: 'text', text: checkedInput }];
           if (args.imageUrl) {
             content.push({ type: 'image', image: args.imageUrl });
           }
@@ -961,7 +997,11 @@ export class AIModelProvider {
       throw new Error(`AI provider adapter "${providerId}" is not registered.`);
     }
 
-    const effectiveModel = modelId || adapter.defaultModelId || 'gpt-4.1';
+    if (!modelId || modelId.trim().length === 0) {
+      throw new BadRequestException('modelId is required');
+    }
+
+    const effectiveModel = modelId;
 
     return this._telemetry.startSpan(
       'ai.generateObjectWithModel',
@@ -975,11 +1015,14 @@ export class AIModelProvider {
           throw new BudgetExceeded(check.reason ?? 'AI budget exceeded', 'utility', orgId);
         }
 
+        const rawInput = this._extractInputText(args);
+        const checkedInput = await this._guardrails.checkInput(rawInput, { orgId });
+
         const model = adapter.createLanguageModel(creds, effectiveModel, {
           temperature: args.temperature,
         });
 
-        const promptPayload = args.messages || [{ role: 'user', content: args.prompt || '' }];
+        const promptPayload = args.messages || [{ role: 'user', content: checkedInput }];
         const result = await (model as any).doGenerate({
           prompt: promptPayload,
           responseFormat: { type: 'json' },
@@ -1017,6 +1060,152 @@ export class AIModelProvider {
     } catch {
       throw new Error(AI_NOT_CONFIGURED_MESSAGE);
     }
+  }
+
+  private _guardPrompt(prompt: any, orgId?: string): any {
+    if (!prompt) return prompt;
+
+    const guardText = (text: string) => this._guardrails.checkInput(text, { orgId });
+
+    if (typeof prompt === 'string') {
+      return guardText(prompt);
+    }
+
+    if (Array.isArray(prompt)) {
+      return Promise.all(
+        prompt.map(async (message: any) => {
+          if (!message || typeof message !== 'object') return message;
+          const cloned = { ...message };
+          if (typeof cloned.content === 'string') {
+            cloned.content = await guardText(cloned.content);
+          } else if (Array.isArray(cloned.content)) {
+            cloned.content = await Promise.all(
+              cloned.content.map(async (part: any) => {
+                if (part && typeof part === 'object' && typeof part.text === 'string') {
+                  return { ...part, text: await guardText(part.text) };
+                }
+                return part;
+              }),
+            );
+          }
+          return cloned;
+        }),
+      );
+    }
+
+    return prompt;
+  }
+
+  private _applyOutputGuardrails(result: any, orgId?: string): any {
+    if (!result) return result;
+    const outputText = this._extractText(result);
+    if (!outputText) return result;
+    return this._guardrails.checkOutput(outputText, { orgId }).then((checkedOutput: string) => {
+      if (checkedOutput === outputText) return result;
+      const updated = { ...result };
+      if (Array.isArray(updated.content)) {
+        let applied = false;
+        updated.content = updated.content.map((part: any) => {
+          if (part && typeof part === 'object' && typeof part.text === 'string') {
+            if (!applied) {
+              applied = true;
+              return { ...part, text: checkedOutput };
+            }
+            return { ...part, text: '' };
+          }
+          return part;
+        });
+      }
+      if (typeof updated.text === 'string') {
+        updated.text = checkedOutput;
+      }
+      return updated;
+    });
+  }
+
+  private _wrapModelWithGovernance(
+    raw: LanguageModel,
+    config: ResolvedConfig,
+    scope: AIScope,
+    orgId?: string,
+  ): LanguageModel {
+    const guardAndGenerate = async (opts: any) => {
+      const budgetCheck = await this._budget.checkBudget(scope, orgId);
+      if (!budgetCheck.allowed) {
+        throw new BudgetExceeded(budgetCheck.reason || 'Budget exceeded', scope, orgId);
+      }
+
+      const guardedPrompt = await this._guardPrompt(opts?.prompt, orgId);
+
+      return this._telemetry.startSpan(
+        'ai.governed.doGenerate',
+        async (span) => {
+          span.setAttribute(TelemetryService.ATTR_GEN_AI_SYSTEM, config.providerId);
+          span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, config.modelId);
+          if (orgId) span.setAttribute('ai.organizationId', orgId);
+
+          const result = await (raw as any).doGenerate({ ...opts, prompt: guardedPrompt });
+          const guardedResult = await this._applyOutputGuardrails(result, orgId);
+          this._health.recordSuccess(config.providerId);
+          await this._recordUsage({
+            usage: guardedResult.usage,
+            span,
+            orgId,
+            providerId: config.providerId,
+            modelId: config.modelId,
+            scope,
+          });
+          return guardedResult;
+        },
+        { 'ai.scope': scope },
+      );
+    };
+
+    const guardAndStream = async (opts: any) => {
+      const budgetCheck = await this._budget.checkBudget(scope, orgId);
+      if (!budgetCheck.allowed) {
+        throw new BudgetExceeded(budgetCheck.reason || 'Budget exceeded', scope, orgId);
+      }
+
+      const guardedPrompt = await this._guardPrompt(opts?.prompt, orgId);
+
+      return this._telemetry.startSpan(
+        'ai.governed.doStream',
+        async (span) => {
+          span.setAttribute(TelemetryService.ATTR_GEN_AI_SYSTEM, config.providerId);
+          span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, config.modelId);
+          if (orgId) span.setAttribute('ai.organizationId', orgId);
+
+          const response = await (raw as any).doStream({ ...opts, prompt: guardedPrompt });
+          const originalConsume = response?.consumeStream?.bind(response);
+          if (originalConsume) {
+            response.consumeStream = async () => {
+              const consumed = await originalConsume();
+              this._health.recordSuccess(config.providerId);
+              await this._recordUsage({
+                usage: consumed?.usage,
+                span,
+                orgId,
+                providerId: config.providerId,
+                modelId: config.modelId,
+                scope,
+              });
+              return consumed;
+            };
+          }
+          return response;
+        },
+        { 'ai.scope': scope },
+      );
+    };
+
+    return new Proxy(raw as object, {
+      get(target, prop) {
+        if (prop === 'doGenerate') return guardAndGenerate;
+        if (prop === 'doStream') return guardAndStream;
+        return (target as any)[prop];
+      },
+    }) as LanguageModel;
   }
 
   async resolveProviderRef(

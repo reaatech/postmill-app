@@ -177,39 +177,47 @@ describe('StorageRepository', () => {
   });
 
   describe('removeOrDetachMountFolders', () => {
-    it('deletes empty mount folders in one batch', async () => {
+    it('deletes empty mount folders in one batch scoped to org', async () => {
       mockModel.fileFolder.findMany.mockResolvedValue([
         {
           id: 'folder-1',
           storageProviderId: 'provider-1',
+          organizationId: 'org-1',
           _count: { files: 0, children: 0 },
         },
         {
           id: 'folder-2',
           storageProviderId: 'provider-1',
+          organizationId: 'org-1',
           _count: { files: 0, children: 0 },
         },
       ]);
       mockModel.fileFolder.deleteMany = vi.fn().mockResolvedValue({ count: 2 });
       const repo = makeRepo();
 
-      await repo.removeOrDetachMountFolders('provider-1');
+      await repo.removeOrDetachMountFolders('org-1', 'provider-1');
 
+      expect(mockModel.fileFolder.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org-1', storageProviderId: 'provider-1' },
+        include: { _count: { select: { files: true, children: true } } },
+      });
       expect(mockModel.fileFolder.deleteMany).toHaveBeenCalledWith({
-        where: { id: { in: ['folder-1', 'folder-2'] } },
+        where: { id: { in: ['folder-1', 'folder-2'] }, organizationId: 'org-1' },
       });
     });
 
-    it('detaches non-empty folders in one batch instead of deleting', async () => {
+    it('detaches non-empty folders in one batch instead of deleting scoped to org', async () => {
       mockModel.fileFolder.findMany.mockResolvedValue([
         {
           id: 'folder-1',
           storageProviderId: 'provider-1',
+          organizationId: 'org-1',
           _count: { files: 5, children: 0 },
         },
         {
           id: 'folder-2',
           storageProviderId: 'provider-1',
+          organizationId: 'org-1',
           _count: { files: 0, children: 1 },
         },
       ]);
@@ -218,10 +226,10 @@ describe('StorageRepository', () => {
         .mockResolvedValue({ count: 2 });
       const repo = makeRepo();
 
-      await repo.removeOrDetachMountFolders('provider-1');
+      await repo.removeOrDetachMountFolders('org-1', 'provider-1');
 
       expect(mockModel.fileFolder.updateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['folder-1', 'folder-2'] } },
+        where: { id: { in: ['folder-1', 'folder-2'] }, organizationId: 'org-1' },
         data: { storageProviderId: null },
       });
     });

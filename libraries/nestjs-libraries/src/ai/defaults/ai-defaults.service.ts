@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  forwardRef,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { DefaultsResolutionService } from './defaults-resolution.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
@@ -11,6 +16,7 @@ import { DefaultsSettingsValidator } from './defaults-settings.validator';
 import { AI_MODEL_CATEGORIES } from './default-categories';
 import { SetDefaultModelDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/default-model.dto';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
+import { bustDefaultsCatalogCache } from './defaults-cache';
 import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
@@ -35,6 +41,7 @@ export class AiDefaultsService {
     private _settingsValidator: DefaultsSettingsValidator,
     private _providerResolution: ProviderResolutionService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
+    @Inject(forwardRef(() => OrgAiSettingsService))
     private _orgAiSettings: OrgAiSettingsService,
   ) {}
 
@@ -214,23 +221,9 @@ export class AiDefaultsService {
   }
 
   bustDefaultsCatalogCache(orgId: string): void {
-    // Best-effort cache invalidation; never fail the request if Redis is down.
-    // AI provider changes affect both AI and media candidates (media union includes
-    // AI providers), so both catalog keyspaces must be cleared.
-    try {
-      const prefixes = [
-        `settings:ai:defaults:catalog:${orgId}:`,
-        `settings:content:media-defaults:catalog:${orgId}:`,
-      ];
-      for (const prefix of prefixes) {
-        ioRedis
-          .keys(`${prefix}*`)
-          .then((keys) => {
-            if (keys.length) ioRedis.del(...keys);
-          })
-          .catch(() => undefined);
-      }
-    } catch {}
+    // Delegated to a standalone helper so OrgAiSettingsService can bust the
+    // cache without creating a dependency-injection cycle with this service.
+    bustDefaultsCatalogCache(orgId);
   }
 
   private _providerLabel(candidate: { providerId: string; metadata: { uiName?: string } }): string {

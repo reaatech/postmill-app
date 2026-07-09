@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 
 import {
+  BadRequestException,
+  forwardRef,
   Inject,
   Injectable,
   Logger,
@@ -21,6 +23,11 @@ import {
   getEnvEnabledIdentifiers,
   isEnvEnabled,
 } from '@gitroom/nestjs-libraries/integrations/channel-env-credentials';
+import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
+import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { timer } from '@gitroom/helpers/utils/timer';
 import {
   PROVIDER_CAPABILITIES,
   ProviderCapability,
@@ -35,6 +42,9 @@ export class IntegrationManager {
     private _orgProviderConfigManager: OrgProviderConfigManager,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     private _providerResolutionService: ProviderResolutionService,
+    private _integrationRepository: IntegrationRepository,
+    @Inject(forwardRef(() => RefreshIntegrationService))
+    private _refreshIntegrationService: RefreshIntegrationService,
   ) {}
 
   // Raw social provider singletons, sourced through ProviderResolutionService so
@@ -387,5 +397,231 @@ export class IntegrationManager {
       return true;
     }
     return false;
+  }
+
+  // ── Cached channel list response (A-19) ──
+
+  /**
+   * Build (and cache) the channel list payload rendered by the composer/calendar.
+   * The controller only delegates; cache read/write and list assembly live here.
+   */
+  async getIntegrationListResponse(orgId: string): Promise<{
+    integrations: any[];
+  }> {
+    const cacheKey = `integrations:list:${orgId}`;
+    try {
+      const cached = await ioRedis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      /* cache miss / redis down — fall through to recompute */
+    }
+
+    const rows = await this._integrationRepository.getIntegrationsList(orgId);
+    const result = {
+      integrations: (
+        await Promise.all(
+          rows.map(async (p) => {
+            // Use the unchecked lookup so already-connected channels keep
+            // rendering even if an admin disabled the provider for new
+            // connections (the gated getSocialIntegration would throw here and
+            // take down the entire channel list for the org).
+            const findIntegration = this.getSocialIntegrationUnchecked(
+              p.providerIdentifier
+            );
+            if (!findIntegration) {
+              return null;
+            }
+            return {
+              name: p.name,
+              id: p.id,
+              internalId: p.internalId,
+              disabled: p.disabled,
+              editor: findIntegration.editor,
+              stripLinks: !!findIntegration?.stripLinks?.(),
+              picture: p.picture || '/no-picture.jpg',
+              identifier: p.providerIdentifier,
+              inBetweenSteps: p.inBetweenSteps,
+              refreshNeeded: p.refreshNeeded,
+              isCustomFields: !!findIntegration.customFields,
+              ...(findIntegration.customFields
+                ? { customFields: await findIntegration.customFields() }
+                : {}),
+              display: p.profile,
+              type: p.type,
+              time: JSON.parse(p.postingTimes),
+              changeProfilePicture: !!findIntegration?.changeProfilePicture,
+              changeNickName: !!findIntegration?.changeNickname,
+              customer: p.customer,
+              additionalSettings: p.additionalSettings || '[]',
+            };
+          })
+        )
+      ).filter(Boolean),
+    };
+
+    try {
+      await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+    } catch {
+      /* redis down — serve uncached */
+    }
+
+    return result;
+  }
+
+  /**
+   * Invalidate the cached integrations list after a mutation that changes it.
+   */
+  async invalidateIntegrationListCache(orgId: string): Promise<void> {
+    try {
+      await ioRedis.del(`integrations:list:${orgId}`);
+    } catch {
+      /* redis down — the 60s TTL still bounds staleness */
+    }
+  }
+
+  // ── OAuth state binding (A-19) ──
+
+  /**
+   * Generate the provider OAuth URL and bind all callback-recovery state in Redis.
+   * The caller is responsible for validating allowed integrations, campaign
+   * ownership, and return-url allowlists; this method only serializes state.
+   */
+  async generateAuthUrl(
+    integration: string,
+    orgId: string,
+    clientInformation: any,
+    options: {
+      externalUrl?: string;
+      configId?: string;
+      refresh?: string;
+      onboarding?: boolean;
+      campaign?: string;
+      redirectUrl?: string;
+    } = {}
+  ): Promise<{ url: string }> {
+    const integrationProvider = await this.getSocialIntegration(
+      integration,
+      orgId
+    );
+
+    if (integrationProvider.externalUrl && !options.externalUrl) {
+      throw new Error('Missing external url');
+    }
+
+    const getExternalUrl = integrationProvider.externalUrl
+      ? {
+          ...(await integrationProvider.externalUrl(options.externalUrl)),
+          instanceUrl: options.externalUrl,
+        }
+      : undefined;
+
+    const { codeVerifier, state, url } =
+      await integrationProvider.generateAuthUrl(clientInformation);
+
+    // Bind the chosen named credential config to this connection so the callback
+    // (and later refresh/publish) use that config's own auth.
+    if (options.configId) {
+      await ioRedis.set(`config:${state}`, options.configId, 'EX', 3600);
+    }
+
+    if (options.refresh) {
+      await ioRedis.set(`refresh:${state}`, options.refresh, 'EX', 3600);
+    }
+
+    if (options.onboarding) {
+      await ioRedis.set(`onboarding:${state}`, 'true', 'EX', 3600);
+    }
+
+    if (options.campaign) {
+      await ioRedis.set(`campaign:${state}`, options.campaign, 'EX', 3600);
+    }
+
+    if (options.redirectUrl) {
+      await ioRedis.set(`redirect:${state}`, options.redirectUrl, 'EX', 3600);
+    }
+
+    await ioRedis.set(`organization:${state}`, orgId, 'EX', 3600);
+    await ioRedis.set(`login:${state}`, codeVerifier, 'EX', 3600);
+    await ioRedis.set(
+      `external:${state}`,
+      JSON.stringify(getExternalUrl),
+      'EX',
+      3600
+    );
+
+    return { url };
+  }
+
+  // ── Function dispatch whitelist (A-19) ──
+
+  /**
+   * Dynamically dispatch a whitelisted provider method. The method name must be
+   * either a @Tool-decorated method on the provider or the special `mention`
+   * helper. Token refresh is handled automatically.
+   */
+  async callTool(
+    orgId: string,
+    integrationId: string,
+    name: string,
+    data: any
+  ): Promise<any> {
+    const getIntegration = await this._integrationRepository.getIntegrationById(
+      orgId,
+      integrationId
+    );
+    if (!getIntegration) {
+      throw new Error('Invalid integration');
+    }
+
+    const integrationProvider = await this.getSocialIntegration(
+      getIntegration.providerIdentifier,
+      orgId
+    );
+    if (!integrationProvider) {
+      throw new Error('Invalid provider');
+    }
+
+    // POSTS-23/24: allow-list callable provider methods. Tool-decorated methods
+    // plus the non-tool `mention` helper are the only legitimate dynamic-dispatch
+    // targets for this route.
+    const tools = this.getAllTools();
+    const allowedMethods = new Set([
+      ...(tools[integrationProvider.identifier] || []).map((t) => t.methodName),
+      'mention',
+    ]);
+    if (!allowedMethods.has(name)) {
+      throw new BadRequestException(`Unknown provider function: ${name}`);
+    }
+
+    // @ts-ignore
+    if (!integrationProvider[name]) {
+      throw new Error('Function not found');
+    }
+
+    try {
+      // @ts-ignore
+      return await integrationProvider[name](
+        getIntegration.token,
+        data,
+        getIntegration.internalId,
+        getIntegration
+      );
+    } catch (err) {
+      if (err instanceof RefreshToken) {
+        const refreshed = await this._refreshIntegrationService.refresh(
+          getIntegration
+        );
+        if (!refreshed || !refreshed.accessToken) {
+          return false;
+        }
+        if (integrationProvider.refreshWait) {
+          await timer(10000);
+        }
+        return this.callTool(orgId, integrationId, name, data);
+      }
+      return false;
+    }
   }
 }

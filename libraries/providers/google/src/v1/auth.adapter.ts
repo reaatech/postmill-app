@@ -7,6 +7,16 @@ import {
 import { google } from 'googleapis';
 
 import { metadata as providerMetadata } from './metadata';
+
+// S-17 / known proxy gap: the googleapis SDK creates its own Gaxios/OAuth2 HTTP
+// clients and does not expose a hook that accepts an undici Dispatcher. The
+// per-channel VPN dispatcher used by SocialAbstract.fetch() (via
+// getVpnDispatcher()) therefore cannot be applied to Google OAuth token or
+// userinfo calls. The hosts are fixed first-party Google endpoints, so SSRF risk
+// is low; the gap is specifically per-channel VPN egress. Closing it would
+// require a custom Gaxios adapter/fetchImplementation that translates
+// GaxiosOptions into undici requests with the active dispatcher.
+
 // Self-contained kernel auth module for Google (YouTube) OAuth login. Mirrors
 // the legacy apps/backend google.provider.ts DB-first → env-fallback precedence;
 // the legacy class is kept for the PROVIDER_KERNEL=legacy decorator path. DB

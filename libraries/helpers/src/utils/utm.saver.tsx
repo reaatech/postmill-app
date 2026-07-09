@@ -19,7 +19,7 @@ const UtmSaver: FC = () => {
       fireEvents('purchase');
       track(TrackEnum.StartTrial);
     }
-  }, []);
+  }, [searchParams, fireEvents, track]);
 
   useEffect(() => {
     const landingUrl = localStorage.getItem('landingUrl');
@@ -36,7 +36,7 @@ const UtmSaver: FC = () => {
     if (utm && !value) {
       setValue(utm);
     }
-  }, [query, value]);
+  }, [query, value, setValue]);
 
   return <></>;
 };

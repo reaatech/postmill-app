@@ -11,6 +11,10 @@ function makeController() {
   const adapter = {
     readFile: vi.fn(),
   };
+  const storageService = {
+    getOrgStoragePublicPrefixes: vi.fn().mockResolvedValue(['https://app.example.com/uploads/']),
+    resolveAdapterForFolder: vi.fn().mockResolvedValue(adapter),
+  };
   const fileService = {
     getFolder: vi.fn().mockResolvedValue({ id: 'f1', organizationId: 'org-1' }),
     getFolderContents: vi.fn().mockResolvedValue({ count: 3 }),
@@ -19,13 +23,42 @@ function makeController() {
     importFromUrl: vi.fn().mockResolvedValue({ id: 'file-1' }),
     saveFile: vi.fn().mockResolvedValue({ id: 'file-1' }),
     bulkSave: vi.fn().mockResolvedValue([{ id: 'file-1' }, { id: 'file-2' }]),
+    importFromPath: vi.fn(async (orgId: string, filePath: string, folderId?: string | null) => {
+      const prefixes = await storageService.getOrgStoragePublicPrefixes(orgId);
+      if (!prefixes.some((prefix: string) => filePath.startsWith(prefix))) {
+        throw new HttpException('Invalid storage path', 400);
+      }
+      const resolvedAdapter = await storageService.resolveAdapterForFolder(folderId, orgId);
+      try {
+        const buffer = await resolvedAdapter.readFile(filePath);
+        return { buffer, fileSize: buffer.length };
+      } catch (err) {
+        throw new HttpException('Storage object not found', 404);
+      }
+    }),
   };
-  const storageService = {
-    getOrgStoragePublicPrefixes: vi.fn().mockResolvedValue(['https://app.example.com/uploads/']),
-    resolveAdapterForFolder: vi.fn().mockResolvedValue(adapter),
+  const contentPackCapabilityMap: Record<string, string> = {
+    photo: 'photos',
+    photos: 'photos',
+    image: 'photos',
+    vector: 'vectors',
+    vectors: 'vectors',
+    video: 'videos',
+    videos: 'videos',
+    sticker: 'stickers',
+    stickers: 'stickers',
+    icon: 'icons',
+    icons: 'icons',
+    audio: 'audio',
   };
   const stockMediaService = {
-    resolveContentPackDownload: vi.fn().mockResolvedValue('https://cdn/licensed.jpg'),
+    importContentPackAsset: vi.fn(async (_orgId: string, source: string, downloadLocation: string, type?: string) => {
+      const capability = contentPackCapabilityMap[(type || 'photos').toLowerCase()];
+      if (!capability) {
+        throw new Error(`Unsupported content pack type: ${type}`);
+      }
+      return { url: 'https://cdn/licensed.jpg', capability };
+    }),
     triggerDownload: vi.fn().mockResolvedValue(undefined),
   };
   const resolution = {
@@ -107,10 +140,11 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
 
       await ctrl.importFromUrl(org, body(clientType) as any);
 
-      expect(stockMediaService.resolveContentPackDownload).toHaveBeenCalledWith(
+      expect(stockMediaService.importContentPackAsset).toHaveBeenCalledWith(
         'org-1',
+        'magnific',
         'item-123',
-        expected,
+        clientType,
       );
     });
 
@@ -120,12 +154,12 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
       await expect(ctrl.importFromUrl(org, body('bogus') as any)).rejects.toMatchObject({
         status: 400,
       });
-      expect(stockMediaService.resolveContentPackDownload).not.toHaveBeenCalled();
+      expect(stockMediaService.importContentPackAsset).not.toHaveBeenCalled();
     });
 
     it('maps a daily-cap error to 402', async () => {
       const { ctrl, stockMediaService } = makeController();
-      stockMediaService.resolveContentPackDownload.mockRejectedValue(
+      stockMediaService.importContentPackAsset.mockRejectedValue(
         new ContentPackDailyCapError('cap reached'),
       );
 
@@ -136,7 +170,7 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
 
     it('returns a generic 502 (not raw provider text) on a mint failure', async () => {
       const { ctrl, stockMediaService } = makeController();
-      stockMediaService.resolveContentPackDownload.mockRejectedValue(
+      stockMediaService.importContentPackAsset.mockRejectedValue(
         new Error('upstream 500 <html>secret</html>'),
       );
 

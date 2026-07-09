@@ -64,11 +64,12 @@ export const BrandPicker = () => {
         isOpen ? 'border-[#2B5CD3]' : 'border-newTextColor/10'
       )}
     >
-      <div
+      <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1 cursor-pointer"
+        className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1 cursor-pointer bg-transparent border-none text-textColor"
       >
-        <div className="cursor-pointer">
+        <div>
           <svg
             width="18"
             height="18"
@@ -82,44 +83,49 @@ export const BrandPicker = () => {
             <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1Z" />
           </svg>
         </div>
-        <div className="cursor-pointer max-w-[160px] truncate whitespace-nowrap">
+        <div className="max-w-[160px] truncate whitespace-nowrap">
           {selectedBrand
             ? `${selectedBrand.name}${
                 selectedBrand.isDefault ? ` (${t('default', 'Default')})` : ''
               }`
             : t('brand', 'Brand')}
         </div>
-        <div className="cursor-pointer">
+        <div>
           <DropdownArrowIcon rotated={isOpen} />
         </div>
-      </div>
+      </button>
       {isOpen && (
-        <div className="z-[300] absolute start-0 bottom-[100%] w-[240px] bg-newBgColorInner p-[12px] menu-shadow -translate-y-[10px] flex flex-col">
-          <div
-            onClick={() => select(null)}
-            className={clsx(
-              'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center',
-              !brandId && 'text-[#2B5CD3]'
-            )}
-          >
-            {t('no_brand', 'No Brand')}
-          </div>
-          {brands.map((brand) => (
-            <div
-              key={brand.id}
-              onClick={() => select(brand.id)}
+        <ul className="z-[300] absolute start-0 bottom-[100%] w-[240px] bg-newBgColorInner p-[12px] menu-shadow -translate-y-[10px] flex flex-col list-none m-0">
+          <li className="m-0 p-0">
+            <button
+              type="button"
+              onClick={() => select(null)}
               className={clsx(
-                'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center',
-                brandId === brand.id && 'text-[#2B5CD3]'
+                'w-full text-left h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center bg-transparent border-none text-textColor',
+                !brandId && 'text-[#2B5CD3]'
               )}
             >
-              <span className="truncate">
-                {brand.name}
-                {brand.isDefault ? ` (${t('default', 'Default')})` : ''}
-              </span>
-            </div>
+              {t('no_brand', 'No Brand')}
+            </button>
+          </li>
+          {brands.map((brand) => (
+            <li key={brand.id} className="m-0 p-0">
+              <button
+                type="button"
+                onClick={() => select(brand.id)}
+                className={clsx(
+                  'w-full text-left h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center bg-transparent border-none text-textColor',
+                  brandId === brand.id && 'text-[#2B5CD3]'
+                )}
+              >
+                <span className="truncate">
+                  {brand.name}
+                  {brand.isDefault ? ` (${t('default', 'Default')})` : ''}
+                </span>
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

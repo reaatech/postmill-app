@@ -68,6 +68,43 @@ export class OrgContentPackSettingsService {
     };
   }
 
+  /**
+   * Safe, client-ready metadata for the active content pack (no credentials).
+   * Returns null when there is no active pack.
+   */
+  async getActiveProviderMetadata(orgId: string) {
+    const active = await this.getActive(orgId);
+    if (!active) return null;
+
+    const meta = this.#meta(active.identifier);
+    return {
+      identifier: active.identifier,
+      name: meta?.name || active.identifier,
+      capabilities: meta?.capabilities || [],
+    };
+  }
+
+  /**
+   * Static catalog metadata for every registered content-pack provider.
+   * Used by the settings UI to render the provider list.
+   */
+  listProviderMetadata() {
+    return this.#listMeta().map((meta) => ({
+      identifier: meta.identifier,
+      name: meta.name,
+      capabilities: meta.capabilities,
+      credentialFields: meta.credentialFields,
+    }));
+  }
+
+  /**
+   * Metadata for a single registered content-pack provider, or undefined
+   * when the identifier is unknown.
+   */
+  getProviderMetadata(identifier: string): ContentPackMeta | undefined {
+    return this.#meta(identifier);
+  }
+
   async getActiveForCapability(orgId: string, capability: string) {
     const active = await this.getActive(orgId);
     if (!active) return null;
@@ -157,28 +194,43 @@ export class OrgContentPackSettingsService {
     return result;
   }
 
-  async testConnection(orgId: string, identifier: string) {
+  async testConnection(
+    orgId: string,
+    identifier: string,
+    credentials?: Record<string, string>
+  ) {
     const { providerId, version } = parseQualified(identifier);
-    const config = await this._repository.getByIdentifier(
-      orgId,
-      providerId,
-      version ?? DEFAULT_VERSION
-    );
-    if (!config) {
-      throw new Error(`Content pack "${identifier}" is not configured for this organization`);
+    const meta = this.#meta(providerId);
+    if (!meta) {
+      throw new Error(`Unknown content pack provider: ${identifier}`);
     }
 
-    const credentials = this._decryptCredentials(config.credentials);
-    if (!credentials?.apiKey) {
+    let testCredentials = credentials;
+    let resolvedVersion = version;
+
+    if (!testCredentials) {
+      const config = await this._repository.getByIdentifier(
+        orgId,
+        providerId,
+        version ?? DEFAULT_VERSION
+      );
+      if (!config) {
+        throw new Error(`Content pack "${identifier}" is not configured for this organization`);
+      }
+      testCredentials = this._decryptCredentials(config.credentials);
+      resolvedVersion = version ?? config.version ?? DEFAULT_VERSION;
+    }
+
+    if (!testCredentials?.apiKey) {
       throw new Error(`Content pack "${identifier}" is missing credentials`);
     }
 
     const capability = this._resolution.resolveContentPack(providerId, {
-      version: version ?? config.version ?? DEFAULT_VERSION,
-      credentials,
+      version: resolvedVersion ?? DEFAULT_VERSION,
+      credentials: testCredentials,
       orgId,
     });
-    const capabilityName = this.#meta(providerId)?.capabilities[0] || 'photos';
+    const capabilityName = meta.capabilities[0] || 'photos';
     try {
       const result = await capability.search(capabilityName, 'test', 1);
       return { ok: true, message: 'Connection successful', result };

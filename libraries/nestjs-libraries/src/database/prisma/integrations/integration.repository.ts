@@ -112,14 +112,27 @@ export class IntegrationRepository {
     });
   }
 
-  getPlug(plugId: string, orgId?: string) {
+  getPlugForOrg(orgId: string, plugId: string) {
     return this._plugs.model.plugs.findFirst({
       where: {
         id: plugId,
-        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
-        // Optional because the current Inngest caller (processPlugs) carries no orgId
-        // in its event payload; org is still enforced upstream by the plug flow.
-        ...(orgId ? { organizationId: orgId } : {}),
+        organizationId: orgId,
+      },
+      include: {
+        integration: true,
+      },
+    });
+  }
+
+  /**
+   * System-wide plug lookup used only by the Inngest worker (processPlugs).
+   * The caller already owns the plug's integration, so org scoping is enforced
+   * upstream by the plug flow itself.
+   */
+  getPlugForSystem(plugId: string) {
+    return this._plugs.model.plugs.findFirst({
+      where: {
+        id: plugId,
       },
       include: {
         integration: true,
@@ -168,7 +181,8 @@ export class IntegrationRepository {
 
       await this._integration.model.integration.update({
         where: {
-          id,
+          id: existing.id,
+          organizationId: params.organizationId!,
         },
         data: {
           internalId: `deleted_${params.internalId}_${makeId(10)}`,
@@ -179,7 +193,8 @@ export class IntegrationRepository {
 
     return this._integration.model.integration.update({
       where: {
-        ...(existing ? { id: existing.id } : { id }),
+        id,
+        organizationId: params.organizationId!,
       },
       data: {
         ...params,
@@ -349,10 +364,11 @@ export class IntegrationRepository {
     }).then((integrations) => integrations.map(decryptIntegrationTokens));
   }
 
-  async setBetweenRefreshSteps(id: string) {
+  async setBetweenRefreshSteps(orgId: string, id: string) {
     return this._integration.model.integration.update({
       where: {
         id,
+        organizationId: orgId,
       },
       data: {
         inBetweenSteps: true,
@@ -371,10 +387,11 @@ export class IntegrationRepository {
     });
   }
 
-  updateNameAndUrl(id: string, name: string, url: string) {
+  updateNameAndUrl(org: string, id: string, name: string, url: string) {
     return this._integration.model.integration.update({
       where: {
         id,
+        organizationId: org,
       },
       data: {
         ...(name ? { name } : {}),
@@ -592,7 +609,7 @@ export class IntegrationRepository {
     const ids = getChannels.map((c) => c.id);
     if (ids.length) {
       await this._integration.model.integration.updateMany({
-        where: { id: { in: ids } },
+        where: { id: { in: ids }, organizationId: org },
         data: { disabled: true },
       });
     }

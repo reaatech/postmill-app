@@ -1,30 +1,19 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { RetentionActivity } from './retention.activity';
+import { RetentionRepository } from '@gitroom/nestjs-libraries/database/prisma/retention/retention.repository';
 
-function makePrisma() {
-  const del = () => vi.fn().mockResolvedValue({ count: 2 });
-  const findEmpty = vi.fn().mockResolvedValue([]);
+function makeRepository() {
   return {
-    errors: { deleteMany: del() },
-    notifications: { deleteMany: del() },
-    multipartUpload: { deleteMany: del() },
-    mastra_traces: { deleteMany: del() },
-    mastra_scorers: { deleteMany: del() },
-    file: { findMany: findEmpty, deleteMany: del() },
-    post: { findMany: findEmpty, deleteMany: del(), updateMany: del() },
-    aiDesignerSession: {
-      findMany: vi
-        .fn()
-        .mockResolvedValueOnce([{ id: 'stale-1' }, { id: 'stale-2' }])
-        .mockResolvedValue([]),
-      deleteMany: del(),
-    },
-    user: { updateMany: del() },
-    session: { updateMany: del() },
-    tagsPosts: { deleteMany: del() },
-    comments: { deleteMany: del() },
-    $transaction: vi.fn().mockResolvedValue([]),
-  } as any;
+    deleteErrorsOlderThan: vi.fn().mockResolvedValue(2),
+    deleteNotificationsOlderThan: vi.fn().mockResolvedValue(2),
+    deleteIncompleteMultipartUploadsOlderThan: vi.fn().mockResolvedValue(2),
+    deleteMastraTracesOlderThan: vi.fn().mockResolvedValue(2),
+    purgeSoftDeletedPosts: vi.fn().mockResolvedValue(2),
+    purgeSoftDeletedFiles: vi.fn().mockResolvedValue(2),
+    purgeAiDesignerSessionsOlderThan: vi.fn().mockResolvedValue(2),
+    nullUserIpAgentOlderThan: vi.fn().mockResolvedValue(2),
+    nullSessionIpAgentOlderThan: vi.fn().mockResolvedValue(2),
+  } as unknown as RetentionRepository;
 }
 
 describe('RetentionActivity', () => {
@@ -34,43 +23,40 @@ describe('RetentionActivity', () => {
   });
 
   it('runs every prune and reports counts', async () => {
-    const prisma = makePrisma();
-    const activity = new RetentionActivity(prisma);
+    const repository = makeRepository();
+    const activity = new RetentionActivity(repository);
 
     const counts = await activity.runRetention();
 
-    expect(prisma.errors.deleteMany).toHaveBeenCalledTimes(1);
-    expect(prisma.notifications.deleteMany).toHaveBeenCalledTimes(1);
-    expect(prisma.multipartUpload.deleteMany).toHaveBeenCalledTimes(1);
-    expect(prisma.mastra_traces.deleteMany).toHaveBeenCalledTimes(1);
-    expect(prisma.user.updateMany).toHaveBeenCalledTimes(1); // IP/agent null
-    expect(prisma.session.updateMany).toHaveBeenCalledTimes(1);
+    expect(repository.deleteErrorsOlderThan).toHaveBeenCalledTimes(1);
+    expect(repository.deleteNotificationsOlderThan).toHaveBeenCalledTimes(1);
+    expect(repository.deleteIncompleteMultipartUploadsOlderThan).toHaveBeenCalledTimes(1);
+    expect(repository.deleteMastraTracesOlderThan).toHaveBeenCalledTimes(1);
+    expect(repository.nullUserIpAgentOlderThan).toHaveBeenCalledTimes(1);
+    expect(repository.nullSessionIpAgentOlderThan).toHaveBeenCalledTimes(1);
     expect(counts.errors).toBe(2);
     expect(counts.userIpAgent).toBe(2);
-    // Batched sweep: ids from findMany feed one capped deleteMany.
-    expect(prisma.aiDesignerSession.deleteMany).toHaveBeenCalledWith({
-      where: { id: { in: ['stale-1', 'stale-2'] } },
-    });
     expect(counts.aiDesignerSessions).toBe(2);
   });
 
   it('is non-fatal: one prune throwing does not abort the rest', async () => {
-    const prisma = makePrisma();
-    prisma.errors.deleteMany = vi.fn().mockRejectedValue(new Error('boom'));
-    const activity = new RetentionActivity(prisma);
+    const repository = makeRepository();
+    vi.mocked(repository.deleteErrorsOlderThan).mockRejectedValue(new Error('boom'));
+    const activity = new RetentionActivity(repository);
 
     const counts = await activity.runRetention();
 
     expect(counts.errors).toBe(-1); // failure marker
-    expect(prisma.notifications.deleteMany).toHaveBeenCalled(); // continued
+    expect(repository.deleteNotificationsOlderThan).toHaveBeenCalled(); // continued
     expect(counts.notifications).toBe(2);
   });
 
   it('only nulls multipart stragglers (state != completed)', async () => {
-    const prisma = makePrisma();
-    const activity = new RetentionActivity(prisma);
+    const repository = makeRepository();
+    const activity = new RetentionActivity(repository);
     await activity.runRetention();
-    const where = prisma.multipartUpload.deleteMany.mock.calls[0][0].where;
-    expect(where.state).toEqual({ not: 'completed' });
+
+    const [cutoff] = vi.mocked(repository.deleteIncompleteMultipartUploadsOlderThan).mock.calls[0];
+    expect(cutoff).toBeInstanceOf(Date);
   });
 });

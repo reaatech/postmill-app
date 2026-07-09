@@ -33,8 +33,24 @@ const mockKernel = {
   latestActive: vi.fn(),
 };
 
+const mockDefaultsSeed = {
+  seedUnset: vi.fn().mockResolvedValue(undefined),
+};
+
 vi.mock('./org-ai-settings.repository', () => ({
   OrgAiSettingsRepository: vi.fn(() => mockRepo),
+}));
+
+vi.mock('@gitroom/nestjs-libraries/ai/defaults/defaults-cache', () => ({
+  bustDefaultsCatalogCache: vi.fn(),
+}));
+
+vi.mock('@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service', () => ({
+  DefaultsSeedService: vi.fn(() => mockDefaultsSeed),
+}));
+
+vi.mock('@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator', () => ({
+  isSafePublicHttpsUrl: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('@gitroom/nestjs-libraries/encryption/encryption.service', () => ({
@@ -59,18 +75,24 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/media-providers/provider-cred
 }));
 
 import { OrgAiSettingsService } from './org-ai-settings.service';
+import { bustDefaultsCatalogCache as mockBustCache } from '@gitroom/nestjs-libraries/ai/defaults/defaults-cache';
 
 describe('OrgAiSettingsService.upsert auto-activation', () => {
   let service: OrgAiSettingsService;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolution.resolveAI.mockReturnValue({
+      identifier: 'openai',
+      credentialFields: [{ key: 'apiKey', required: true }],
+    });
     service = new OrgAiSettingsService(
       mockRepo as any,
       mockEncryption as any,
       mockResolution as any,
       mockKernel as any,
-      undefined
+      mockDefaultsSeed as any,
+      undefined,
     );
   });
 
@@ -203,6 +225,39 @@ describe('OrgAiSettingsService.upsert auto-activation', () => {
       service.upsert('org-1', 'openai', { credentials: { apiKey: 'sk' } }),
     ).resolves.toEqual({ id: 'x' });
   });
+
+  it('rejects an unknown provider at upsert (A-22)', async () => {
+    mockResolution.resolveAI.mockReturnValue(null);
+
+    await expect(
+      service.upsert('org-1', 'ghost', { credentials: { apiKey: 'sk' } }),
+    ).rejects.toThrow('Unknown provider');
+    expect(mockRepo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-public baseURL at upsert (A-22)', async () => {
+    const { isSafePublicHttpsUrl } = await import(
+      '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator'
+    );
+    (isSafePublicHttpsUrl as any).mockResolvedValueOnce(false);
+
+    await expect(
+      service.upsert('org-1', 'openai', {
+        credentials: { apiKey: 'sk', baseURL: 'http://localhost:3000' },
+      }),
+    ).rejects.toThrow('Base URL must be a public HTTPS URL');
+    expect(mockRepo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('seeds defaults and busts catalog cache after upsert (A-22)', async () => {
+    mockRepo.getByOrg.mockResolvedValue([{ id: 'cfg-1', identifier: 'openai' }]);
+    mockRepo.upsert.mockResolvedValue({ id: 'cfg-1' });
+
+    await service.upsert('org-1', 'openai', { enabled: false });
+
+    expect(mockDefaultsSeed.seedUnset).toHaveBeenCalledWith('org-1');
+    expect(mockBustCache).toHaveBeenCalledWith('org-1');
+  });
 });
 
 describe('OrgAiSettingsService reads/mutations', () => {
@@ -219,11 +274,16 @@ describe('OrgAiSettingsService reads/mutations', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolution.resolveAI.mockReturnValue({
+      identifier: 'openai',
+      credentialFields: [{ key: 'apiKey', required: true }],
+    });
     service = new OrgAiSettingsService(
       mockRepo as any,
       mockEncryption as any,
       mockResolution as any,
       mockKernel as any,
+      mockDefaultsSeed as any,
       undefined,
     );
   });
@@ -394,6 +454,18 @@ describe('OrgAiSettingsService reads/mutations', () => {
       await service.setActive('org-1', 'openai');
       expect(mockRepo.setActive).toHaveBeenCalledWith('org-1', 'openai', 'v1');
     });
+
+    it('seeds defaults and busts catalog cache after setActive (A-22)', async () => {
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1' } });
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1', credentials: 'enc:{"apiKey":"sk-x"}' });
+      mockResolution.resolveAI.mockReturnValue(adapter);
+      mockRepo.setActive.mockResolvedValue({ ok: true });
+
+      await service.setActive('org-1', 'openai');
+
+      expect(mockDefaultsSeed.seedUnset).toHaveBeenCalledWith('org-1');
+      expect(mockBustCache).toHaveBeenCalledWith('org-1');
+    });
   });
 
   describe('testConnection', () => {
@@ -418,6 +490,22 @@ describe('OrgAiSettingsService reads/mutations', () => {
       expect(validate).toHaveBeenCalledWith({ apiKey: 'sk-x' });
       expect(res).toEqual({ valid: true });
     });
+
+    it('validates candidate credentials when supplied (A-22)', async () => {
+      const validate = vi.fn().mockResolvedValue({ valid: true });
+      mockResolution.resolveAI.mockReturnValue({ ...adapter, validateCredentials: validate });
+
+      const res = await service.testConnection('org-1', 'openai', {
+        apiKey: 'candidate',
+        baseURL: 'https://api.example.com',
+      });
+
+      expect(validate).toHaveBeenCalledWith({
+        apiKey: 'candidate',
+        baseURL: 'https://api.example.com',
+      });
+      expect(res).toEqual({ valid: true });
+    });
   });
 
   describe('delete + budget pass-throughs', () => {
@@ -427,6 +515,13 @@ describe('OrgAiSettingsService reads/mutations', () => {
       await service.delete('org-1', 'openai');
       expect(mockRepo.delete).toHaveBeenCalledWith('org-1', 'openai', 'v2');
       expect(mockResolution.invalidate).toHaveBeenCalledWith('ai', 'openai', 'org-1');
+    });
+
+    it('busts catalog cache after delete (A-22)', async () => {
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1' });
+      mockRepo.delete.mockResolvedValue({ ok: true });
+      await service.delete('org-1', 'openai');
+      expect(mockBustCache).toHaveBeenCalledWith('org-1');
     });
 
     it('getBudget delegates to the repository', async () => {

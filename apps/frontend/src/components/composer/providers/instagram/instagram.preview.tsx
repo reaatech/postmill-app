@@ -1,3 +1,5 @@
+'use client';
+
 import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';

@@ -82,7 +82,32 @@ export class FarcasterProvider
     codeVerifier: string;
     refresh?: string;
   }) {
-    const data = JSON.parse(Buffer.from(params.code, 'base64').toString());
+    let data: {
+      fid: number | string;
+      display_name: string;
+      signer_uuid: string;
+      username: string;
+      pfp_url?: string;
+    };
+    try {
+      const parsed = JSON.parse(Buffer.from(params.code, 'base64').toString());
+      if (
+        !parsed ||
+        typeof parsed !== 'object' ||
+        parsed.fid === undefined ||
+        parsed.fid === null ||
+        typeof parsed.display_name !== 'string' ||
+        typeof parsed.signer_uuid !== 'string' ||
+        typeof parsed.username !== 'string' ||
+        !parsed.signer_uuid.trim() ||
+        !parsed.username.trim()
+      ) {
+        throw new Error('Invalid callback');
+      }
+      data = parsed;
+    } catch (err) {
+      return 'Invalid credentials';
+    }
     return {
       id: String(data.fid),
       name: data.display_name,

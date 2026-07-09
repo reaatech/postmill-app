@@ -6,11 +6,11 @@ import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/p
 
 const OLD_ENV = { ...process.env };
 
-const mockOpenAIAdapterInstance = { mock: 'OpenAIAdapter' };
-const mockAnthropicAdapterInstance = { mock: 'AnthropicAdapter' };
-const mockGoogleAdapterInstance = { mock: 'GoogleGenerativeAIAdapter' };
-const mockGroqAdapterInstance = { mock: 'GroqAdapter' };
-const mockLangChainAdapterInstance = { mock: 'LangChainAdapter' };
+const mockOpenAIAdapterInstance = { mock: 'OpenAIAdapter', process: vi.fn().mockResolvedValue({ threadId: 't1' }) };
+const mockAnthropicAdapterInstance = { mock: 'AnthropicAdapter', process: vi.fn().mockResolvedValue({ threadId: 't1' }) };
+const mockGoogleAdapterInstance = { mock: 'GoogleGenerativeAIAdapter', process: vi.fn().mockResolvedValue({ threadId: 't1' }) };
+const mockGroqAdapterInstance = { mock: 'GroqAdapter', process: vi.fn().mockResolvedValue({ threadId: 't1' }) };
+const mockLangChainAdapterInstance = { mock: 'LangChainAdapter', process: vi.fn().mockResolvedValue({ threadId: 't1' }) };
 const mockEmptyAdapterInstance = { mock: 'EmptyAdapter' };
 vi.mock('@copilotkit/runtime', () => ({
   AnthropicAdapter: class {
@@ -153,6 +153,20 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/budget.service', () => ({
   },
 }));
 
+const mockCheckInput = vi.fn().mockResolvedValue('guarded input');
+vi.mock('@gitroom/nestjs-libraries/ai/governance/guardrail.service', () => ({
+  GuardrailService: class {
+    checkInput = mockCheckInput;
+  },
+}));
+
+const mockStartSpan = vi.fn().mockImplementation(async (_name, fn) => fn({ setAttribute: vi.fn() }));
+vi.mock('@gitroom/nestjs-libraries/ai/governance/telemetry.service', () => ({
+  TelemetryService: class {
+    startSpan = mockStartSpan;
+  },
+}));
+
 vi.mock('@gitroom/nestjs-libraries/feature-flags', () => ({
   FeatureFlagsService: class {
     isDisabled = vi.fn().mockReturnValue(false);
@@ -182,8 +196,15 @@ import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/s
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
+import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { RequestContext } from '@mastra/core/di';
+
+function expectWrappedAdapter(result: any, rawInstance: any) {
+  expect(result).not.toBe(rawInstance);
+  expect(typeof result.process).toBe('function');
+}
 
 describe('CopilotController', () => {
   let controller: CopilotController;
@@ -197,6 +218,8 @@ describe('CopilotController', () => {
     mockOpenAIClass.mockClear();
     mockAnthropicClass.mockClear();
     mockGroqClass.mockClear();
+    mockCheckInput.mockClear();
+    mockStartSpan.mockClear();
     mockResolveConfigForScope.mockResolvedValue(null);
 
     subscriptionService = new (SubscriptionService as any)();
@@ -204,12 +227,16 @@ describe('CopilotController', () => {
     aiModelProvider = new (AIModelProvider as any)();
 
     const budgetService = new (BudgetService as any)();
+    const guardrailService = new (GuardrailService as any)();
+    const telemetryService = new (TelemetryService as any)();
     const featureFlagsService = new (FeatureFlagsService as any)();
     controller = new CopilotController(
       subscriptionService,
       mastraService,
       aiModelProvider,
       budgetService,
+      guardrailService,
+      telemetryService,
       featureFlagsService,
     );
   });
@@ -227,7 +254,7 @@ describe('CopilotController', () => {
         const result = await (controller as any)._buildServiceAdapter(undefined);
 
         expect(mockOpenAIClass).toHaveBeenCalledWith({ apiKey: 'sk-resolved-key' });
-        expect(result).toBe(mockOpenAIAdapterInstance);
+        expectWrappedAdapter(result, mockOpenAIAdapterInstance);
         expect(mockResolveConfigForScope).toHaveBeenCalledWith('agent', undefined);
       });
 
@@ -259,7 +286,7 @@ describe('CopilotController', () => {
         expect(mockOpenAIClass).toHaveBeenCalledWith(
           expect.objectContaining({ apiKey: 'sk-decrypted-key' }),
         );
-        expect(result).toBe(mockOpenAIAdapterInstance);
+        expectWrappedAdapter(result, mockOpenAIAdapterInstance);
       });
 
       it('uses scoped model from facade-resolved config', async () => {
@@ -273,7 +300,7 @@ describe('CopilotController', () => {
         const result = await (controller as any)._buildServiceAdapter('org-1');
 
         expect(mockResolveConfigForScope).toHaveBeenCalledWith('agent', 'org-1');
-        expect(result).toBe(mockOpenAIAdapterInstance);
+        expectWrappedAdapter(result, mockOpenAIAdapterInstance);
       });
     });
 
@@ -289,7 +316,7 @@ describe('CopilotController', () => {
         const result = await (controller as any)._buildServiceAdapter('org-1');
 
         expect(mockAnthropicClass).toHaveBeenCalledWith({ apiKey: 'sk-anthropic' });
-        expect(result).toBe(mockAnthropicAdapterInstance);
+        expectWrappedAdapter(result, mockAnthropicAdapterInstance);
       });
     });
 
@@ -305,7 +332,7 @@ describe('CopilotController', () => {
 
         const result = await (controller as any)._buildServiceAdapter('org-1');
 
-        expect(result).toBe(mockAnthropicAdapterInstance);
+        expectWrappedAdapter(result, mockAnthropicAdapterInstance);
       });
     });
 
@@ -326,7 +353,7 @@ describe('CopilotController', () => {
             baseURL: 'https://my-gateway.example.com/v1',
           }),
         );
-        expect(result).toBe(mockOpenAIAdapterInstance);
+        expectWrappedAdapter(result, mockOpenAIAdapterInstance);
       });
 
       it('does not borrow OPENAI_API_KEY when active admin credentials are missing', async () => {
@@ -376,7 +403,7 @@ describe('CopilotController', () => {
         expect(mockOpenAIClass).toHaveBeenCalledWith(
           expect.objectContaining({ apiKey: 'sk-byok-org-key' }),
         );
-        expect(result).toBe(mockOpenAIAdapterInstance);
+        expectWrappedAdapter(result, mockOpenAIAdapterInstance);
       });
     });
 
@@ -405,6 +432,49 @@ describe('CopilotController', () => {
         await (controller as any)._buildServiceAdapter(undefined);
 
         expect(mockResolveConfigForScope).toHaveBeenCalledWith('agent', undefined);
+      });
+
+      it('wraps the adapter so process() runs input guardrails and telemetry', async () => {
+        mockResolveConfigForScope.mockResolvedValue({
+          adapter: mockOpenaiAdapter,
+          modelId: 'gpt-5.2',
+          creds: { apiKey: 'sk-guard-test' },
+          providerId: 'openai',
+        });
+
+        const result = await (controller as any)._buildServiceAdapter('org-guard');
+        const textMessage = {
+          type: 'TextMessage',
+          isTextMessage: () => true,
+          content: 'Hello agent',
+        };
+        await result.process({ messages: [textMessage] });
+
+        expect(mockCheckInput).toHaveBeenCalledWith('Hello agent', { orgId: 'org-guard' });
+        expect(mockStartSpan).toHaveBeenCalledWith(
+          'copilot.generate',
+          expect.any(Function),
+          { 'ai.scope': 'agent' },
+        );
+      });
+
+      it('does not run guardrails when there are no text messages', async () => {
+        mockResolveConfigForScope.mockResolvedValue({
+          adapter: mockOpenaiAdapter,
+          modelId: 'gpt-5.2',
+          creds: { apiKey: 'sk-no-text' },
+          providerId: 'openai',
+        });
+
+        const result = await (controller as any)._buildServiceAdapter('org-notext');
+        await result.process({ messages: [] });
+
+        expect(mockCheckInput).not.toHaveBeenCalled();
+        expect(mockStartSpan).toHaveBeenCalledWith(
+          'copilot.generate',
+          expect.any(Function),
+          { 'ai.scope': 'agent' },
+        );
       });
     });
   });

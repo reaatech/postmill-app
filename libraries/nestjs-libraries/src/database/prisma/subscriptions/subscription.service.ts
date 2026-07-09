@@ -6,6 +6,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { Organization } from '@prisma/client';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
 @Injectable()
 export class SubscriptionService {
@@ -13,6 +14,7 @@ export class SubscriptionService {
     private readonly _subscriptionRepository: SubscriptionRepository,
     @Inject(forwardRef(() => IntegrationService))
     private readonly _integrationService: IntegrationService,
+    @Inject(forwardRef(() => OrganizationService))
     private readonly _organizationService: OrganizationService
   ) {}
 
@@ -106,6 +108,36 @@ export class SubscriptionService {
     }
 
     return true;
+  }
+
+  /**
+   * Parse a JWT-signed `params` payload from the public `/modify-subscription`
+   * webhook and apply the requested billing tier. Non-fatal: returns { success: false }
+   * on any validation or processing error.
+   */
+  async modifyFromJwtToken(params: string): Promise<{ success: boolean }> {
+    try {
+      const load = AuthService.verifyJWT(params) as {
+        orgId: string;
+        billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
+      };
+
+      if (!load || !load.orgId || !load.billing || !pricing[load.billing]) {
+        return { success: false };
+      }
+
+      const totalChannels = pricing[load.billing].channel || 0;
+
+      await this.modifySubscriptionByOrg(
+        load.orgId,
+        totalChannels,
+        load.billing
+      );
+
+      return { success: true };
+    } catch {
+      return { success: false };
+    }
   }
 
   async modifySubscription(

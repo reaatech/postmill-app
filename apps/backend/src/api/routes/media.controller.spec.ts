@@ -29,9 +29,22 @@ function build(defaultsOverride: Record<string, any> = {}, credits = 100, budget
   };
   const subscription = { checkCredits: vi.fn().mockResolvedValue({ credits }) };
   const budget = { checkBudget: vi.fn().mockResolvedValue({ allowed: budgetAllowed, reason: 'over' }) };
+  const aiMediaService = {
+    checkMediaBudget: vi.fn().mockImplementation(async () => {
+      if (!budgetAllowed) {
+        throw { status: HttpStatus.TOO_MANY_REQUESTS, response: { error: 'AI budget exceeded' } };
+      }
+    }),
+    urlToBase64Image: vi.fn().mockResolvedValue('data:image/png;base64,abc'),
+    saveUrlToFile: vi.fn().mockResolvedValue({
+      id: 'file-1',
+      path: 'http://localhost/uploads/file-1.png',
+      name: 'generated-123.png',
+    }),
+  };
   const controller = new MediaController(
     aiDefaults as any,
-    {} as any, // _aiMediaService
+    aiMediaService as any,
     {} as any, // _defaultsResolution
     {} as any, // _fileService
     subscription as any,
@@ -40,7 +53,7 @@ function build(defaultsOverride: Record<string, any> = {}, credits = 100, budget
     {} as any, // _brandsService
     budget as any
   );
-  return { controller, aiDefaults, subscription, budget };
+  return { controller, aiDefaults, subscription, budget, aiMediaService };
 }
 
 afterEach(() => {
@@ -153,27 +166,21 @@ describe('MediaController — Designer AI-media routes', () => {
     });
 
     it('generate-image returns { output: <base64 dataUrl> }', async () => {
-      const { controller, aiDefaults } = build();
-      (controller as any)._urlToBase64Image = vi.fn().mockResolvedValue('data:image/png;base64,abc');
+      const { controller, aiDefaults, aiMediaService } = build();
 
       const res = await controller.generateImage(org, { body: {} } as any, 'a cat');
 
       expect(aiDefaults.textToImage).toHaveBeenCalledWith('org-1', 'a cat');
+      expect(aiMediaService.urlToBase64Image).toHaveBeenCalledWith('https://cdn/gen.png');
       expect(res).toEqual({ output: 'data:image/png;base64,abc' });
     });
 
     it('generate-image-with-prompt persists and returns { id, path, name }', async () => {
-      const { controller } = build();
-      (controller as any)._urlToBase64Image = vi.fn().mockResolvedValue('data:image/png;base64,abc');
-      (controller as any)._saveUrlToFile = vi.fn().mockResolvedValue({
-        id: 'file-1',
-        path: 'http://localhost/uploads/file-1.png',
-        name: 'generated-123.png',
-      });
+      const { controller, aiMediaService } = build();
 
       const res = await controller.generateImageFromText(org, { body: {} } as any, 'a cat');
 
-      expect((controller as any)._saveUrlToFile).toHaveBeenCalledWith(
+      expect(aiMediaService.saveUrlToFile).toHaveBeenCalledWith(
         'org-1',
         'data:image/png;base64,abc',
         'generated'

@@ -152,4 +152,16 @@ export class CampaignTagService {
     const result = await this._items.deleteExpired(days, new Date());
     return { deleted: result.count };
   }
+
+  async copyTags(
+    orgId: string,
+    fromCampaignId: string,
+    toCampaignId: string,
+    userId?: string
+  ): Promise<number> {
+    // Verify the destination campaign belongs to this org before copying any
+    // tags into it (defense-in-depth against a leaked/foreign target id).
+    await this._requireCampaign(orgId, toCampaignId);
+    return this._items.copyAllToCampaign(fromCampaignId, toCampaignId, orgId, userId);
+  }
 }

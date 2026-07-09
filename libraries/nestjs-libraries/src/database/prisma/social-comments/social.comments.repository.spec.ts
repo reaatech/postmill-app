@@ -52,17 +52,17 @@ describe('SocialCommentsRepository', () => {
   });
 
   describe('getComments', () => {
-    it('returns paginated comments ordered by platformCreatedAt desc', async () => {
+    it('returns paginated comments ordered by platformCreatedAt desc scoped to org', async () => {
       const comments = [
         { id: 'c1', platformCreatedAt: new Date('2024-01-03'), postId: 'p1' },
         { id: 'c2', platformCreatedAt: new Date('2024-01-02'), postId: 'p1' },
       ];
       mockSocialComment.findMany.mockResolvedValue(comments);
 
-      const result = await repository.getComments('p1');
+      const result = await repository.getComments('org1', 'p1');
 
       expect(mockSocialComment.findMany).toHaveBeenCalledWith({
-        where: { postId: 'p1', deletedAt: null },
+        where: { postId: 'p1', deletedAt: null, post: { organizationId: 'org1' } },
         orderBy: [{ platformCreatedAt: 'desc' }, { id: 'desc' }],
         take: 51,
       });
@@ -73,12 +73,13 @@ describe('SocialCommentsRepository', () => {
       const cursorDate = '2024-01-10T00:00:00.000Z';
       mockSocialComment.findMany.mockResolvedValue([]);
 
-      await repository.getComments('p1', cursorDate);
+      await repository.getComments('org1', 'p1', cursorDate);
 
       expect(mockSocialComment.findMany).toHaveBeenCalledWith({
         where: {
           postId: 'p1',
           deletedAt: null,
+          post: { organizationId: 'org1' },
           platformCreatedAt: { lt: new Date(cursorDate) },
         },
         orderBy: [{ platformCreatedAt: 'desc' }, { id: 'desc' }],
@@ -89,7 +90,7 @@ describe('SocialCommentsRepository', () => {
     it('fetches limit + 1 items to detect hasMore', async () => {
       mockSocialComment.findMany.mockResolvedValue([]);
 
-      await repository.getComments('p1', undefined, 20);
+      await repository.getComments('org1', 'p1', undefined, 20);
 
       expect(mockSocialComment.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ take: 21 })
@@ -393,15 +394,15 @@ describe('SocialCommentsRepository', () => {
   });
 
   describe('getActiveCommentIds', () => {
-    it('returns id + platformCommentId for active comments of a post', async () => {
+    it('returns id + platformCommentId for active comments of a post scoped to org', async () => {
       mockSocialComment.findMany.mockResolvedValue([
         { id: 'db-1', platformCommentId: 'c1' },
       ]);
 
-      const result = await repository.getActiveCommentIds('p1');
+      const result = await repository.getActiveCommentIds('p1', 'org1');
 
       expect(mockSocialComment.findMany).toHaveBeenCalledWith({
-        where: { postId: 'p1', deletedAt: null },
+        where: { postId: 'p1', deletedAt: null, post: { organizationId: 'org1' } },
         select: { id: true, platformCommentId: true },
       });
       expect(result).toEqual([{ id: 'db-1', platformCommentId: 'c1' }]);
@@ -510,13 +511,13 @@ describe('SocialCommentsRepository', () => {
   });
 
   describe('countComments', () => {
-    it('returns count of non-deleted comments for a post', async () => {
+    it('returns count of non-deleted comments for a post scoped to org', async () => {
       mockSocialComment.count.mockResolvedValue(7);
 
-      const result = await repository.countComments('p1');
+      const result = await repository.countComments('p1', 'org1');
 
       expect(mockSocialComment.count).toHaveBeenCalledWith({
-        where: { postId: 'p1', deletedAt: null },
+        where: { postId: 'p1', deletedAt: null, post: { organizationId: 'org1' } },
       });
       expect(result).toBe(7);
     });
@@ -524,18 +525,18 @@ describe('SocialCommentsRepository', () => {
     it('returns 0 when no comments exist', async () => {
       mockSocialComment.count.mockResolvedValue(0);
 
-      const result = await repository.countComments('p1');
+      const result = await repository.countComments('p1', 'org1');
 
       expect(result).toBe(0);
     });
   });
 
   describe('getUnreadCount', () => {
-    it('counts non-own comments when no read state exists', async () => {
+    it('counts non-own comments when no read state exists scoped to org', async () => {
       mockPostCommentRead.findUnique.mockResolvedValue(null);
       mockSocialComment.count.mockResolvedValue(3);
 
-      const result = await repository.getUnreadCount('u1', 'p1');
+      const result = await repository.getUnreadCount('u1', 'p1', 'org1');
 
       expect(mockPostCommentRead.findUnique).toHaveBeenCalledWith({
         where: { userId_postId: { userId: 'u1', postId: 'p1' } },
@@ -545,12 +546,13 @@ describe('SocialCommentsRepository', () => {
           postId: 'p1',
           deletedAt: null,
           isOwn: false,
+          post: { organizationId: 'org1' },
         },
       });
       expect(result).toBe(3);
     });
 
-    it('filters by platformCreatedAt after lastReadAt when read state exists', async () => {
+    it('filters by platformCreatedAt after lastReadAt when read state exists scoped to org', async () => {
       const lastReadAt = new Date('2024-01-10T10:00:00Z');
       mockPostCommentRead.findUnique.mockResolvedValue({
         userId: 'u1',
@@ -560,7 +562,7 @@ describe('SocialCommentsRepository', () => {
       });
       mockSocialComment.count.mockResolvedValue(2);
 
-      const result = await repository.getUnreadCount('u1', 'p1');
+      const result = await repository.getUnreadCount('u1', 'p1', 'org1');
 
       expect(mockSocialComment.count).toHaveBeenCalledWith({
         where: {
@@ -568,6 +570,7 @@ describe('SocialCommentsRepository', () => {
           deletedAt: null,
           isOwn: false,
           platformCreatedAt: { gt: lastReadAt },
+          post: { organizationId: 'org1' },
         },
       });
       expect(result).toBe(2);

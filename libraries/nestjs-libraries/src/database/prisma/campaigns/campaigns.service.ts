@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
+import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
 import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
@@ -28,6 +29,7 @@ export class CampaignsService {
   constructor(
     private _campaignsRepository: CampaignsRepository,
     private _campaignItems: CampaignItemRepository,
+    private _campaignTagService: CampaignTagService,
     private _campaignItemResolver: CampaignItemResolverRepository,
     private _audit: AuditService,
     private _postsService: PostsService,
@@ -104,6 +106,16 @@ export class CampaignsService {
     return parsed.data;
   }
 
+  private _validateDateOrder(startDate?: Date, endDate?: Date) {
+    if (
+      startDate &&
+      endDate &&
+      new Date(endDate).getTime() <= new Date(startDate).getTime()
+    ) {
+      throw new BadRequestException('endDate must be after startDate');
+    }
+  }
+
   async create(params: {
     organizationId: string;
     name: string;
@@ -119,6 +131,7 @@ export class CampaignsService {
     createdById?: string;
   }) {
     const goals = this._validateGoals(params.goals);
+    this._validateDateOrder(params.startDate, params.endDate);
     return this._campaignsRepository.create({ ...params, goals });
   }
 
@@ -136,6 +149,7 @@ export class CampaignsService {
     goals?: CampaignGoal[] | unknown;
   }) {
     const goals = this._validateGoals(data.goals);
+    this._validateDateOrder(data.startDate, data.endDate);
     return this._campaignsRepository.update(id, organizationId, { ...data, goals });
   }
 
@@ -359,7 +373,7 @@ export class CampaignsService {
       tags: source.tags,
     });
 
-    await this._campaignItems.copyAllToCampaign(id, copy.id, organizationId, userId);
+    await this._campaignTagService.copyTags(organizationId, id, copy.id, userId);
 
     const sourceDrafts = await this._postsService.getCampaignDrafts(organizationId, id);
     for (const group of Object.values(sourceDrafts)) {

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { shuffle } from 'lodash';
 import { z } from 'zod';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
@@ -39,6 +39,7 @@ export class OpenaiService {
   private readonly _logger = new Logger(OpenaiService.name);
 
   constructor(
+    @Inject(forwardRef(() => AIModelProvider))
     private readonly _aiModelProvider: AIModelProvider,
     private readonly _aiMediaService: AiMediaService,
   ) {}
@@ -181,11 +182,14 @@ export class OpenaiService {
         if (err instanceof BudgetExceeded || err instanceof GuardrailViolation) {
           throw err;
         }
-        this._logger.error(err, OpenaiService.name);
+        this._logger.error(
+          `generateSlidesFromText attempt failed: ${(err as Error)?.message}`,
+          OpenaiService.name,
+        );
       }
     }
 
-    this._logger.error('generateSlidesFromText failed after 3 retries');
+    this._logger.error('generateSlidesFromText failed after 3 retries', OpenaiService.name);
     return [];
   }
 
@@ -226,7 +230,7 @@ export class OpenaiService {
       });
       return result.trim();
     } catch (err) {
-      this._logger.error(`generateAltText failed: ${err}`);
+      this._logger.error(`generateAltText failed: ${(err as Error)?.message}`);
       return '';
     }
   }

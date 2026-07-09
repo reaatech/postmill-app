@@ -44,6 +44,69 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     return 500;
   }
 
+  private _buildRedirectUri(pathSuffix: string): string {
+    const frontendUrl = process.env.FRONTEND_URL || '';
+    if (!frontendUrl) {
+      throw new Error(
+        `FRONTEND_URL is not configured (provider: ${this.identifier})`
+      );
+    }
+    if (!frontendUrl.toLowerCase().startsWith('https://')) {
+      throw new Error(
+        `FRONTEND_URL must use HTTPS for OAuth redirects (provider: ${this.identifier})`
+      );
+    }
+    const redirectUri = `${frontendUrl.replace(/\/+$/, '')}${pathSuffix}`;
+    if (!this._isAllowedReturnUrl(redirectUri)) {
+      throw new Error(
+        `OAuth redirect URI ${redirectUri} is not allowed for provider ${this.identifier}. Add the origin to INTEGRATION_RETURN_URL_ALLOWLIST or set a secure FRONTEND_URL.`
+      );
+    }
+    return redirectUri;
+  }
+
+  private _isAllowedReturnUrl(url: string): boolean {
+    if (!url || typeof url !== 'string' || !url.toLowerCase().startsWith('https://')) {
+      return false;
+    }
+    try {
+      const parsed = new URL(url);
+      if (parsed.username || parsed.password) {
+        return false;
+      }
+      const hostname = parsed.hostname.toLowerCase();
+      if (
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname === '[::1]' ||
+        hostname.endsWith('.local') ||
+        hostname.endsWith('.internal') ||
+        hostname.endsWith('.lan') ||
+        /^10\./.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+        /^192\.168\./.test(hostname) ||
+        /^169\.254\./.test(hostname)
+      ) {
+        return false;
+      }
+      const origin = parsed.origin.toLowerCase().replace(/\/+$/, '');
+      const allowlist = (process.env.INTEGRATION_RETURN_URL_ALLOWLIST || '')
+        .split(',')
+        .map((s) => s.trim().toLowerCase().replace(/\/+$/, ''))
+        .filter(Boolean);
+      if (allowlist.includes(origin)) {
+        return true;
+      }
+      const frontendOrigin = (process.env.FRONTEND_URL || '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+      return origin === frontendOrigin;
+    } catch {
+      return false;
+    }
+  }
+
   override handleErrors(body: string):
     | {
         type: 'refresh-token' | 'bad-body';
@@ -108,11 +171,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
         'https://www.threads.net/oauth/authorize' +
         `?client_id=${clientInformation?.client_id || ''}` +
         `&redirect_uri=${encodeURIComponent(
-          `${
-            process?.env.FRONTEND_URL?.indexOf('https') == -1
-              ? `https://redirectmeto.com/${process?.env.FRONTEND_URL}`
-              : `${process?.env.FRONTEND_URL}`
-          }/integrations/social/threads`
+          this._buildRedirectUri('/integrations/social/threads')
         )}` +
         `&state=${state}` +
         `&scope=${encodeURIComponent(this.scopes.join(','))}`,
@@ -134,11 +193,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
         'https://graph.threads.net/oauth/access_token' +
           `?client_id=${clientInformation?.client_id || ''}` +
           `&redirect_uri=${encodeURIComponent(
-            `${
-              process?.env.FRONTEND_URL?.indexOf('https') == -1
-                ? `https://redirectmeto.com/${process?.env.FRONTEND_URL}`
-                : `${process?.env.FRONTEND_URL}`
-            }/integrations/social/threads`
+            this._buildRedirectUri('/integrations/social/threads')
           )}` +
           `&grant_type=authorization_code` +
           `&client_secret=${clientInformation?.client_secret || ''}` +

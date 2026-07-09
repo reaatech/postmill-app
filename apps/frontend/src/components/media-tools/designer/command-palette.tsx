@@ -1,5 +1,11 @@
 'use client';
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from 'react';
 import { actionLabel, menuLabel, type DesignerAction } from './actions';
 
 interface CommandPaletteProps {
@@ -65,24 +71,32 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
   }, [open]);
 
   // Only runnable (enabled) commands appear in the palette.
-  const available = actions.filter((a) => !a.enabled || a.enabled());
+  const available = useMemo(
+    () => actions.filter((a) => !a.enabled || a.enabled()),
+    [actions]
+  );
 
-  const filtered = available.filter((a) => {
-    if (!query) return true;
+  const filtered = useMemo(() => {
+    if (!query) return available;
     const q = query.toLowerCase();
-    return (
-      actionLabel(a).toLowerCase().includes(q) ||
-      (a.keywords || []).some((k) => k.toLowerCase().includes(q))
+    return available.filter(
+      (a) =>
+        actionLabel(a).toLowerCase().includes(q) ||
+        (a.keywords || []).some((k) => k.toLowerCase().includes(q))
     );
-  });
+  }, [available, query]);
 
-  const grouped = filtered.reduce(
-    (acc, a) => {
-      const cat = menuLabel(a.menu);
-      (acc[cat] = acc[cat] || []).push(a);
-      return acc;
-    },
-    {} as Record<string, DesignerAction[]>
+  const grouped = useMemo(
+    () =>
+      filtered.reduce(
+        (acc, a) => {
+          const cat = menuLabel(a.menu);
+          (acc[cat] = acc[cat] || []).push(a);
+          return acc;
+        },
+        {} as Record<string, DesignerAction[]>
+      ),
+    [filtered]
   );
 
   const executeAction = useCallback((action: DesignerAction) => {
@@ -121,12 +135,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
     >
       <div
         ref={containerRef}
-        className="bg-[#1a1a2e] border border-[#2a2a4a] rounded-xl w-[560px] max-h-[400px] flex flex-col shadow-2xl"
+        className="bg-studioBg border border-studioBorder rounded-xl w-[560px] max-h-[400px] flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <input
           ref={inputRef}
-          className="w-full px-4 py-3 bg-transparent text-white text-lg outline-none border-b border-[#2a2a4a] placeholder-gray-500"
+          className="w-full px-4 py-3 bg-transparent text-textColor text-lg outline-none border-b border-studioBorder placeholder:text-textColor/50"
           placeholder="Type a command..."
           value={query}
           onChange={(e) => {
@@ -137,7 +151,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
         <div className="flex-1 overflow-y-auto p-2">
           {Object.entries(grouped).map(([category, items]) => (
             <div key={category}>
-              <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="px-3 py-1.5 text-xs font-semibold text-textColor/50 uppercase tracking-wider">
                 {category}
               </div>
               {items.map((action) => {
@@ -147,24 +161,24 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
                     key={action.id}
                     className={`w-full text-left px-3 py-2 rounded text-sm flex items-center gap-3 ${
                       globalIndex === selectedIndex
-                        ? 'bg-designerAccent text-white'
-                        : 'text-gray-300 hover:bg-white/5'
+                        ? 'bg-designerAccent text-textColor'
+                        : 'text-textColor hover:bg-textColor/5'
                     }`}
                     onClick={() => executeAction(action)}
                     onMouseEnter={() => setSelectedIndex(globalIndex)}
                   >
                     <span className="flex-1">{actionLabel(action)}</span>
                     {action.shortcut && (
-                      <span className="text-xs text-gray-500">{action.shortcut}</span>
+                      <span className="text-xs text-textColor/50">{action.shortcut}</span>
                     )}
-                    <span className="text-xs text-gray-500">{menuLabel(action.menu)}</span>
+                    <span className="text-xs text-textColor/50">{menuLabel(action.menu)}</span>
                   </button>
                 );
               })}
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="px-3 py-6 text-center text-sm text-gray-500">
+            <div className="px-3 py-6 text-center text-sm text-textColor/50">
               No matching commands
             </div>
           )}

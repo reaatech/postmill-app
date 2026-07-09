@@ -23,9 +23,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
+import { StockMediaService, CONTENT_PACK_CAPABILITY_MAP } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
 import { ContentPackDailyCapError } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.interface';
-import type { ContentPackCapability } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.interface';
 import { ImportFromUrlDto } from '@gitroom/nestjs-libraries/dtos/file/import.from.url.dto';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
@@ -54,24 +53,6 @@ import { UPLOAD_LIMITS } from '@gitroom/nestjs-libraries/upload/upload-limits';
 const TMP_UPLOAD_DIR = path.join(tmpdir(), 'postmill-uploads');
 try { mkdirSync(TMP_UPLOAD_DIR, { recursive: true }); } catch {}
 
-// 0.4: the frontend sends a SINGULAR media kind (`photo`/`video`/…), but content
-// pack capabilities are PLURAL (`photos`/`videos`/…). Map + validate so the
-// mint-then-ingest path actually resolves a pack capability instead of 500-ing.
-const CONTENT_PACK_CAPABILITY_MAP: Record<string, ContentPackCapability> = {
-  photo: 'photos',
-  photos: 'photos',
-  image: 'photos',
-  vector: 'vectors',
-  vectors: 'vectors',
-  video: 'videos',
-  videos: 'videos',
-  sticker: 'stickers',
-  stickers: 'stickers',
-  icon: 'icons',
-  icons: 'icons',
-  audio: 'audio',
-};
-
 @ApiTags('Files')
 @Controller('/files')
 export class FilesController {
@@ -83,36 +64,6 @@ export class FilesController {
     private _stockMediaService: StockMediaService,
     private _resolution: ProviderResolutionService
   ) {}
-
-  /**
-   * Validate a client-supplied storage path before persisting it. The path must
-   * match one of the org's configured storage public URL prefixes and the object
-   * must be reachable by the resolved adapter.
-   */
-  private async _assertPathBelongsToOrg(
-    orgId: string,
-    filePath: string,
-    folderId?: string
-  ): Promise<Buffer> {
-    const prefixes = await this._storageService.getOrgStoragePublicPrefixes(orgId);
-    const matchesPrefix = prefixes.some((prefix) => filePath.startsWith(prefix));
-    if (!matchesPrefix) {
-      throw new HttpException('Invalid storage path', 400);
-    }
-
-    const adapter = await this._storageService.resolveAdapterForFolder(
-      folderId,
-      orgId
-    );
-    try {
-      return await adapter.readFile(filePath);
-    } catch (err) {
-      this._logger.warn(
-        `save-media path probe failed for org=${orgId}: ${(err as Error).message}`
-      );
-      throw new HttpException('Storage object not found', 404);
-    }
-  }
 
   // ── File CRUD ────────────────────────────────────────────
 
@@ -212,14 +163,14 @@ export class FilesController {
     if (!body.name) {
       return false;
     }
-    const buffer = await this._assertPathBelongsToOrg(org.id, body.path, body.folderId);
+    const { fileSize } = await this._fileService.importFromPath(org.id, body.path, body.folderId);
     return this._fileService.saveFile(
       org.id,
       body.name,
       body.path,
       body.originalName || undefined,
       body.folderId,
-      buffer.length
+      fileSize
     );
   }
 
@@ -407,8 +358,8 @@ export class FilesController {
   ) {
     const items = await Promise.all(
       body.items.map(async (item) => {
-        const buffer = await this._assertPathBelongsToOrg(org.id, item.path, item.folderId);
-        return { ...item, fileSize: buffer.length };
+        const { fileSize } = await this._fileService.importFromPath(org.id, item.path, item.folderId);
+        return { ...item, fileSize };
       })
     );
     return this._fileService.bulkSave(org.id, items);
@@ -451,24 +402,27 @@ export class FilesController {
       .listManifests('contentpack')
       .map((m) => m.providerId);
     if (body.source && contentPackIdentifiers.includes(body.source) && body.downloadLocation) {
-      // 0.4: map the singular client `type` → the plural pack capability and
-      // validate before resolving. An unknown type is a client error (400), not
-      // a silent default that mints the wrong capability.
       const capability = CONTENT_PACK_CAPABILITY_MAP[(body.type || 'photos').toLowerCase()];
       if (!capability) {
         throw new HttpException(`Unsupported content pack type: ${body.type}`, 400);
       }
-
-      let licensedUrl: string;
       try {
-        licensedUrl = await this._stockMediaService.resolveContentPackDownload(
+        const { url: licensedUrl } = await this._stockMediaService.importContentPackAsset(
           org.id,
+          body.source,
           body.downloadLocation,
-          capability
+          body.type,
         );
+        return this._fileService.importFromUrl(org.id, { ...body, url: licensedUrl });
       } catch (err) {
         if (err instanceof ContentPackDailyCapError) {
           throw new HttpException(err.message, 402);
+        }
+        if (
+          err instanceof Error &&
+          err.message.startsWith('Unsupported content pack type')
+        ) {
+          throw new HttpException(err.message, 400);
         }
         // 6.3: never leak the raw upstream provider body to the client — log the
         // detail server-side, return a generic message.
@@ -477,7 +431,6 @@ export class FilesController {
         );
         throw new HttpException('Could not retrieve the licensed asset', 502);
       }
-      return this._fileService.importFromUrl(org.id, { ...body, url: licensedUrl });
     }
 
     const result = await this._fileService.importFromUrl(org.id, body);

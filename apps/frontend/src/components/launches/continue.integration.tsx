@@ -92,7 +92,7 @@ export const ContinueIntegration: FC<{
     }
 
     return searchParams;
-  }, []);
+  }, [provider, searchParams]);
 
   useEffect(() => {
     (async () => {
@@ -200,7 +200,16 @@ export const ContinueIntegration: FC<{
         'Channel Updated'
       );
     })();
-  }, []);
+  }, [
+    fetch,
+    modifiedParams,
+    provider,
+    navigateOrShow,
+    extensionId,
+    backendUrl,
+    searchParams.onboarding,
+    searchParams.refresh,
+  ]);
 
   const onSave = useCallback(
     async (data: any) => {
@@ -242,7 +251,7 @@ export const ContinueIntegration: FC<{
         setIsSaving(false);
       }
     },
-    [twoStepState, fetch, modifiedParams, provider, navigateOrShow]
+    [twoStepState, fetch, modifiedParams, provider, navigateOrShow, logged]
   );
 
   const Provider = useMemo(() => {

@@ -6,12 +6,14 @@ import { inngest, isInngestEnabled } from '@gitroom/nestjs-libraries/inngest/inn
 import { getRenderConcurrency } from '@gitroom/nestjs-libraries/media/design-render/render-config';
 import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
 
-// Polling fallback for async media generations (§11.2): drives `adapter.pollJob()` for
-// every pending/processing AIMediaJob via the shared lifecycle service (which also
-// handles the webhook path). Never throws — a sweep failure must not crash the workflow.
+// Polling fallback for async media generations (§11.2): the sweep selects pending
+// jobs and fans them out via `media/poll-job` Inngest events; local renders are
+// re-enqueued to the concurrency-capped `media/render` function. Never throws — a
+// sweep failure must not crash the workflow.
 @Injectable()
 export class MediaJobsActivity {
   private readonly logger = new Logger(MediaJobsActivity.name);
+  private _inlineRenderTimeoutMs = MediaJobsActivity.INLINE_RENDER_TIMEOUT_MS;
 
   constructor(
     private _lifecycle: MediaJobLifecycleService,
@@ -27,6 +29,9 @@ export class MediaJobsActivity {
    */
   private static readonly STALE_RENDER_MS = 90_000;
 
+  /** Cap the inline fallback so one hanging render cannot freeze the sweep. */
+  private static readonly INLINE_RENDER_TIMEOUT_MS = 5 * 60 * 1000;
+
   /** True for the two local-compute render kinds (design timeline render + clip merge). */
   private isLocalRender(job: { provider: string; model?: string | null }): boolean {
     return job.provider === 'chromium-ffmpeg' || job.model === 'local/ffmpeg-merge';
@@ -36,6 +41,18 @@ export class MediaJobsActivity {
     const ts = job.updatedAt ?? job.createdAt;
     if (!ts) return true;
     return Date.now() - new Date(ts).getTime() > MediaJobsActivity.STALE_RENDER_MS;
+  }
+
+  /**
+   * Poll a single pending media job (invoked by the `media/poll-job` Inngest handler).
+   */
+  async processPollJob(jobId: string): Promise<void> {
+    try {
+      await this._lifecycle.processJob(jobId);
+    } catch (err) {
+      // Non-fatal: the next sweep / poll will retry until the job times out.
+      this.logger.warn(`Media poll-job error for ${jobId}: ${(err as Error).message}`);
+    }
   }
 
   /**
@@ -53,35 +70,55 @@ export class MediaJobsActivity {
   }
 
   async processPendingMediaJobs(): Promise<{ processed: number; completed: number; failed: number }> {
-    let result = { processed: 0, completed: 0, failed: 0 };
+    const result = { processed: 0, completed: 0, failed: 0 };
+
+    // §3.1 crash-recovery: reclaim any jobs stranded in the transient `landing` state.
     try {
-      result = await this._lifecycle.processPendingJobs();
-      if (result.processed > 0) {
-        this.logger.log(
-          `media jobs sweep: processed=${result.processed} completed=${result.completed} failed=${result.failed}`,
-        );
-      }
+      await this._lifecycle.reclaimStaleLandingJobs();
     } catch (err) {
-      this.logger.warn(`media jobs sweep failed: ${(err as Error).message}`);
+      this.logger.warn(`Stale-landing reclaim failed: ${(err as Error).message}`);
     }
 
-    // Local renders are processed by the concurrency-limited `media-render` Inngest
-    // function. This sweep is a safety net: re-enqueue any still-pending local render
-    // (idempotent — processRenderJob no-ops once status != pending). When Inngest is off
-    // there is no event consumer, so render inline through a host semaphore that holds the
-    // same 3-concurrent cap.
     try {
-      const pending = await this._aiSettings.getPendingMediaJobs(50);
-      const localJobs = pending.filter(
-        (j) => this.isLocalRender(j) && this.isStaleRender(j),
-      );
+      const pending = await this._aiSettings.getPendingMediaJobs(100);
+      const localJobs: typeof pending = [];
+      const pollJobs: typeof pending = [];
+
+      for (const job of pending) {
+        if (this.isLocalRender(job)) {
+          if (this.isStaleRender(job)) {
+            localJobs.push(job);
+          }
+        } else {
+          pollJobs.push(job);
+        }
+      }
+
+      // Fan out external-provider polling via events.
+      if (pollJobs.length > 0) {
+        if (isInngestEnabled()) {
+          for (const job of pollJobs) {
+            await inngest.send({
+              name: 'media/poll-job',
+              // Deterministic id dedupes against other sweeps within the same minute.
+              id: `media-poll-${job.id}-${Math.floor(Date.now() / 60000)}`,
+              data: { jobId: job.id },
+            });
+          }
+        }
+        result.processed += pollJobs.length;
+      }
+
+      // Local renders are processed by the concurrency-limited `media/render` Inngest
+      // function. This sweep is a safety net: re-enqueue any still-pending local render
+      // (idempotent — processRenderJob no-ops once status != pending). When Inngest is off
+      // there is no event consumer, so render inline through a host semaphore that holds the
+      // same 3-concurrent cap, with a per-job timeout so a hanging render cannot freeze the sweep.
       if (localJobs.length > 0) {
         if (isInngestEnabled()) {
           for (const job of localJobs) {
             await inngest.send({
               name: 'media/render',
-              // Deterministic id: a stale-job re-enqueue dedups against the initial dispatch
-              // (and other sweeps) within the same minute bucket, so at most one run is queued.
               id: `media-render-${job.id}-${Math.floor(Date.now() / 60000)}`,
               data: {
                 jobId: job.id,
@@ -89,10 +126,15 @@ export class MediaJobsActivity {
               },
             });
           }
+          result.processed += localJobs.length;
         } else {
           await mapWithConcurrency(localJobs, getRenderConcurrency(), async (job) => {
             try {
-              await this.processRenderJob(job.id);
+              await this._withTimeout(
+                this.processRenderJob(job.id),
+                this._inlineRenderTimeoutMs,
+                `Inline render timeout for ${job.id}`,
+              );
               result.processed++;
               result.completed++;
             } catch (err) {
@@ -105,10 +147,24 @@ export class MediaJobsActivity {
           });
         }
       }
+
+      if (result.processed > 0) {
+        this.logger.log(
+          `media jobs sweep: processed=${result.processed} completed=${result.completed} failed=${result.failed}`,
+        );
+      }
     } catch (err) {
-      this.logger.warn(`Local render sweep failed: ${(err as Error).message}`);
+      this.logger.warn(`media jobs sweep failed: ${(err as Error).message}`);
     }
 
     return result;
+  }
+
+  private _withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    const timeout = new Promise<never>((_, reject) => {
+      const timer = setTimeout(() => reject(new Error(message)), ms);
+      if (timer.unref) timer.unref();
+    });
+    return Promise.race([promise, timeout]);
   }
 }

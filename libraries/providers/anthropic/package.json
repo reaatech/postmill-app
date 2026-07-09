@@ -9,5 +9,12 @@
     "@gitroom/provider-kernel": "workspace:*",
     "@langchain/anthropic": "^1.0.0",
     "@langchain/core": "^1.1.48"
+  },
+  "license": "AGPL-3.0",
+  "engines": {
+    "node": ">=22.12.0 <23.0.0"
+  },
+  "scripts": {
+    "test": "vitest run"
   }
 }

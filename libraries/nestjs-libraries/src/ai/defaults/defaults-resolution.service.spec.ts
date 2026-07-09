@@ -4,9 +4,11 @@ import { AI_MODEL_CATEGORIES } from './default-categories';
 
 const makeKernel = (overrides: {
   get?: ReturnType<typeof vi.fn>;
+  latestActive?: ReturnType<typeof vi.fn>;
   getMetadata?: ReturnType<typeof vi.fn>;
 } = {}) => ({
-  get: overrides.get ?? vi.fn(),
+  get: overrides.get ?? vi.fn().mockReturnValue({ manifest: { status: 'active' } }),
+  latestActive: overrides.latestActive ?? vi.fn().mockReturnValue(undefined),
   getMetadata:
     overrides.getMetadata ??
     vi.fn().mockImplementation((_domain: string, providerId: string) => ({
@@ -79,7 +81,7 @@ describe('DefaultsResolutionService', () => {
     expect(result?.model).toBe('gpt-4.1');
   });
 
-  it('follow-current: keeps stored default on the currently configured version when provenance version differs', async () => {
+  it('honors the stored version when it is still active', async () => {
     const repository = makeRepository({
       get: vi.fn().mockResolvedValue({
         providerId: 'openai',
@@ -93,6 +95,7 @@ describe('DefaultsResolutionService', () => {
     ]);
     const kernel = makeKernel({
       get: vi.fn().mockReturnValue({
+        manifest: { status: 'active' },
         create: () => ({
           listModels: vi.fn().mockResolvedValue([{ id: 'gpt-4.1' }, { id: 'gpt-5' }]),
         }),
@@ -109,6 +112,48 @@ describe('DefaultsResolutionService', () => {
     const result = await service.resolve('ai', 'low-reasoning', 'org-1');
 
     expect(result?.source).toBe('stored');
+    expect(result?.providerId).toBe('openai');
+    expect(result?.version).toBe('v1');
+    expect(result?.model).toBe('gpt-4.1');
+  });
+
+  it('auto-upgrades a stored default when its pinned version is retired', async () => {
+    const repository = makeRepository({
+      get: vi.fn().mockResolvedValue({
+        providerId: 'openai',
+        version: 'v1',
+        model: 'gpt-4.1',
+        settings: null,
+      }),
+    });
+    const aiSettings = makeAiSettings([
+      { identifier: 'openai', enabled: true, isConfigured: true, version: 'v2' },
+    ]);
+    const kernel = makeKernel({
+      get: vi.fn().mockImplementation((_domain: string, _providerId: string, version: string) => {
+        if (version === 'v1') {
+          return { manifest: { status: 'retired' } };
+        }
+        return {
+          manifest: { status: 'active' },
+          create: () => ({
+            listModels: vi.fn().mockResolvedValue([{ id: 'gpt-4.1' }]),
+          }),
+        };
+      }),
+      latestActive: vi.fn().mockReturnValue({ manifest: { version: 'v2', status: 'active' } }),
+    });
+    service = new DefaultsResolutionService(
+      repository as any,
+      aiSettings as any,
+      makeMediaSettings() as any,
+      kernel as any,
+      makeRuntimeContextFactory() as any,
+    );
+
+    const result = await service.resolve('ai', 'low-reasoning', 'org-1');
+
+    expect(result?.source).toBe('auto');
     expect(result?.providerId).toBe('openai');
     expect(result?.version).toBe('v2');
     expect(result?.model).toBe('gpt-4.1');

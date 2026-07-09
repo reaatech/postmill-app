@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useMemo, useState } from 'react';
 import { HexColorPicker } from 'react-colorful';
 import { useFormContext } from 'react-hook-form';
 import { Button } from './button';
@@ -33,11 +33,15 @@ export const ColorPicker: FC<{
     translationParams,
   } = props;
   const form = useFormContext();
-  const color = onChange
-    ? {
-        onChange,
-      }
-    : form.register(name);
+  const color = useMemo(
+    () =>
+      onChange
+        ? {
+            onChange,
+          }
+        : form.register(name),
+    [onChange, form, name]
+  );
   const watch = onChange ? value : form.watch(name);
   const [enabledState, setEnabledState] = useState(!!watch);
   const enable = useCallback(async () => {
@@ -48,7 +52,7 @@ export const ColorPicker: FC<{
       },
     });
     setEnabledState(true);
-  }, []);
+  }, [color, name]);
   const cancel = useCallback(async () => {
     await color.onChange({
       target: {
@@ -57,7 +61,7 @@ export const ColorPicker: FC<{
       },
     });
     setEnabledState(false);
-  }, []);
+  }, [color, name]);
 
   const t = useT();
 

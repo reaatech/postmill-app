@@ -337,7 +337,7 @@ export class PostsRepository {
       if (color) settings.color = color;
       else delete settings.color;
       return this._post.model.post.update({
-        where: { id: post.id },
+        where: { id: post.id, organizationId: orgId },
         data: { settings: JSON.stringify(settings) },
       });
     });
@@ -833,6 +833,7 @@ export class PostsRepository {
           where: {
             post: {
               id: posts[0].id,
+              organizationId: orgId,
             },
           },
         });
@@ -852,6 +853,7 @@ export class PostsRepository {
             await this._post.model.post.update({
               where: {
                 id: posts[posts.length - 1].id,
+                organizationId: orgId,
               },
               data: {
                 tags: {

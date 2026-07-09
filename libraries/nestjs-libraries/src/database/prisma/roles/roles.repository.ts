@@ -81,13 +81,14 @@ export class RolesRepository {
     if (!role) return null;
 
     if (data.name !== undefined || data.description !== undefined) {
-      await this._appRole.model.appRole.update({
-        where: { id: roleId },
+      const { count } = await this._appRole.model.appRole.updateMany({
+        where: { id: roleId, organizationId: orgId, isSystem: false },
         data: {
           ...(data.name !== undefined && { name: data.name }),
           ...(data.description !== undefined && { description: data.description }),
         },
       });
+      if (count === 0) return null;
     }
 
     if (data.permissionIds !== undefined) {
@@ -113,9 +114,11 @@ export class RolesRepository {
     });
     if (!role) return null;
 
-    return this._appRole.model.appRole.delete({
-      where: { id: roleId },
+    const { count } = await this._appRole.model.appRole.deleteMany({
+      where: { id: roleId, organizationId: orgId, isSystem: false },
     });
+    if (count === 0) return null;
+    return { id: roleId };
   }
 
   getMemberEffectivePermissions(orgId: string, userId: string) {
@@ -140,7 +143,7 @@ export class RolesRepository {
     if (!membership) return null;
 
     return this._userOrganization.model.userOrganization.update({
-      where: { id: membership.id },
+      where: { userId_organizationId: { userId, organizationId: orgId } },
       data: { roleId },
     });
   }

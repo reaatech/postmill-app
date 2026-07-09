@@ -3,15 +3,18 @@ import { StorageProviderType, Organization, User } from '@prisma/client';
 
 const serviceMock = {
   getProviderConfigs: vi.fn(),
-  createConfig: vi.fn(),
+  createAndTestConfig: vi.fn(),
   updateConfig: vi.fn(),
   deleteConfig: vi.fn(),
   testConnection: vi.fn(),
   mount: vi.fn(),
   unmount: vi.fn(),
-  getUsage: vi.fn(),
+  getUsageDto: vi.fn(),
+  getQuotaStatusDto: vi.fn(),
+  getUsageBreakdownDto: vi.fn(),
   getMigrationPreview: vi.fn(),
   migrate: vi.fn(),
+  setDefaultFolderForProvider: vi.fn(),
 };
 
 const auditMock = {
@@ -25,15 +28,18 @@ const fileMock = {
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
     getProviderConfigs = serviceMock.getProviderConfigs;
-    createConfig = serviceMock.createConfig;
+    createAndTestConfig = serviceMock.createAndTestConfig;
     updateConfig = serviceMock.updateConfig;
     deleteConfig = serviceMock.deleteConfig;
     testConnection = serviceMock.testConnection;
     mount = serviceMock.mount;
     unmount = serviceMock.unmount;
-    getUsage = serviceMock.getUsage;
+    getUsageDto = serviceMock.getUsageDto;
+    getQuotaStatusDto = serviceMock.getQuotaStatusDto;
+    getUsageBreakdownDto = serviceMock.getUsageBreakdownDto;
     getMigrationPreview = serviceMock.getMigrationPreview;
     migrate = serviceMock.migrate;
+    setDefaultFolderForProvider = serviceMock.setDefaultFolderForProvider;
   },
 }));
 
@@ -74,13 +80,12 @@ describe('StorageController', () => {
   });
 
   describe('createProvider', () => {
-    it('creates a new storage provider', async () => {
-      serviceMock.createConfig.mockResolvedValue({
+    it('delegates create+test+rollback to the service', async () => {
+      serviceMock.createAndTestConfig.mockResolvedValue({
         id: 's3-1',
         name: 'My S3',
         type: 'S3',
       });
-      serviceMock.testConnection.mockResolvedValue({ ok: true });
       const controller = makeController();
 
       const result = await controller.createProvider(org, user, {
@@ -92,20 +97,34 @@ describe('StorageController', () => {
       });
 
       expect(result.name).toBe('My S3');
-      expect(serviceMock.createConfig).toHaveBeenCalledWith(
+      expect(serviceMock.createAndTestConfig).toHaveBeenCalledWith(
         'org-1',
-        expect.objectContaining({ name: 'My S3' }),
+        expect.objectContaining({ name: 'My S3', quotaBytes: undefined }),
         'user-1'
       );
     });
 
-    it('deletes the config if test connection fails', async () => {
-      serviceMock.createConfig.mockResolvedValue({ id: 's3-1' });
-      serviceMock.testConnection.mockResolvedValue({
-        ok: false,
-        error: 'Invalid credentials',
-      });
-      serviceMock.deleteConfig.mockResolvedValue({});
+    it('passes BigInt quotaBytes to the service', async () => {
+      serviceMock.createAndTestConfig.mockResolvedValue({ id: 's3-1' });
+      const controller = makeController();
+
+      await controller.createProvider(org, user, {
+        type: StorageProviderType.S3,
+        name: 'My S3',
+        quotaBytes: 1024,
+      } as any);
+
+      expect(serviceMock.createAndTestConfig).toHaveBeenCalledWith(
+        'org-1',
+        expect.objectContaining({ quotaBytes: BigInt(1024) }),
+        'user-1'
+      );
+    });
+
+    it('propagates a connection-test failure from the service', async () => {
+      serviceMock.createAndTestConfig.mockRejectedValue(
+        new HttpException('Connection test failed: bad creds', 400)
+      );
       const controller = makeController();
 
       await expect(
@@ -114,8 +133,6 @@ describe('StorageController', () => {
           name: 'Bad Config',
         } as any)
       ).rejects.toThrow(HttpException);
-
-      expect(serviceMock.deleteConfig).toHaveBeenCalled();
     });
   });
 
@@ -256,36 +273,86 @@ describe('StorageController', () => {
   });
 
   describe('getUsage', () => {
-    it('returns storage usage for all providers', async () => {
-      serviceMock.getUsage.mockResolvedValue({
-        totalBytes: BigInt(1000),
-        quotaBytes: BigInt(5000),
+    it('returns DTO-ready storage usage', async () => {
+      serviceMock.getUsageDto.mockResolvedValue({
+        totalBytes: 1000,
+        quotaBytes: 5000,
         providers: [
-          { id: 'local-1', name: 'Local', usageBytes: BigInt(1000) },
+          { id: 'local-1', name: 'Local', usageBytes: 1000 },
         ],
       });
       const controller = makeController();
 
       const result = await controller.getUsage(org);
 
+      expect(serviceMock.getUsageDto).toHaveBeenCalledWith('org-1');
       expect(result.totalBytes).toBe(1000);
       expect(result.quotaBytes).toBe(5000);
       expect(result.providers).toHaveLength(1);
     });
+  });
 
-    it('handles null usageBytes for cloud providers', async () => {
-      serviceMock.getUsage.mockResolvedValue({
-        totalBytes: BigInt(1000),
-        quotaBytes: BigInt(5000),
-        providers: [
-          { id: 's3-1', name: 'S3', usageBytes: null },
-        ],
+  describe('getQuotaStatus', () => {
+    it('returns DTO-ready quota status', async () => {
+      serviceMock.getQuotaStatusDto.mockResolvedValue({
+        usedBytes: 1000,
+        quotaBytes: 5000,
+        percentUsed: 20,
+        warning: false,
       });
       const controller = makeController();
 
-      const result = await controller.getUsage(org);
+      const result = await controller.getQuotaStatus(org);
 
-      expect(result.providers[0].usageBytes).toBeNull();
+      expect(serviceMock.getQuotaStatusDto).toHaveBeenCalledWith('org-1');
+      expect(result.percentUsed).toBe(20);
+      expect(result.warning).toBe(false);
+    });
+  });
+
+  describe('getUsageBreakdown', () => {
+    it('returns DTO-ready usage breakdown', async () => {
+      serviceMock.getUsageBreakdownDto.mockResolvedValue({
+        byFolder: [{ folderId: 'f-1', folderName: 'Root', totalBytes: 100 }],
+        byProvider: [{ providerId: 'local', providerName: 'Local', totalBytes: 100 }],
+      });
+      const controller = makeController();
+
+      const result = await controller.getUsageBreakdown(org);
+
+      expect(serviceMock.getUsageBreakdownDto).toHaveBeenCalledWith('org-1');
+      expect(result.byFolder[0].totalBytes).toBe(100);
+    });
+  });
+
+  describe('setDefaultFolder', () => {
+    it('delegates folder ownership validation and update to the service', async () => {
+      serviceMock.setDefaultFolderForProvider.mockResolvedValue({ id: 's3-1', defaultFolderId: 'f-1' });
+      const controller = makeController();
+
+      const result = await controller.setDefaultFolder(org, user, 's3-1', { folderId: 'f-1' });
+
+      expect(serviceMock.setDefaultFolderForProvider).toHaveBeenCalledWith(
+        's3-1',
+        'f-1',
+        'org-1',
+        'user-1'
+      );
+      expect(result).toEqual({ id: 's3-1', defaultFolderId: 'f-1' });
+    });
+
+    it('normalizes empty folderId to null', async () => {
+      serviceMock.setDefaultFolderForProvider.mockResolvedValue({ id: 's3-1', defaultFolderId: null });
+      const controller = makeController();
+
+      await controller.setDefaultFolder(org, user, 's3-1', { folderId: '' });
+
+      expect(serviceMock.setDefaultFolderForProvider).toHaveBeenCalledWith(
+        's3-1',
+        null,
+        'org-1',
+        'user-1'
+      );
     });
   });
 
@@ -296,10 +363,6 @@ describe('StorageController', () => {
       expect(
         Object.getOwnPropertyNames(Object.getPrototypeOf(controller))
       ).not.toContain('setDefaultProvider');
-    });
-
-    it('does not expose a setDefault method on the service', () => {
-      expect(serviceMock).not.toHaveProperty('setDefault');
     });
   });
 });
