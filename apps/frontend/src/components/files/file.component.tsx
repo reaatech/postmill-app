@@ -555,7 +555,7 @@ export const MultiFileComponent: FC<{
         kinds={['image', 'video']}
         excludeTabs={['Stock Stickers', 'Stock Icons']}
       />
-      <div className="text-[12px] text-red-400">{error}</div>
+      <div className="text-[12px] text-dangerText">{error}</div>
     </>
   );
 };

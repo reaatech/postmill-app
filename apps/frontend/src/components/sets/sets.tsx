@@ -227,7 +227,7 @@ export const Sets: FC = () => {
 
       {!isLoading && error && !data && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
-          <span className="text-[14px] text-red-400">{t('failed_loading_templates', 'Failed to load templates')}</span>
+          <span className="text-[14px] text-dangerText">{t('failed_loading_templates', 'Failed to load templates')}</span>
           <button onClick={() => mutate()} className="text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors">{t('try_again', 'Try again')}</button>
         </div>
       )}
@@ -322,7 +322,7 @@ export const Sets: FC = () => {
                 {/* Actions */}
                 <div className="flex items-center gap-[10px] shrink-0">
                   <button onClick={addSet(s)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
-                  <button onClick={deleteSet(s)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
+                  <button onClick={deleteSet(s)} className="text-[12px] text-dangerText hover:underline">{t('delete', 'Delete')}</button>
                 </div>
               </div>
             );

@@ -151,7 +151,7 @@ export const BulkToolbar: FC<{
       </button>
       <button
         onClick={handleBulkDelete}
-        className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-red-400 border border-newColColor hover:bg-boxHover transition-all"
+        className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-dangerText border border-newColColor hover:bg-boxHover transition-all"
       >
         Delete
       </button>

@@ -1244,7 +1244,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
           {brandEnforcement && brandViolations.length > 0 && (
             <div className="rounded-[6px] border border-red-400/30 bg-red-400/10 p-2">
-              <div className="text-[12px] text-red-400 font-medium mb-1">
+              <div className="text-[12px] text-dangerText font-medium mb-1">
                 Off-brand elements detected
               </div>
               <ul className="text-[11px] text-newTextColor/60 list-disc pl-4 space-y-0.5 max-h-[100px] overflow-y-auto">
@@ -1724,7 +1724,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                 {posterUrl && (
                   <button
                     onClick={() => setPosterUrl('')}
-                    className="text-[11px] text-red-400 hover:text-red-300"
+                    className="text-[11px] text-dangerText hover:text-red-300"
                   >
                     Clear
                   </button>
@@ -1757,7 +1757,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           </div>
 
           {renderError && (
-            <div className="text-[12px] text-red-400 mt-2">{renderError}</div>
+            <div className="text-[12px] text-dangerText mt-2">{renderError}</div>
           )}
         </>
       )}
@@ -1905,7 +1905,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <circle cx="12" cy="12" r="11" fill="#ef4444" stroke="none" />
                   <path d="M8 8l8 8M16 8l-8 8" stroke="white" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                <div className="text-[14px] text-red-400 font-medium">Render Failed</div>
+                <div className="text-[14px] text-dangerText font-medium">Render Failed</div>
                 {renderError && (
                   <div className="text-[12px] text-newTextColor/60 text-center">{renderError}</div>
                 )}

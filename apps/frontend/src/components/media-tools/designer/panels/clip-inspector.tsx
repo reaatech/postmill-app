@@ -723,7 +723,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
         {keyframes.length > 0 && (
           <button
             onClick={() => updateClip({ keyframes: [] })}
-            className="w-full px-2 py-1 rounded text-[11px] border border-red-400/40 text-red-400 hover:bg-red-400/5"
+            className="w-full px-2 py-1 rounded text-[11px] border border-red-400/40 text-dangerText hover:bg-red-400/5"
           >
             Clear all keyframes
           </button>

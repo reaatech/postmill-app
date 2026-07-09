@@ -12,7 +12,7 @@ import {
 } from './field-classification';
 
 function RequiredMark({ required }: { required?: boolean }) {
-  return required ? <span className="text-red-400 ml-1">*</span> : null;
+  return required ? <span className="text-dangerText ml-1">*</span> : null;
 }
 
 const inputClass =

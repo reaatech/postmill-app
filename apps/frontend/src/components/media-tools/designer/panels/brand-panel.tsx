@@ -368,7 +368,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
 
         {brandEnforcement && violations.length > 0 && (
           <div className="rounded-[6px] border border-red-400/30 bg-red-400/10 p-2">
-            <div className="text-[11px] text-red-400 font-medium mb-1">
+            <div className="text-[11px] text-dangerText font-medium mb-1">
               Off-brand elements detected
             </div>
             <ul className="text-[10px] text-newTextColor/60 list-disc pl-4 space-y-0.5 max-h-[120px] overflow-y-auto">
@@ -717,7 +717,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                 <button
                   type="button"
                   onClick={() => handleFontDelete(f)}
-                  className="ml-2 w-5 h-5 rounded-full border border-studioBorder text-[11px] text-textColor/60 hover:text-red-400 hover:border-red-400 flex items-center justify-center shrink-0 transition-colors"
+                  className="ml-2 w-5 h-5 rounded-full border border-studioBorder text-[11px] text-textColor/60 hover:text-dangerText hover:border-red-400 flex items-center justify-center shrink-0 transition-colors"
                   title={`Remove ${f.family}`}
                 >
                   ✕

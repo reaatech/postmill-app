@@ -207,7 +207,7 @@ const PromptLibraryDropdown: FC<{
                   deletePrompt(item.id);
                 }}
                 disabled={deleting === item.id}
-                className="opacity-0 group-hover:opacity-100 ml-[8px] text-[11px] text-red-400 hover:text-red-500 disabled:opacity-50 shrink-0"
+                className="opacity-0 group-hover:opacity-100 ml-[8px] text-[11px] text-dangerText hover:text-red-500 disabled:opacity-50 shrink-0"
               >
                 {deleting === item.id ? (
                   <Loading height={12} width={12} type="spin" color="#ef4444" />
