@@ -42,7 +42,7 @@ export const getUppyUploadPlugin = (
       return {
         plugin: XHRUpload,
         options: {
-          endpoint: `${backendUrl}/media/upload-server`,
+          endpoint: `${backendUrl}/files/upload-server`,
           withCredentials: true,
           formData: true,
           allowedMetaFields: ['folderId'],
