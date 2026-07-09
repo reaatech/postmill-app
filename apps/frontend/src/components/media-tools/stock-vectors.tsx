@@ -138,6 +138,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
           <select
             value={orientation}
             onChange={(e) => setOrientation(e.target.value)}
+            aria-label="Filter by orientation"
             className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
           >
             <option value="">All orientations</option>

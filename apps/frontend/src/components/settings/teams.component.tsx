@@ -107,7 +107,7 @@ const InviteMemberForm = ({ onDone }: { onDone: () => void }) => {
           ))}
         </Select>
         <div className="flex gap-[5px] items-center">
-          <input type="checkbox" {...form.register('sendEmail')} className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer" />
+          <input type="checkbox" aria-label={t('send_invitation_via_email', 'Send invitation via email?')} {...form.register('sendEmail')} className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer" />
           <span className="text-[13px]">{t('send_invitation_via_email', 'Send invitation via email?')}</span>
         </div>
         <Button type="submit" className="mt-[18px]">{t('send_invitation_link', 'Send Invitation')}</Button>
@@ -272,6 +272,7 @@ export const TeamsComponent = () => {
           />
         </div>
         <select
+          aria-label={t('filter_by_role', 'Filter by role')}
           value={roleFilter}
           onChange={(e) => { setRoleFilter(e.target.value); setPage(0); }}
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
@@ -282,6 +283,7 @@ export const TeamsComponent = () => {
           ))}
         </select>
         <select
+          aria-label={t('sort_by', 'Sort by')}
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as 'name' | 'joined')}
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
@@ -341,6 +343,7 @@ export const TeamsComponent = () => {
                   render: (m: any) =>
                     canManageMember(m) ? (
                       <select
+                        aria-label={`${t('role', 'Role')} — ${m.user.profile?.name || m.user.email}`}
                         value={m.roleId || ''}
                         onChange={changeRole(m)}
                         className="bg-newBgColor border border-newTableBorder rounded-[8px] px-[8px] py-[4px] text-[13px] outline-none"

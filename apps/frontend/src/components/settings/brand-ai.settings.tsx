@@ -292,6 +292,7 @@ export const BrandVoiceSection = () => {
           <Select
             name="platformSelector"
             label=""
+            aria-label={t('platform_overrides', 'Per-Platform Overrides')}
             disableForm={true}
             hideErrors={true}
             value={selectedPlatform}
@@ -360,6 +361,7 @@ export const BrandVoiceSection = () => {
           <Select
             name="brandLanguage"
             label=""
+            aria-label={t('brand_language', 'Language')}
             disableForm={true}
             hideErrors={true}
             value={language}

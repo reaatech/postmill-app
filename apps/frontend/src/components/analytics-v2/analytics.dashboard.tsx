@@ -340,8 +340,9 @@ export const AnalyticsDashboard: FC = () => {
     <button
       key={item.key}
       type="button"
+      role="tab"
+      aria-selected={tab === item.key}
       onClick={() => handleTabChange(item.key)}
-      aria-current={tab === item.key ? 'page' : undefined}
       className={clsx(
         'px-[16px] py-[10px] text-[14px] font-[500] whitespace-nowrap border-b-2 -mb-[1px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-designerAccent/60',
         tab === item.key
@@ -413,7 +414,7 @@ export const AnalyticsDashboard: FC = () => {
               className="flex-1 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
               role="tablist"
             >
-              <div className="flex items-center gap-[2px] min-w-max">
+              <div role="presentation" className="flex items-center gap-[2px] min-w-max">
                 {tabItems.map((item) => renderTab(item))}
               </div>
             </div>

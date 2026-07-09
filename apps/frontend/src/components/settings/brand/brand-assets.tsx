@@ -141,12 +141,14 @@ export const BrandAssets = ({
             type="color"
             value={newColor}
             onChange={(e) => setNewColor(e.target.value)}
+            aria-label="Brand color"
             className="w-[36px] h-[32px] rounded-[6px] border border-newTableBorder bg-transparent cursor-pointer p-0"
           />
           <input
             type="text"
             value={newColor}
             onChange={(e) => setNewColor(e.target.value)}
+            aria-label="Hex color value"
             className="w-[110px] bg-newBgColor border border-newTableBorder rounded-[8px] px-[10px] py-[6px] text-[13px] text-textColor outline-none"
           />
           <button

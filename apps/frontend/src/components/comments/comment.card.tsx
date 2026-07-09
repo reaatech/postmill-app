@@ -206,6 +206,7 @@ export const CommentCard: FC<CommentCardProps> = ({
               type="button"
               onClick={toggleLike}
               aria-pressed={liked}
+              aria-label={liked ? t('unlike', 'Unlike') : t('like', 'Like')}
               className={`flex items-center gap-[3px] text-[11px] ${
                 liked ? 'text-red-500' : 'text-newTableText'
               } hover:text-dangerText transition-colors`}

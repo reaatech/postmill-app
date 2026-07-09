@@ -87,6 +87,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
     <div className="flex flex-col gap-[16px]">
       {fields.map((field) => {
         const value = values[field.name];
+        const a11yLabel = field.label ?? field.name;
         return (
           <div key={field.name}>
             <Label field={field} />
@@ -94,6 +95,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
             {(field.type === 'prompt' || field.type === 'text') &&
               (field.type === 'prompt' ? (
                 <textarea
+                  aria-label={a11yLabel}
                   value={(value as string) ?? ''}
                   onChange={(e) => onChange(field.name, e.target.value)}
                   placeholder={field.placeholder}
@@ -103,6 +105,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
               ) : (
                 <input
                   type="text"
+                  aria-label={a11yLabel}
                   value={(value as string) ?? ''}
                   onChange={(e) => onChange(field.name, e.target.value)}
                   placeholder={field.placeholder}
@@ -121,6 +124,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                 />
               ) : (
                 <select
+                  aria-label={a11yLabel}
                   value={(value as string) ?? (field.default as string) ?? ''}
                   onChange={(e) => onChange(field.name, e.target.value)}
                   className={inputClass}
@@ -138,6 +142,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                 <div className="flex items-center gap-[12px]">
                   <input
                     type="range"
+                    aria-label={a11yLabel}
                     min={field.min}
                     max={field.max}
                     step={field.step ?? 1}
@@ -152,6 +157,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
               ) : (
                 <input
                   type="number"
+                  aria-label={a11yLabel}
                   min={field.min}
                   max={field.max}
                   step={field.step ?? 1}

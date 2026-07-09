@@ -18,10 +18,12 @@ export const ProfileComponent: FC<{
       <h4 className="text-[16px] font-[600]">{t('profile', 'Profile')}</h4>
       <Input
         label={t('full_name', 'Full Name')}
+        aria-label={t('full_name', 'Full Name')}
         {...form.register('fullname')}
       />
       <Input
         label={t('last_name', 'Last Name')}
+        aria-label={t('last_name', 'Last Name')}
         {...form.register('lastName')}
       />
       <div className="flex flex-col gap-[8px]">

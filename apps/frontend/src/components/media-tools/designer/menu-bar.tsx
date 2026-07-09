@@ -154,9 +154,10 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
 
   const trigger = useCallback(
     (menu: DesignerMenu, label: string, items: DesignerAction[], mobileHidden: boolean) => (
-      <div key={menu} className={clsx('relative', mobileHidden && 'mobile:hidden')}>
+      <div key={menu} role="none" className={clsx('relative', mobileHidden && 'mobile:hidden')}>
         <button
           type="button"
+          role="menuitem"
           aria-haspopup="menu"
           aria-expanded={open === menu}
           onClick={() => setOpen((cur) => (cur === menu ? null : menu))}
@@ -180,9 +181,10 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
     <div ref={barRef} role="menubar" className="flex items-center gap-0.5">
       {menus.map((g, i) => trigger(g.menu, g.label, g.items, i >= visibleOnMobile))}
       {overflowMenus.length > 0 && (
-        <div className="relative hidden mobile:block">
+        <div role="none" className="relative hidden mobile:block">
           <button
             type="button"
+            role="menuitem"
             aria-haspopup="menu"
             aria-expanded={open === 'more'}
             aria-label="More menus"

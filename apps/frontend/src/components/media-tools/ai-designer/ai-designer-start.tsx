@@ -315,6 +315,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
             <Input
               label="Variants"
               name="variants"
+              aria-label="Variants"
               type="number"
               disableForm
               min={1}

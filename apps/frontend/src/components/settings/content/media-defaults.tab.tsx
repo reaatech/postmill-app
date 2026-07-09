@@ -448,6 +448,7 @@ const MediaCategoryRow: React.FC<{
         options={options}
         isLoading={optionsLoading}
         disabled={empty}
+        label={`Default model for ${CATEGORY_LABELS[category]}`}
         value={value}
         onChange={(newValue) => {
           if (!newValue) return;

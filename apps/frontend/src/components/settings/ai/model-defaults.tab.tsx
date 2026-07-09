@@ -106,6 +106,7 @@ const AiDefaultRow: React.FC<{
         options={options}
         isLoading={isLoading}
         disabled={empty}
+        label={`Default model for ${CATEGORY_LABELS[row.category]}`}
         value={value}
         onChange={(newValue) => {
           if (!newValue) return;

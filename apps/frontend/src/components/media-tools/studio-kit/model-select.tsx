@@ -62,6 +62,7 @@ export const ModelSelect: FC<{
     <div className="relative">
       <input
         type="text"
+        aria-label="Model"
         value={open ? query : selectedLabel}
         placeholder={isLoading ? 'Loading models…' : 'Search or type a model id…'}
         onFocus={() => {

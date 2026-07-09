@@ -68,9 +68,10 @@ export const DefaultModelSelect: FC<{
   options: DefaultCatalogOption[];
   isLoading?: boolean;
   disabled?: boolean;
+  label?: string;
   value?: { providerId: string; version: string; model?: string } | null;
   onChange: (value: { providerId: string; version: string; model?: string } | null) => void;
-}> = ({ options, isLoading, disabled, value, onChange }) => {
+}> = ({ options, isLoading, disabled, label, value, onChange }) => {
   const selectedValue = value ? encodeValue(value) : '';
   // A stored value whose option is no longer in the live catalog still needs to render as
   // the selected entry, so append it as an extra option when it's missing.
@@ -84,6 +85,7 @@ export const DefaultModelSelect: FC<{
   return (
     <div className="relative">
       <select
+        aria-label={label ?? 'Default model'}
         disabled={disabled || isLoading}
         value={selectedValue}
         onChange={(e) => {
