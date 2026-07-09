@@ -83,6 +83,12 @@ function findDestructive(sql) {
 }
 
 const sql = readInput();
+
+if (!sql || sql.trim().length === 0) {
+  console.error('schema-destructive-guard: empty input — upstream migration diff likely failed.');
+  process.exit(2);
+}
+
 const findings = findDestructive(sql);
 
 if (findings.length === 0) {

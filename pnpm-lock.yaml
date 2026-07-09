@@ -683,9 +683,6 @@ importers:
       cookie-parser:
         specifier: ^1.4.7
         version: 1.4.7
-      cross-env:
-        specifier: ^10.0.0
-        version: 10.1.0
       dotenv-cli:
         specifier: ^8.0.0
         version: 8.0.0
@@ -711,6 +708,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.0
         version: 4.1.8(vitest@4.1.8)
+      cross-env:
+        specifier: ^10.0.0
+        version: 10.1.0
       vitest:
         specifier: ^4.1.0
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(happy-dom@20.10.2(bufferutil@4.1.0)(utf-8-validate@6.0.6))(jsdom@22.1.0(bufferutil@4.1.0)(canvas@3.2.3)(utf-8-validate@6.0.6))(vite@6.4.3(@types/node@22.19.20)(jiti@2.6.1)(lightningcss@1.31.1)(sass@1.100.0)(terser@5.48.0)(yaml@2.9.0))
@@ -1063,7 +1063,7 @@ importers:
         version: 4.7.0(vite@6.4.3(@types/node@22.19.20)(jiti@1.21.7)(lightningcss@1.31.1)(sass@1.100.0)(terser@5.48.0)(yaml@2.9.0))
       autoprefixer:
         specifier: ^10.4.17
-        version: 10.4.27(postcss@8.4.38)
+        version: 10.4.27(postcss@8.5.16)
       cross-env:
         specifier: ^10.0.0
         version: 10.1.0
@@ -1071,8 +1071,8 @@ importers:
         specifier: ^8.0.0
         version: 8.0.0
       postcss:
-        specifier: 8.4.38
-        version: 8.4.38
+        specifier: ^8.5.10
+        version: 8.5.16
       react-refresh:
         specifier: ^0.10.0
         version: 0.10.0
@@ -1485,7 +1485,7 @@ importers:
         version: 3.0.2
       inngest:
         specifier: ^3.35.0
-        version: 3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76)
+        version: 3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76)
       ioredis:
         specifier: ^5.11.1
         version: 5.11.1
@@ -4681,444 +4681,591 @@ packages:
 
   '@gitroom/helpers@file:libraries/helpers':
     resolution: {directory: libraries/helpers, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/nestjs-libraries@file:libraries/nestjs-libraries':
     resolution: {directory: libraries/nestjs-libraries, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-adobe-stock@file:libraries/providers/adobe-stock':
     resolution: {directory: libraries/providers/adobe-stock, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-anthropic@file:libraries/providers/anthropic':
     resolution: {directory: libraries/providers/anthropic, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-azure@file:libraries/providers/azure':
     resolution: {directory: libraries/providers/azure, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-backblaze-b2@file:libraries/providers/backblaze-b2':
     resolution: {directory: libraries/providers/backblaze-b2, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-bedrock@file:libraries/providers/bedrock':
     resolution: {directory: libraries/providers/bedrock, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-bitdeer@file:libraries/providers/bitdeer':
     resolution: {directory: libraries/providers/bitdeer, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-bitly@file:libraries/providers/bitly':
     resolution: {directory: libraries/providers/bitly, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-black-forest-labs@file:libraries/providers/black-forest-labs':
     resolution: {directory: libraries/providers/black-forest-labs, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-blink@file:libraries/providers/blink':
     resolution: {directory: libraries/providers/blink, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-bluesky@file:libraries/providers/bluesky':
     resolution: {directory: libraries/providers/bluesky, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-cleanuri@file:libraries/providers/cleanuri':
     resolution: {directory: libraries/providers/cleanuri, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-cloudflare-r2@file:libraries/providers/cloudflare-r2':
     resolution: {directory: libraries/providers/cloudflare-r2, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-cohere@file:libraries/providers/cohere':
     resolution: {directory: libraries/providers/cohere, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-custom-proxy@file:libraries/providers/custom-proxy':
     resolution: {directory: libraries/providers/custom-proxy, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-cuttly@file:libraries/providers/cuttly':
     resolution: {directory: libraries/providers/cuttly, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-cyberghost@file:libraries/providers/cyberghost':
     resolution: {directory: libraries/providers/cyberghost, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-deepgram@file:libraries/providers/deepgram':
     resolution: {directory: libraries/providers/deepgram, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-deepinfra@file:libraries/providers/deepinfra':
     resolution: {directory: libraries/providers/deepinfra, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-deepseek@file:libraries/providers/deepseek':
     resolution: {directory: libraries/providers/deepseek, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-devto@file:libraries/providers/devto':
     resolution: {directory: libraries/providers/devto, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-did@file:libraries/providers/did':
     resolution: {directory: libraries/providers/did, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-digitalocean-spaces@file:libraries/providers/digitalocean-spaces':
     resolution: {directory: libraries/providers/digitalocean-spaces, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-discord@file:libraries/providers/discord':
     resolution: {directory: libraries/providers/discord, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-dribbble@file:libraries/providers/dribbble':
     resolution: {directory: libraries/providers/dribbble, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-dub@file:libraries/providers/dub':
     resolution: {directory: libraries/providers/dub, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-elevenlabs@file:libraries/providers/elevenlabs':
     resolution: {directory: libraries/providers/elevenlabs, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-empty@file:libraries/providers/empty':
     resolution: {directory: libraries/providers/empty, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-envato@file:libraries/providers/envato':
     resolution: {directory: libraries/providers/envato, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-expressvpn@file:libraries/providers/expressvpn':
     resolution: {directory: libraries/providers/expressvpn, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-facebook@file:libraries/providers/facebook':
     resolution: {directory: libraries/providers/facebook, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-fal@file:libraries/providers/fal':
     resolution: {directory: libraries/providers/fal, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-fireworks@file:libraries/providers/fireworks':
     resolution: {directory: libraries/providers/fireworks, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-gateway@file:libraries/providers/gateway':
     resolution: {directory: libraries/providers/gateway, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-generic@file:libraries/providers/generic':
     resolution: {directory: libraries/providers/generic, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-genviral@file:libraries/providers/genviral':
     resolution: {directory: libraries/providers/genviral, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-github@file:libraries/providers/github':
     resolution: {directory: libraries/providers/github, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-gmb@file:libraries/providers/gmb':
     resolution: {directory: libraries/providers/gmb, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-gmihub@file:libraries/providers/gmihub':
     resolution: {directory: libraries/providers/gmihub, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-google-ai@file:libraries/providers/google-ai':
     resolution: {directory: libraries/providers/google-ai, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-google@file:libraries/providers/google':
     resolution: {directory: libraries/providers/google, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-groq@file:libraries/providers/groq':
     resolution: {directory: libraries/providers/groq, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-hashnode@file:libraries/providers/hashnode':
     resolution: {directory: libraries/providers/hashnode, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-hedra@file:libraries/providers/hedra':
     resolution: {directory: libraries/providers/hedra, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-hetzner@file:libraries/providers/hetzner':
     resolution: {directory: libraries/providers/hetzner, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-heygen@file:libraries/providers/heygen':
     resolution: {directory: libraries/providers/heygen, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-hideme@file:libraries/providers/hideme':
     resolution: {directory: libraries/providers/hideme, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-higgsfield@file:libraries/providers/higgsfield':
     resolution: {directory: libraries/providers/higgsfield, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-hotspotshield@file:libraries/providers/hotspotshield':
     resolution: {directory: libraries/providers/hotspotshield, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-ideogram@file:libraries/providers/ideogram':
     resolution: {directory: libraries/providers/ideogram, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-idrive-e2@file:libraries/providers/idrive-e2':
     resolution: {directory: libraries/providers/idrive-e2, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-instagram-standalone@file:libraries/providers/instagram-standalone':
     resolution: {directory: libraries/providers/instagram-standalone, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-instagram@file:libraries/providers/instagram':
     resolution: {directory: libraries/providers/instagram, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-ipvanish@file:libraries/providers/ipvanish':
     resolution: {directory: libraries/providers/ipvanish, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-isgd@file:libraries/providers/isgd':
     resolution: {directory: libraries/providers/isgd, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-kernel@file:libraries/providers/kernel':
     resolution: {directory: libraries/providers/kernel, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-kick@file:libraries/providers/kick':
     resolution: {directory: libraries/providers/kick, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-lemmy@file:libraries/providers/lemmy':
     resolution: {directory: libraries/providers/lemmy, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-leonardo@file:libraries/providers/leonardo':
     resolution: {directory: libraries/providers/leonardo, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-lightning@file:libraries/providers/lightning':
     resolution: {directory: libraries/providers/lightning, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-linkedin-page@file:libraries/providers/linkedin-page':
     resolution: {directory: libraries/providers/linkedin-page, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-linkedin@file:libraries/providers/linkedin':
     resolution: {directory: libraries/providers/linkedin, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-linkly@file:libraries/providers/linkly':
     resolution: {directory: libraries/providers/linkly, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-linode@file:libraries/providers/linode':
     resolution: {directory: libraries/providers/linode, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-listmonk@file:libraries/providers/listmonk':
     resolution: {directory: libraries/providers/listmonk, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-local@file:libraries/providers/local':
     resolution: {directory: libraries/providers/local, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-ltx@file:libraries/providers/ltx':
     resolution: {directory: libraries/providers/ltx, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-luma@file:libraries/providers/luma':
     resolution: {directory: libraries/providers/luma, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-magnific@file:libraries/providers/magnific':
     resolution: {directory: libraries/providers/magnific, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-mailgun@file:libraries/providers/mailgun':
     resolution: {directory: libraries/providers/mailgun, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-mastodon@file:libraries/providers/mastodon':
     resolution: {directory: libraries/providers/mastodon, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-medium@file:libraries/providers/medium':
     resolution: {directory: libraries/providers/medium, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-meta-llama@file:libraries/providers/meta-llama':
     resolution: {directory: libraries/providers/meta-llama, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-mewe@file:libraries/providers/mewe':
     resolution: {directory: libraries/providers/mewe, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-minimax@file:libraries/providers/minimax':
     resolution: {directory: libraries/providers/minimax, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-mistral@file:libraries/providers/mistral':
     resolution: {directory: libraries/providers/mistral, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-moltbook@file:libraries/providers/moltbook':
     resolution: {directory: libraries/providers/moltbook, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-mozillavpn@file:libraries/providers/mozillavpn':
     resolution: {directory: libraries/providers/mozillavpn, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-mullvad@file:libraries/providers/mullvad':
     resolution: {directory: libraries/providers/mullvad, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-nordvpn@file:libraries/providers/nordvpn':
     resolution: {directory: libraries/providers/nordvpn, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-nostr@file:libraries/providers/nostr':
     resolution: {directory: libraries/providers/nostr, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-openai@file:libraries/providers/openai':
     resolution: {directory: libraries/providers/openai, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-openrouter@file:libraries/providers/openrouter':
     resolution: {directory: libraries/providers/openrouter, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-owly@file:libraries/providers/owly':
     resolution: {directory: libraries/providers/owly, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-peertube@file:libraries/providers/peertube':
     resolution: {directory: libraries/providers/peertube, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-perplexity@file:libraries/providers/perplexity':
     resolution: {directory: libraries/providers/perplexity, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-pia@file:libraries/providers/pia':
     resolution: {directory: libraries/providers/pia, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-pinterest@file:libraries/providers/pinterest':
     resolution: {directory: libraries/providers/pinterest, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-pixelfed@file:libraries/providers/pixelfed':
     resolution: {directory: libraries/providers/pixelfed, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-pixelme@file:libraries/providers/pixelme':
     resolution: {directory: libraries/providers/pixelme, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-postmark@file:libraries/providers/postmark':
     resolution: {directory: libraries/providers/postmark, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-protonvpn@file:libraries/providers/protonvpn':
     resolution: {directory: libraries/providers/protonvpn, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-purevpn@file:libraries/providers/purevpn':
     resolution: {directory: libraries/providers/purevpn, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-qwen@file:libraries/providers/qwen':
     resolution: {directory: libraries/providers/qwen, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-rebrandly@file:libraries/providers/rebrandly':
     resolution: {directory: libraries/providers/rebrandly, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-recraft@file:libraries/providers/recraft':
     resolution: {directory: libraries/providers/recraft, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-reddit@file:libraries/providers/reddit':
     resolution: {directory: libraries/providers/reddit, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-reelfarm@file:libraries/providers/reelfarm':
     resolution: {directory: libraries/providers/reelfarm, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-replicate@file:libraries/providers/replicate':
     resolution: {directory: libraries/providers/replicate, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-replug@file:libraries/providers/replug':
     resolution: {directory: libraries/providers/replug, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-resend@file:libraries/providers/resend':
     resolution: {directory: libraries/providers/resend, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-runway@file:libraries/providers/runway':
     resolution: {directory: libraries/providers/runway, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-s3-compatible@file:libraries/providers/s3-compatible':
     resolution: {directory: libraries/providers/s3-compatible, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-s3@file:libraries/providers/s3':
     resolution: {directory: libraries/providers/s3, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-scaleway@file:libraries/providers/scaleway':
     resolution: {directory: libraries/providers/scaleway, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-sendgrid@file:libraries/providers/sendgrid':
     resolution: {directory: libraries/providers/sendgrid, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-ses@file:libraries/providers/ses':
     resolution: {directory: libraries/providers/ses, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-shortio@file:libraries/providers/shortio':
     resolution: {directory: libraries/providers/shortio, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-siliconflow@file:libraries/providers/siliconflow':
     resolution: {directory: libraries/providers/siliconflow, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-skool@file:libraries/providers/skool':
     resolution: {directory: libraries/providers/skool, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-slack@file:libraries/providers/slack':
     resolution: {directory: libraries/providers/slack, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-smtp@file:libraries/providers/smtp':
     resolution: {directory: libraries/providers/smtp, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-sniply@file:libraries/providers/sniply':
     resolution: {directory: libraries/providers/sniply, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-stability@file:libraries/providers/stability':
     resolution: {directory: libraries/providers/stability, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-storj@file:libraries/providers/storj':
     resolution: {directory: libraries/providers/storj, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-suno@file:libraries/providers/suno':
     resolution: {directory: libraries/providers/suno, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-surfshark@file:libraries/providers/surfshark':
     resolution: {directory: libraries/providers/surfshark, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-switchy@file:libraries/providers/switchy':
     resolution: {directory: libraries/providers/switchy, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-t2m@file:libraries/providers/t2m':
     resolution: {directory: libraries/providers/t2m, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-tavus@file:libraries/providers/tavus':
     resolution: {directory: libraries/providers/tavus, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-telegram@file:libraries/providers/telegram':
     resolution: {directory: libraries/providers/telegram, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-threads@file:libraries/providers/threads':
     resolution: {directory: libraries/providers/threads, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-tiktok@file:libraries/providers/tiktok':
     resolution: {directory: libraries/providers/tiktok, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-tinycc@file:libraries/providers/tinycc':
     resolution: {directory: libraries/providers/tinycc, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-tinyurl@file:libraries/providers/tinyurl':
     resolution: {directory: libraries/providers/tinyurl, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-tly@file:libraries/providers/tly':
     resolution: {directory: libraries/providers/tly, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-togetherai@file:libraries/providers/togetherai':
     resolution: {directory: libraries/providers/togetherai, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-tumblr@file:libraries/providers/tumblr':
     resolution: {directory: libraries/providers/tumblr, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-tunnelbear@file:libraries/providers/tunnelbear':
     resolution: {directory: libraries/providers/tunnelbear, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-twitch@file:libraries/providers/twitch':
     resolution: {directory: libraries/providers/twitch, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-vecteezy@file:libraries/providers/vecteezy':
     resolution: {directory: libraries/providers/vecteezy, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-vertex@file:libraries/providers/vertex':
     resolution: {directory: libraries/providers/vertex, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-vgd@file:libraries/providers/vgd':
     resolution: {directory: libraries/providers/vgd, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-vk@file:libraries/providers/vk':
     resolution: {directory: libraries/providers/vk, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-vultr@file:libraries/providers/vultr':
     resolution: {directory: libraries/providers/vultr, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-vyprvpn@file:libraries/providers/vyprvpn':
     resolution: {directory: libraries/providers/vyprvpn, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-wallet@file:libraries/providers/wallet':
     resolution: {directory: libraries/providers/wallet, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-wan@file:libraries/providers/wan':
     resolution: {directory: libraries/providers/wan, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-wasabi@file:libraries/providers/wasabi':
     resolution: {directory: libraries/providers/wasabi, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-whop@file:libraries/providers/whop':
     resolution: {directory: libraries/providers/whop, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-windscribe@file:libraries/providers/windscribe':
     resolution: {directory: libraries/providers/windscribe, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-wordpress@file:libraries/providers/wordpress':
     resolution: {directory: libraries/providers/wordpress, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-wrapcast@file:libraries/providers/wrapcast':
     resolution: {directory: libraries/providers/wrapcast, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-x@file:libraries/providers/x':
     resolution: {directory: libraries/providers/x, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-xai@file:libraries/providers/xai':
     resolution: {directory: libraries/providers/xai, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@gitroom/provider-youtube@file:libraries/providers/youtube':
     resolution: {directory: libraries/providers/youtube, type: directory}
+    engines: {node: '>=22.12.0 <23.0.0'}
 
   '@google-cloud/aiplatform@6.8.1':
     resolution: {integrity: sha512-8O64485bzBzQQ1VlgEhaLJcOvVlfC/V8MB5nQ5y2Dcl8UAfGXW5LkXK1CEfZ7c6IZYxpkJ9U818ldc8pg7eteg==}
@@ -17736,10 +17883,6 @@ packages:
     resolution: {integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==}
     engines: {node: ^10 || ^12 || >=14}
 
-  postcss@8.4.38:
-    resolution: {integrity: sha512-Wglpdk03BSfXkHoQa3b/oulrotAkwrlLDRSOb9D0bN86FdRyE9lppSp33aHNPgBa0JKCoB+drFLZkQoRRYae5A==}
-    engines: {node: ^10 || ^12 || >=14}
-
   postcss@8.5.16:
     resolution: {integrity: sha512-vuwillviilfKZsg0VGj5R/YwwcHx4SLsIOI/7K6mQkWx+l5cUHTjj5g0AasTBcyXsbfTgrwsUNmVUb5xVwyPwg==}
     engines: {node: ^10 || ^12 || >=14}
@@ -24509,7 +24652,7 @@ snapshots:
       google-auth-library: 9.15.1
       googleapis: 137.1.0
       image-to-pdf: 3.0.2
-      inngest: 3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76)
+      inngest: 3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76)
       ioredis: 5.11.1
       jsdom: 22.1.0(bufferutil@4.1.0)(canvas@3.2.3)(utf-8-validate@6.0.6)
       json-to-graphql-query: 2.3.0
@@ -24851,7 +24994,7 @@ snapshots:
       google-auth-library: 9.15.1
       googleapis: 137.1.0
       image-to-pdf: 3.0.2
-      inngest: 3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76)
+      inngest: 3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76)
       ioredis: 5.11.1
       jsdom: 22.1.0(bufferutil@4.1.0)(canvas@3.2.3)(utf-8-validate@6.0.6)
       json-to-graphql-query: 2.3.0
@@ -35813,13 +35956,13 @@ snapshots:
 
   attr-accept@2.2.5: {}
 
-  autoprefixer@10.4.27(postcss@8.4.38):
+  autoprefixer@10.4.27(postcss@8.5.16):
     dependencies:
       browserslist: 4.28.2
       caniuse-lite: 1.0.30001793
       fraction.js: 5.3.4
       picocolors: 1.1.1
-      postcss: 8.4.38
+      postcss: 8.5.16
       postcss-value-parser: 4.2.0
 
   available-typed-arrays@1.0.7:
@@ -39758,6 +39901,45 @@ snapshots:
 
   inline-style-parser@0.2.7: {}
 
+  inngest@3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76):
+    dependencies:
+      '@bufbuild/protobuf': 2.12.0
+      '@inngest/ai': 0.1.7
+      '@jpwilliams/waitgroup': 2.1.1
+      '@opentelemetry/api': 1.9.1
+      '@opentelemetry/auto-instrumentations-node': 0.77.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))
+      '@opentelemetry/context-async-hooks': 2.8.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/exporter-trace-otlp-http': 0.219.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/instrumentation': 0.219.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/resources': 2.8.0(@opentelemetry/api@1.9.1)
+      '@opentelemetry/sdk-trace-base': 2.8.0(@opentelemetry/api@1.9.1)
+      '@standard-schema/spec': 1.1.0
+      '@traceloop/instrumentation-anthropic': 0.20.0
+      '@types/debug': 4.1.13
+      '@types/ms': 2.1.0
+      canonicalize: 1.0.8
+      chalk: 4.1.2
+      cross-fetch: 4.1.0
+      debug: 4.4.3(supports-color@5.5.0)
+      hash.js: 1.1.7
+      json-stringify-safe: 5.0.1
+      ms: 2.1.3
+      serialize-error-cjs: 0.1.4
+      strip-ansi: 5.2.0
+      temporal-polyfill: 0.2.5
+      ulid: 2.4.0
+      zod: 3.25.76
+    optionalDependencies:
+      express: 5.2.1
+      fastify: 5.8.5
+      hono: 4.12.26
+      next: 16.2.7(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0)
+      typescript: 5.9.3
+    transitivePeerDependencies:
+      - '@opentelemetry/core'
+      - encoding
+      - supports-color
+
   inngest@3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.5.4)(zod@3.25.76):
     dependencies:
       '@bufbuild/protobuf': 2.12.0
@@ -39792,45 +39974,6 @@ snapshots:
       hono: 4.12.26
       next: 16.2.7(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0)
       typescript: 5.5.4
-    transitivePeerDependencies:
-      - '@opentelemetry/core'
-      - encoding
-      - supports-color
-
-  inngest@3.54.2(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))(express@5.2.1)(fastify@5.8.5)(hono@4.12.26)(next@16.2.7(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0))(typescript@5.9.3)(zod@3.25.76):
-    dependencies:
-      '@bufbuild/protobuf': 2.12.0
-      '@inngest/ai': 0.1.7
-      '@jpwilliams/waitgroup': 2.1.1
-      '@opentelemetry/api': 1.9.1
-      '@opentelemetry/auto-instrumentations-node': 0.77.0(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.1))
-      '@opentelemetry/context-async-hooks': 2.8.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/exporter-trace-otlp-http': 0.219.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/instrumentation': 0.219.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/resources': 2.8.0(@opentelemetry/api@1.9.1)
-      '@opentelemetry/sdk-trace-base': 2.8.0(@opentelemetry/api@1.9.1)
-      '@standard-schema/spec': 1.1.0
-      '@traceloop/instrumentation-anthropic': 0.20.0
-      '@types/debug': 4.1.13
-      '@types/ms': 2.1.0
-      canonicalize: 1.0.8
-      chalk: 4.1.2
-      cross-fetch: 4.1.0
-      debug: 4.4.3(supports-color@5.5.0)
-      hash.js: 1.1.7
-      json-stringify-safe: 5.0.1
-      ms: 2.1.3
-      serialize-error-cjs: 0.1.4
-      strip-ansi: 5.2.0
-      temporal-polyfill: 0.2.5
-      ulid: 2.4.0
-      zod: 3.25.76
-    optionalDependencies:
-      express: 5.2.1
-      fastify: 5.8.5
-      hono: 4.12.26
-      next: 16.2.7(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(@playwright/test@1.58.2)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(sass@1.100.0)
-      typescript: 5.9.3
     transitivePeerDependencies:
       - '@opentelemetry/core'
       - encoding
@@ -43045,12 +43188,6 @@ snapshots:
   postcss-value-parser@4.2.0: {}
 
   postcss@8.4.31:
-    dependencies:
-      nanoid: 3.3.15
-      picocolors: 1.1.1
-      source-map-js: 1.2.1
-
-  postcss@8.4.38:
     dependencies:
       nanoid: 3.3.15
       picocolors: 1.1.1
