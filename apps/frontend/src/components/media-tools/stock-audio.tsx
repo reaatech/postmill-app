@@ -7,6 +7,7 @@ import { SaveToFilesModal } from './save-to-files-modal';
 import { StockAudioItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
 import { AudioPlayer } from './audio-player';
+import { decodeEntities } from '@gitroom/frontend/components/shared/decode-entities';
 
 const SUGGESTED_SEARCHES = ['Upbeat', 'Cinematic', 'Lo-fi', 'Ambient', 'Corporate'];
 
@@ -162,9 +163,9 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-baseline justify-between gap-[10px]">
-                    <div className="text-[13px] text-textColor truncate">{item.name}</div>
+                    <div className="text-[13px] text-textColor truncate">{decodeEntities(item.name)}</div>
                     <div className="text-[11px] text-newTextColor/50 shrink-0 truncate">
-                      {item.author} · {stockSourceLabel(item.source)}
+                      {decodeEntities(item.author)} · {stockSourceLabel(item.source)}
                     </div>
                   </div>
                   <div className="mt-[6px]">
@@ -175,7 +176,7 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
                   type="button"
                   onClick={() =>
                     mode === 'select' && onSelect
-                      ? onSelect({ url: item.url, name: item.name })
+                      ? onSelect({ url: item.url, name: decodeEntities(item.name) })
                       : saveToFiles(item)
                   }
                   className="shrink-0 px-[14px] py-[8px] rounded-[8px] bg-[#2B5CD3] text-white text-[12px] font-[500] hover:bg-[#2B5CD3]/80 transition-all flex items-center gap-[6px]"
