@@ -102,7 +102,7 @@ jobs:
       - name: Start backend (:3000) and frontend (:4200)
         run: |
           node apps/backend/dist/apps/backend/src/main.js > backend.log 2>&1 &
-          (cd apps/frontend && pnpm exec next start -p 4200 > ../../frontend.log 2>&1 &)
+          (cd apps/frontend && pnpm exec next start -H 0.0.0.0 -p 4200 > ../../frontend.log 2>&1 &)
           # Wait for both to bind (backend answers 401 unauth on /user/self; frontend 307 → /auth).
           for i in $(seq 1 45); do
             be=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/user/self || true)

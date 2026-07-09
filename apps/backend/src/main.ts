@@ -190,7 +190,15 @@ async function start() {
     // binds IPv6-only and browsers that prefer 127.0.0.1 get ECONNREFUSED).
     const listenHost = process.env.BACKEND_LISTEN_HOST;
     await (listenHost ? app.listen(port, listenHost) : app.listen(port));
-    new Logger('Bootstrap').log('Backend started successfully on port ' + port);
+    new Logger('Bootstrap').log(
+      'Backend started successfully on port ' +
+        port +
+        ' (bind host: ' +
+        (listenHost || 'default') +
+        ', address: ' +
+        JSON.stringify(app.getHttpServer().address()) +
+        ')',
+    );
 
     const server = app.getHttpServer();
     const collabGateway = app.get(CollaborationGateway);
