@@ -17,9 +17,12 @@
     --new-btn-simple: #313030;
     --new-btn-text: #ffffff;
     --new-btn-primary: #2b5cd3;
+    /* Accessible accent text for subtle btnPrimary/15 chips (a11y: text-btnPrimary fails
+       AA ~3.3:1 on the tinted-over-dark bg). Lighter blue → ~5.9:1 on dark chip surfaces. */
+    --new-btn-primary-accent: #6d95ec;
     --new-ai-btn: #1d9bf0;
     --new-promo: #aa0fa4;
-    --new-badge: #ff3ea2;
+    --new-badge: #d6006e;
     --new-priority-high: #f97066;
     --new-priority-medium: #ffac30;
     --new-priority-low: #1d9bf0;
@@ -73,9 +76,12 @@
     --new-btn-simple: #eceef1;
     --new-btn-text: #0e0e0e;
     --new-btn-primary: #2b5cd3;
+    /* Accessible accent text for subtle btnPrimary/15 chips in light mode: darker blue →
+       ~5.7:1 on the light tinted chip bg (plain btnPrimary is ~4.2:1 there). */
+    --new-btn-primary-accent: #1e47b8;
     --new-ai-btn: #1d9bf0;
     --new-promo: #aa0fa4;
-    --new-badge: #ff3ea2;
+    --new-badge: #d6006e;
     --new-priority-high: #f97066;
     --new-priority-medium: #ffac30;
     --new-priority-low: #1d9bf0;

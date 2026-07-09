@@ -525,7 +525,7 @@ export const SignaturesComponent: FC<{
                       {sig.name || sig.content.slice(0, 40) + (sig.content.length > 40 ? '…' : '')}
                     </span>
                     {sig.autoAdd && (
-                      <span className="text-[10px] px-[6px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary shrink-0">
+                      <span className="text-[10px] px-[6px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimaryAccent shrink-0">
                         {t('auto', 'Auto')}
                       </span>
                     )}

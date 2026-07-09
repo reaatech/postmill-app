@@ -374,7 +374,7 @@ const Chip: FC<{ onRemove: () => void; children: React.ReactNode }> = ({
   onRemove,
   children,
 }) => (
-  <span className="flex items-center gap-[4px] pl-[10px] pr-[6px] py-[3px] rounded-full bg-btnPrimary/15 text-btnPrimary text-[12px]">
+  <span className="flex items-center gap-[4px] pl-[10px] pr-[6px] py-[3px] rounded-full bg-btnPrimary/15 text-btnPrimaryAccent text-[12px]">
     {children}
     <button
       type="button"

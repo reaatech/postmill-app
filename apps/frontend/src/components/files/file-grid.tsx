@@ -178,7 +178,7 @@ export const FileGrid: FC<{
               {tags.length > 0 && (
                 <div className="flex gap-[4px] mt-[3px] flex-wrap">
                   {tags.slice(0, 2).map((tag: string) => (
-                    <span key={tag} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-btnPrimary/15 text-btnPrimary">{tag}</span>
+                    <span key={tag} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-btnPrimary/15 text-btnPrimaryAccent">{tag}</span>
                   ))}
                 </div>
               )}

@@ -159,7 +159,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
           aria-pressed={color === ''}
           className={`h-[30px] px-[12px] rounded-full border text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary ${
             color === ''
-              ? 'border-btnPrimary bg-btnPrimary/15 text-btnPrimary font-[500]'
+              ? 'border-btnPrimary bg-btnPrimary/15 text-btnPrimaryAccent font-[500]'
               : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
           }`}
         >

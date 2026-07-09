@@ -19,6 +19,7 @@ const AUDIT_SPECS = [
   '**/92-a11y.spec.ts',
   '**/93-metadata-titles.spec.ts',
   '**/94-setup-rbac.spec.ts',
+  '**/95-contrast.spec.ts',
 ];
 
 export default defineConfig({

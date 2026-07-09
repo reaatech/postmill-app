@@ -62,7 +62,7 @@ export const TagsInput: FC<{
       {value.map((tag, idx) => (
         <span
           key={tag}
-          className="flex items-center gap-[4px] px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary text-[12px]"
+          className="flex items-center gap-[4px] px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimaryAccent text-[12px]"
         >
           {tag}
           <button

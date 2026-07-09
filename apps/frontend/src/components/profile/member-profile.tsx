@@ -59,7 +59,7 @@ export const MemberProfile: FC = () => {
               className="w-[72px] h-[72px] rounded-full object-cover border border-newTableBorder"
             />
           ) : (
-            <div className="w-[72px] h-[72px] rounded-full bg-btnPrimary/15 text-btnPrimary flex items-center justify-center text-[28px] font-semibold">
+            <div className="w-[72px] h-[72px] rounded-full bg-btnPrimary/15 text-btnPrimaryAccent flex items-center justify-center text-[28px] font-semibold">
               {initials}
             </div>
           )}
@@ -67,7 +67,7 @@ export const MemberProfile: FC = () => {
             <h1 className="text-[22px] font-semibold text-textColor truncate">{data.name}</h1>
             <div className="flex flex-wrap items-center gap-[8px] mt-[4px]">
               {data.role && (
-                <span className="px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary text-[11px] capitalize">
+                <span className="px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimaryAccent text-[11px] capitalize">
                   {data.role}
                 </span>
               )}
