@@ -12,6 +12,7 @@ import {
   latestActiveVersion,
 } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CapabilityBadges as KitCapabilityBadges } from '@gitroom/frontend/components/settings/shared/kit/capabilities';
@@ -336,6 +337,10 @@ export const ChannelsTab: FC = () => {
   const { data: catalog } = useProviderCatalog('social');
   const modals = useModals();
   const toaster = useToaster();
+  const permissions = usePermissions();
+  // Adding a channel hits POST endpoints gated by @RequirePermission('channels','create');
+  // hide the trigger for members who lack it (the backend still 403s — this is UI gating only).
+  const canAddChannel = permissions.hasPermission('channels', 'create');
 
   const [search, setSearch] = useState('');
 
@@ -480,13 +485,15 @@ export const ChannelsTab: FC = () => {
           onSearch={setSearch}
           placeholder={t('search_channels', 'Search channels...')}
           trailing={
-            <button
-              type="button"
-              onClick={openPicker}
-              className="text-[13px] px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white hover:opacity-90 transition-opacity whitespace-nowrap"
-            >
-              + {t('add_channel', 'Add channel')}
-            </button>
+            canAddChannel ? (
+              <button
+                type="button"
+                onClick={openPicker}
+                className="text-[13px] px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                + {t('add_channel', 'Add channel')}
+              </button>
+            ) : undefined
           }
         />
       }

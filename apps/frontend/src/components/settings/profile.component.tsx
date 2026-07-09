@@ -30,6 +30,7 @@ export const ProfileComponent: FC<{
         <label className="text-[14px] font-[500]">{t('bio', 'Bio')}</label>
         <textarea
           {...form.register('bio')}
+          aria-label={t('bio', 'Bio')}
           rows={3}
           className="bg-newBgColor border border-newTableBorder rounded-[6px] px-[12px] py-[8px] text-[13px] text-textColor outline-none resize-none"
         />

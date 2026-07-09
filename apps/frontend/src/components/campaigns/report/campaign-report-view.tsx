@@ -14,6 +14,29 @@ import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-label
 const stripHtml = (html?: string | null): string =>
   (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
+// A tagged-item icon that degrades to an initial-avatar when the image is
+// missing OR fails to load (a stale/deleted media URL on this public report
+// otherwise shows a broken-image icon to the client).
+const ItemIcon: FC<{ icon?: string | null; name: string }> = ({ icon, name }) => {
+  const [failed, setFailed] = useState(false);
+  if (icon && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={icon}
+        alt=""
+        onError={() => setFailed(true)}
+        className="w-[24px] h-[24px] rounded-full object-cover"
+      />
+    );
+  }
+  return (
+    <div className="w-[24px] h-[24px] rounded-full bg-newTableHeader flex items-center justify-center text-[11px] font-medium text-newTableText">
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+};
+
 interface ReportEngagement {
   totalViews: number;
   totalLikes: number;
@@ -478,14 +501,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
                   <ul className="flex flex-col gap-[8px]">
                     {items.map((item) => (
                       <li key={item.id} className="flex items-center gap-[8px]">
-                        {item.icon ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={item.icon} alt="" className="w-[24px] h-[24px] rounded-full object-cover" />
-                        ) : (
-                          <div className="w-[24px] h-[24px] rounded-full bg-newTableHeader flex items-center justify-center text-[11px] font-medium text-newTableText">
-                            {item.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                        <ItemIcon icon={item.icon} name={item.name} />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[13px] text-textColor truncate">{item.name}</span>
                           {item.subtitle && <span className="text-[11px] text-newTableText truncate">{item.subtitle}</span>}

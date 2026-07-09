@@ -232,6 +232,7 @@ export function DataTable<T>({
                 <th className="w-[40px] py-[14px] px-[16px] text-left">
                   <input
                     type="checkbox"
+                    aria-label="Select all rows"
                     checked={allSelected && data.length > 0}
                     onChange={handleSelectAll}
                     className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer"
@@ -292,6 +293,7 @@ export function DataTable<T>({
                     <td className="py-[14px] px-[16px]" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
+                        aria-label="Select row"
                         checked={isSelected}
                         onChange={() => handleSelect(id)}
                         className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer"

@@ -237,6 +237,7 @@ export const FolderTree: FC<{
           <div className="text-[13px] font-[600] text-textColor">Folders</div>
           <button
             onClick={() => { setNewFolderParent(null); setNewFolderName(''); }}
+            aria-label="New folder"
             className="p-[4px] rounded-[4px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover transition-all"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>

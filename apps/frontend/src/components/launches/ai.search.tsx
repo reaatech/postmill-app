@@ -136,6 +136,7 @@ export const AiSearch: FC = () => {
       <button
         type="button"
         onClick={openModal}
+        aria-label={t('ai_search', 'AI Search')}
         className={clsx(
           'm-0 p-0 border-0 bg-transparent cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
         )}

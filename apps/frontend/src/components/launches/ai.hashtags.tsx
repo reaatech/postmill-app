@@ -217,6 +217,7 @@ export const AiHashtags: FC<HashtagsProps> = ({ onSelect }) => {
     <button
       type="button"
       onClick={openModal}
+      aria-label={t('hashtags', 'Hashtags')}
       className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
     >
       <div className="flex gap-[5px] items-center">

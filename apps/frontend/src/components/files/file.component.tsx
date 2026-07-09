@@ -484,6 +484,7 @@ export const MultiFileComponent: FC<{
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
+                aria-label={t('insert_media', 'Insert Media')}
                 className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
               >
                 <div className="flex gap-[8px] items-center">

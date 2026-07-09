@@ -405,6 +405,7 @@ const CalendarColumn: FC<{
         {!isBeforeNow && (
           <button
             type="button"
+            aria-label={t('add_post', 'Add post')}
             className="pb-[2.5px] px-[5px] flex-1 flex m-0 p-0 border-0 bg-transparent"
             onClick={integrations.length ? addModal : addProvider}
           >

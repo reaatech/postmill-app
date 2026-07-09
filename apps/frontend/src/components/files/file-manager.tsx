@@ -261,6 +261,7 @@ export const FileManager: FC<{
 
             <select
               value={filterType}
+              aria-label="Filter by file type"
               onChange={e => setFilterTypeAndReset(e.target.value)}
               className="h-[44px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3] shrink-0"
             >
@@ -276,6 +277,8 @@ export const FileManager: FC<{
             <div className="flex items-center gap-[8px] mobile:order-2">
               <button
                 onClick={() => setViewMode('grid')}
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid'}
                 className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'grid'
                   ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
                   : 'border-newColColor text-textColor hover:bg-boxHover')}
@@ -284,6 +287,8 @@ export const FileManager: FC<{
               </button>
               <button
                 onClick={() => setViewMode('list')}
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
                 className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'list'
                   ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
                   : 'border-newColColor text-textColor hover:bg-boxHover')}

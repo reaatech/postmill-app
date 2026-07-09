@@ -120,6 +120,7 @@ export const AiBestTime: FC = () => {
       <button
         type="button"
         onClick={openModal}
+        aria-label={t('best_times', 'Best Times')}
         className={clsx(
           'cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
         )}
