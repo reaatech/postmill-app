@@ -242,7 +242,11 @@ export const CommentInbox: FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px] min-w-0">
-      <PageHeader title="Inbox" description="Manage and respond to replies across channels" action={syncAction} />
+      <PageHeader
+        title={t('inbox', 'Inbox')}
+        description={t('inbox_description', 'Manage and respond to replies across channels')}
+        action={syncAction}
+      />
 
       {filterBar}
 

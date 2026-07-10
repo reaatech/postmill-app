@@ -76,6 +76,7 @@ const jakartaSans = Plus_Jakarta_Sans({
 
 export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   const fetch = useFetch();
+  const t = useT();
 
   const { billingEnabled, isGeneral } = useVariables();
 
@@ -162,7 +163,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         )}
                       >
                         <div className="flex flex-col h-full gap-[32px] flex-1 py-[12px]">
-                          <Link href="/" aria-label="Home">
+                          <Link href="/" aria-label={t('home', 'Home')}>
                             <Logo />
                           </Link>
                           <TopMenu />
@@ -176,7 +177,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                               icon; add the wordmark only on the dashboard. */}
                           <Link
                             href="/"
-                            aria-label="Home"
+                            aria-label={t('home', 'Home')}
                             className="mobile:flex hidden items-center gap-[8px] shrink-0"
                           >
                             <Logo size={34} className="" />
@@ -190,7 +191,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                           {isDashboard && (
                             <Link
                               href="/"
-                              aria-label="Home"
+                              aria-label={t('home', 'Home')}
                               className="mobile:hidden flex shrink-0"
                             >
                               <Wordmark height={34} className="text-textColor" />

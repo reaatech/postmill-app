@@ -3,6 +3,7 @@
 import { FC } from 'react';
 import { SignaturesComponent } from '@gitroom/frontend/components/settings/signatures.component';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export interface AppendSignaturePayload {
   content: string;
@@ -14,6 +15,7 @@ export const SignatureBox: FC<{
   appendImages?: (value: { id: string; path: string }[]) => void;
 }> = ({ editor, appendImages }) => {
   const modals = useModals();
+  const t = useT();
   const appendValue = (sig: AppendSignaturePayload) => {
     editor?.commands?.insertContent('\n\n' + sig.content);
     editor?.commands?.focus();
@@ -25,7 +27,7 @@ export const SignatureBox: FC<{
 
   const addSignature = () => {
     modals.openModal({
-      title: 'Add Signature',
+      title: t('add_signature_title', 'Add Signature'),
       withCloseButton: true,
       children: (close) => (
         <SignatureModal appendSignature={appendValue} close={close} />
@@ -38,7 +40,7 @@ export const SignatureBox: FC<{
       <div
         onClick={addSignature}
         data-tooltip-id="tooltip"
-        data-tooltip-content="Add Signature"
+        data-tooltip-content={t('add_signature_title', 'Add Signature')}
         className="select-none cursor-pointer rounded-[6px] w-[30px] h-[30px] bg-newColColor flex justify-center items-center"
       >
         <svg

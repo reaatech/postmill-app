@@ -39,12 +39,13 @@ const useApiKeys = () => {
 
 const CopyButton = ({ text, label }: { text: string; label: string }) => {
   const toaster = useToaster();
+  const t = useT();
   return (
     <button
       type="button"
       onClick={() => {
         copy(text);
-        toaster.show(`${label} copied to clipboard`, 'success');
+        toaster.show(t('label_copied_to_clipboard', '{{label}} copied to clipboard', { label }), 'success');
       }}
       className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
     >
@@ -73,7 +74,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
 
   const createKey = useCallback(async () => {
     if (!newKeyName.trim()) {
-      toaster.show('Key name is required', 'warning');
+      toaster.show(t('key_name_required', 'Key name is required'), 'warning');
       return;
     }
     try {
@@ -89,16 +90,16 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
       if (result.plaintext) {
         setCreatedKey(result);
         onKeyCreated?.(result);
-        toaster.show('API key created!', 'success');
+        toaster.show(t('api_key_created_toast', 'API key created!'), 'success');
       }
       setCreating(false);
       setNewKeyName('');
       setNewKeyExpiry('');
       mutate('api-keys');
     } catch {
-      toaster.show('Failed to create API key', 'warning');
+      toaster.show(t('failed_to_create_api_key', 'Failed to create API key'), 'warning');
     }
-  }, [newKeyName, newKeyExpiry, fetch, mutate, toaster, onKeyCreated]);
+  }, [newKeyName, newKeyExpiry, fetch, mutate, toaster, onKeyCreated, t]);
 
   const revokeKey = useCallback(async (id: string, name: string) => {
     const approved = await decision.open({
@@ -110,10 +111,10 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
     if (!approved) return;
     try {
       await fetch(`/user/api-keys/${id}`, { method: 'DELETE' });
-      toaster.show('API key revoked', 'success');
+      toaster.show(t('api_key_revoked_toast', 'API key revoked'), 'success');
       mutate('api-keys');
     } catch {
-      toaster.show('Failed to revoke API key', 'warning');
+      toaster.show(t('failed_to_revoke_api_key', 'Failed to revoke API key'), 'warning');
     }
   }, [decision, fetch, mutate, toaster, t]);
 
@@ -135,13 +136,13 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
       if (result.plaintext) {
         setCreatedKey(result);
         onKeyCreated?.(result);
-        toaster.show('API key rotated!', 'success');
+        toaster.show(t('api_key_rotated_toast', 'API key rotated!'), 'success');
       }
       setRotatingId(null);
       setRotateName('');
       mutate('api-keys');
     } catch {
-      toaster.show('Failed to rotate API key', 'warning');
+      toaster.show(t('failed_to_rotate_api_key', 'Failed to rotate API key'), 'warning');
     }
   }, [decision, fetch, mutate, toaster, rotateName, onKeyCreated, t]);
 
@@ -213,7 +214,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
                 className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] text-textColor outline-none"
                 value={newKeyName}
                 onChange={(e) => setNewKeyName(e.target.value)}
-                placeholder="My API Key"
+                placeholder={t('my_api_key_placeholder', 'My API Key')}
                 maxLength={100}
               />
             </div>

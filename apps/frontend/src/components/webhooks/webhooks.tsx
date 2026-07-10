@@ -20,11 +20,11 @@ import dayjs from 'dayjs';
 const PAGE_SIZE = 25;
 
 const EVENT_OPTIONS = [
-  { value: 'post.published', label: 'Post Published' },
-  { value: 'post.failed', label: 'Post Failed' },
-  { value: 'comment.new', label: 'New Comment' },
-  { value: 'comment.reply', label: 'Comment Reply' },
-  { value: 'analytics.snapshot_complete', label: 'Analytics Snapshot' },
+  { value: 'post.published', labelKey: 'event_post_published', label: 'Post Published' },
+  { value: 'post.failed', labelKey: 'event_post_failed', label: 'Post Failed' },
+  { value: 'comment.new', labelKey: 'event_new_comment', label: 'New Comment' },
+  { value: 'comment.reply', labelKey: 'event_comment_reply', label: 'Comment Reply' },
+  { value: 'analytics.snapshot_complete', labelKey: 'event_analytics_snapshot', label: 'Analytics Snapshot' },
 ];
 
 const webhookDetails = object().shape({
@@ -139,7 +139,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
                     onChange={() => toggleEvent(opt.value)}
                     className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary [&:checked]:bg-btnPrimary"
                   />
-                  {opt.label}
+                  {t(opt.labelKey, opt.label)}
                 </label>
               ))}
             </div>

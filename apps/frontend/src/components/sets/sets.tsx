@@ -72,7 +72,7 @@ const SaveSetModal: FC<{
           value={name}
           disableForm
           onChange={(e) => setName(e.target.value)}
-          placeholder="Enter a name for this set"
+          placeholder={t('enter_a_name_for_this_set', 'Enter a name for this set')}
         />
       </div>
       <div className="flex gap-2 justify-end">
@@ -147,7 +147,7 @@ export const Sets: FC = () => {
           {...(params?.id ? { set: JSON.parse(params.content) } : {})}
           addEditSets={(data: any) => {
             modal.openModal({
-              title: 'Save as Template',
+              title: t('save_as_template', 'Save as Template'),
               children: (
                 <SaveSetModal
                   initialValue={params?.name || ''}

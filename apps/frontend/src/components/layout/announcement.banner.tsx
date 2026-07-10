@@ -54,7 +54,7 @@ const AnnouncementDetailModal: FC<{
         ),
         t('yes_delete', 'Yes, delete'),
         t('confirm_delete', 'Confirm Delete'),
-        t('no_cancel', 'No, cancel')
+        t('no_cancel', 'No, cancel!')
       ))
     ) {
       return;
@@ -138,7 +138,7 @@ export const AnnouncementBanner: FC = () => {
       {latest.title}
       {announcements.length > 1 && (
         <span className="ml-[8px] opacity-70">
-          (+{announcements.length - 1} {t('more', 'more')})
+          (+{announcements.length - 1} {t('more_lowercase', 'more')})
         </span>
       )}
       <style>{`#left-menu {padding-top: 60px !important;}`}</style>

@@ -78,7 +78,12 @@ const JoinOver: FC<{ onShowYouTube: () => void }> = ({ onShowYouTube }) => {
               alt="YouTube"
             />
           </div>
-          <div>See the power of Postmill (click here)</div>
+          <div>
+            {t(
+              'billing_see_the_power_of_postiz',
+              'See the power of Postmill (click here)'
+            )}
+          </div>
         </button>
       </div>
 
@@ -150,12 +155,15 @@ export const FirstBillingComponent = () => {
 
   const showYouTube = () => {
     modals.openModal({
-      title: 'Grow Fast With Postmill (Play the video)',
+      title: t(
+        'billing_grow_fast_with_postiz_play_video',
+        'Grow Fast With Postmill (Play the video)'
+      ),
       children: (
         <iframe
           className="h-full aspect-video min-w-[800px]"
           src="https://www.youtube.com/embed/BdsCVvEYgHU?si=vvhaZJ8I5oXXvVJS?autoplay=1"
-          title="Postmill Tutorial"
+          title={t('billing_postiz_tutorial', 'Postmill Tutorial')}
           allow="autoplay"
           allowFullScreen
         />

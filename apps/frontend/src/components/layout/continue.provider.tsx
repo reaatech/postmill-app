@@ -10,6 +10,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { continueProviderList } from '@gitroom/frontend/components/composer/providers/continue-provider/list';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export const Null: FC<{
   onSave: (data: any) => Promise<void>;
   existingId: string[];
@@ -131,6 +132,7 @@ const ContinueModal: FC<{
 }> = (props) => {
   const { refreshList, added, continueId, integrations, provider } = props;
   const { openModal } = useModals();
+  const t = useT();
   const openedRef = useRef(false);
 
   useEffect(() => {
@@ -139,7 +141,7 @@ const ContinueModal: FC<{
     }
     openedRef.current = true;
     openModal({
-      title: 'Configure Channel',
+      title: t('configure_channel', 'Configure Channel'),
       children: (close) => (
         <ModalContent
           added={added}
@@ -153,7 +155,7 @@ const ContinueModal: FC<{
         />
       ),
     });
-  }, [openModal, refreshList, added, continueId, integrations, provider]);
+  }, [openModal, refreshList, added, continueId, integrations, provider, t]);
 
   return null;
 };

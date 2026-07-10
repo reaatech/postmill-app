@@ -243,6 +243,7 @@ export const NotificationOpenComponent: FC<{
 
 const NotificationComponent = () => {
   const fetch = useFetch();
+  const t = useT();
   const [show, setShow] = useState(false);
 
   const loadUnreadCount = useCallback(async (): Promise<{ total: number }> => {
@@ -267,7 +268,7 @@ const NotificationComponent = () => {
     <div className="relative cursor-pointer select-none" ref={ref}>
       <button
         type="button"
-        aria-label="Notifications"
+        aria-label={t('notifications', 'Notifications')}
         onClick={changeShow}
         className="relative cursor-pointer"
       >
