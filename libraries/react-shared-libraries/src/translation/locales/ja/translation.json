@@ -3979,5 +3979,10 @@
   "confirm_delete_brand": "「{{name}}」を削除しますか？",
   "compliance_issues": "{{count}} 件の問題が見つかりました",
   "poll_option_placeholder": "選択肢 {{number}}...",
-  "revoke_api_key_description": "「{{name}}」を完全に無効化します。このキーを使用している連携は直ちに動作しなくなります。"
+  "revoke_api_key_description": "「{{name}}」を完全に無効化します。このキーを使用している連携は直ちに動作しなくなります。",
+  "add_a_thread_finisher": "スレッドの締めくくりを追加",
+  "tiktok_upload_notification_note": "投稿後、コンテンツスタジオではなく受信箱内で投稿に関する通知を確認できます",
+  "what_do_you_want_to_do": "何をしますか？",
+  "post_already_published_what_to_do": "この投稿はすでに公開されています。どうしますか？",
+  "reddit_add_subreddit_hint": "設定から少なくとも1つのSubredditを追加してください"
 }

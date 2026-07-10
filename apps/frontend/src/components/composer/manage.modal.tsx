@@ -179,7 +179,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           <div className="relative">
             <SettingsIcon size={15} className="text-white" />
           </div>
-          <div>Settings</div>
+          <div>{t('settings', 'Settings')}</div>
         </div>
       );
     }
@@ -453,11 +453,14 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       ) {
         const whatToDo = await new Promise((resolve) => {
           modal.openModal({
-            title: 'What do you want to do?',
+            title: t('what_do_you_want_to_do', 'What do you want to do?'),
             children: (
               <div className="flex flex-col">
                 <div className="text-[20px] mb-[20px]">
-                  This post was already published, what do you want to do?
+                  {t(
+                    'post_already_published_what_to_do',
+                    'This post was already published, what do you want to do?'
+                  )}
                 </div>
                 <div className="flex w-full gap-[10px]">
                   <div className="flex-1 flex">

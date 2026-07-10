@@ -3979,5 +3979,10 @@
   "confirm_delete_brand": "Xóa \"{{name}}\"?",
   "compliance_issues": "Đã tìm thấy {{count}} vấn đề",
   "poll_option_placeholder": "Lựa chọn {{number}}...",
-  "revoke_api_key_description": "Thao tác này sẽ thu hồi vĩnh viễn \"{{name}}\". Mọi tích hợp đang sử dụng khóa này sẽ ngừng hoạt động ngay lập tức."
+  "revoke_api_key_description": "Thao tác này sẽ thu hồi vĩnh viễn \"{{name}}\". Mọi tích hợp đang sử dụng khóa này sẽ ngừng hoạt động ngay lập tức.",
+  "add_a_thread_finisher": "Thêm phần kết thúc chuỗi bài đăng",
+  "tiktok_upload_notification_note": "Sau khi đăng, bạn sẽ thấy thông báo về bài đăng của mình trong Hộp thư đến (không phải trong content studio)",
+  "what_do_you_want_to_do": "Bạn muốn làm gì?",
+  "post_already_published_what_to_do": "Bài đăng này đã được xuất bản, bạn muốn làm gì?",
+  "reddit_add_subreddit_hint": "Vui lòng thêm ít nhất một Subreddit từ phần cài đặt"
 }

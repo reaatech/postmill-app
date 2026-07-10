@@ -3979,5 +3979,10 @@
   "confirm_delete_brand": "\"{{name}}\"을(를) 삭제하시겠습니까?",
   "compliance_issues": "{{count}}개의 문제가 발견되었습니다",
   "poll_option_placeholder": "옵션 {{number}}...",
-  "revoke_api_key_description": "\"{{name}}\"이(가) 영구적으로 취소됩니다. 이 키를 사용하는 통합은 즉시 작동을 멈춥니다."
+  "revoke_api_key_description": "\"{{name}}\"이(가) 영구적으로 취소됩니다. 이 키를 사용하는 통합은 즉시 작동을 멈춥니다.",
+  "add_a_thread_finisher": "스레드 마무리 게시물 추가",
+  "tiktok_upload_notification_note": "게시 후 받은함(콘텐츠 스튜디오 아님)에서 게시물 관련 알림을 확인할 수 있습니다",
+  "what_do_you_want_to_do": "무엇을 하시겠습니까?",
+  "post_already_published_what_to_do": "이 게시물은 이미 게시되었습니다. 어떻게 하시겠습니까?",
+  "reddit_add_subreddit_hint": "설정에서 서브레딧을 하나 이상 추가해 주세요"
 }

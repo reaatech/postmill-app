@@ -3979,5 +3979,10 @@
   "confirm_delete_brand": "删除“{{name}}”？",
   "compliance_issues": "发现 {{count}} 个问题",
   "poll_option_placeholder": "选项 {{number}}……",
-  "revoke_api_key_description": "此操作将永久吊销“{{name}}”。使用此密钥的所有集成将立即停止工作。"
+  "revoke_api_key_description": "此操作将永久吊销“{{name}}”。使用此密钥的所有集成将立即停止工作。",
+  "add_a_thread_finisher": "添加话题串结尾",
+  "tiktok_upload_notification_note": "发布后，你会在收件箱中收到一条关于该帖子的通知（而非内容工作室）",
+  "what_do_you_want_to_do": "你想要做什么？",
+  "post_already_published_what_to_do": "该帖子已发布，你想要做什么？",
+  "reddit_add_subreddit_hint": "请在设置中至少添加一个 Subreddit"
 }

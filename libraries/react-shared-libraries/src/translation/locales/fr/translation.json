@@ -3979,5 +3979,10 @@
   "confirm_delete_brand": "Supprimer « {{name}} » ?",
   "compliance_issues": "{{count}} problème(s) trouvé(s)",
   "poll_option_placeholder": "Option {{number}}...",
-  "revoke_api_key_description": "Cette action révoquera définitivement « {{name}} ». Toute intégration utilisant cette clé cessera immédiatement de fonctionner."
+  "revoke_api_key_description": "Cette action révoquera définitivement « {{name}} ». Toute intégration utilisant cette clé cessera immédiatement de fonctionner.",
+  "add_a_thread_finisher": "Ajouter une conclusion de fil",
+  "tiktok_upload_notification_note": "Après la publication, vous trouverez une notification dans votre boîte de réception concernant votre publication (pas le studio de contenu)",
+  "what_do_you_want_to_do": "Que voulez-vous faire ?",
+  "post_already_published_what_to_do": "Cette publication a déjà été publiée, que voulez-vous faire ?",
+  "reddit_add_subreddit_hint": "Veuillez ajouter au moins un subreddit depuis les paramètres"
 }
