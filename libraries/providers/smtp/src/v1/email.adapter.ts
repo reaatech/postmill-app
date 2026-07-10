@@ -56,19 +56,19 @@ export class SmtpAdapter implements EmailCapability {
   }
 
   private htmlToText(html: string): string {
-    return html
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<\/(p|div|br|h[1-6]|li|tr)>/gi, '\n')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
+    const stripTag = (s: string, tag: string) =>
+      s.replace(new RegExp(`<${tag}\\b[^>]*>[\\s\\S]*?<\\/${tag}\\s*>`, 'gi'), '');
+    let out = stripTag(stripTag(html, 'style'), 'script')
+      .replace(/<\/(p|div|h[1-6]|li|tr)\s*>/gi, '\n')
+      .replace(/<br\s*\/?\s*>/gi, '\n');
+    let prev: string;
+    do { prev = out; out = out.replace(/<[^>]*>/g, ''); } while (out !== prev);
+    out = out
       .replace(/&nbsp;/gi, ' ')
-      .replace(/&amp;/gi, '&')
       .replace(/&lt;/gi, '<')
       .replace(/&gt;/gi, '>')
-      .replace(/[ \t]+/g, ' ')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
+      .replace(/&amp;/gi, '&');
+    return out.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
   }
 }
 

@@ -36,6 +36,7 @@ export default defineConfig({
       'src/components/launches/generator/**/*.spec.{ts,tsx}',
       'src/components/dashboard/**/*.spec.{ts,tsx}',
       'src/components/settings/media-providers/**/*.spec.{ts,tsx}',
+      'src/components/shared/**/*.spec.{ts,tsx}',
       'src/components/ai/**/*.spec.{ts,tsx}',
       'src/components/settings/shortlinks/**/*.spec.{ts,tsx}',
       'src/components/settings/vpn/**/*.spec.{ts,tsx}',

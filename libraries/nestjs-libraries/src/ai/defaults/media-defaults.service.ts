@@ -43,28 +43,31 @@ export class MediaDefaultsService {
     category: string,
     body: SetDefaultModelDto,
   ) {
-    if (!AI_MEDIA_CATEGORIES.includes(category as any)) {
+    const safeCategory = AI_MEDIA_CATEGORIES.find((c) => c === category);
+    if (!safeCategory) {
       throw new BadRequestException(`Invalid media category: ${category}`);
     }
-    const cleaned = this._sanitizeSettings('media', category, body);
-    await this._defaultsRepository.upsert(orgId, 'media', category, cleaned);
+    const cleaned = this._sanitizeSettings('media', safeCategory, body);
+    await this._defaultsRepository.upsert(orgId, 'media', safeCategory, cleaned);
     this._bustDefaultsCatalogCache(orgId);
-    return { category, success: true };
+    return { category: safeCategory, success: true };
   }
 
   async clearMediaDefault(orgId: string, category: string) {
-    if (!AI_MEDIA_CATEGORIES.includes(category as any)) {
+    const safeCategory = AI_MEDIA_CATEGORIES.find((c) => c === category);
+    if (!safeCategory) {
       throw new BadRequestException(`Invalid media category: ${category}`);
     }
-    await this._defaultsRepository.remove(orgId, 'media', category);
-    return { category, success: true };
+    await this._defaultsRepository.remove(orgId, 'media', safeCategory);
+    return { category: safeCategory, success: true };
   }
 
   async getMediaDefaultsCatalog(orgId: string, category: string) {
-    if (!AI_MEDIA_CATEGORIES.includes(category as any)) {
+    const safeCategory = AI_MEDIA_CATEGORIES.find((c) => c === category);
+    if (!safeCategory) {
       throw new BadRequestException(`Invalid media category: ${category}`);
     }
-    const cacheKey = `settings:content:media-defaults:catalog:${orgId}:${category}`;
+    const cacheKey = `settings:content:media-defaults:catalog:${orgId}:${safeCategory}`;
     const cached = await ioRedis.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
@@ -72,7 +75,7 @@ export class MediaDefaultsService {
 
     const candidates = await this._defaultsResolution.candidates(
       'media',
-      category,
+      safeCategory,
       orgId,
     );
     const options: {
@@ -84,7 +87,7 @@ export class MediaDefaultsService {
     }[] = [];
     for (const c of candidates) {
       const providerLabel = this._providerLabel(c);
-      const staticModels = this._staticModelsForCandidate(c, category);
+      const staticModels = this._staticModelsForCandidate(c, safeCategory);
 
       if (c.metadata.kind === 'action') {
         options.push({
@@ -93,7 +96,7 @@ export class MediaDefaultsService {
           label: providerLabel,
         });
       } else if (c.metadata.hasModelList) {
-        const models = await this._listModelsForCandidate(c, category, orgId);
+        const models = await this._listModelsForCandidate(c, safeCategory, orgId);
         if (!models || models.length === 0) {
           // Configured model-list provider whose catalog couldn't be enumerated
           // (transient API failure / empty list). Still offer a provider-level option
@@ -146,7 +149,7 @@ export class MediaDefaultsService {
         });
       }
     }
-    const result = { category, options };
+    const result = { category: safeCategory, options };
     await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', 60);
     return result;
   }

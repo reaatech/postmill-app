@@ -110,7 +110,11 @@ describe('vertex media adapter (Imagen image + Veo long-running video)', () => {
     const done = await adapter.pollJob(opName, { credentials: CREDS });
     expect(done.status).toBe('completed');
     // The gs:// URI is turned into the authenticated JSON-API media download URL (bucket + %2F-encoded object).
-    const dl = recs.find((r) => r.url.startsWith('https://storage.googleapis.com'));
+    const dl = recs.find(
+      (r) =>
+        r.url ===
+        'https://storage.googleapis.com/storage/v1/b/my-bucket/o/renders%2Fout.mp4?alt=media',
+    );
     expect(dl?.url).toBe(
       'https://storage.googleapis.com/storage/v1/b/my-bucket/o/renders%2Fout.mp4?alt=media',
     );

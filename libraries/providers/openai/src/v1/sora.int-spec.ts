@@ -198,7 +198,9 @@ describe('openai media adapter — Sora Videos API', () => {
       },
     };
     const { ctx } = makeCtx((url) =>
-      url.startsWith('https://ref.example') ? bigImg : json({ id: 'video_abc', status: 'queued' }),
+      new URL(url).origin === 'https://ref.example'
+        ? bigImg
+        : json({ id: 'video_abc', status: 'queued' }),
     );
     const adapter: any = openaiMediaModule.create(ctx as any);
     await expect(

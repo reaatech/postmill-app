@@ -48,6 +48,8 @@ describe('DashboardController', () => {
     getCampaignSummaries: ReturnType<typeof vi.fn>;
     getMediaJobs: ReturnType<typeof vi.fn>;
     getAttention: ReturnType<typeof vi.fn>;
+    buildUsage: ReturnType<typeof vi.fn>;
+    buildPlanUsage: ReturnType<typeof vi.fn>;
   };
   let briefService: {
     getCachedBrief: ReturnType<typeof vi.fn>;
@@ -141,6 +143,9 @@ describe('DashboardController', () => {
     const result = await controller.getUsage(org);
 
     expect(result.billingEnabled).toBe(true);
+    if (!('usage' in result)) {
+      throw new Error('expected usage to be present');
+    }
     expect(result.usage.postsThisCycle).toBe(12);
     expect(result.usage.channels).toBe(1);
     expect(result.usage.teamMembers).toBe(2);

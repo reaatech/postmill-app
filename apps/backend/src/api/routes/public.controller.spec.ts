@@ -91,7 +91,7 @@ describe('PublicController', () => {
     it('tracks the event and returns the tracking cookie', async () => {
       const res = makeRes() as Response;
       const req = makeReq() as Request;
-      const body = { tt: TrackEnum.LOGIN, additional: { foo: 'bar' } };
+      const body = { tt: TrackEnum.CompleteRegistration, additional: { foo: 'bar' } };
 
       await controller.trackEvent(res, req, '127.0.0.1', 'Mozilla/5.0', body);
 
@@ -99,7 +99,7 @@ describe('PublicController', () => {
         expect.any(String),
         '127.0.0.1',
         'Mozilla/5.0',
-        TrackEnum.LOGIN,
+        TrackEnum.CompleteRegistration,
         { foo: 'bar' },
         undefined
       );

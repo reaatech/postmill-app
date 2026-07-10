@@ -37,6 +37,7 @@ import {
 } from './anomaly.detection';
 import { getRetentionDays } from './analytics-aggregation';
 import { METRIC_REGISTRY } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
+import { stripHtmlTags } from '@gitroom/helpers/utils/strip.tags';
 
 dayjs.extend(isoWeek);
 
@@ -944,7 +945,7 @@ export class AnalyticsService {
               rootCauseByGroup.set(key, {
                 topPostId: top.postId,
                 topPostTitle: content
-                  ? content.replace(/<[^>]*>/g, '').slice(0, 80).trim()
+                  ? stripHtmlTags(content).slice(0, 80).trim()
                   : undefined,
               });
             }
@@ -978,7 +979,7 @@ export class AnalyticsService {
                 rootCauseByGroup.set(`${fg.integrationId}::${fg.metric}`, {
                   topPostId: top.postId,
                   topPostTitle: content
-                    ? content.replace(/<[^>]*>/g, '').slice(0, 80).trim()
+                    ? stripHtmlTags(content).slice(0, 80).trim()
                     : undefined,
                 });
               }

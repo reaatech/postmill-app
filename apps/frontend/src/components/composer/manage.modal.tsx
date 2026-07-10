@@ -25,6 +25,7 @@ import { TagsComponent } from '@gitroom/frontend/components/launches/tags.compon
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { stripHtmlTags } from '@gitroom/helpers/utils/strip.tags';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { capitalize } from 'lodash';
@@ -252,8 +253,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   // below so we only warn when there's actual unsaved work — not on an empty composer.
   const hasStartedComposing = useMemo(() => {
     const stripped = (html: string) =>
-      (html || '')
-        .replace(/<[^>]*>/g, '')
+      stripHtmlTags(html || '')
         .replace(/&nbsp;/g, ' ')
         .trim();
     const hasWork = (v?: { content?: string; media?: any[] }) =>

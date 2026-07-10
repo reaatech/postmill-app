@@ -41,7 +41,11 @@ describe('SocialCommentsController', () => {
 
   describe('GET /:id/social-comments', () => {
     it('returns comments for a post with cursor query param', async () => {
-      const mockResult = {
+      const mockResult: {
+        comments: Array<{ id: string }>;
+        nextCursor: string | undefined;
+        unreadCount: number;
+      } = {
         comments: [{ id: 'c1' }],
         nextCursor: undefined,
         unreadCount: 0,
@@ -85,7 +89,10 @@ describe('SocialCommentsController', () => {
   describe('GET /inbox', () => {
     it('parses filters and delegates to the service', async () => {
       const filters = { status: 'needs_reply', limit: 25 };
-      const mockResult = { comments: [], nextCursor: undefined };
+      const mockResult: {
+        comments: Array<{ id: string }>;
+        nextCursor: string | undefined;
+      } = { comments: [], nextCursor: undefined };
       (service.parseInboxFilters as any).mockReturnValue(filters);
       (service.getInbox as any).mockResolvedValue(mockResult);
 

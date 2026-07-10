@@ -42,6 +42,8 @@ jobs:
               - e2e/**
               - '**/*.spec.ts'
               - '**/*.spec.tsx'
+              - '**/*.int-spec.ts'
+              - '**/*.int-spec.tsx'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

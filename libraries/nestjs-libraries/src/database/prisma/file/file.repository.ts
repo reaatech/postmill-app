@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
 import { Prisma } from '@prisma/client';
 import { stat } from 'fs/promises';
-import { extname } from 'path';
+import { extname, resolve, sep } from 'path';
 
 const MIME_MAP: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -90,17 +90,20 @@ export class FileRepository {
 
     let resolvedFileSize = fileSize ?? 0;
 
-    // Only stat local absolute paths. Cloud adapters return public URLs
-    // (https://…) where stat() will fail; the caller must supply fileSize.
-    if (resolvedFileSize === 0 && filePath.startsWith('/')) {
+    // Only stat paths inside the configured upload root. Cloud adapters return
+    // public URLs (https://…) where stat() will fail; the caller must supply fileSize.
+    const uploadRoot = resolve(process.env.UPLOAD_DIRECTORY || './uploads');
+    const resolved = resolve(filePath);
+    const insideRoot = resolved === uploadRoot || resolved.startsWith(uploadRoot + sep);
+    if (resolvedFileSize === 0 && insideRoot) {
       try {
-        const s = await stat(filePath);
+        const s = await stat(resolved);
         resolvedFileSize = s.size;
 
         if (IMAGE_EXTS.has(extname(fileName).toLowerCase())) {
           try {
             const sharp = (await import('sharp')).default;
-            const metadata = await sharp(filePath).metadata();
+            const metadata = await sharp(resolved).metadata();
             meta.dimensions = { width: metadata.width, height: metadata.height };
           } catch {
           }
