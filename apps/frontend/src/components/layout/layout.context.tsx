@@ -29,6 +29,9 @@ export function setClientCookie(cname: string, cvalue: string, exdays: number) {
 export const setCookie = setClientCookie;
 function LayoutContextInner(params: { children: ReactNode }) {
   const returnUrl = useReturnUrl();
+  // useReturnUrl returns a fresh object per render, but its getAndClear member is a
+  // stable useCallback — destructure it so afterRequest's deps stay stable.
+  const { getAndClear: getAndClearReturnUrl } = returnUrl;
   const { backendUrl, isGeneral, isSecured } = useVariables();
   const t = useT();
   const afterRequest = useCallback(
@@ -52,7 +55,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
         response?.headers?.get('reload') ||
         response?.headers?.get('onboarding');
       if (reloadOrOnboarding) {
-        const getAndClear = returnUrl.getAndClear();
+        const getAndClear = getAndClearReturnUrl();
         if (getAndClear) {
           try {
             const parsed = new URL(getAndClear, window.location.origin);
@@ -120,7 +123,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
       return true;
     },
-    [t]
+    [t, isSecured, getAndClearReturnUrl]
   );
   return (
     <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>

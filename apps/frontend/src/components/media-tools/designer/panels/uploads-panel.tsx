@@ -272,7 +272,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
     } finally {
       setUploadingFile(false);
     }
-  }, [addAudioClip, mutate, toaster, t]);
+  }, [addAudioClip, mutate, toaster, t, fetch]);
 
   const handleStickerUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -296,7 +296,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
     } finally {
       setUploadingFile(false);
     }
-  }, [addStickerClip, mutate, toaster, t]);
+  }, [addStickerClip, mutate, toaster, t, fetch]);
 
   const handleModalSelect = useCallback(async (item: {
     source: 'stock' | 'file';
