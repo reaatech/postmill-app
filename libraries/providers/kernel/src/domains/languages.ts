@@ -6,7 +6,6 @@
  */
 export const LANGUAGE_CODES = [
   'en',
-  'he',
   'ru',
   'zh',
   'fr',

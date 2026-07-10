@@ -29,7 +29,6 @@ const LANGUAGES = [
   { value: 'pt-BR', label: 'Portuguese (Brazil)' },
   { value: 'ja', label: 'Japanese' },
   { value: 'ar', label: 'Arabic' },
-  { value: 'he', label: 'Hebrew' },
   { value: 'zh-CN', label: 'Chinese (Simplified)' },
   { value: 'zh-TW', label: 'Chinese (Traditional)' },
   { value: 'ko', label: 'Korean' },
@@ -212,6 +211,12 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
               setSelectedChannel('');
             }}
           >
+            {/* Display-only guard: a brand saved with a now-removed language
+                (e.g. legacy 'he') keeps its stored value + profile intact — we
+                only surface a synthetic option so the selector isn't blank. */}
+            {!LANGUAGES.some((lang) => lang.value === language) && (
+              <option value={language}>{language}</option>
+            )}
             {LANGUAGES.map((lang) => (
               <option key={lang.value} value={lang.value}>
                 {lang.label}
