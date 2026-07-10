@@ -3,18 +3,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 
 // 3.3: hoisted to module scope. Human-readable description per granted scope so the
 // user sees what they approve instead of a hardcoded, possibly-wrong capability list.
 // `mcp:admin` is intentionally absent — no tool enforces it and it is no longer
 // advertised in scopes_supported, so it must never be presented as a grantable scope.
-const SCOPE_LABELS: Record<string, string> = {
-  'mcp:read': 'Read your integrations, posts, and analytics',
-  'mcp:posts:write': 'Create, schedule, and publish posts on your behalf',
+const SCOPE_LABELS: Record<string, { key: string; text: string }> = {
+  'mcp:read': {
+    key: 'oauth_scope_mcp_read',
+    text: 'Read your integrations, posts, and analytics',
+  },
+  'mcp:posts:write': {
+    key: 'oauth_scope_mcp_posts_write',
+    text: 'Create, schedule, and publish posts on your behalf',
+  },
 };
 
 export default function OAuthAuthorizePage() {
+  const t = useT();
   const searchParams = useSearchParams();
   const fetch = useFetch();
   const clientId = searchParams.get('client_id');
@@ -31,10 +39,16 @@ export default function OAuthAuthorizePage() {
   const [appInfo, setAppInfo] = useState<any>(null);
   const [error, setError] = useState(() => {
     if (!clientId || !responseType) {
-      return 'Missing required parameters (client_id, response_type)';
+      return t(
+        'oauth_missing_required_params',
+        'Missing required parameters (client_id, response_type)'
+      );
     }
     if (responseType !== 'code') {
-      return 'Only response_type=code is supported';
+      return t(
+        'oauth_only_code_supported',
+        'Only response_type=code is supported'
+      );
     }
     return '';
   });
@@ -77,17 +91,21 @@ export default function OAuthAuthorizePage() {
       .then((r) => r.json())
       .then((data) => {
         if (data.statusCode && data.statusCode >= 400) {
-          setError(data.message || 'Invalid OAuth request');
+          setError(
+            data.message || t('oauth_invalid_request', 'Invalid OAuth request')
+          );
         } else {
           setAppInfo(data);
         }
         setLoading(false);
       })
       .catch(() => {
-        setError('Failed to validate OAuth request');
+        setError(
+          t('oauth_failed_validate_request', 'Failed to validate OAuth request')
+        );
         setLoading(false);
       });
-  }, [clientId, responseType, state, redirectUri, scope, fetch, loading]);
+  }, [clientId, responseType, state, redirectUri, scope, fetch, loading, t]);
 
   const handleAction = useCallback(
     async (action: 'approve' | 'deny') => {
@@ -121,13 +139,21 @@ export default function OAuthAuthorizePage() {
         // mismatch or non-S256 challenge). Surface the message and re-enable the
         // buttons instead of dead-ending with both permanently disabled.
         if (!result.redirect) {
-          setError(result.message || 'Authorization failed');
+          setError(
+            result.message ||
+              t('oauth_authorization_failed', 'Authorization failed')
+          );
           setSubmitting(false);
           return;
         }
         window.location.href = result.redirect;
       } catch {
-        setError('Failed to process authorization');
+        setError(
+          t(
+            'oauth_failed_process_authorization',
+            'Failed to process authorization'
+          )
+        );
         setSubmitting(false);
       }
     },
@@ -139,6 +165,7 @@ export default function OAuthAuthorizePage() {
       codeChallenge,
       codeChallengeMethod,
       requestedScopes,
+      t,
     ]
   );
 
@@ -154,7 +181,7 @@ export default function OAuthAuthorizePage() {
             <Logo />
           </div>
           <div className="text-[16px] text-gray-400">
-            Please wait...
+            {t('please_wait_ellipsis', 'Please wait...')}
           </div>
           <div className="mt-[32px] flex justify-center">
             <div className="w-[48px] h-[48px] border-[3px] border-[#2B5CD3] border-t-transparent rounded-full animate-spin" />
@@ -189,7 +216,7 @@ export default function OAuthAuthorizePage() {
             </svg>
           </div>
           <div className="text-[28px] font-semibold mb-[12px]">
-            Authorization Error
+            {t('oauth_authorization_error', 'Authorization Error')}
           </div>
           <div className="text-[16px] text-gray-400 max-w-[400px]">
             {error}
@@ -241,20 +268,22 @@ export default function OAuthAuthorizePage() {
 
           <div className="border-t border-[#2A2929] pt-[16px]">
             <div className="text-[14px] text-gray-400 mb-[12px]">
-              This application is requesting access to your Postmill account. It
-              will be able to:
+              {t(
+                'oauth_requesting_access',
+                'This application is requesting access to your Postmill account. It will be able to:'
+              )}
             </div>
             <ul className="text-[14px] list-disc list-inside space-y-[4px]">
               {requestedScopes.map((s) =>
                 SCOPE_LABELS[s] ? (
-                  <li key={s}>{SCOPE_LABELS[s]}</li>
+                  <li key={s}>{t(SCOPE_LABELS[s].key, SCOPE_LABELS[s].text)}</li>
                 ) : (
                   // 3.3: never render a client-authored scope string as prose (it
                   // could be a reassuring sentence that diverges from the actual
                   // floored grant). Show the raw id in monospace, muted, with an
                   // explicit "Unrecognized scope" prefix.
                   <li key={s} className="text-gray-500">
-                    Unrecognized scope:{' '}
+                    {t('oauth_unrecognized_scope', 'Unrecognized scope:')}{' '}
                     <code className="font-mono text-gray-400">{s}</code>
                   </li>
                 )
@@ -268,14 +297,14 @@ export default function OAuthAuthorizePage() {
               disabled={submitting}
               className="flex-1 bg-[#2B5CD3] hover:bg-[#7B3FF2] disabled:opacity-50 text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
             >
-              Authorize
+              {t('authorize', 'Authorize')}
             </button>
             <button
               onClick={() => handleAction('deny')}
               disabled={submitting}
               className="flex-1 bg-[#2A2929] hover:bg-[#3A3939] disabled:opacity-50 text-white rounded-[8px] py-[10px] px-[16px] text-[14px] font-semibold transition-colors"
             >
-              Deny
+              {t('deny', 'Deny')}
             </button>
           </div>
         </div>

@@ -309,7 +309,11 @@ export const BrandVoiceSection = () => {
         {selectedPlatform && (
           <div className="flex flex-col gap-[4px]">
             <div className="text-[13px] text-newTableText">
-              {t('platform_instructions', `Instructions for ${PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label || selectedPlatform}`)}
+              {t('platform_instructions', 'Instructions for {{platform}}', {
+                platform:
+                  PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label ||
+                  selectedPlatform,
+              })}
             </div>
             <textarea
               className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"

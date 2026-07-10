@@ -6,15 +6,26 @@ import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { useSidebarCollapse } from '@gitroom/frontend/components/layout/use-sidebar-collapse';
 import { SubmenuStrip } from '@gitroom/frontend/components/new-layout/submenu-strip';
 import { StudioErrorBoundary } from '@gitroom/frontend/components/media-tools/studio-error-boundary';
 
-const tabs = [
+interface MediaTab {
+  href: string;
+  label: string;
+  // Present only for generic (non-provider-name) labels; the i18n key to translate `label` with.
+  labelKey?: string;
+  section: string;
+  icon: React.ReactNode;
+}
+
+const tabs: MediaTab[] = [
   {
     href: '/media/stock-photos',
     label: 'Stock Photos',
+    labelKey: 'stock_photos_tab',
     section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -27,6 +38,7 @@ const tabs = [
   {
     href: '/media/stock-videos',
     label: 'Stock Videos',
+    labelKey: 'stock_videos_tab',
     section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -38,6 +50,7 @@ const tabs = [
   {
     href: '/media/ai-designer',
     label: 'AI Designer',
+    labelKey: 'ai_designer',
     section: 'Platform',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -48,6 +61,7 @@ const tabs = [
   {
     href: '/media/designer',
     label: 'Designer',
+    labelKey: 'designer_tab',
     section: 'Platform',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -490,6 +504,7 @@ const tabs = [
   {
     href: '/media/stock-vectors',
     label: 'Vectors',
+    labelKey: 'vectors_tab',
     section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -503,6 +518,7 @@ const tabs = [
   {
     href: '/media/stock-stickers',
     label: 'Stickers',
+    labelKey: 'uploads_panel_stickers',
     section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -516,6 +532,7 @@ const tabs = [
   {
     href: '/media/stock-audio',
     label: 'Stock Audio',
+    labelKey: 'stock_audio_tab',
     section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -528,6 +545,7 @@ const tabs = [
   {
     href: '/media/stock-icons',
     label: 'Icons',
+    labelKey: 'panel_icons',
     section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -552,8 +570,14 @@ const sortedTabs = [...tabs].sort((a, b) => {
 });
 
 // Display labels for section headers (the internal section key stays stable).
-const SECTION_LABELS: Record<string, string> = {
-  Providers: 'AI Media',
+// labelKey/labelDefault feed the i18n t() call at the render site.
+const SECTION_LABELS: Record<string, { labelKey: string; labelDefault: string }> = {
+  Platform: { labelKey: 'platform', labelDefault: 'Platform' },
+  Providers: { labelKey: 'media_section_ai_media', labelDefault: 'AI Media' },
+  'Content Pack': {
+    labelKey: 'media_section_content_pack',
+    labelDefault: 'Content Pack',
+  },
 };
 
 // Most studio routes equal the provider identifier (/media/<id>). These few
@@ -592,10 +616,14 @@ const useEnabledMediaProviders = () => {
 };
 
 export default function MediaLayout({ children }: { children: React.ReactNode }) {
+  // Named `translate` (not `t`) because `t` is already used as the tab loop variable below.
+  const translate = useT();
   const pathname = usePathname();
   const permissions = usePermissions();
   const { collapsed, toggle } = useSidebarCollapse('media:sidebar-collapsed');
   const { data: enabledProviders } = useEnabledMediaProviders();
+  const tabLabel = (tab: (typeof sortedTabs)[number]) =>
+    tab.labelKey ? translate(tab.labelKey, tab.label) : tab.label;
 
   // Provider studios that aren't configured yet stay DISCOVERABLE: the desktop
   // rail shows them dimmed (click → the studio's own configure/landing screen)
@@ -609,9 +637,14 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
     return (
       <div className="flex flex-1 items-center justify-center h-full p-[20px] bg-newBgColorInner text-textColor">
         <div className="text-center">
-          <div className="text-[16px] font-semibold mb-2">Media access required</div>
+          <div className="text-[16px] font-semibold mb-2">
+            {translate('media_access_required', 'Media access required')}
+          </div>
           <div className="text-[13px] text-newTableText/60">
-            You don&apos;t have permission to access media tools.
+            {translate(
+              'media_access_required_body',
+              "You don't have permission to access media tools."
+            )}
           </div>
         </div>
       </div>
@@ -637,13 +670,23 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
           )}
         >
           {!collapsed && (
-            <span className="text-[13px] font-[600] text-textColor">Media Tools</span>
+            <span className="text-[13px] font-[600] text-textColor">
+              {translate('media_tools_heading', 'Media Tools')}
+            </span>
           )}
           <button
             type="button"
             onClick={toggle}
-            aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
-            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            aria-label={
+              collapsed
+                ? translate('expand_menu', 'Expand menu')
+                : translate('collapse_menu', 'Collapse menu')
+            }
+            title={
+              collapsed
+                ? translate('expand_menu', 'Expand menu')
+                : translate('collapse_menu', 'Collapse menu')
+            }
             className="flex w-[24px] h-[24px] items-center justify-center rounded-[6px] text-textColor/60 hover:text-textColor hover:bg-newColColor/50 transition-colors"
           >
             <svg
@@ -679,12 +722,23 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
                       collapsed && 'hidden'
                     )}
                   >
-                    {SECTION_LABELS[t.section] || t.section}
+                    {SECTION_LABELS[t.section]
+                      ? translate(
+                          SECTION_LABELS[t.section].labelKey,
+                          SECTION_LABELS[t.section].labelDefault
+                        )
+                      : t.section}
                   </div>
                 )}
                 <Link
                   href={t.href}
-                  title={enabled ? t.label : `${t.label} — not configured`}
+                  title={
+                    enabled
+                      ? tabLabel(t)
+                      : translate('media_tab_not_configured', '{{label}} — not configured', {
+                          label: tabLabel(t),
+                        })
+                  }
                   aria-current={active ? 'page' : undefined}
                   className={clsx(
                     'group/rail relative flex items-center gap-[10px] rounded-e-[6px] text-[13px] text-textColor transition-colors',
@@ -703,7 +757,7 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
                   <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
                     {t.icon}
                   </span>
-                  {!collapsed && <span className="truncate">{t.label}</span>}
+                  {!collapsed && <span className="truncate">{tabLabel(t)}</span>}
                 </Link>
               </React.Fragment>
             );
@@ -714,10 +768,10 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
       {/* Page area: mobile gets a horizontal sub-menu strip above the content. */}
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <SubmenuStrip
-          ariaLabel="Media tools"
+          ariaLabel={translate('media_tools_aria_label', 'Media tools')}
           items={stripTabs.map((t) => ({
             href: t.href,
-            label: t.label,
+            label: tabLabel(t),
             icon: t.icon,
             active: pathname.startsWith(t.href),
           }))}

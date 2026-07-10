@@ -267,7 +267,9 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
         {selectedChannel && (
           <div className="flex flex-col gap-[4px]">
             <div className="text-[13px] text-newTableText">
-              {t('channel_instructions', `Instructions for ${channelName(selectedChannel)}`)}
+              {t('channel_instructions', 'Instructions for {{channel}}', {
+                channel: channelName(selectedChannel),
+              })}
             </div>
             <textarea
               className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"

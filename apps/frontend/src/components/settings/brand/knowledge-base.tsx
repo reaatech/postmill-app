@@ -299,7 +299,9 @@ export const KnowledgeBase = () => {
       }
       const data = await res.json();
       toaster.show(
-        t('backfill_completed', `Backfill completed — indexed ${data.indexed || 0} new sources`),
+        t('backfill_completed', 'Backfill completed — indexed {{count}} new sources', {
+          count: data.indexed || 0,
+        }),
         'success',
       );
       mutateStatus();

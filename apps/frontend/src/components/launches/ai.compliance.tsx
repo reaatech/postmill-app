@@ -92,7 +92,9 @@ export const AICompliance: FC<{ content?: string; platform?: string }> = ({
           <div className={`text-[14px] font-medium ${result.passed ? 'text-green-500' : 'text-red-500'}`}>
             {result.passed
               ? t('compliance_passed', 'No issues found')
-              : t('compliance_issues', `Found ${result.violations.length} issue(s)`)}
+              : t('compliance_issues', 'Found {{count}} issue(s)', {
+                  count: result.violations.length,
+                })}
           </div>
 
           {result.violations.length > 0 && (

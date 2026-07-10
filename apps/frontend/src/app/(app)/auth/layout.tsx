@@ -8,10 +8,13 @@ import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.com
 const ReturnUrlComponent = loadDynamic(() => import('./return.url.component'));
 
 const features = [
-  '28+ social & chat channels',
-  'AI-powered content creation',
-  'Team collaboration & approval workflows',
-  'Analytics & best-time scheduling',
+  { key: 'auth_feature_channels', text: '28+ social & chat channels' },
+  { key: 'auth_feature_ai_content', text: 'AI-powered content creation' },
+  {
+    key: 'auth_feature_team_collab',
+    text: 'Team collaboration & approval workflows',
+  },
+  { key: 'auth_feature_analytics', text: 'Analytics & best-time scheduling' },
 ];
 
 export default async function AuthLayout({
@@ -41,15 +44,17 @@ export default async function AuthLayout({
               className="h-[48px] w-auto"
             />
             <h1 className="text-[28px] font-[700] text-textColor text-center leading-tight">
-              Schedule smarter.
+              {t('auth_headline_schedule_smarter', 'Schedule smarter.')}
               <br />
-              <span className="text-[#1d9bf0]">Grow faster.</span>
+              <span className="text-[#1d9bf0]">
+                {t('auth_headline_grow_faster', 'Grow faster.')}
+              </span>
             </h1>
           </div>
           <div className="flex flex-col gap-[14px] w-full">
             {features.map((feature) => (
               <div
-                key={feature}
+                key={feature.key}
                 className="flex items-center gap-[12px] text-[15px] text-textColor"
               >
                 <svg
@@ -68,7 +73,7 @@ export default async function AuthLayout({
                     strokeLinejoin="round"
                   />
                 </svg>
-                <span>{feature}</span>
+                <span>{t(feature.key, feature.text)}</span>
               </div>
             ))}
           </div>

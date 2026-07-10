@@ -104,7 +104,11 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
   const revokeKey = useCallback(async (id: string, name: string) => {
     const approved = await decision.open({
       title: t('revoke_api_key', 'Revoke API Key?'),
-      description: t('revoke_api_key_description', `This will permanently revoke "${name}". Any integrations using this key will stop working immediately.`),
+      description: t(
+        'revoke_api_key_description',
+        'This will permanently revoke "{{name}}". Any integrations using this key will stop working immediately.',
+        { name }
+      ),
       approveLabel: t('revoke', 'Revoke'),
       cancelLabel: t('cancel', 'Cancel'),
     });
