@@ -127,7 +127,7 @@ const AddOrEditAutopost: FC<{ data?: any; reload: () => void }> = ({ data, reloa
         toast.show(t('rss_feed_invalid', 'Could not use this RSS feed'), 'warning');
         return;
       }
-      toast.show(t('rss_valid', 'RSS feed valid!'), 'success');
+      toast.show(t('rss_valid', 'RSS valid!'), 'success');
       setValid(u);
       setLastUrl(newUrl);
     } catch {
@@ -226,7 +226,7 @@ export const Autopost: FC = () => {
 
   const addEdit = useCallback((ruleData?: any) => () => {
     modal.openModal({
-      title: ruleData ? t('edit_autopost', 'Edit Autopost Rule') : t('add_autopost_title', 'Add Autopost Rule'),
+      title: ruleData ? t('edit_autopost', 'Edit Autopost') : t('add_autopost_title', 'Add Autopost'),
       withCloseButton: true,
       children: <AddOrEditAutopost data={ruleData} reload={mutate} />,
     });
@@ -300,7 +300,7 @@ export const Autopost: FC = () => {
             <div className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-newTableText uppercase font-medium pb-[12px] border-b border-newTableBorder items-center">
               <div>{t('name', 'Name')}</div>
               <div>{t('channels', 'Channels')}</div>
-              <div>{t('status', 'Status')}</div>
+              <div>{t('status', 'Status:')}</div>
               <div>{t('next_run', 'Next Run')}</div>
               <div className="text-end">{t('actions', 'Actions')}</div>
             </div>

@@ -106,7 +106,7 @@ export const CampaignSelector: FC<{
                     type="button"
                     onClick={() => remove(c.id)}
                     className="text-newTableText hover:text-textColor"
-                    aria-label="Remove"
+                    aria-label={t('remove', 'Remove')}
                   >
                     ×
                   </button>

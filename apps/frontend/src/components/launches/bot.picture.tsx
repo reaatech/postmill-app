@@ -80,7 +80,7 @@ export const BotPicture: FC<{
               {/* eslint-disable-next-line @next/next/no-img-element -- external bot avatar */}
               <img
                 src={picture}
-                alt="Bot avatar"
+                alt={t('bot_avatar', 'Bot avatar')}
                 className="w-[100px] h-[100px] rounded-full"
               />
               <Button type="button" onClick={() => setPickerOpen(true)}>

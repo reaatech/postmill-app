@@ -360,7 +360,7 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
                 : 'border-newTableBorder text-newTableText hover:text-textColor'
             }`}
           >
-            {t('last_n_days', 'Last {{count}} days').replace('{{count}}', String(days))}
+            {t('last_n_days', 'Last {{count}} days', { count: days })}
           </button>
         ))}
       </div>
@@ -410,7 +410,7 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
                 <div className="text-[13px] text-newTableText mb-[4px]">
                   {index === 0
                     ? t('original_post', 'Original post')
-                    : `${t('reply', 'Reply')} ${index}`}
+                    : t('reply_index', 'Reply {{index}}', { index })}
                 </div>
                 <div className="text-[14px] break-words">
                   {stripHtmlValidation('none', post.content, false, true, false) ||

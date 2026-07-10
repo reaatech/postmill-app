@@ -4,6 +4,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback, useSyncExternalStore } from 'react';
 import useSWR from 'swr';
 import { getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
+import { createFetchError } from '../dashboard.utils';
 
 export interface ScheduleDay {
   date: string;
@@ -21,7 +22,7 @@ export const useSchedule = (days = 7) => {
     async (url: string): Promise<ScheduleResponse> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load schedule');
+        throw createFetchError('schedule_fetch_failed', 'Failed to load schedule');
       }
       return res.json();
     },

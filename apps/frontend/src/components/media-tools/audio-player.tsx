@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 // One-at-a-time playback across every instance on the page.
 let activeAudio: HTMLAudioElement | null = null;
@@ -38,6 +39,7 @@ interface AudioPlayerProps {
 }
 
 export const AudioPlayer: FC<AudioPlayerProps> = ({ src, lazy = false, height = 44, className }) => {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const peaksRef = useRef<number[] | null>(null);
@@ -210,7 +212,7 @@ export const AudioPlayer: FC<AudioPlayerProps> = ({ src, lazy = false, height = 
       <button
         type="button"
         onClick={toggle}
-        aria-label={playing ? 'Pause' : 'Play'}
+        aria-label={playing ? t('pause', 'Pause') : t('play', 'Play')}
         className="shrink-0 w-[34px] h-[34px] rounded-full bg-[#2B5CD3] text-white flex items-center justify-center hover:bg-[#2B5CD3]/85 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]/50"
       >
         {playing ? (

@@ -136,7 +136,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
                     strokeLinejoin="round"
                   />
                 </svg>
-                Back to {channel.name}
+                {t('back_to_channel', 'Back to {{name}}', { name: channel.name })}
               </button>
 
               <div className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] mb-[16px]">
@@ -199,7 +199,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
               {metricData.series && metricData.series.length > 1 && (
                 <div className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] mb-[16px]">
                   <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">
-                    Time Series
+                    {t('time_series', 'Time Series')}
                   </h4>
                   <div className="h-[200px]">
                     <AreaChart
@@ -220,7 +220,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
                 metricData.topPosts.length > 0 && (
                   <div className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] mb-[16px]">
                     <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">
-                      Top Posts
+                      {t('top_posts', 'Top Posts')}
                     </h4>
                     <div className="space-y-[6px]">
                       {metricData.topPosts
@@ -255,7 +255,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
                 metricData.byDay.length > 0 && (
                   <div className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px]">
                     <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">
-                      By Day
+                      {t('by_day', 'By Day')}
                     </h4>
                     <div className="max-h-[300px] overflow-y-auto space-y-[4px]">
                       {metricData.byDay.map((day) => (
@@ -377,7 +377,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
           {data?.topPosts && data.topPosts.length > 0 && (
             <div>
               <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">
-                Top Posts
+                {t('top_posts', 'Top Posts')}
               </h4>
               <div className="space-y-[6px]">
                 {data.topPosts.slice(0, 5).map((post) => (

@@ -6,6 +6,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fullscreen-button';
 import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useReplicateStore, type CategoryDefinition } from './replicate.store';
 import { ModelPicker } from './model-picker';
 import { DynamicForm } from './dynamic-form';
@@ -34,6 +35,17 @@ const REPLICATE_LANDING = {
 };
 
 type Medium = 'image' | 'video' | 'audio';
+
+function mediumTitle(t: (key: string, fallback: string) => string, medium: Medium): string {
+  switch (medium) {
+    case 'image':
+      return t('image', 'Image');
+    case 'video':
+      return t('video', 'Video');
+    case 'audio':
+      return t('audio', 'Audio');
+  }
+}
 
 function useReplicateStatus() {
   const fetch = useFetch();
@@ -66,6 +78,7 @@ function flattenFolders(nodes: FolderNode[], depth = 0): Array<{ id: string; lab
 }
 
 function SaveFolderPicker() {
+  const t = useT();
   const fetch = useFetch();
   const saveFolderId = useReplicateStore((s) => s.saveFolderId);
   const setSaveFolderId = useReplicateStore((s) => s.setSaveFolderId);
@@ -77,14 +90,16 @@ function SaveFolderPicker() {
 
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor="replicate-save-folder" className="text-xs text-newTextColor/65 mobile:hidden">Save to</label>
+      <label htmlFor="replicate-save-folder" className="text-xs text-newTextColor/65 mobile:hidden">
+        {t('save_to', 'Save to')}
+      </label>
       <select
         id="replicate-save-folder"
         value={saveFolderId || ''}
         onChange={(e) => setSaveFolderId(e.target.value || null)}
         className="px-2 py-1 rounded-lg border border-studioBorder bg-newBgColorInner text-textColor text-xs focus:outline-none max-w-[140px]"
       >
-        <option value="">Files root…</option>
+        <option value="">{t('files_root_ellipsis', 'Files root…')}</option>
         {folders.map((f) => (
           <option key={f.id} value={f.id}>
             {f.label}
@@ -97,7 +112,6 @@ function SaveFolderPicker() {
 
 const MEDIUM_ICONS: Record<Medium, string> = { image: '🖼️', video: '🎬', audio: '🎵' };
 const MEDIUM_ORDER: Medium[] = ['image', 'video', 'audio'];
-const MEDIUM_TITLE: Record<Medium, string> = { image: 'Image', video: 'Video', audio: 'Audio' };
 
 // ── The icon menu rail (the Designer's 48px panel spine) ─────────────────────
 function MenuSpine({
@@ -117,6 +131,7 @@ function MenuSpine({
   hasControls: boolean;
   activeMedium: Medium | null;
 }) {
+  const t = useT();
   const mediums = MEDIUM_ORDER.filter((m) => categories.some((c) => c.medium === m));
   return (
     <div className="w-[52px] flex-shrink-0 flex flex-col items-center pt-2 gap-1 border-r border-studioBorder bg-newBgColorInner z-30">
@@ -126,8 +141,8 @@ function MenuSpine({
           <button
             key={m}
             onClick={() => onToggleMedium(m)}
-            title={MEDIUM_TITLE[m]}
-            aria-label={`${MEDIUM_TITLE[m]} tools`}
+            title={mediumTitle(t, m)}
+            aria-label={t('medium_tools_aria', '{{medium}} tools', { medium: mediumTitle(t, m) })}
             className={`w-10 h-10 flex items-center justify-center rounded-lg text-lg transition-colors ${
               active ? 'bg-designerAccent/20 ring-1 ring-designerAccent/40' : 'hover:bg-boxHover'
             }`}
@@ -141,8 +156,8 @@ function MenuSpine({
           <div className="flex-1" />
           <button
             onClick={onToggleControls}
-            title="Toggle controls"
-            aria-label="Toggle controls panel"
+            title={t('toggle_controls', 'Toggle controls')}
+            aria-label={t('toggle_controls_panel', 'Toggle controls panel')}
             className={`w-10 h-10 mb-2 flex items-center justify-center rounded-lg text-lg transition-colors ${
               controlsOpen ? 'bg-designerAccent/20 text-btnPrimaryAccent' : 'text-newTextColor/70 hover:bg-boxHover'
             }`}
@@ -169,6 +184,7 @@ function CategoryPanel({
   onPick: (key: string) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   return (
     <>
       {/* mobile tap-out scrim */}
@@ -176,9 +192,9 @@ function CategoryPanel({
       <div className="absolute left-[52px] inset-y-0 w-[220px] z-20 border-r border-studioBorder bg-newBgColorInner overflow-y-auto shadow-2xl">
         <div className="flex items-center justify-between px-3 h-12 border-b border-studioBorder sticky top-0 bg-newBgColorInner">
           <span className="text-xs uppercase tracking-wider text-newTextColor/65">
-            {MEDIUM_ICONS[medium]} {MEDIUM_TITLE[medium]}
+            {MEDIUM_ICONS[medium]} {mediumTitle(t, medium)}
           </span>
-          <button onClick={onClose} className="text-newTextColor/65 hover:text-textColor" aria-label="Close">
+          <button onClick={onClose} className="text-newTextColor/65 hover:text-textColor" aria-label={t('close', 'Close')}>
             ✕
           </button>
         </div>
@@ -203,6 +219,7 @@ function CategoryPanel({
 }
 
 function GenerateButton({ category }: { category: string }) {
+  const t = useT();
   const selectedModel = useReplicateStore((s) => s.selectedModel);
   const formInput = useReplicateStore((s) => s.formInput);
   const runState = useReplicateStore((s) => s.runState);
@@ -216,25 +233,38 @@ function GenerateButton({ category }: { category: string }) {
 
   return (
     <div className="space-y-2">
-      {needsFolder && <p className="text-[11px] text-amber-600">Pick a save folder before generating.</p>}
+      {needsFolder && (
+        <p className="text-[11px] text-amber-600">
+          {t('pick_save_folder_before_generating', 'Pick a save folder before generating.')}
+        </p>
+      )}
       {missing.length > 0 && selectedModel && (
-        <p className="text-[11px] text-newTextColor/65">Required: {missing.join(', ')}</p>
+        <p className="text-[11px] text-newTextColor/65">
+          {t('required_fields_list', 'Required: {{fields}}', { fields: missing.join(', ') })}
+        </p>
       )}
       <button
         onClick={() => generate()}
         disabled={disabled}
         className="w-full py-2.5 rounded-xl bg-designerAccent text-white font-medium hover:bg-designerAccent/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
-        {runState === 'running' ? 'Generating…' : 'Generate'}
+        {runState === 'running' ? t('generating_ellipsis', 'Generating…') : t('generate', 'Generate')}
       </button>
     </div>
   );
 }
 
 function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string }) {
+  const t = useT();
   const runState = useReplicateStore((s) => s.runState);
   const stateLabel =
-    runState === 'running' ? 'Generating…' : runState === 'error' ? 'Error' : runState === 'success' ? 'Done' : '';
+    runState === 'running'
+      ? t('generating_ellipsis', 'Generating…')
+      : runState === 'error'
+        ? t('error_label', 'Error')
+        : runState === 'success'
+          ? t('done', 'Done')
+          : '';
   const stateColor =
     runState === 'running'
       ? 'text-amber-600'
@@ -248,7 +278,9 @@ function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string })
     <div className="flex items-center justify-between h-12 flex-shrink-0 border-b border-studioBorder px-3 bg-newBgColorInner">
       <div className="flex items-center gap-2 min-w-0">
         <Logo size={20} className="" />
-        <h1 className="text-sm font-semibold text-textColor whitespace-nowrap">Replicate Studio</h1>
+        <h1 className="text-sm font-semibold text-textColor whitespace-nowrap">
+          {t('replicate_studio_title', 'Replicate Studio')}
+        </h1>
         {activeCategoryLabel && (
           <span className="text-xs text-newTextColor/65 truncate mobile:hidden">› {activeCategoryLabel}</span>
         )}
@@ -266,6 +298,7 @@ function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string })
 }
 
 export function ReplicateStudio() {
+  const t = useT();
   const { data: status } = useReplicateStatus();
   const { data: categories } = useCategories();
   const selectedCategory = useReplicateStore((s) => s.selectedCategory);
@@ -347,8 +380,10 @@ export function ReplicateStudio() {
         {!selectedCategory ? (
           <div className="flex-1 flex items-center justify-center text-newTextColor/65 px-6 text-center">
             <div>
-              <p className="text-lg">Pick a tool to get started</p>
-              <p className="text-sm mt-1">Tap a medium on the left — image, video, or audio.</p>
+              <p className="text-lg">{t('pick_a_tool_to_get_started', 'Pick a tool to get started')}</p>
+              <p className="text-sm mt-1">
+                {t('tap_medium_hint', 'Tap a medium on the left — image, video, or audio.')}
+              </p>
             </div>
           </div>
         ) : isLocal ? (
@@ -370,8 +405,14 @@ export function ReplicateStudio() {
             {controlsOpen && (
               <div className={controlsClasses}>
                 <div className="flex items-center justify-between px-4 h-10 border-b border-studioBorder mobile:flex hidden">
-                  <span className="text-xs uppercase tracking-wider text-newTextColor/65">Controls</span>
-                  <button onClick={() => setControlsOpen(false)} className="text-newTextColor/65 hover:text-textColor" aria-label="Close controls">
+                  <span className="text-xs uppercase tracking-wider text-newTextColor/65">
+                    {t('controls_label', 'Controls')}
+                  </span>
+                  <button
+                    onClick={() => setControlsOpen(false)}
+                    className="text-newTextColor/65 hover:text-textColor"
+                    aria-label={t('close_controls', 'Close controls')}
+                  >
                     ✕
                   </button>
                 </div>

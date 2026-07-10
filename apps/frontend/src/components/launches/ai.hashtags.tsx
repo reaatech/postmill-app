@@ -72,7 +72,9 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
       });
 
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: 'Request failed' }));
+        const err = await res.json().catch(() => ({
+          message: t('request_failed', 'Request failed'),
+        }));
         setError(err);
         return;
       }
@@ -80,7 +82,9 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
       const data = await res.json();
       setHashtags(data.hashtags || []);
     } catch {
-      setError('Network error — please try again');
+      setError(
+        t('network_error_please_try_again', 'Network error — please try again')
+      );
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
 import { useCustomFonts, CustomFontEntry } from './use-brand-fonts';
@@ -34,6 +35,7 @@ interface BrandPanelProps {
 }
 
 export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
+  const t = useT();
   const fetch = useFetch();
   const user = useUser();
   const toaster = useToaster();
@@ -142,8 +144,8 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
   // render-time toaster.show fires on every render and warns about setState in
   // render).
   useEffect(() => {
-    if (filesError && !files) toaster.show("Couldn't load files", 'warning');
-  }, [filesError, files, toaster]);
+    if (filesError && !files) toaster.show(t('designer_couldnt_load_files', "Couldn't load files"), 'warning');
+  }, [filesError, files, toaster, t]);
 
   const handleColorClick = useCallback(
     (color: string) => {
@@ -177,10 +179,10 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           }),
         });
         if (!res.ok) {
-          toaster.show('Failed to save brand kit', 'warning');
+          toaster.show(t('designer_failed_save_brand_kit', 'Failed to save brand kit'), 'warning');
           return;
         }
-        toaster.show('Brand kit saved', 'success');
+        toaster.show(t('designer_brand_kit_saved', 'Brand kit saved'), 'success');
         mutate();
       } finally {
         setSaving(false);
@@ -241,11 +243,11 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
       if (!file) return;
       const ext = file.name.split('.').pop()?.toLowerCase();
       if (!ext || !['ttf', 'otf', 'woff2'].includes(ext)) {
-        toaster.show('Invalid file type. Accepted: .ttf, .otf, .woff2', 'warning');
+        toaster.show(t('designer_invalid_font_file_type', 'Invalid file type. Accepted: .ttf, .otf, .woff2'), 'warning');
         return;
       }
       if (file.size > 5 * 1024 * 1024) {
-        toaster.show('Font file must be under 5MB', 'warning');
+        toaster.show(t('designer_font_file_too_large', 'Font file must be under 5MB'), 'warning');
         return;
       }
       setUploading(true);
@@ -258,10 +260,10 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          toaster.show(err.message || 'Upload failed', 'warning');
+          toaster.show(err.message || t('designer_upload_failed', 'Upload failed'), 'warning');
           return;
         }
-        toaster.show('Font uploaded', 'success');
+        toaster.show(t('designer_font_uploaded', 'Font uploaded'), 'success');
         mutateCustomFonts();
       } finally {
         setUploading(false);
@@ -278,13 +280,13 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           method: 'DELETE',
         });
         if (!res.ok) {
-          toaster.show('Failed to remove font', 'warning');
+          toaster.show(t('designer_failed_remove_font', 'Failed to remove font'), 'warning');
           return;
         }
-        toaster.show('Font removed', 'success');
+        toaster.show(t('designer_font_removed', 'Font removed'), 'success');
         mutateCustomFonts();
       } catch {
-        toaster.show('Failed to remove font', 'warning');
+        toaster.show(t('designer_failed_remove_font', 'Failed to remove font'), 'warning');
       }
     },
     [fetch, toaster, mutateCustomFonts]
@@ -298,14 +300,14 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
   if (brands === undefined) {
     return (
       <div className="text-newTextColor/60 text-[12px] text-center py-8">
-        Loading brand profiles…
+        {t('designer_loading_brand_profiles', 'Loading brand profiles…')}
       </div>
     );
   }
   if (brands.length === 0) {
     return (
       <div className="text-newTextColor/60 text-[12px] text-center py-8">
-        No brand profiles found. Create one in Settings &rarr; Brands.
+        {t('designer_no_brand_profiles', 'No brand profiles found. Create one in Settings → Brands.')}
       </div>
     );
   }
@@ -315,10 +317,10 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
       <div className="flex flex-col gap-1">
         <div className="flex items-center justify-between">
           <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Brand Profile
+            {t('designer_brand_profile', 'Brand Profile')}
           </div>
           {saving && (
-            <span className="text-[11px] text-newTextColor/60">Saving…</span>
+            <span className="text-[11px] text-newTextColor/60">{t('designer_saving_ellipsis', 'Saving…')}</span>
           )}
         </div>
         <select
@@ -340,7 +342,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Brand Enforcement
+            {t('designer_brand_enforcement', 'Brand Enforcement')}
           </span>
           <button
             type="button"
@@ -363,20 +365,20 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </button>
         </div>
         <div className="text-[11px] text-newTextColor/65">
-          When on, only brand colors and fonts can be used.
+          {t('designer_brand_enforcement_desc', 'When on, only brand colors and fonts can be used.')}
         </div>
 
         {brandEnforcement && violations.length > 0 && (
           <div className="rounded-[6px] border border-red-400/30 bg-red-400/10 p-2">
             <div className="text-[11px] text-dangerText font-medium mb-1">
-              Off-brand elements detected
+              {t('designer_off_brand_detected', 'Off-brand elements detected')}
             </div>
             <ul className="text-[10px] text-newTextColor/60 list-disc pl-4 space-y-0.5 max-h-[120px] overflow-y-auto">
               {violations.slice(0, 5).map((v, i) => (
-                <li key={i}>{v}</li>
+                <li key={i}>{t(v.key, v.text, v.vars)}</li>
               ))}
               {violations.length > 5 && (
-                <li>…and {violations.length - 5} more</li>
+                <li>{t('designer_and_more_count', '…and {{count}} more', { count: violations.length - 5 })}</li>
               )}
             </ul>
           </div>
@@ -393,7 +395,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
               className="accent-purple-500 w-[14px] h-[14px]"
             />
             <span className="text-[11px] text-newTextColor/70">
-              Admin override — allow save/export
+              {t('designer_admin_override_desc', 'Admin override — allow save/export')}
             </span>
           </label>
         )}
@@ -404,7 +406,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         <div className="flex items-center gap-2">
           <ProviderIcon identifier="LOCAL" name="Storage" size={16} />
           <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Logos
+            {t('designer_logos', 'Logos')}
           </span>
         </div>
 
@@ -413,7 +415,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           onClick={() => setModalOpen(true)}
           className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
         >
-          Add logo from media…
+          {t('designer_add_logo_from_media', 'Add logo from media…')}
         </button>
 
         <MediaSelectorModal
@@ -431,7 +433,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   key={id}
                   type="button"
                   onClick={() => file && addLogoToCanvas(file)}
-                  title={file ? `Add ${file.name} to canvas` : id}
+                  title={file ? t('designer_add_file_to_canvas', 'Add {{name}} to canvas', { name: file.name }) : id}
                   className="group relative aspect-square rounded-lg overflow-hidden border border-designerAccent bg-newBgColorInner"
                 >
                   {file ? (
@@ -453,14 +455,14 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </div>
         )}
 
-        <div className="text-[11px] text-newTextColor/60">Pick from files</div>
+        <div className="text-[11px] text-newTextColor/60">{t('designer_pick_from_files', 'Pick from files')}</div>
         {filesLoading && !files ? (
           <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
         ) : filesError && !files ? (
-          <PanelError message="Couldn't load files" onRetry={() => mutateFiles()} />
+          <PanelError message={t('designer_couldnt_load_files', "Couldn't load files")} onRetry={() => mutateFiles()} />
         ) : !files?.results?.length ? (
           <div className="text-[12px] text-newTextColor/60 text-center py-2">
-            No files found
+            {t('no_files_found', 'No files found')}
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2">
@@ -503,18 +505,18 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         <div className="flex items-center gap-2">
           <ProviderIcon identifier="LOCAL" name="Storage" size={16} />
           <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Intro / Outro
+            {t('designer_intro_outro', 'Intro / Outro')}
           </span>
         </div>
 
-        <div className="text-[11px] text-newTextColor/60">Pick from video files</div>
+        <div className="text-[11px] text-newTextColor/60">{t('designer_pick_from_video_files', 'Pick from video files')}</div>
         {filesLoading && !files ? (
           <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
         ) : filesError && !files ? (
-          <PanelError message="Couldn't load files" onRetry={() => mutateFiles()} />
+          <PanelError message={t('designer_couldnt_load_files', "Couldn't load files")} onRetry={() => mutateFiles()} />
         ) : !files?.results?.length ? (
           <div className="text-[12px] text-newTextColor/60 text-center py-2">
-            No files found
+            {t('no_files_found', 'No files found')}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
@@ -537,7 +539,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                       if (isOutro) persist({ outroFileId: null });
                       else persist({ outroFileId: file.id });
                     }}
-                    title={`${file.name} — click=intro, right-click=outro`}
+                    title={t('designer_intro_outro_hint', '{{name}} — click=intro, right-click=outro', { name: file.name })}
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
                       isIntro || isOutro
                         ? 'border-designerAccent ring-1 ring-designerAccent'
@@ -552,7 +554,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                     />
                     {(isIntro || isOutro) && (
                       <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] bg-designerAccent text-white">
-                        {isIntro ? 'INTRO' : 'OUTRO'}
+                        {isIntro ? t('designer_intro_badge', 'INTRO') : t('designer_outro_badge', 'OUTRO')}
                       </span>
                     )}
                   </button>
@@ -588,11 +590,11 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   height: vo.height,
                 });
                 state.pushHistory();
-                toaster.show('Intro added to timeline', 'success');
+                toaster.show(t('designer_intro_added_to_timeline', 'Intro added to timeline'), 'success');
               }}
               className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-btnPrimaryAccent hover:bg-designerAccent/10 disabled:opacity-40"
             >
-              Apply intro
+              {t('designer_apply_intro', 'Apply intro')}
             </button>
             <button
               type="button"
@@ -619,11 +621,11 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   height: vo.height,
                 });
                 state.pushHistory();
-                toaster.show('Outro added to timeline', 'success');
+                toaster.show(t('designer_outro_added_to_timeline', 'Outro added to timeline'), 'success');
               }}
               className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-btnPrimaryAccent hover:bg-designerAccent/10 disabled:opacity-40"
             >
-              Apply outro
+              {t('designer_apply_outro', 'Apply outro')}
             </button>
           </div>
         )}
@@ -633,7 +635,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
       {palette.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Palette
+            {t('designer_palette', 'Palette')}
           </div>
           <div className="flex flex-wrap gap-2">
             {palette.map((color, i) => (
@@ -651,7 +653,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </div>
           {!selectedElement && (
             <div className="text-[11px] text-newTextColor/60">
-              Select an element to apply color
+              {t('designer_select_element_apply_color', 'Select an element to apply color')}
             </div>
           )}
         </div>
@@ -661,7 +663,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
       {fontFamilies.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Fonts
+            {t('designer_fonts', 'Fonts')}
           </div>
           <div className="flex flex-col gap-1">
             {fontFamilies.map((font, i) => (
@@ -682,7 +684,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </div>
           {(!selectedElement || selectedElement.type !== 'text') && (
             <div className="text-[11px] text-newTextColor/60">
-              Select a text element to apply font
+              {t('designer_select_text_apply_font', 'Select a text element to apply font')}
             </div>
           )}
         </div>
@@ -691,7 +693,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
       {/* Custom Fonts (T-32) */}
       <div className="flex flex-col gap-2">
         <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-          Brand Fonts
+          {t('designer_brand_fonts', 'Brand Fonts')}
         </div>
 
         {customFonts.length > 0 && (
@@ -718,7 +720,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   type="button"
                   onClick={() => handleFontDelete(f)}
                   className="ml-2 w-5 h-5 rounded-full border border-studioBorder text-[11px] text-textColor/60 hover:text-dangerText hover:border-red-400 flex items-center justify-center shrink-0 transition-colors"
-                  title={`Remove ${f.family}`}
+                  title={t('designer_remove_font', 'Remove {{name}}', { name: f.family })}
                 >
                   ✕
                 </button>
@@ -740,7 +742,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           onClick={() => fileInputRef.current?.click()}
           className="w-full py-2 rounded-[6px] border border-dashed border-studioBorder text-[12px] text-textColor/60 hover:text-textColor hover:border-designerAccent bg-newBgColorInner transition-colors"
         >
-          {uploading ? 'Uploading...' : '+ Upload font (.ttf, .otf, .woff2)'}
+          {uploading ? t('designer_uploading_ellipsis', 'Uploading...') : t('designer_upload_font_cta', '+ Upload font (.ttf, .otf, .woff2)')}
         </button>
       </div>
 
@@ -749,7 +751,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         logoFileIds.length === 0 &&
         customFonts.length === 0 && (
           <div className="text-newTextColor/60 text-[12px]">
-            This brand has no palette, fonts, or logos configured yet.
+            {t('designer_brand_empty_state', 'This brand has no palette, fonts, or logos configured yet.')}
           </div>
         )}
     </div>

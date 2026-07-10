@@ -85,9 +85,11 @@ export const BrandPicker = () => {
         </div>
         <div className="max-w-[160px] truncate whitespace-nowrap">
           {selectedBrand
-            ? `${selectedBrand.name}${
-                selectedBrand.isDefault ? ` (${t('default', 'Default')})` : ''
-              }`
+            ? selectedBrand.isDefault
+              ? t('brand_name_default', '{{name}} (Default)', {
+                  name: selectedBrand.name,
+                })
+              : selectedBrand.name
             : t('brand', 'Brand')}
         </div>
         <div>
@@ -119,8 +121,11 @@ export const BrandPicker = () => {
                 )}
               >
                 <span className="truncate">
-                  {brand.name}
-                  {brand.isDefault ? ` (${t('default', 'Default')})` : ''}
+                  {brand.isDefault
+                    ? t('brand_name_default', '{{name}} (Default)', {
+                        name: brand.name,
+                      })
+                    : brand.name}
                 </span>
               </button>
             </li>

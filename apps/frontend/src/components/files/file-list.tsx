@@ -4,20 +4,31 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import i18next from '@gitroom/react/translation/i18next';
 import type { FileItem } from './file-manager';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
 
 const formatDate = (dateStr: string) => {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(i18next.resolvedLanguage || 'en', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
 };
 
-const fileSize = (bytes: number) => {
+const fileSize = (bytes: number, t: ReturnType<typeof useT>) => {
   if (!bytes) return '-';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes < 1024) return t('file_size_bytes', '{{size}} B', { size: bytes });
+  if (bytes < 1024 * 1024)
+    return t('file_size_kb', '{{size}} KB', { size: (bytes / 1024).toFixed(1) });
+  return t('file_size_mb', '{{size}} MB', { size: (bytes / (1024 * 1024)).toFixed(1) });
 };
 
 export const FileList: FC<{
@@ -31,6 +42,7 @@ export const FileList: FC<{
 }> = ({ files, selectedFiles, onToggleSelect, onFileClick, sortField, sortOrder, onSort }) => {
   const mediaDirectory = useMediaDirectory();
   const fetch = useFetch();
+  const t = useT();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -73,7 +85,7 @@ export const FileList: FC<{
               </div>
             ) : isVideo ? (
               <video src={mediaDirectory.set(file.path)} className="w-full h-full object-cover" muted preload="metadata">
-                <track kind="captions" src="" label="No captions" default />
+                <track kind="captions" src="" label={t('no_captions', 'No captions')} default />
               </video>
             ) : (
               // Remote upload URLs cannot be pre-configured in next/image domains; use native img for thumbnails.
@@ -86,7 +98,7 @@ export const FileList: FC<{
     },
     {
       key: 'name',
-      header: 'Name',
+      header: t('name', 'Name'),
       sortable: true,
       render: (file: FileItem) => {
         if (renamingId === file.id) {
@@ -118,20 +130,20 @@ export const FileList: FC<{
         );
       },
     },
-    { key: 'type', header: 'Type', sortable: true, render: (file: FileItem) => {
+    { key: 'type', header: t('type', 'Type'), sortable: true, render: (file: FileItem) => {
       const ext = file.name?.split('.').pop()?.toUpperCase() || file.type?.toUpperCase();
       return <span className="text-[12px] text-textColor/60">{ext}</span>;
     }},
-    { key: 'size', header: 'Size', sortable: true, render: (file: FileItem) => (
-      <span className="text-[12px] text-textColor/60">{fileSize(file.fileSize)}</span>
+    { key: 'size', header: t('size', 'Size'), sortable: true, render: (file: FileItem) => (
+      <span className="text-[12px] text-textColor/60">{fileSize(file.fileSize, t)}</span>
     )},
-    { key: 'folder', header: 'Folder', render: (file: FileItem) => (
+    { key: 'folder', header: t('folder', 'Folder'), render: (file: FileItem) => (
       <span className="text-[12px] text-textColor/60">{file.folder?.name || '-'}</span>
     )},
-    { key: 'createdAt', header: 'Created', sortable: true, render: (file: FileItem) => (
+    { key: 'createdAt', header: t('created', 'Created'), sortable: true, render: (file: FileItem) => (
       <span className="text-[12px] text-textColor/60 whitespace-nowrap">{formatDate(file.createdAt)}</span>
     )},
-  ], [renamingId, renamingName, mediaDirectory, handleRename]);
+  ], [renamingId, renamingName, mediaDirectory, handleRename, t]);
 
   return (
     <DataTable
@@ -149,7 +161,7 @@ export const FileList: FC<{
       sortDir={sortOrder as 'asc' | 'desc'}
       onSort={(key) => onSort(key)}
       onRowClick={(file: FileItem) => onToggleSelect(file)}
-      emptyState={{ title: 'No files found' }}
+      emptyState={{ title: t('no_files_found', 'No files found') }}
     />
   );
 };

@@ -19,11 +19,12 @@ interface MemberProfileData {
 
 const useMemberProfile = (id?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/user/profile/${id}`);
-    if (!r.ok) throw new Error('Failed to load profile');
+    if (!r.ok) throw new Error(t('failed_to_load_profile', 'Failed to load profile'));
     return r.json();
-  }, [fetch, id]);
+  }, [fetch, id, t]);
   return useSWR<MemberProfileData>(id ? `member-profile-${id}` : null, loader, {
     revalidateOnFocus: false,
   });
@@ -42,7 +43,7 @@ export const MemberProfile: FC = () => {
     );
   }
   if (isLoading || !data) {
-    return <div className="p-[24px] text-center text-newTableText">{t('loading', 'Loading…')}</div>;
+    return <div className="p-[24px] text-center text-newTableText">{t('loading', 'Loading')}</div>;
   }
 
   const initials = (data.name || '?').charAt(0).toUpperCase();
@@ -72,7 +73,7 @@ export const MemberProfile: FC = () => {
                 </span>
               )}
               <span className="text-[12px] text-newTableText">
-                {t('member_since', 'Member since')} {dayjs(data.joinedAt).format('MMM D, YYYY')}
+                {t('member_since', 'Member since')} {dayjs(data.joinedAt).format(t('member_since_date_format', 'MMM D, YYYY'))}
               </span>
             </div>
           </div>

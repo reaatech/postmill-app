@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import {
   CHANNEL_PRESETS,
   type ChannelPreset,
@@ -128,6 +129,7 @@ const PortalPopover: React.FC<PortalPopoverProps> = ({
 };
 
 export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
+  const t = useT();
   const doc = store((s: any) => s.doc);
   const currentOutput = store((s: any) => s.currentOutput);
   const outputs: any[] = doc.outputs;
@@ -279,7 +281,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               style={{ minWidth: THUMB_MIN_W, height: THUMB_H }}
             >
 {i !== currentOutput && Array.isArray(output.children) && output.children.some((c: any) => c?.originId && activeOriginIds.has(c.originId)) && (
-                <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-designerAccent" title="Has linked elements" />
+                <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-designerAccent" title={t('designer_has_linked_elements', 'Has linked elements')} />
               )}
               {(() => {
                 const updatedAt = i !== currentOutput ? linkedUpdateFlash[i] : 0;
@@ -287,7 +289,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 return isUpdated ? (
                   <div
                     className={`absolute top-1 left-1 w-2 h-2 rounded-full bg-green-400 ${reduceMotion ? '' : 'animate-pulse'}`}
-                    title="Updated from another format"
+                    title={t('designer_updated_from_another_format', 'Updated from another format')}
                   />
                 ) : null;
               })()}
@@ -305,8 +307,8 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                   e.stopPropagation();
                   openPopover('resize', e.currentTarget as HTMLElement, { resizeIndex: i });
                 }}
-                title="Resize / change format"
-                aria-label="Resize or change format"
+                title={t('designer_resize_change_format_title', 'Resize / change format')}
+                aria-label={t('designer_resize_or_change_format_aria', 'Resize or change format')}
                 className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[8px] text-textColor/60 hover:text-textColor"
               >
                 ⋮
@@ -314,8 +316,8 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               {outputs.length > 1 && (
                 <button
                   onClick={(e) => handleRemove(e, i)}
-                  title="Remove format"
-                  aria-label="Remove format"
+                  title={t('designer_remove_format', 'Remove format')}
+                  aria-label={t('designer_remove_format', 'Remove format')}
                   className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[9px] text-dangerText hover:bg-red-500/20"
                 >
                   ×
@@ -336,7 +338,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                   openPopover('overflow', e.currentTarget as HTMLElement);
                 }
               }}
-              aria-label="More formats"
+              aria-label={t('designer_more_formats_aria', 'More formats')}
               className="flex items-center justify-center rounded-md border border-studioBorder text-textColor/60 hover:border-studioBorder hover:text-textColor text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
               style={{ width: 32, height: THUMB_H }}
             >
@@ -375,8 +377,8 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                         e.stopPropagation();
                         openPopover('resize', e.currentTarget as HTMLElement, { resizeIndex: i });
                       }}
-                      title="Resize / change format"
-                      aria-label="Resize or change format"
+                      title={t('designer_resize_change_format_title', 'Resize / change format')}
+                      aria-label={t('designer_resize_or_change_format_aria', 'Resize or change format')}
                       className="w-5 h-5 flex items-center justify-center rounded text-[10px] text-textColor/40 hover:text-textColor opacity-0 group-hover/item:opacity-100"
                     >
                       ⋮
@@ -387,7 +389,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                           handleRemove(e, i);
                           closePopover();
                         }}
-                        aria-label="Remove format"
+                        aria-label={t('designer_remove_format', 'Remove format')}
                         className="w-5 h-5 flex items-center justify-center rounded text-[10px] text-dangerText hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100"
                       >
                         ×
@@ -412,7 +414,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               openPopover('addFormats', e.currentTarget as HTMLElement);
             }
           }}
-          aria-label="Add format"
+          aria-label={t('designer_add_format_aria', 'Add format')}
           className="shrink-0 flex items-center justify-center rounded-md border-2 border-dashed border-studioBorder text-textColor/50 hover:border-designerAccent hover:text-btnPrimaryAccent text-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
           style={{ width: 40, height: THUMB_H }}
         >
@@ -427,7 +429,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
           className="bg-newBgColorInner border border-studioBorder rounded-lg shadow-xl overflow-hidden w-72 p-3"
         >
           <div className="text-[12px] font-medium text-textColor mb-2">
-            Add Formats
+            {t('designer_add_formats_heading', 'Add Formats')}
           </div>
 
           <button
@@ -442,7 +444,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
             }}
             className="w-full text-left px-2 py-1.5 rounded text-[11px] text-btnPrimaryAccent hover:bg-designerAccent/10 mb-2 border border-designerAccent/30"
           >
-            Recommended set (IG Post + Story + Linked + X)
+            {t('designer_recommended_set_description', 'Recommended set (IG Post + Story + Linked + X)')}
           </button>
 
           <div className="max-h-52 overflow-y-auto space-y-0.5">
@@ -453,7 +455,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 return (
                   <div key={key}>
                     <div className="text-[10px] font-semibold text-textColor/30 uppercase tracking-wider px-1 py-1">
-                      {group.label}
+                      {key === 'custom' ? t('designer_group_custom', 'Custom') : group.label}
                     </div>
                     {group.presets.map((p) => {
                       const already = existingFormatIds.has(p.id);
@@ -497,14 +499,14 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
 
           <div className="border-t border-studioBorder mt-2 pt-2">
             <div className="text-[10px] font-semibold text-textColor/30 uppercase tracking-wider px-1 mb-1">
-              Custom Size
+              {t('designer_custom_size_heading', 'Custom Size')}
             </div>
             <div className="flex items-center gap-1.5">
               <input
                 type="number"
                 value={cW}
                 onChange={(e) => setCW(e.target.value)}
-                placeholder="W"
+                placeholder={t('designer_width_short', 'W')}
                 className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <span className="text-textColor/30 text-[12px]">
@@ -514,14 +516,14 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 type="number"
                 value={cH}
                 onChange={(e) => setCH(e.target.value)}
-                placeholder="H"
+                placeholder={t('designer_height_short', 'H')}
                 className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <button
                 onClick={handleAddCustom}
                 className="h-7 px-2 rounded text-[11px] bg-designerAccent text-white hover:bg-designerAccent/80 shrink-0"
               >
-                Add
+                {t('add', 'Add')}
               </button>
             </div>
           </div>
@@ -532,8 +534,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 onClick={handleAddFormats}
                 className="w-full py-1.5 rounded text-[12px] bg-designerAccent text-white hover:bg-designerAccent/80 font-medium"
               >
-                Add {pendingFormats.size} format
-                {pendingFormats.size > 1 ? 's' : ''}
+                {t('designer_add_n_formats', 'Add {{count}} format', { count: pendingFormats.size })}
               </button>
             </div>
           )}
@@ -548,7 +549,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
         className="bg-newBgColorInner border border-studioBorder rounded-lg shadow-xl overflow-hidden w-64 p-3"
       >
         <div className="text-[12px] font-medium text-textColor mb-2">
-          Resize Format
+          {t('designer_resize_format_heading', 'Resize Format')}
         </div>
         <div className="max-h-48 overflow-y-auto space-y-0.5">
           {CHANNEL_PRESETS.filter(
@@ -576,7 +577,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               type="number"
               value={cW}
               onChange={(e) => setCW(e.target.value)}
-              placeholder="W"
+              placeholder={t('designer_width_short', 'W')}
               className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <span className="text-textColor/30 text-[12px]">
@@ -586,7 +587,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               type="number"
               value={cH}
               onChange={(e) => setCH(e.target.value)}
-              placeholder="H"
+              placeholder={t('designer_height_short', 'H')}
               className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <button
@@ -595,7 +596,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               }
               className="h-7 px-2 rounded text-[11px] bg-designerAccent text-white hover:bg-designerAccent/80 shrink-0"
             >
-              Apply
+              {t('apply', 'Apply')}
             </button>
           </div>
         </div>

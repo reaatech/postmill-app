@@ -3,6 +3,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { ChannelConfigForm } from './channel-edit.modal';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
@@ -109,14 +110,14 @@ const capabilityMeta: Record<string, CapabilityMeta> = Object.fromEntries(
 const useConfigs = () => {
   const fetch = useFetch();
   return useSWR<ChannelConfigItem[]>('/channels/config', (url: string) =>
-    fetch(url).then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+    fetch(url).then((r) => { if (!r.ok) throw createFetchError('channels_load_failed', 'Failed to load channels'); return r.json(); })
   );
 };
 
 const useProviders = () => {
   const fetch = useFetch();
   return useSWR<ProviderCatalogItem[]>('/channels/config/providers', (url: string) =>
-    fetch(url).then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
+    fetch(url).then((r) => { if (!r.ok) throw createFetchError('provider_catalog_load_failed', 'Failed to load provider catalog'); return r.json(); })
   );
 };
 
@@ -358,7 +359,9 @@ export const ChannelsTab: FC = () => {
       modals.openModal({
         title: config
           ? t('edit_channel', 'Edit channel')
-          : `${t('configure', 'Configure')} ${providerName(identifier)}`,
+          : t('configure_provider_name', 'Configure {{provider}}', {
+              provider: providerName(identifier),
+            }),
         children: (close) => (
           <ChannelConfigForm
             identifier={identifier}
@@ -394,7 +397,7 @@ export const ChannelsTab: FC = () => {
       return;
     }
     modals.openModal({
-      title: t('add_channel', 'Add channel'),
+      title: t('add_channel', 'Add Channel'),
       children: (close) => (
         <ProviderPicker
           providers={providers}
@@ -491,7 +494,7 @@ export const ChannelsTab: FC = () => {
                 onClick={openPicker}
                 className="text-[13px] px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white hover:opacity-90 transition-opacity whitespace-nowrap"
               >
-                + {t('add_channel', 'Add channel')}
+                + {t('add_channel', 'Add Channel')}
               </button>
             ) : undefined
           }

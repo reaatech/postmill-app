@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type {
   AiDesignerAckPayload,
   AiDesignerAcceptPlanPayload,
@@ -76,6 +77,7 @@ export function useAiDesignerSocket(
   options: UseAiDesignerSocketOptions = {}
 ) {
   const { backendUrl } = useVariables();
+  const t = useT();
   const { sessionId, enabled = true } = options;
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -183,12 +185,15 @@ export function useAiDesignerSocket(
     <T extends object>(event: string, payload: T): string => {
       if (!socketRef.current?.connected) {
         callbacksRef.current.onError?.({
-          message: 'Not connected to the AI Designer — reconnecting, please try again.',
+          message: t(
+            'not_connected_reconnecting_retry',
+            'Not connected to the AI Designer — reconnecting, please try again.'
+          ),
         });
       }
       return emit(event, payload);
     },
-    [emit]
+    [emit, t]
   );
 
   const start = useCallback(

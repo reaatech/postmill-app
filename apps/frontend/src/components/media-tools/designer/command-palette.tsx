@@ -6,7 +6,8 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { actionLabel, menuLabel, type DesignerAction } from './actions';
+import { actionLabel, actionLabelKey, menuLabel, menuLabelKey, type DesignerAction } from './actions';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface CommandPaletteProps {
   actions: DesignerAction[];
@@ -15,6 +16,7 @@ interface CommandPaletteProps {
 // ⌘K command palette. Renders from the shared action registry (actions.ts) so
 // every command stays defined in exactly one place.
 export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -90,13 +92,13 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
     () =>
       filtered.reduce(
         (acc, a) => {
-          const cat = menuLabel(a.menu);
+          const cat = t(menuLabelKey(a.menu), menuLabel(a.menu));
           (acc[cat] = acc[cat] || []).push(a);
           return acc;
         },
         {} as Record<string, DesignerAction[]>
       ),
-    [filtered]
+    [filtered, t]
   );
 
   const executeAction = useCallback((action: DesignerAction) => {
@@ -141,7 +143,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
         <input
           ref={inputRef}
           className="w-full px-4 py-3 bg-transparent text-textColor text-lg outline-none border-b border-studioBorder placeholder:text-textColor/50"
-          placeholder="Type a command..."
+          placeholder={t('designer_type_a_command', 'Type a command...')}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -167,11 +169,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
                     onClick={() => executeAction(action)}
                     onMouseEnter={() => setSelectedIndex(globalIndex)}
                   >
-                    <span className="flex-1">{actionLabel(action)}</span>
+                    <span className="flex-1">{t(actionLabelKey(action), actionLabel(action))}</span>
                     {action.shortcut && (
                       <span className="text-xs text-textColor/50">{action.shortcut}</span>
                     )}
-                    <span className="text-xs text-textColor/50">{menuLabel(action.menu)}</span>
+                    <span className="text-xs text-textColor/50">{t(menuLabelKey(action.menu), menuLabel(action.menu))}</span>
                   </button>
                 );
               })}
@@ -179,7 +181,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({ actions }) => {
           ))}
           {filtered.length === 0 && (
             <div className="px-3 py-6 text-center text-sm text-textColor/50">
-              No matching commands
+              {t('designer_no_matching_commands', 'No matching commands')}
             </div>
           )}
         </div>

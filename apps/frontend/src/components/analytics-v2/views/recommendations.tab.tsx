@@ -62,7 +62,9 @@ export const RecommendationsTab: FC = () => {
             >
               {priorityLabels[item.priority] || t('priority_info', 'Info')}
             </span>
-            <span className="text-[11px] text-newTableText capitalize">{item.type.replace(/_/g, ' ')}</span>
+            <span className="text-[11px] text-newTableText capitalize">
+              {t(`recommendation_type_${item.type}`, item.type.replace(/_/g, ' '))}
+            </span>
           </div>
           <h3 className="text-[15px] font-semibold text-textColor">{item.title}</h3>
           <p className="text-[13px] text-newTableText leading-relaxed">{item.description}</p>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useMediaVoices } from './use-media-voices';
 
 interface VoiceoverDialogProps {
@@ -15,6 +16,7 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
   onClose,
   onGenerate,
 }) => {
+  const t = useT();
   const [text, setText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -35,17 +37,17 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
 
   return (
     <div className="flex flex-col gap-[16px] p-[4px] min-w-[320px]">
-      <h3 className="text-[14px] font-medium text-textColor">Generate AI voiceover</h3>
+      <h3 className="text-[14px] font-medium text-textColor">{t('designer_generate_ai_voiceover_title', 'Generate AI voiceover')}</h3>
 
       <div>
         <label htmlFor="voiceover-script" className="block text-[12px] text-newTextColor/70 mb-[6px]">
-          Script <span className="text-amber-600">*</span>
+          {t('designer_script_label', 'Script')} <span className="text-amber-600">*</span>
         </label>
         <textarea
           id="voiceover-script"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Type the voiceover text…"
+          placeholder={t('designer_voiceover_script_placeholder', 'Type the voiceover text…')}
           rows={4}
           className={`${inputClass} resize-y min-h-[88px]`}
         />
@@ -53,14 +55,14 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
 
       <div>
         <label htmlFor="voiceover-voice" className="block text-[12px] text-newTextColor/70 mb-[6px]">
-          Voice <span className="text-amber-600">*</span>
+          {t('designer_voice_label', 'Voice')} <span className="text-amber-600">*</span>
         </label>
         {isLoading && (
-          <div className="text-[13px] text-newTextColor/60">Loading voices…</div>
+          <div className="text-[13px] text-newTextColor/60">{t('designer_loading_voices', 'Loading voices…')}</div>
         )}
         {error && (
           <div className="text-[13px] text-amber-600">
-            Could not load voices. Make sure a TTS-capable provider is configured.
+            {t('designer_voiceover_load_error', 'Could not load voices. Make sure a TTS-capable provider is configured.')}
           </div>
         )}
         {!isLoading && !error && (
@@ -71,7 +73,7 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
             className={inputClass}
           >
             <option value="" disabled>
-              Choose a voice…
+              {t('designer_choose_a_voice_option', 'Choose a voice…')}
             </option>
             {(voices || []).map((voice) => (
               <option key={voice.id} value={voice.id}>
@@ -88,7 +90,7 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
           onClick={onClose}
           className="px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-studioBorder/30 transition-colors"
         >
-          Cancel
+          {t('cancel', 'Cancel')}
         </button>
         <button
           type="button"
@@ -96,7 +98,7 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
           disabled={!canGenerate || generating}
           className="px-[12px] py-[8px] rounded-[8px] text-[13px] bg-[#2B5CD3] text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#244bb0] transition-colors"
         >
-          {generating ? 'Generating…' : 'Generate'}
+          {generating ? t('designer_generating_ellipsis', 'Generating…') : t('generate', 'Generate')}
         </button>
       </div>
     </div>

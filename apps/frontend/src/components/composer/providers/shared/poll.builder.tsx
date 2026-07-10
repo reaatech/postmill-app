@@ -112,7 +112,7 @@ export const PollBuilder: FC<PollBuilderProps> = ({
                 className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-[13px] text-textColor flex-1"
                 value={option.value}
                 onChange={(e) => handleOptionChange(option.id, e.target.value)}
-                placeholder={t('poll_option_placeholder', `Option ${i + 1}...`)}
+                placeholder={t('poll_option_placeholder', 'Option {{number}}...', { number: i + 1 })}
                 maxLength={100}
                 aria-label={t('poll_option_aria', 'Poll option {{index}}', { index: i + 1 })}
               />

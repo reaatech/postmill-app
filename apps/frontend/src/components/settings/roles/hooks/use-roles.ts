@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { createFetchError } from '../../shared/fetch-error';
 
 export interface PermissionItem {
   id: string;
@@ -38,7 +39,7 @@ export const useRoles = () => {
   const fetch = useFetch();
   const load = useCallback(async (): Promise<RoleItem[]> => {
     const res = await fetch('/settings/roles');
-    if (!res.ok) throw new Error('Failed to load roles');
+    if (!res.ok) throw createFetchError('failed_to_load_roles', 'Failed to load roles');
     return res.json();
   }, [fetch]);
   return useSWR<RoleItem[]>('/settings/roles', load, {
@@ -50,7 +51,7 @@ export const usePermissionsCatalog = () => {
   const fetch = useFetch();
   const load = useCallback(async (): Promise<PermissionItem[]> => {
     const res = await fetch('/settings/roles/permissions');
-    if (!res.ok) throw new Error('Failed to load permissions catalog');
+    if (!res.ok) throw createFetchError('failed_to_load_permissions_catalog', 'Failed to load permissions catalog');
     return res.json();
   }, [fetch]);
   return useSWR<PermissionItem[]>('/settings/roles/permissions', load, {
@@ -62,7 +63,7 @@ export const useTeamMembers = () => {
   const fetch = useFetch();
   const load = useCallback(async (): Promise<TeamMemberItem[]> => {
     const res = await fetch('/settings/team');
-    if (!res.ok) throw new Error('Failed to load team');
+    if (!res.ok) throw createFetchError('failed_to_load_team', 'Failed to load team');
     const data: { users?: TeamMemberItem[] } = await res.json();
     return data.users || [];
   }, [fetch]);

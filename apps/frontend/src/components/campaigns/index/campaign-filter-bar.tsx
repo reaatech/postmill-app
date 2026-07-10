@@ -230,7 +230,7 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
                     <span className="w-[6px] h-[6px] rounded-full bg-[#2B5CD3]" />
                   )}
                   <div className="text-[12px] font-[600] text-newTableText">
-                    {t('status', 'Status')}
+                    {t('status', 'Status:')}
                   </div>
                 </div>
                 {filters.status !== DEFAULT_CAMPAIGN_FILTERS.status && (

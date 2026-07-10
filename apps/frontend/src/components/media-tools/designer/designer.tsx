@@ -10,6 +10,7 @@ import { setImageFetch, clearImageCache } from './elements';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useDebounce } from 'use-debounce';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
 import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
@@ -199,6 +200,7 @@ export const Designer: FC<DesignerProps> = ({
 }) => {
   const fetch = useFetch();
   const toaster = useToaster();
+  const translate = useT();
   const modals = useModals();
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const [showSafeZones, setShowSafeZones] = useState(false);
@@ -435,18 +437,18 @@ export const Designer: FC<DesignerProps> = ({
   const handleExport = useCallback(() => {
     const s = store.getState();
     if (s.brandEnforcement && !s.brandAdminOverride && brandViolations.length > 0) {
-      toaster.show('Export blocked: off-brand elements detected. Fix them or use admin override.', 'warning');
+      toaster.show(translate('export_blocked_off_brand', 'Export blocked: off-brand elements detected. Fix them or use admin override.'), 'warning');
       return;
     }
     modals.openModal({
       children: <ExportDialog store={store} onClose={() => modals.closeAll()} />,
     });
-  }, [modals, store, brandViolations, toaster]);
+  }, [modals, store, brandViolations, toaster, translate]);
 
   const handleSave = useCallback(async () => {
     const s = store.getState();
     if (s.brandEnforcement && !s.brandAdminOverride && brandViolations.length > 0) {
-      toaster.show('Save blocked: off-brand elements detected. Fix them or use admin override.', 'warning');
+      toaster.show(translate('save_blocked_off_brand', 'Save blocked: off-brand elements detected. Fix them or use admin override.'), 'warning');
       return;
     }
     s.setSaving(true);
@@ -494,18 +496,18 @@ export const Designer: FC<DesignerProps> = ({
         s.setDesignId(data.id);
       }
       s.markSaved();
-      toaster.show('Design saved', 'success');
+      toaster.show(translate('design_saved', 'Design saved'), 'success');
     } catch {
-      toaster.show('Save failed', 'warning');
+      toaster.show(translate('save_failed', 'Failed to save'), 'warning');
     } finally {
       s.setSaving(false);
     }
-  }, [fetch, toaster, store, brandViolations]);
+  }, [fetch, toaster, store, brandViolations, translate]);
 
   const handleSaveAsTemplate = useCallback(async () => {
     const s = store.getState();
     if (s.brandEnforcement && !s.brandAdminOverride && brandViolations.length > 0) {
-      toaster.show('Save blocked: off-brand elements detected. Fix them or use admin override.', 'warning');
+      toaster.show(translate('save_blocked_off_brand', 'Save blocked: off-brand elements detected. Fix them or use admin override.'), 'warning');
       return;
     }
     s.setSaving(true);
@@ -546,13 +548,13 @@ export const Designer: FC<DesignerProps> = ({
         const data = await res.json();
         s.setTemplateId(data.id);
       }
-      toaster.show('Saved as template', 'success');
+      toaster.show(translate('saved_as_template', 'Saved as template'), 'success');
     } catch {
-      toaster.show('Failed to save as template', 'warning');
+      toaster.show(translate('failed_to_save_as_template', 'Failed to save as template'), 'warning');
     } finally {
       s.setSaving(false);
     }
-  }, [fetch, toaster, store, brandViolations]);
+  }, [fetch, toaster, store, brandViolations, translate]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -702,17 +704,17 @@ export const Designer: FC<DesignerProps> = ({
     if (!initialTimelineMedia || timelineInitRef.current) return;
     timelineInitRef.current = true;
     addMediaToTimeline(store, initialTimelineMedia).catch(() => {
-      toaster.show('Could not add media to timeline', 'warning');
+      toaster.show(translate('could_not_add_media_to_timeline', 'Could not add media to timeline'), 'warning');
     });
-  }, [initialTimelineMedia, store, toaster]);
+  }, [initialTimelineMedia, store, toaster, translate]);
 
   // --- Unsaved-changes guard shared by New / Open / Templates (D-7b) ---
   const confirmDiscardIfDirty = useCallback(() => {
     if (store.getState().isDirty) {
-      return window.confirm('Discard unsaved changes? Your current design will be replaced.');
+      return window.confirm(translate('discard_unsaved_changes_confirm', 'Discard unsaved changes? Your current design will be replaced.'));
     }
     return true;
-  }, [store]);
+  }, [store, translate]);
 
   // Reusable image-from-media placement (centered + aspect-correct) — shared by
   // the Insert/Import media modal and the canvas "Add Image" (D-8).
@@ -748,7 +750,7 @@ export const Designer: FC<DesignerProps> = ({
 
   const onOpenMedia = useCallback(() => {
     modals.openModal({
-      title: 'Add media',
+      title: translate('add_media', 'Add media'),
       children: (close: () => void) => (
         <MediaSelectorModal
           open
@@ -760,7 +762,7 @@ export const Designer: FC<DesignerProps> = ({
         />
       ),
     });
-  }, [modals, addImageFromMedia]);
+  }, [modals, addImageFromMedia, translate]);
 
   const selectedImageId = useCallback(() => {
     const st = store.getState();
@@ -799,14 +801,14 @@ export const Designer: FC<DesignerProps> = ({
       },
       onNewCustom: () =>
         modals.openModal({
-          title: 'New design',
+          title: translate('new_design_dialog_title', 'New design'),
           children: (close: () => void) => (
             <NewDesignDialog store={store} onClose={close} guard={confirmDiscardIfDirty} />
           ),
         }),
       onOpenDesigns: () =>
         modals.openModal({
-          title: 'Open design',
+          title: translate('open_design', 'Open design'),
           children: (close: () => void) => (
             <MyDesignsPanel
               onOpen={async (d) => {
@@ -822,7 +824,7 @@ export const Designer: FC<DesignerProps> = ({
         }),
       onBrowseTemplates: () =>
         modals.openModal({
-          title: 'Browse templates',
+          title: translate('browse_templates', 'Browse templates'),
           children: (close: () => void) => (
             <TemplatesPanel store={store as any} onClose={close} guard={confirmDiscardIfDirty} />
           ),
@@ -857,25 +859,25 @@ export const Designer: FC<DesignerProps> = ({
         const target = cur === 'image' ? 'video' : 'image';
         const msg =
           cur === 'image'
-            ? 'Convert to video mode? All image elements will be lost.'
-            : 'Convert to image mode? All video tracks and clips will be lost.';
+            ? translate('convert_to_video_mode_confirm', 'Convert to video mode? All image elements will be lost.')
+            : translate('convert_to_image_mode_confirm', 'Convert to image mode? All video tracks and clips will be lost.');
         if (window.confirm(msg)) st.setMode(target);
       },
       onToggleShare: () => setCollabEnabled((v) => !v),
       onAiGenerate: () => setActivePanel('ai'),
       onAiRemoveBg: () =>
-        runAi((id) => aiRemoveBackground({ fetch, store, elementId: id }), 'Background removal failed'),
+        runAi((id) => aiRemoveBackground({ fetch, store, elementId: id }), translate('background_removal_failed', 'Background removal failed')),
       onAiUpscale: (scale) =>
-        runAi((id) => aiUpscale({ fetch, store, elementId: id }, scale), 'Upscale failed'),
+        runAi((id) => aiUpscale({ fetch, store, elementId: id }, scale), translate('upscale_failed', 'Upscale failed')),
       onAiInpaint: () => {
         const id = selectedImageId();
         if (!id) return;
         setActivePanel(null);
         setInspectorCollapsed(false);
-        toaster.show('Draw a mask in the inspector’s AI Tools, then Inpaint', 'success');
+        toaster.show(translate('draw_mask_ai_tools_inpaint', 'Draw a mask in the inspector’s AI Tools, then Inpaint'), 'success');
       },
       onAiDetectSubject: () =>
-        runAi((id) => aiDetectSubject({ fetch, store, elementId: id }), 'Subject detection failed'),
+        runAi((id) => aiDetectSubject({ fetch, store, elementId: id }), translate('subject_detection_failed', 'Subject detection failed')),
     }),
     [
       showSafeZones,
@@ -897,6 +899,7 @@ export const Designer: FC<DesignerProps> = ({
       confirmDiscardIfDirty,
       selectedImageId,
       runAi,
+      translate,
     ]
   );
 
@@ -907,7 +910,7 @@ export const Designer: FC<DesignerProps> = ({
 
   const onSetBackgroundImage = useCallback(() => {
     modals.openModal({
-      title: 'Background image',
+      title: translate('background_image', 'Background image'),
       children: (close: () => void) => (
         <MediaSelectorModal
           open
@@ -923,19 +926,19 @@ export const Designer: FC<DesignerProps> = ({
         />
       ),
     });
-  }, [modals, store]);
+  }, [modals, store, translate]);
 
   const panels = [
-    { id: 'text', icon: 'T', label: 'Text' },
-    { id: 'elements', icon: '◇', label: 'Elements' },
-    { id: 'icons', icon: '★', label: 'Icons' },
-    { id: 'photos', icon: '▣', label: 'Photos' },
-    { id: 'uploads', icon: '☰', label: 'Uploads' },
-    { id: 'background', icon: '◨', label: 'Background' },
-    { id: 'layers', icon: '≡', label: 'Layers' },
+    { id: 'text', icon: 'T', label: translate('provider_chip_text', 'Text') },
+    { id: 'elements', icon: '◇', label: translate('panel_elements', 'Elements') },
+    { id: 'icons', icon: '★', label: translate('panel_icons', 'Icons') },
+    { id: 'photos', icon: '▣', label: translate('panel_photos', 'Photos') },
+    { id: 'uploads', icon: '☰', label: translate('panel_uploads', 'Uploads') },
+    { id: 'background', icon: '◨', label: translate('panel_background', 'Background') },
+    { id: 'layers', icon: '≡', label: translate('panel_layers', 'Layers') },
     // AI panel only when the org has an active AI provider (E4).
-    ...(aiActive ? [{ id: 'ai', icon: '✦', label: 'AI' }] : []),
-    { id: 'brand', icon: '♥', label: 'Brand' },
+    ...(aiActive ? [{ id: 'ai', icon: '✦', label: translate('ai', 'AI') }] : []),
+    { id: 'brand', icon: '♥', label: translate('brand_label', 'Brand') },
   ];
 
   // Global ⌘E → Export (⌘S/⌘K already handled elsewhere; the rest of the
@@ -967,7 +970,7 @@ export const Designer: FC<DesignerProps> = ({
           <input
             value={designName}
             onChange={(e) => store.getState().setDesignName(e.target.value)}
-            aria-label="Design name"
+            aria-label={translate('design_name_label', 'Design name')}
             className="mobile:hidden bg-transparent border-none text-textColor text-[14px] font-medium outline-none focus:border-b focus:border-designerAccent px-1 py-0.5 w-[150px]"
           />
         </div>
@@ -975,11 +978,11 @@ export const Designer: FC<DesignerProps> = ({
         <MenuBar actions={actions} />
 
         <div className="mobile:hidden flex items-center text-[11px] min-w-0 shrink-0">
-          {isSaving && <span className="text-newTextColor/60">Saving…</span>}
+          {isSaving && <span className="text-newTextColor/60">{translate('saving_ellipsis', 'Saving…')}</span>}
           {!isSaving && !isDirty && currentDesignId && (
-            <span className="text-green-500">Saved</span>
+            <span className="text-green-500">{translate('saved_status', 'Saved')}</span>
           )}
-          {!isSaving && isDirty && <span className="text-amber-600">Unsaved</span>}
+          {!isSaving && isDirty && <span className="text-amber-600">{translate('unsaved_status', 'Unsaved')}</span>}
         </div>
 
         <div className="flex-1" />
@@ -991,16 +994,16 @@ export const Designer: FC<DesignerProps> = ({
           <button
             onClick={() => undo()}
             className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-            title="Undo (Ctrl+Z)"
-            aria-label="Undo (Ctrl+Z)"
+            title={translate('undo_ctrl_z', 'Undo (Ctrl+Z)')}
+            aria-label={translate('undo_ctrl_z', 'Undo (Ctrl+Z)')}
           >
             ↩
           </button>
           <button
             onClick={() => redo()}
             className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-            title="Redo (Ctrl+Shift+Z)"
-            aria-label="Redo (Ctrl+Shift+Z)"
+            title={translate('redo_ctrl_shift_z', 'Redo (Ctrl+Shift+Z)')}
+            aria-label={translate('redo_ctrl_shift_z', 'Redo (Ctrl+Shift+Z)')}
           >
             ↪
           </button>
@@ -1012,9 +1015,9 @@ export const Designer: FC<DesignerProps> = ({
                   : 'border-studioBorder text-textColor/70 hover:text-textColor'
               }`}
               onClick={() => setCollabEnabled(!collabEnabled)}
-              title={collabEnabled ? `${connectedCount} connected` : 'Enable real-time collaboration'}
+              title={collabEnabled ? translate('peers_connected_count', '{{count}} connected', { count: connectedCount }) : translate('enable_realtime_collaboration', 'Enable real-time collaboration')}
             >
-              {collabEnabled ? `👥 ${connectedCount}` : 'Share'}
+              {collabEnabled ? `👥 ${connectedCount}` : translate('share', 'Share')}
             </button>
           )}
           <div className="w-px h-6 bg-studioBorder mx-1" />
@@ -1022,9 +1025,9 @@ export const Designer: FC<DesignerProps> = ({
             onClick={handleSave}
             disabled={isSaving}
             className="px-3 py-1.5 rounded-md text-[12px] border border-studioBorder text-textColor hover:bg-boxHover disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-            aria-label="Save (Ctrl+S)"
+            aria-label={translate('save_ctrl_s', 'Save (Ctrl+S)')}
           >
-            Save
+            {translate('save', 'Save')}
           </button>
           </div>
           <FullscreenButton className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent shrink-0" />
@@ -1033,16 +1036,16 @@ export const Designer: FC<DesignerProps> = ({
             disabled={isSaving}
             className="px-4 py-1.5 rounded-md text-[12px] bg-designerAccent text-white hover:bg-designerAccent/80 disabled:opacity-50 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
           >
-            Export
+            {translate('export', 'Export')}
           </button>
           {setMedia && (
             <button
               onClick={handleExport}
               disabled={isSaving}
               className="px-4 py-1.5 rounded-md text-[12px] bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              aria-label="Use in post"
+              aria-label={translate('use_in_post', 'Use in post')}
             >
-              Use in post
+              {translate('use_in_post', 'Use in post')}
             </button>
           )}
           {closeModal && (
@@ -1051,8 +1054,8 @@ export const Designer: FC<DesignerProps> = ({
               <button
                 onClick={closeModal}
                 className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-                title="Close"
-                aria-label="Close designer"
+                title={translate('close', 'Close')}
+                aria-label={translate('close_designer', 'Close designer')}
               >
                 ✕
               </button>
@@ -1080,7 +1083,7 @@ export const Designer: FC<DesignerProps> = ({
                   : 'text-textColor/60 hover:bg-studioBorder/30 hover:text-textColor'
               }`}
               title={p.label}
-              aria-label={`${p.label} panel`}
+              aria-label={translate('panel_aria_label', '{{label}} panel', { label: p.label })}
             >
               {p.icon}
             </button>
@@ -1137,13 +1140,13 @@ export const Designer: FC<DesignerProps> = ({
               <div className="absolute right-0 top-0 bottom-0 w-[280px] z-20 border-l border-studioBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-                    {hasInspectorTarget ? 'Inspector' : 'Canvas'}
+                    {hasInspectorTarget ? translate('inspector_panel_label', 'Inspector') : translate('canvas_panel_label', 'Canvas')}
                   </div>
                   <button
                     onClick={() => setInspectorCollapsed(true)}
                     className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-studioBorder/30 hover:text-textColor text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-                    title="Collapse panel"
-                    aria-label="Collapse properties panel"
+                    title={translate('collapse_panel', 'Collapse panel')}
+                    aria-label={translate('collapse_properties_panel', 'Collapse properties panel')}
                   >
                     ›
                   </button>
@@ -1164,8 +1167,8 @@ export const Designer: FC<DesignerProps> = ({
               <button
                 onClick={() => setInspectorCollapsed(false)}
                 className="absolute right-0 top-2 z-20 px-1.5 py-3 rounded-l-md border border-r-0 border-studioBorder bg-newBgColorInner text-textColor/60 hover:text-textColor shadow-xl text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent focus-visible:ring-inset"
-                title="Show properties"
-                aria-label="Expand properties panel"
+                title={translate('show_properties', 'Show properties')}
+                aria-label={translate('expand_properties_panel', 'Expand properties panel')}
               >
                 ‹
               </button>

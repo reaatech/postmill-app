@@ -41,7 +41,8 @@ export const BrandList = () => {
 
   const handleDelete = useCallback(
     async (brand: Brand) => {
-      if (!(await deleteDialog(t('confirm_delete_brand', `Delete "${brand.name}"?`)))) return;
+      if (!(await deleteDialog(t('confirm_delete_brand', 'Delete "{{name}}"?', { name: brand.name }))))
+        return;
       const res = await fetch(`/brands/${brand.id}`, { method: 'DELETE' });
       if (!res.ok) {
         toaster.show(t('delete_failed', 'Failed to delete brand'), 'warning');
@@ -69,7 +70,7 @@ export const BrandList = () => {
   if (isLoading) {
     return (
       <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }

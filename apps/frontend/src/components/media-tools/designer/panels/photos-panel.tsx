@@ -9,6 +9,7 @@ import { PanelSkeletonGrid, PanelError } from './panel-states';
 import { fitWithin } from './fit-within';
 import { MediaSelectorModal } from '../../media-selector-modal';
 import { getDefaultClipEndMs, getVideoDurationMs } from './video-clip-duration';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface PhotosPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -42,6 +43,7 @@ type TabType = 'photos' | 'videos';
 
 export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
   const fetch = useFetch();
+  const t = useT();
   const [tab, setTab] = useState<TabType>('photos');
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -220,7 +222,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
         onClick={() => setModalOpen(true)}
         className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
       >
-        Browse media library…
+        {t('browse_media_library', 'Browse media library…')}
       </button>
 
       <MediaSelectorModal
@@ -236,7 +238,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
             tab === 'photos' ? 'bg-designerAccent text-white' : 'text-textColor/60 hover:text-textColor'
           }`}
         >
-          Photos
+          {t('photos', 'Photos')}
         </button>
         <button
           onClick={() => { setTab('videos'); setPage(1); }}
@@ -244,7 +246,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
             tab === 'videos' ? 'bg-designerAccent text-white' : 'text-textColor/60 hover:text-textColor'
           }`}
         >
-          Videos
+          {t('videos', 'Videos')}
         </button>
       </div>
 
@@ -252,21 +254,23 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
         type="text"
         value={query}
         onChange={e => { setQuery(e.target.value); setPage(1); }}
-        placeholder={`Search ${tab}...`}
+        placeholder={t('photos_panel_search_tab_placeholder', 'Search {{tab}}...', { tab })}
         className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-studioBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
       />
 
       {isLoading && !data ? (
         <PanelSkeletonGrid count={6} />
       ) : error && !data ? (
-        <PanelError message={`Couldn't load ${tab}`} onRetry={() => mutate()} />
+        <PanelError message={t('photos_panel_couldnt_load_tab', "Couldn't load {{tab}}", { tab })} onRetry={() => mutate()} />
       ) : data && !data.configured ? (
         <div className="text-[12px] text-newTextColor/60 text-center py-4">
-          Stock browsing isn't configured
+          {t('photos_panel_stock_browsing_not_configured', "Stock browsing isn't configured")}
         </div>
       ) : !(data?.results || []).length ? (
         <div className="text-[12px] text-newTextColor/60 text-center py-4">
-          No {tab} found{debouncedQuery ? ` for "${debouncedQuery}"` : ''}
+          {debouncedQuery
+            ? t('photos_panel_no_tab_found_for_query', 'No {{tab}} found for "{{query}}"', { tab, query: debouncedQuery })
+            : t('photos_panel_no_tab_found', 'No {{tab}} found', { tab })}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -309,7 +313,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
               </div>
               <div className="p-1.5">
                 <div className="text-[10px] text-newTextColor/60 truncate">
-                  by{' '}
+                  {t('photos_panel_by', 'by')}{' '}
                   <a href={item.authorUrl} target="_blank" rel="noopener noreferrer" className="text-btnPrimaryAccent hover:underline">
                     {item.author}
                   </a>
@@ -327,7 +331,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
             onClick={() => setPage(p => Math.max(1, p - 1))}
             className="px-3 py-1 rounded border border-studioBorder text-[12px] text-textColor hover:bg-boxHover disabled:opacity-30"
           >
-            Prev
+            {t('photos_panel_prev', 'Prev')}
           </button>
           <span className="text-[11px] text-newTextColor/60">{page} / {data?.totalPages || 1}</span>
           <button
@@ -335,7 +339,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
             onClick={() => setPage(p => p + 1)}
             className="px-3 py-1 rounded border border-studioBorder text-[12px] text-textColor hover:bg-boxHover disabled:opacity-30"
           >
-            Next
+            {t('next', 'Next')}
           </button>
         </div>
       )}

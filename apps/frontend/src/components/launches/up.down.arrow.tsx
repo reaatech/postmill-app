@@ -2,6 +2,7 @@
 import { FC, useCallback } from 'react';
 import clsx from 'clsx';
 import { ChevronUpIcon } from '@gitroom/frontend/components/ui/icons';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const Arrow: FC<{
   flip: boolean;
@@ -21,6 +22,7 @@ export const UpDownArrow: FC<{
   onChange: (type: 'up' | 'down') => void;
 }> = (props) => {
   const { isUp, isDown, onChange } = props;
+  const t = useT();
   const changePosition = useCallback(
     (type: 'up' | 'down') => () => {
       onChange(type);
@@ -31,7 +33,7 @@ export const UpDownArrow: FC<{
     <div className="flex flex-col gap-[8px] pt-[8px]">
       <button
         onClick={changePosition('up')}
-        aria-label="Move up"
+        aria-label={t('move_up', 'Move up')}
         className={clsx(
           'outline-none w-[20px] h-[20px] flex justify-center items-center',
           isUp
@@ -43,7 +45,7 @@ export const UpDownArrow: FC<{
       </button>
       <button
         onClick={changePosition('down')}
-        aria-label="Move down"
+        aria-label={t('move_down', 'Move down')}
         className={clsx(
           'outline-none rounded-bl-[20px] w-[20px] h-[20px] flex justify-center items-center',
           isDown

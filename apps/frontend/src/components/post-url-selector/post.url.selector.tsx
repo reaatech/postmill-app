@@ -135,10 +135,9 @@ export const PostSelector: FC<{
                 <div className="flex">
                   <div className="flex-1">
                     <TopTitle
-                      title={
-                        'Select Post Before ' +
-                        date.format('DD/MM/YYYY HH:mm:ss')
-                      }
+                      title={t('select_post_before', 'Select Post Before {{date}}', {
+                        date: date.format(t('post_selector_date_format', 'DD/MM/YYYY HH:mm:ss')),
+                      })}
                     />
                   </div>
                   <button
@@ -200,8 +199,8 @@ export const PostSelector: FC<{
                         </div>
                         <div className="flex-1">{removeMd(p.content)}</div>
                         <div>
-                          {t('status', 'Status:')}
-                          {p.state}
+                          {t('status_label', 'Status:')}
+                          {t(`post_state_${p.state.toLowerCase()}`, p.state) as string}
                         </div>
                       </button>
                     ))}

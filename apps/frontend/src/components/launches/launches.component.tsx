@@ -202,7 +202,7 @@ export const LaunchesComponent = () => {
                     onClick={addChannel}
                     className="bg-btnPrimary text-white px-[24px] py-[10px] rounded-[8px] text-[14px] cursor-pointer"
                   >
-                    {t('add_channel', 'Add a channel')}
+                    {t('add_channel', 'Add Channel')}
                   </button>
                 </div>
               </div>

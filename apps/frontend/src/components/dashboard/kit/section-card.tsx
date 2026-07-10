@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useDashboardPrefs } from '../hooks/useDashboardPrefs';
 import { ErrorBoundary } from '@gitroom/frontend/components/analytics-v2/error.boundary';
 import { ErrorState } from '@gitroom/frontend/components/analytics-v2/kit/states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 
@@ -29,6 +30,7 @@ export const SectionCard: FC<SectionCardProps> = ({
 }) => {
   const { hidden } = useDashboardPrefs();
   const permissions = usePermissions();
+  const t = useT();
 
   if (hidden.includes(id)) {
     return null;
@@ -66,7 +68,7 @@ export const SectionCard: FC<SectionCardProps> = ({
             href={viewAllHref}
             className="shrink-0 text-[12px] font-medium text-newTableText hover:text-textColor transition-colors"
           >
-            View all
+            {t('view_all', 'View all')}
           </Link>
         )}
       </div>
@@ -74,8 +76,11 @@ export const SectionCard: FC<SectionCardProps> = ({
         <ErrorBoundary
           fallback={
             <ErrorState
-              title="This section failed to load"
-              message="Something went wrong inside this dashboard card."
+              title={t('section_failed_title', 'This section failed to load')}
+              message={t(
+                'section_failed_message',
+                'Something went wrong inside this dashboard card.'
+              )}
             />
           }
         >

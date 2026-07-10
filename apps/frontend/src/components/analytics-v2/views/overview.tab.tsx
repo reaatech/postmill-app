@@ -2,7 +2,7 @@
 
 import { FC, useMemo, useState } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { OverviewResponse } from '../utils';
+import { OverviewResponse, FetchError } from '../utils';
 import { StatTile } from '../kit/stat-tile';
 import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
 import { LineChart, CampaignBand } from '../charts/line.chart';
@@ -136,10 +136,11 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   }
 
   if (error) {
+    const fe = error as FetchError;
     return (
       <ErrorState
         title={t('analytics_load_failed', 'Failed to load analytics data')}
-        message={error.message}
+        message={fe.messageKey ? t(fe.messageKey, fe.message) : fe.message}
       />
     );
   }
@@ -240,12 +241,12 @@ export const OverviewTab: FC<OverviewTabProps> = ({
         {breakdownData.length > 0 && (
           <div className="bg-newTableHeader border border-newTableBorder rounded-[12px] p-[16px]">
             <h3 className="text-[13px] font-medium text-newTableText mb-[12px]">
-              By Platform
+              {t('by_platform', 'By Platform')}
             </h3>
             <PieChart
               data={breakdownData}
               height={250}
-              centerLabel="Total"
+              centerLabel={t('total', 'Total')}
               onSliceClick={(identifier) => {
                 const integrationId = data?.byChannel?.find(
                   (c) => c.identifier === identifier
@@ -258,7 +259,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
         {channelBarData.labels.length > 0 && (
           <div className="bg-newTableHeader border border-newTableBorder rounded-[12px] p-[16px]">
             <h3 className="text-[13px] font-medium text-newTableText mb-[12px]">
-              Channel Comparison
+              {t('channel_comparison', 'Channel Comparison')}
             </h3>
             <div className="w-full aspect-[4/3] max-h-[260px]">
               <BarChart

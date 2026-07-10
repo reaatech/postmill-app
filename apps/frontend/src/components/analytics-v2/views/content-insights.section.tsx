@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useContentInsights, ContentFinding } from '../hooks/useContentInsights';
 import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
+import { FetchError } from '../utils';
 
 // Content-attribute intelligence ("what works", 7.4). Ranked findings with the
 // sample size always shown; each finding deep-links the posts tab filtered to
@@ -53,10 +54,11 @@ export const ContentInsightsSection: FC = () => {
   }
 
   if (error) {
+    const fe = error as FetchError;
     return (
       <ErrorState
         title={t('content_insights_error', 'Failed to load content insights')}
-        message={error.message}
+        message={fe.messageKey ? t(fe.messageKey, fe.message) : fe.message}
         onRetry={() => mutate()}
       />
     );

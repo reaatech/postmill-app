@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CapabilityMeta } from './provider-surface.types';
 
 /**
@@ -26,6 +27,7 @@ export const CapabilityBadges: React.FC<CapabilityBadgesProps> = ({
   meta,
   leading,
 }) => {
+  const t = useT();
   if (!leading && (!keys || keys.length === 0)) return null;
   return (
     <div className="flex gap-[4px] mt-[4px] flex-wrap items-center">
@@ -39,7 +41,9 @@ export const CapabilityBadges: React.FC<CapabilityBadgesProps> = ({
               m?.color || FALLBACK_COLOR
             }`}
           >
-            {m?.label || titleCase(key)}
+            {m?.label
+              ? t('provider_capability_' + key, m.label)
+              : titleCase(key)}
           </span>
         );
       })}

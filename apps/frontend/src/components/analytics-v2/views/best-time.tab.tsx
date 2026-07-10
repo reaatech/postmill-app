@@ -92,10 +92,10 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
           <div className="text-[11px] text-newTableText font-medium" />
           {HOUR_LABELS.map((label) => (
             <div
-              key={label}
+              key={label.key}
               className="text-[9px] md:text-[10px] text-newTableText text-center font-medium"
             >
-              {label}
+              {t(label.key, label.fallback)}
             </div>
           ))}
 
@@ -105,7 +105,10 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
               return (
                 <div key={`row-${entry.day}`} className="contents">
                   <div className="text-[10px] md:text-[11px] text-newTableText font-medium flex items-center">
-                    {DAY_LABELS[entry.day]}
+                    {t(
+                      DAY_LABELS[entry.day].key,
+                      DAY_LABELS[entry.day].fallback,
+                    )}
                   </div>
                   {dayEntries.map((de) => {
                     const ratio = maxAvg === 0 ? 0 : de.avgEngagement / maxAvg;
@@ -117,7 +120,22 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
                           lowConfidence ? 'opacity-40' : ''
                         }`}
                         style={ratio > 0 ? { backgroundColor: heatmapColor(ratio) } : undefined}
-                        title={`${DAY_LABELS[de.day]} ${HOUR_LABELS[de.hour]}: ${de.avgEngagement} avg engagement (${de.postCount} posts)`}
+                        title={t(
+                          'heatmap_cell_tooltip',
+                          '{{day}} {{hour}}: {{avg}} avg engagement ({{count}} posts)',
+                          {
+                            day: t(
+                              DAY_LABELS[de.day].key,
+                              DAY_LABELS[de.day].fallback,
+                            ),
+                            hour: t(
+                              HOUR_LABELS[de.hour].key,
+                              HOUR_LABELS[de.hour].fallback,
+                            ),
+                            avg: de.avgEngagement,
+                            count: de.postCount,
+                          }
+                        )}
                       />
                     );
                   })}
@@ -146,10 +164,19 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
                     low ? 'opacity-60' : ''
                   }`}
                 >
-                  <span className="font-medium">{DAY_LABELS[slot.day]}</span>{' '}
-                  <span>{HOUR_LABELS[slot.hour]}</span>
+                  <span className="font-medium">
+                    {t(DAY_LABELS[slot.day].key, DAY_LABELS[slot.day].fallback)}
+                  </span>{' '}
+                  <span>
+                    {t(
+                      HOUR_LABELS[slot.hour].key,
+                      HOUR_LABELS[slot.hour].fallback,
+                    )}
+                  </span>
                   <span className="text-newTableText ml-[4px]">
-                    ({slot.avgEngagement} avg)
+                    {t('slot_avg_engagement', '({{avg}} avg)', {
+                      avg: slot.avgEngagement,
+                    })}
                   </span>
                   {slot.postCount != null && (
                     <span className="text-newTableText ml-[4px]">

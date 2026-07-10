@@ -3,7 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
-import { OverviewResponse } from '../utils';
+import { OverviewResponse, createFetchError } from '../utils';
 
 interface OverviewParams {
   from: string;
@@ -32,7 +32,7 @@ export const useOverview = (params: OverviewParams) => {
 
   const load = useCallback(async (path: string) => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to fetch overview');
+    if (!res.ok) throw createFetchError('overview_fetch_failed', 'Failed to fetch overview');
     return res.json() as Promise<OverviewResponse>;
   }, [fetch]);
 

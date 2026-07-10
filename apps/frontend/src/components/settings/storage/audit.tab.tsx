@@ -4,6 +4,8 @@ import React, { useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 
 const limit = 25;
 
@@ -23,7 +25,7 @@ const useAuditLog = (page: number) => {
     const res = await fetch(
       `/settings/storage/audit-log?limit=${limit}&offset=${page * limit}`
     );
-    if (!res.ok) throw new Error('Failed to load audit logs');
+    if (!res.ok) throw createFetchError('failed_to_load_audit_logs', 'Failed to load audit logs');
     return res.json();
   }, [fetch, page]);
   return useSWR<{ logs: AuditLogRow[]; total: number }>(
@@ -34,6 +36,7 @@ const useAuditLog = (page: number) => {
 };
 
 export const AuditTab: React.FC = () => {
+  const t = useT();
   const [currentPage, setCurrentPage] = useState(0);
 
   const { data, isLoading } = useAuditLog(currentPage);
@@ -47,27 +50,27 @@ export const AuditTab: React.FC = () => {
 
   const actionLabel = (action: string) => {
     const map: Record<string, string> = {
-      'storage.create': 'Created',
-      'storage.update': 'Updated',
-      'storage.delete': 'Deleted',
-      'storage.mount': 'Mounted',
-      'storage.unmount': 'Unmounted',
-      'storage.set-default-folder': 'Set as Default',
-      'storage.migrate': 'Migrated',
+      'storage.create': t('audit_action_created', 'Created'),
+      'storage.update': t('audit_action_updated', 'Updated'),
+      'storage.delete': t('audit_action_deleted', 'Deleted'),
+      'storage.mount': t('mounted', 'Mounted'),
+      'storage.unmount': t('unmounted', 'Unmounted'),
+      'storage.set-default-folder': t('audit_action_set_as_default', 'Set as Default'),
+      'storage.migrate': t('audit_action_migrated', 'Migrated'),
     };
     return map[action] || action;
   };
 
   return (
     <div className="flex flex-col gap-[20px]">
-      <h3 className="text-[18px] font-semibold text-textColor">Audit Log</h3>
+      <h3 className="text-[18px] font-semibold text-textColor">{t('audit_log', 'Audit Log')}</h3>
 
       <DataTable
         columns={[
-          { key: 'action', header: 'Action', render: (log: any) => actionLabel(log.action) },
-          { key: 'entity', header: 'Provider', render: (log: any) => log.entityName || log.entityId || '—' },
-          { key: 'user', header: 'User', render: (log: any) => log.userId || 'System' },
-          { key: 'date', header: 'Date', render: (log: any) => formatDate(log.createdAt) },
+          { key: 'action', header: t('action', 'Action'), render: (log: any) => actionLabel(log.action) },
+          { key: 'entity', header: t('provider', 'Provider'), render: (log: any) => log.entityName || log.entityId || '—' },
+          { key: 'user', header: t('user', 'User'), render: (log: any) => log.userId || t('system', 'System') },
+          { key: 'date', header: t('date', 'Date'), render: (log: any) => formatDate(log.createdAt) },
         ]}
         data={logs}
         keyExtractor={(log: any) => log.id}
@@ -76,7 +79,7 @@ export const AuditTab: React.FC = () => {
         total={total}
         limit={limit}
         onPageChange={(p) => setCurrentPage(p - 1)}
-        emptyState={{ title: 'No audit logs yet.' }}
+        emptyState={{ title: t('no_audit_logs_yet', 'No audit logs yet.') }}
       />
     </div>
   );

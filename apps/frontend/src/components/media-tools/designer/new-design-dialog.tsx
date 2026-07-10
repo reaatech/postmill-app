@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 type StoreApi = ReturnType<typeof import('./designer.store').createDesignerStore>;
 
@@ -18,8 +19,17 @@ const CHIPS = [
   { label: 'Landscape', w: 1920, h: 1080 },
 ];
 
+// CHIPS is a module-scope literal (no hook access) — map labels to keys at the render site.
+const CHIP_LABEL_KEYS: Record<string, string> = {
+  Square: 'designer_chip_square',
+  Portrait: 'designer_chip_portrait',
+  Story: 'designer_chip_story',
+  Landscape: 'designer_chip_landscape',
+};
+
 // File → New → Custom Size… — pick mode + dimensions, then start a fresh doc.
 export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guard }) => {
+  const t = useT();
   const [mode, setMode] = useState<'image' | 'video'>('image');
   const [w, setW] = useState('1080');
   const [h, setH] = useState('1080');
@@ -41,7 +51,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
 
   return (
     <div className="w-[360px] p-5 bg-newBgColorInner">
-      <h2 className="text-[16px] font-bold text-textColor mb-4">New design</h2>
+      <h2 className="text-[16px] font-bold text-textColor mb-4">{t('designer_new_design_title', 'New design')}</h2>
 
       <div className="flex gap-2 mb-4">
         {(['image', 'video'] as const).map((m) => (
@@ -54,7 +64,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
                 : 'border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover'
             }`}
           >
-            {m}
+            {m === 'image' ? t('designer_mode_image', 'image') : t('designer_mode_video', 'video')}
           </button>
         ))}
       </div>
@@ -69,7 +79,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
             }}
             className="px-3 py-1.5 rounded-full text-[12px] border border-studioBorder text-textColor/80 hover:border-designerAccent hover:text-textColor transition-colors"
           >
-            {c.label} <span className="text-textColor/40">{c.w}×{c.h}</span>
+            {t(CHIP_LABEL_KEYS[c.label], c.label)} <span className="text-textColor/40">{c.w}×{c.h}</span>
           </button>
         ))}
       </div>
@@ -79,7 +89,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
           type="number"
           value={w}
           onChange={(e) => setW(e.target.value)}
-          placeholder="W"
+          placeholder={t('designer_width_short', 'W')}
           className="w-full h-[38px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
         />
         <span className="text-textColor/40">×</span>
@@ -87,7 +97,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
           type="number"
           value={h}
           onChange={(e) => setH(e.target.value)}
-          placeholder="H"
+          placeholder={t('designer_height_short', 'H')}
           className="w-full h-[38px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
         />
       </div>
@@ -97,13 +107,13 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
           onClick={onClose}
           className="px-4 py-2 rounded-lg text-[13px] border border-studioBorder text-textColor hover:bg-boxHover transition-colors"
         >
-          Cancel
+          {t('cancel', 'Cancel')}
         </button>
         <button
           onClick={create}
           className="px-4 py-2 rounded-lg text-[13px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80 transition-colors"
         >
-          Create
+          {t('designer_create', 'Create')}
         </button>
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
+import { createFetchError } from '../../shared/fetch-error';
 
 export interface ShortlinkProviderInfo {
   identifier: string;
@@ -61,7 +62,7 @@ export const useShortlinksConfig = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/shortlinks/config');
-    if (!res.ok) throw new Error('Failed to load shortlinks config');
+    if (!res.ok) throw createFetchError('failed_to_load_shortlinks_config', 'Failed to load shortlinks config');
     return res.json();
   }, [fetch]);
   return useSWR<ShortlinksConfigResponse>('org-shortlinks-config', load, {
@@ -73,7 +74,7 @@ export const useShortlinksProviders = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/shortlinks/providers');
-    if (!res.ok) throw new Error('Failed to load shortlinks providers');
+    if (!res.ok) throw createFetchError('failed_to_load_shortlinks_providers', 'Failed to load shortlinks providers');
     return res.json();
   }, [fetch]);
   return useSWR<ShortlinkProviderInfo[]>('org-shortlinks-providers', load, {

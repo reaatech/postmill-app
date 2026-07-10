@@ -34,7 +34,7 @@ export const CampaignsPage: FC = () => {
     '/campaigns',
     async (url: string) => {
       const r = await fetch(url);
-      if (!r.ok) throw new Error('Failed to load campaigns');
+      if (!r.ok) throw new Error(t('failed_to_load_campaigns', 'Failed to load campaigns'));
       return r.json();
     },
   );
@@ -168,7 +168,7 @@ export const CampaignsPage: FC = () => {
 
       {isLoading && (
         <div className="flex items-center justify-center py-[60px] text-newTableText">
-          {t('loading', 'Loading...')}
+          {t('loading', 'Loading')}
         </div>
       )}
 

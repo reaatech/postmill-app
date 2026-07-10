@@ -20,16 +20,21 @@ import {
   OrgEntityOption,
 } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
 
-const ENTITY_LABELS: Record<CampaignEntitySlug, string> = {
-  post: 'Posts',
-  channel: 'Channels',
-  vpn: 'VPN',
-  llm: 'AI Providers',
-  brand: 'Brands',
-  storage: 'Storage',
-  file: 'Files',
-  set: 'Post Templates',
-  signature: 'Signatures',
+const ENTITY_LABELS: Record<CampaignEntitySlug, { key: string; fallback: string }> = {
+  post: { key: 'entity_posts', fallback: 'Posts' },
+  channel: { key: 'entity_channels', fallback: 'Channels' },
+  vpn: { key: 'entity_vpn', fallback: 'VPN' },
+  llm: { key: 'entity_llm', fallback: 'AI Providers' },
+  brand: { key: 'entity_brands', fallback: 'Brands' },
+  storage: { key: 'entity_storage', fallback: 'Storage' },
+  file: { key: 'entity_files', fallback: 'Files' },
+  set: { key: 'entity_post_templates', fallback: 'Post Templates' },
+  signature: { key: 'entity_signatures', fallback: 'Signatures' },
+};
+
+const entityLabel = (slug: CampaignEntitySlug, t: (key: string, fallback: string) => string) => {
+  const { key, fallback } = ENTITY_LABELS[slug];
+  return t(key, fallback);
 };
 
 // 'channel', 'file', and 'set' are intentionally omitted — the dedicated Channels,
@@ -48,7 +53,8 @@ export const PanelItem: FC<{
   onRemove: (entityType: CampaignEntitySlug, entityId: string) => void;
   busy: boolean;
   onOpen?: () => void;
-}> = ({ item, onRemove, busy, onOpen }) => {
+  t: (key: string, fallback: string) => string;
+}> = ({ item, onRemove, busy, onOpen, t }) => {
   const iconSrc = item.icon || undefined;
   const inner = (
     <>
@@ -86,7 +92,7 @@ export const PanelItem: FC<{
         disabled={busy}
         onClick={() => onRemove(item.entityType as CampaignEntitySlug, item.id)}
         className="text-[12px] text-newTableText hover:text-dangerText shrink-0 px-[6px] py-[2px] rounded-[4px] hover:bg-red-500/10 transition-colors disabled:opacity-40"
-        aria-label="Remove"
+        aria-label={t('remove', 'Remove')}
       >
         ×
       </button>
@@ -164,7 +170,7 @@ export const AddItemsModal: FC<{
           >
             {types.map((slug) => (
               <option key={slug} value={slug}>
-                {ENTITY_LABELS[slug]}
+                {entityLabel(slug, t)}
               </option>
             ))}
           </select>
@@ -185,7 +191,7 @@ export const AddItemsModal: FC<{
       <div className="flex flex-col gap-[6px] max-h-[300px] overflow-y-auto">
         {isLoading && (
           <div className="text-center py-[24px] text-[13px] text-newTableText">
-            {t('loading', 'Loading…')}
+            {t('loading', 'Loading')}
           </div>
         )}
         {error && (
@@ -316,7 +322,7 @@ export const TaggedItemsPanels: FC<{
                 {item.subtitle}
               </div>
             ) : (
-              <div className="text-[13px] text-newTableText">{t('no_content', 'No content')}</div>
+              <div className="text-[13px] text-newTableText">{t('no_content', 'no content')}</div>
             )}
             <p className="text-[13px] text-newTableText">
               {t(
@@ -360,7 +366,7 @@ export const TaggedItemsPanels: FC<{
           : 'border-transparent text-newTableText hover:text-textColor'
       )}
     >
-      {ENTITY_LABELS[slug]}
+      {entityLabel(slug, t)}
       <span className="ms-[6px] text-[11px] text-newTableText">
         {(items[slug] || []).length}
       </span>
@@ -439,7 +445,7 @@ export const TaggedItemsPanels: FC<{
                   items={overflowTypes.map((slug) => ({
                     label: (
                       <span className={clsx(active === slug && 'text-btnPrimary')}>
-                        {ENTITY_LABELS[slug]} ({(items[slug] || []).length})
+                        {entityLabel(slug, t)} ({(items[slug] || []).length})
                       </span>
                     ),
                     onClick: () => setActiveType(slug),
@@ -453,6 +459,7 @@ export const TaggedItemsPanels: FC<{
             {(active ? items[active] || [] : []).map((item) => (
               <PanelItem
                 key={item.id}
+                t={t}
                 item={item}
                 onRemove={remove}
                 busy={removingKey === `${item.entityType}:${item.id}`}

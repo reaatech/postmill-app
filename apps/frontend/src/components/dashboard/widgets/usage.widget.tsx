@@ -4,6 +4,7 @@ import { FC } from 'react';
 import { useUsage } from '../hooks/useUsage';
 import { useAiUsage } from '../hooks/useAiUsage';
 import { EmptyState, TabSkeleton } from '@gitroom/frontend/components/analytics-v2/kit/states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface UsageBarProps {
   label: string;
@@ -36,6 +37,7 @@ const UsageBar: FC<UsageBarProps> = ({ label, used, limit }) => {
 };
 
 export const UsageWidget: FC = () => {
+  const t = useT();
   const { data: usage, isLoading: usageLoading } = useUsage();
   const { data: aiUsage, error: aiError, isLoading: aiLoading } = useAiUsage();
 
@@ -49,8 +51,11 @@ export const UsageWidget: FC = () => {
   if (!hasPlan && !hasAi) {
     return (
       <EmptyState
-        title="Usage data unavailable"
-        description="Plan usage and AI budget will appear here."
+        title={t('usage_data_unavailable_title', 'Usage data unavailable')}
+        description={t(
+          'usage_data_unavailable_description',
+          'Plan usage and AI budget will appear here.'
+        )}
       />
     );
   }
@@ -60,39 +65,53 @@ export const UsageWidget: FC = () => {
       {hasPlan && (
         <div className="flex flex-col gap-[10px]">
           <h4 className="text-[12px] font-medium text-newTableText uppercase tracking-wide">
-            Plan
+            {t('plan_label', 'Plan')}
           </h4>
-          <UsageBar label="Posts" used={planUsageData!.postsThisCycle} limit={planLimits!.postsPerMonth} />
-          <UsageBar label="Channels" used={planUsageData!.channels} limit={planLimits!.channels} />
-          <UsageBar label="Team" used={planUsageData!.teamMembers} limit={planLimits!.teamMembers} />
+          <UsageBar
+            label={t('posts', 'Posts')}
+            used={planUsageData!.postsThisCycle}
+            limit={planLimits!.postsPerMonth}
+          />
+          <UsageBar
+            label={t('channels', 'Channels')}
+            used={planUsageData!.channels}
+            limit={planLimits!.channels}
+          />
+          <UsageBar
+            label={t('team', 'Team')}
+            used={planUsageData!.teamMembers}
+            limit={planLimits!.teamMembers}
+          />
         </div>
       )}
 
       {hasAi && (
         <div className="flex flex-col gap-[10px]">
           <h4 className="text-[12px] font-medium text-newTableText uppercase tracking-wide">
-            AI spend
+            {t('ai_spend_label', 'AI spend')}
           </h4>
           <div className="grid grid-cols-2 gap-[12px]">
             <div className="p-[10px] rounded-[8px] bg-newTableHeader">
-              <div className="text-[11px] text-newTableText">Monthly</div>
+              <div className="text-[11px] text-newTableText">
+                {t('monthly_label', 'Monthly')}
+              </div>
               <div className="text-[16px] font-semibold text-textColor">
                 ${aiUsage.monthlySpendUsd.toFixed(2)}
               </div>
               {aiUsage.budget?.monthlyCap != null && (
                 <div className="text-[11px] text-newTableText">
-                  ${aiUsage.budget.remainingMonthly?.toFixed(2)} left
+                  ${aiUsage.budget.remainingMonthly?.toFixed(2)} {t('left_suffix', 'left')}
                 </div>
               )}
             </div>
             <div className="p-[10px] rounded-[8px] bg-newTableHeader">
-              <div className="text-[11px] text-newTableText">Daily</div>
+              <div className="text-[11px] text-newTableText">{t('daily', 'Daily')}</div>
               <div className="text-[16px] font-semibold text-textColor">
                 ${aiUsage.dailySpendUsd.toFixed(2)}
               </div>
               {aiUsage.budget?.dailyCap != null && (
                 <div className="text-[11px] text-newTableText">
-                  ${aiUsage.budget.remainingDaily?.toFixed(2)} left
+                  ${aiUsage.budget.remainingDaily?.toFixed(2)} {t('left_suffix', 'left')}
                 </div>
               )}
             </div>

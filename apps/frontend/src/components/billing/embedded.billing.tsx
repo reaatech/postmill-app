@@ -198,7 +198,7 @@ const PriceBreakdown: FC = () => {
   const dueToday = checkout?.total?.total?.amount || '$0.00';
   const nextBillingTotal = recurring?.dueNext?.total?.amount;
   const nextBillingDate = recurring?.trial?.trialEnd
-    ? dayjs(recurring.trial.trialEnd * 1000).format('MMMM D, YYYY')
+    ? dayjs(recurring.trial.trialEnd * 1000).format(t('billing_embedded_date_format', 'MMMM D, YYYY'))
     : null;
   const billingInterval =
     recurring?.interval === 'month'
@@ -347,11 +347,11 @@ const AppliedCouponDisplay: FC<{
 
     if (expiresAt && typeof expiresAt === 'number') {
       const date = new Date(expiresAt * 1000);
-      return dayjs(date).format('MMMM D, YYYY');
+      return dayjs(date).format(t('billing_embedded_date_format', 'MMMM D, YYYY'));
     }
 
     if (expiresAt && typeof expiresAt === 'string') {
-      return dayjs(expiresAt).format('MMMM D, YYYY');
+      return dayjs(expiresAt).format(t('billing_embedded_date_format', 'MMMM D, YYYY'));
     }
 
     return null;
@@ -625,7 +625,7 @@ const SubmitBar: FC<{ loading: boolean }> = ({ loading }) => {
             <span className="text-textColor font-[600]">
               {dayjs(
                 checkout.checkout.recurring?.trial?.trialEnd * 1000
-              ).format('MMMM D, YYYY')}{' '}
+              ).format(t('billing_embedded_date_format', 'MMMM D, YYYY'))}{' '}
               —{' '}
             </span>
             <span className="text-textColor font-[600]">

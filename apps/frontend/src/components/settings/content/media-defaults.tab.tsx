@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Button } from '@gitroom/react/form/button';
 import {
@@ -36,9 +37,9 @@ interface MediaDefaultsResponse {
   categories: MediaDefaultRow[];
 }
 
-const GROUPS: { title: string; categories: AiMediaCategory[] }[] = [
+const GROUPS: { titleKey: [string, string]; categories: AiMediaCategory[] }[] = [
   {
-    title: 'Image',
+    titleKey: ['media_group_image', 'Image'],
     categories: [
       'text-to-image',
       'image-to-image',
@@ -50,7 +51,7 @@ const GROUPS: { title: string; categories: AiMediaCategory[] }[] = [
     ],
   },
   {
-    title: 'Video',
+    titleKey: ['media_group_video', 'Video'],
     categories: [
       'text-to-video',
       'image-to-video',
@@ -62,48 +63,59 @@ const GROUPS: { title: string; categories: AiMediaCategory[] }[] = [
     ],
   },
   {
-    title: 'Audio',
+    titleKey: ['media_group_audio', 'Audio'],
     categories: ['text-to-speech', 'text-to-music'],
   },
 ];
 
-const CATEGORY_LABELS: Record<AiMediaCategory, string> = {
-  'text-to-speech': 'Text to Speech',
-  'text-to-music': 'Text to Music',
-  'text-to-image': 'Text to Image',
-  'text-to-video': 'Text to Video',
-  'image-to-image': 'Image to Image',
-  'image-to-video': 'Image to Video',
-  'image-upscale': 'Image Upscale',
-  'image-bg-remove': 'Remove Background',
-  'image-inpaint': 'Inpaint',
-  'image-focal-point': 'Focal Point',
-  'image-slide': 'Slide Generator',
-  'video-avatar': 'Avatar Video',
-  'video-caption': 'Caption Burn-in',
-  'video-to-video': 'Video to Video',
-  'video-background': 'Video Background',
-  'video-upscale': 'Video Upscale',
+const CATEGORY_LABELS: Record<AiMediaCategory, [string, string]> = {
+  'text-to-speech': ['ai_media_category_text_to_speech', 'Text to Speech'],
+  'text-to-music': ['ai_media_category_text_to_music', 'Text to Music'],
+  'text-to-image': ['ai_media_category_text_to_image', 'Text to Image'],
+  'text-to-video': ['ai_media_category_text_to_video', 'Text to Video'],
+  'image-to-image': ['ai_media_category_image_to_image', 'Image to Image'],
+  'image-to-video': ['ai_media_category_image_to_video', 'Image to Video'],
+  'image-upscale': ['ai_media_category_image_upscale', 'Image Upscale'],
+  'image-bg-remove': ['ai_media_category_image_bg_remove', 'Remove Background'],
+  'image-inpaint': ['ai_media_category_image_inpaint', 'Inpaint'],
+  'image-focal-point': ['ai_media_category_image_focal_point', 'Focal Point'],
+  'image-slide': ['ai_media_category_image_slide', 'Slide Generator'],
+  'video-avatar': ['ai_media_category_video_avatar', 'Avatar Video'],
+  'video-caption': ['ai_media_category_video_caption', 'Caption Burn-in'],
+  'video-to-video': ['ai_media_category_video_to_video', 'Video to Video'],
+  'video-background': ['ai_media_category_video_background', 'Video Background'],
+  'video-upscale': ['ai_media_category_video_upscale', 'Video Upscale'],
 };
 
-const CATEGORY_HELP: Record<AiMediaCategory, string> = {
-  'text-to-speech': 'Voice used for narration and TTS.',
-  'text-to-music': 'Music/audio generation from a prompt.',
-  'text-to-image': 'Default image generator.',
-  'text-to-video': 'Default text-to-video model.',
-  'image-to-image': 'Image editing/transformation.',
-  'image-to-video': 'Image-to-video generation.',
-  'image-upscale': 'Image upscaling/enhancement.',
-  'image-bg-remove': 'Background removal for images.',
-  'image-inpaint': 'Inpainting with a mask.',
-  'image-focal-point': 'Vision model used to detect focal points.',
-  'image-slide':
+const CATEGORY_HELP: Record<AiMediaCategory, [string, string]> = {
+  'text-to-speech': ['ai_media_category_help_text_to_speech', 'Voice used for narration and TTS.'],
+  'text-to-music': ['ai_media_category_help_text_to_music', 'Music/audio generation from a prompt.'],
+  'text-to-image': ['ai_media_category_help_text_to_image', 'Default image generator.'],
+  'text-to-video': ['ai_media_category_help_text_to_video', 'Default text-to-video model.'],
+  'image-to-image': ['ai_media_category_help_image_to_image', 'Image editing/transformation.'],
+  'image-to-video': ['ai_media_category_help_image_to_video', 'Image-to-video generation.'],
+  'image-upscale': ['ai_media_category_help_image_upscale', 'Image upscaling/enhancement.'],
+  'image-bg-remove': ['ai_media_category_help_image_bg_remove', 'Background removal for images.'],
+  'image-inpaint': ['ai_media_category_help_image_inpaint', 'Inpainting with a mask.'],
+  'image-focal-point': [
+    'ai_media_category_help_image_focal_point',
+    'Vision model used to detect focal points.',
+  ],
+  'image-slide': [
+    'ai_media_category_help_image_slide',
     'Frame image model for slideshows. Narration uses your Text to Speech default; the slide breakdown uses your High Reasoning default.',
-  'video-avatar': 'Avatar/talking-head video.',
-  'video-caption': 'Speech-to-text provider for caption burn-in.',
-  'video-to-video': 'Video restyle/transformation.',
-  'video-background': 'Video background removal/replacement.',
-  'video-upscale': 'Video upscaling/enhancement.',
+  ],
+  'video-avatar': ['ai_media_category_help_video_avatar', 'Avatar/talking-head video.'],
+  'video-caption': [
+    'ai_media_category_help_video_caption',
+    'Speech-to-text provider for caption burn-in.',
+  ],
+  'video-to-video': ['ai_media_category_help_video_to_video', 'Video restyle/transformation.'],
+  'video-background': [
+    'ai_media_category_help_video_background',
+    'Video background removal/replacement.',
+  ],
+  'video-upscale': ['ai_media_category_help_video_upscale', 'Video upscaling/enhancement.'],
 };
 
 const NO_SETTINGS_CATEGORIES: AiMediaCategory[] = ['image-focal-point'];
@@ -428,9 +440,11 @@ const MediaCategoryRow: React.FC<{
       <div className="flex justify-between items-start">
         <div>
           <div className="text-[14px] font-[600] text-textColor">
-            {CATEGORY_LABELS[category]}
+            {t(CATEGORY_LABELS[category][0], CATEGORY_LABELS[category][1])}
           </div>
-          <div className="text-[12px] text-newTextColor/60">{CATEGORY_HELP[category]}</div>
+          <div className="text-[12px] text-newTextColor/60">
+            {t(CATEGORY_HELP[category][0], CATEGORY_HELP[category][1])}
+          </div>
         </div>
         {!empty && row.source === 'stored' && (
           <Button
@@ -448,7 +462,11 @@ const MediaCategoryRow: React.FC<{
         options={options}
         isLoading={optionsLoading}
         disabled={empty}
-        label={`Default model for ${CATEGORY_LABELS[category]}`}
+        label={t(
+          'default_model_for_category',
+          'Default model for {{category}}',
+          { category: t(CATEGORY_LABELS[category][0], CATEGORY_LABELS[category][1]) }
+        )}
         value={value}
         onChange={(newValue) => {
           if (!newValue) return;
@@ -490,6 +508,8 @@ const MediaCategoryRow: React.FC<{
                 }
                 provider={row.providerId ?? ''}
                 operation={MEDIA_CATEGORY_OPERATION[category]}
+                keyNs={`media_defaults_${row.providerId ?? ''}`}
+                tabKey={category}
               />
               <Button
                 type="button"
@@ -574,7 +594,7 @@ export const MediaDefaultsTab: React.FC = () => {
           const res = await fetch(`/settings/content/media-defaults/${category}`, {
             method: 'DELETE',
           });
-          if (!res.ok) throw new Error('Failed to reset default');
+          if (!res.ok) throw createFetchError('failed_to_reset_default', 'Failed to reset default');
         } else {
           const body: Record<string, unknown> = {
             providerId: value.providerId,
@@ -587,8 +607,8 @@ export const MediaDefaultsTab: React.FC = () => {
             body: JSON.stringify(body),
           });
           if (!res.ok) {
-            const errText = await res.text().catch(() => 'Failed to save default');
-            throw new Error(errText);
+            const errText = await res.text().catch(() => '');
+            throw createFetchError('failed_to_save_default', errText || 'Failed to save default');
           }
         }
         await mutate();
@@ -606,14 +626,16 @@ export const MediaDefaultsTab: React.FC = () => {
   );
 
   if (isLoading || !data) {
-    return <div className="text-newTextColor/60 text-[14px]">{t('loading', 'Loading…')}</div>;
+    return <div className="text-newTextColor/60 text-[14px]">{t('loading', 'Loading')}</div>;
   }
 
   return (
     <div className="flex flex-col gap-[24px]">
       {GROUPS.map((group) => (
-        <div key={group.title}>
-          <div className="text-[16px] font-[600] text-textColor mb-[12px]">{group.title}</div>
+        <div key={group.titleKey[0]}>
+          <div className="text-[16px] font-[600] text-textColor mb-[12px]">
+            {t(group.titleKey[0], group.titleKey[1])}
+          </div>
           <div className="flex flex-col gap-[12px]">
             {group.categories.map((category) => {
               const row =

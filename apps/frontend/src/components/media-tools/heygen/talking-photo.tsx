@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
@@ -9,22 +10,23 @@ import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/med
 import { VoicePicker } from './voice-picker';
 import { HeyGenVoice } from './use-heygen';
 
-const DIMENSIONS = [
-  { key: '16:9', label: 'Landscape 16:9', width: 1280, height: 720 },
-  { key: '9:16', label: 'Portrait 9:16', width: 720, height: 1280 },
-  { key: '1:1', label: 'Square 1:1', width: 1080, height: 1080 },
-];
-
 interface TalkingPhotoProps {
   voices: HeyGenVoice[];
   onGenerated: () => void;
 }
 
 export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => {
+  const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
   const mediaDirectory = useMediaDirectory();
+
+  const DIMENSIONS = [
+    { key: '16:9', label: t('heygen_dimension_landscape_16_9', 'Landscape 16:9'), width: 1280, height: 720 },
+    { key: '9:16', label: t('heygen_dimension_portrait_9_16', 'Portrait 9:16'), width: 720, height: 1280 },
+    { key: '1:1', label: t('heygen_dimension_square_1_1', 'Square 1:1'), width: 1080, height: 1080 },
+  ];
 
   const [photo, setPhoto] = useState<{ fileId: string; previewUrl: string } | null>(null);
   const [voice, setVoice] = useState<{ voiceId: string; name: string } | null>(null);
@@ -50,13 +52,13 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
         }),
       });
       if (!res.ok) {
-        toaster.show('Failed to start the render', 'warning');
+        toaster.show(t('heygen_failed_to_start_render', 'Failed to start the render'), 'warning');
         return;
       }
-      toaster.show('Talking photo started — track it in the queue', 'success');
+      toaster.show(t('heygen_talking_photo_started_track_queue', 'Talking photo started — track it in the queue'), 'success');
       onGenerated();
     } catch {
-      toaster.show('Failed to start the render', 'warning');
+      toaster.show(t('heygen_failed_to_start_render', 'Failed to start the render'), 'warning');
     } finally {
       setGenerating(false);
     }
@@ -65,7 +67,7 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
   return (
     <div className="flex flex-col gap-[16px] max-w-[560px]">
       <p className="text-[13px] text-newTextColor/60">
-        Turn a photo from your Files into a talking avatar. Pick a portrait, give it a voice and a script.
+        {t('heygen_talking_photo_intro', 'Turn a photo from your Files into a talking avatar. Pick a portrait, give it a voice and a script.')}
       </p>
 
       <button
@@ -76,14 +78,14 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
         <div className="w-[64px] h-[64px] rounded-[8px] bg-newBgColorInner overflow-hidden flex items-center justify-center shrink-0">
           {photo ? (
             // eslint-disable-next-line @next/next/no-img-element -- external provider asset
-            <img src={photo.previewUrl} alt="Selected" className="w-full h-full object-cover" />
+            <img src={photo.previewUrl} alt={t('heygen_selected', 'Selected')} className="w-full h-full object-cover" />
           ) : (
             <span className="text-newTextColor/60 text-[22px]">＋</span>
           )}
         </div>
         <div>
-          <div className="text-[13px] text-textColor">{photo ? 'Change photo' : 'Pick a photo from Files'}</div>
-          <div className="text-[11px] text-newTextColor/60">A clear, front-facing portrait works best</div>
+          <div className="text-[13px] text-textColor">{photo ? t('heygen_change_photo', 'Change photo') : t('heygen_pick_photo_from_files', 'Pick a photo from Files')}</div>
+          <div className="text-[11px] text-newTextColor/60">{t('heygen_portrait_works_best', 'A clear, front-facing portrait works best')}</div>
         </div>
       </button>
 
@@ -98,8 +100,8 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
         className="flex items-center justify-between gap-[8px] px-[12px] py-[10px] rounded-[10px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
       >
         <div>
-          <div className="text-[13px] text-textColor">{voice?.name || 'Pick a voice'}</div>
-          <div className="text-[11px] text-newTextColor/60">Voice</div>
+          <div className="text-[13px] text-textColor">{voice?.name || t('heygen_pick_a_voice', 'Pick a voice')}</div>
+          <div className="text-[11px] text-newTextColor/60">{t('heygen_voice_label', 'Voice')}</div>
         </div>
         <span className="text-newTextColor/60">🎙️</span>
       </button>
@@ -107,7 +109,7 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="What should the photo say?"
+        placeholder={t('heygen_what_should_photo_say', 'What should the photo say?')}
         rows={5}
         className="w-full px-[12px] py-[10px] rounded-[10px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
       />
@@ -128,7 +130,7 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
         disabled={!valid || generating}
         className="px-[20px] h-[42px] rounded-[10px] bg-[#2B5CD3] text-white text-[14px] font-[600] hover:bg-[#2B5CD3]/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all w-fit"
       >
-        {generating ? 'Starting…' : 'Generate talking photo → Files'}
+        {generating ? t('heygen_starting', 'Starting…') : t('heygen_generate_talking_photo_to_files', 'Generate talking photo → Files')}
       </button>
 
       <MediaSelectorModal
@@ -136,11 +138,11 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
         onClose={() => setPicking(false)}
         onSelect={(item) => {
           if (item.source !== 'file' || !item.fileId) {
-            toaster.show('Save the image to Files first, then pick it here', 'warning');
+            toaster.show(t('heygen_save_image_to_files_first', 'Save the image to Files first, then pick it here'), 'warning');
             return;
           }
           if (item.type !== 'image') {
-            toaster.show('Talking photo needs an image', 'warning');
+            toaster.show(t('heygen_talking_photo_needs_image', 'Talking photo needs an image'), 'warning');
             return;
           }
           setPhoto({ fileId: item.fileId, previewUrl: mediaDirectory.set(item.url) });

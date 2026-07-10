@@ -7,6 +7,7 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
 import { StreakComponent } from '@gitroom/frontend/components/layout/streak.component';
 import { Button } from '@gitroom/react/form/button';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CustomizePopover, DashboardSectionMeta } from './customize.popover';
 import { greetingForUser } from './dashboard.utils';
 
@@ -23,12 +24,15 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({
 }) => {
   const router = useRouter();
   const user = useUser();
+  const t = useT();
 
-  const firstName = user?.profile?.name?.trim().split(/\s+/)[0] || 'there';
+  const firstName =
+    user?.profile?.name?.trim().split(/\s+/)[0] ||
+    t('greeting_fallback_name', 'there');
   const hour = dayjs().tz(getTimezone()).hour();
-  const greeting = greetingForUser(firstName, hour);
+  const greeting = greetingForUser(firstName, hour, t);
 
-  const dateLabel = dayjs().tz(getTimezone()).format('dddd, MMMM D');
+  const dateLabel = dayjs().tz(getTimezone()).format(t('dashboard_date_format', 'dddd, MMMM D'));
 
   return (
     <div className="flex flex-col gap-[8px] mb-[20px]">
@@ -50,26 +54,26 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({
             secondary
             onClick={onBriefClick}
             className="px-[12px]"
-            aria-label="Daily brief"
+            aria-label={t('daily_brief_section_label', 'Daily brief')}
           >
             <span className="mr-[6px]">✨</span>
-            Daily Brief
+            {t('daily_brief', 'Daily Brief')}
           </Button>
         )}
         <Button
           onClick={() => router.push('/posts/post')}
           className="px-[12px]"
-          aria-label="New post"
+          aria-label={t('new_post_aria', 'New post')}
         >
-          + New Post
+          + {t('new_post', 'New Post')}
         </Button>
         <Button
           secondary
           onClick={() => router.push('/campaigns?new=1')}
           className="px-[12px]"
-          aria-label="New campaign"
+          aria-label={t('new_campaign_aria', 'New campaign')}
         >
-          + New Campaign
+          + {t('new_campaign', 'New Campaign')}
         </Button>
         <CustomizePopover sections={sections} />
       </div>

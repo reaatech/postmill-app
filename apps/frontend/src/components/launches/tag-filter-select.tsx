@@ -59,7 +59,7 @@ export const TagFilterSelect: FC<{
           {selectedCount === 0
             ? t('all_tags', 'All tags')
             : `${selectedCount} ${
-                selectedCount === 1 ? t('tag', 'tag') : t('tags', 'tags')
+                selectedCount === 1 ? t('tag', 'tag') : t('tags', 'Tags')
               }`}
         </span>
         <div className="flex-1" />

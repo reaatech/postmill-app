@@ -329,7 +329,7 @@ export const usePostActions = (onMutate?: () => void) => {
             )
           : t(
               'are_you_sure_you_want_to_delete_post',
-              'Are you sure you want to delete post?'
+              'Are you sure you want to delete this post?'
             );
       if (!(await deleteDialog(confirmMessage))) {
         return;

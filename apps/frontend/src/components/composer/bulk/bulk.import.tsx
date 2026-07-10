@@ -212,7 +212,7 @@ export const BulkImport: FC = () => {
             <DataTable
               columns={[
                 { key: 'idx', header: '#', width: '40px', render: (r: any) => r._idx + 1 },
-                { key: 'status', header: t('status', 'Status'), render: (r: any) => r.success ? t('success', 'Success') : t('failed', 'Failed') },
+                { key: 'status', header: t('status', 'Status:'), render: (r: any) => r.success ? t('success', 'Success') : t('failed', 'Failed') },
                 { key: 'details', header: t('details', 'Details'), render: (r: any) => (
                   <>
                     {r.error && <span className="text-red-500">{r.error}</span>}

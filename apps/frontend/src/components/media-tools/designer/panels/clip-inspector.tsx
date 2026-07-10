@@ -5,6 +5,7 @@ import { Slider, Stepper } from '../controls';
 import type { VideoClip } from '../designer.store';
 import { TEXT_ANIMATION_PRESETS } from '../text-animation-presets';
 import type { EaseType } from '../video-preview';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface ClipInspectorProps {
   store: any;
@@ -21,11 +22,11 @@ interface KeyframeLike {
   ease?: 'linear' | 'easeInOut' | 'easeIn' | 'easeOut';
 }
 
-const EASE_OPTIONS: { value: KeyframeLike['ease']; label: string }[] = [
-  { value: 'linear', label: 'Linear' },
-  { value: 'easeInOut', label: 'Ease In-Out' },
-  { value: 'easeIn', label: 'Ease In' },
-  { value: 'easeOut', label: 'Ease Out' },
+const EASE_OPTIONS: { value: KeyframeLike['ease']; label: string; labelKey: string }[] = [
+  { value: 'linear', label: 'Linear', labelKey: 'designer_ease_linear' },
+  { value: 'easeInOut', label: 'Ease In-Out', labelKey: 'designer_ease_in_out' },
+  { value: 'easeIn', label: 'Ease In', labelKey: 'designer_ease_in' },
+  { value: 'easeOut', label: 'Ease Out', labelKey: 'designer_ease_out' },
 ];
 
 function useKeyframeDrag(
@@ -84,6 +85,7 @@ const MiniKeyframeTimeline: FC<{
   onMove: (oldTMs: number, newTMs: number) => void;
   onRemove: (tMs: number) => void;
 }> = ({ keyframes, totalMs, onAdd, onMove, onRemove }) => {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const { setDragging, justDraggedRef } = useKeyframeDrag(ref, totalMs, onMove);
   const [keyboardMs, setKeyboardMs] = useState(0);
@@ -96,7 +98,7 @@ const MiniKeyframeTimeline: FC<{
       aria-valuemin={0}
       aria-valuemax={Math.round(totalMs)}
       aria-valuenow={Math.round(keyboardMs)}
-      aria-label="Keyframe timeline"
+      aria-label={t('designer_keyframe_timeline', 'Keyframe timeline')}
       className="relative h-5 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden cursor-crosshair focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
       onClick={(e) => {
         if (justDraggedRef.current) return; // ignore the click that follows a drag
@@ -123,10 +125,10 @@ const MiniKeyframeTimeline: FC<{
           key={`${kf.tMs}-${Object.keys(kf.props).sort().join('-')}`}
           role="button"
           tabIndex={0}
-          aria-label={`Keyframe at ${Math.round(kf.tMs)}ms`}
+          aria-label={t('designer_keyframe_at_ms', 'Keyframe at {{ms}}ms', { ms: Math.round(kf.tMs) })}
           className="absolute top-0 bottom-0 w-0.5 bg-designerAccent cursor-ew-resize focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
           style={{ left: `${(kf.tMs / totalMs) * 100}%` }}
-          title={`Keyframe at ${kf.tMs}ms`}
+          title={t('designer_keyframe_at_ms', 'Keyframe at {{ms}}ms', { ms: kf.tMs })}
           onMouseDown={(e) => {
             e.stopPropagation();
             setDragging({ oldTMs: kf.tMs, startX: e.clientX });
@@ -158,6 +160,7 @@ const KeyframePropRow: FC<{
   onRemove: (tMs: number, prop?: string) => void;
   onEase: (tMs: number, ease: 'linear' | 'easeInOut' | 'easeIn' | 'easeOut') => void;
 }> = ({ prop, clip, keyframes, totalMs, onAdd, onMove, onRemove, onEase }) => {
+  const t = useT();
   const ref = useRef<HTMLDivElement>(null);
   const { setDragging, justDraggedRef } = useKeyframeDrag(ref, totalMs, onMove);
   const [keyboardMs, setKeyboardMs] = useState(0);
@@ -187,7 +190,7 @@ const KeyframePropRow: FC<{
         aria-valuemin={0}
         aria-valuemax={Math.round(totalMs)}
         aria-valuenow={Math.round(keyboardMs)}
-        aria-label={`${prop} keyframe timeline`}
+        aria-label={t('designer_prop_keyframe_timeline', '{{prop}} keyframe timeline', { prop })}
         className="relative h-3 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
         onClick={(e) => {
           if (justDraggedRef.current) return; // ignore the click that follows a drag
@@ -214,10 +217,10 @@ const KeyframePropRow: FC<{
             key={kf.tMs}
             role="button"
             tabIndex={0}
-            aria-label={`${prop} keyframe at ${Math.round(kf.tMs)}ms`}
+            aria-label={t('designer_prop_keyframe_at_ms', '{{prop}} keyframe at {{ms}}ms', { prop, ms: Math.round(kf.tMs) })}
             className="absolute top-0 bottom-0 w-2 h-2 rounded-full bg-designerAccent -translate-x-1/2 -translate-y-1/2 top-1/2 cursor-pointer hover:scale-125 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
             style={{ left: `${(kf.tMs / totalMs) * 100}%` }}
-            title={`${prop}: ${kf.props[prop]} at ${kf.tMs}ms`}
+            title={t('designer_prop_keyframe_value_at', '{{prop}}: {{value}} at {{ms}}ms', { prop, value: kf.props[prop], ms: kf.tMs })}
             onMouseDown={(e) => {
               e.stopPropagation();
               setDragging({ oldTMs: kf.tMs, startX: e.clientX });
@@ -251,7 +254,7 @@ const KeyframePropRow: FC<{
               className="h-5 px-1 rounded text-[9px] bg-newBgColor border border-studioBorder text-textColor outline-none"
             >
               {EASE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>{t(opt.labelKey, opt.label)}</option>
               ))}
             </select>
           ))}
@@ -262,6 +265,8 @@ const KeyframePropRow: FC<{
 };
 
 export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trackId, clipId }) => {
+  // Named `translate` (not `t`) — this component already uses `t` as a `.find()` callback var.
+  const translate = useT();
   const doc = store((s: any) => s.doc);
   const vo = doc.outputs[outputIndex];
 
@@ -454,31 +459,31 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
   return (
     <div className="space-y-3">
       <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-        Video Clip
+        {translate('designer_video_clip', 'Video Clip')}
       </div>
 
       {/* Position & Size */}
       <div className="grid grid-cols-2 gap-2">
         <Stepper
-          label="X"
+          label={translate('designer_label_x', 'X')}
           value={Math.round(clip.x ?? 0)}
           onChange={(n) => updateClip({ x: n })}
         />
         <Stepper
-          label="Y"
+          label={translate('designer_label_y', 'Y')}
           value={Math.round(clip.y ?? 0)}
           onChange={(n) => updateClip({ y: n })}
         />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Stepper
-          label="Width"
+          label={translate('designer_label_width', 'Width')}
           min={1}
           value={Math.round(clip.width ?? 1)}
           onChange={(n) => updateClip({ width: n })}
         />
         <Stepper
-          label="Height"
+          label={translate('designer_label_height', 'Height')}
           min={1}
           value={Math.round(clip.height ?? 1)}
           onChange={(n) => updateClip({ height: n })}
@@ -486,7 +491,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       </div>
 
       <Slider
-        label="Rotation"
+        label={translate('designer_label_rotation', 'Rotation')}
         suffix="\u00B0"
         min={0}
         max={360}
@@ -495,7 +500,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       />
 
       <Slider
-        label="Opacity"
+        label={translate('designer_label_opacity', 'Opacity')}
         suffix="%"
         min={0}
         max={100}
@@ -505,9 +510,9 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
 
       {/* Audio */}
       <div className="pt-1 border-t border-studioBorder">
-        <div className="text-[11px] text-textColor/50 mb-1">Audio</div>
+        <div className="text-[11px] text-textColor/50 mb-1">{translate('audio', 'Audio')}</div>
         <Slider
-          label="Volume"
+          label={translate('designer_label_volume', 'Volume')}
           suffix="%"
           min={0}
           max={100}
@@ -515,7 +520,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
           onChange={(n) => updateClip({ volume: n / 100 })}
         />
         <Slider
-          label="Fade In"
+          label={translate('designer_label_fade_in', 'Fade In')}
           suffix="ms"
           min={0}
           max={3000}
@@ -524,7 +529,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
           onChange={(n) => updateClip({ fadeInMs: n })}
         />
         <Slider
-          label="Fade Out"
+          label={translate('designer_label_fade_out', 'Fade Out')}
           suffix="ms"
           min={0}
           max={3000}
@@ -536,7 +541,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
 
       {/* Speed / Reverse / Freeze */}
       <div className="pt-1 border-t border-studioBorder space-y-2">
-        <div className="text-[11px] text-textColor/50">Speed</div>
+        <div className="text-[11px] text-textColor/50">{translate('designer_label_speed', 'Speed')}</div>
         <div className="flex gap-1">
           {PRESET_STEPS.map((s) => (
             <button
@@ -554,7 +559,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
         </div>
 
         <div className="flex items-center justify-between pt-1">
-          <span className="text-[11px] text-textColor/70">Reverse</span>
+          <span className="text-[11px] text-textColor/70">{translate('designer_label_reverse', 'Reverse')}</span>
           <button
             type="button"
             role="switch"
@@ -573,7 +578,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
         </div>
 
         <Stepper
-          label="Freeze frame (ms)"
+          label={translate('designer_label_freeze_frame', 'Freeze frame (ms)')}
           min={0}
           max={10000}
           step={500}
@@ -584,13 +589,13 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
 
       {/* Filters */}
       <div className="pt-1 border-t border-studioBorder space-y-2">
-        <div className="text-[11px] text-textColor/50">Filters</div>
+        <div className="text-[11px] text-textColor/50">{translate('designer_label_filters', 'Filters')}</div>
         <div className="text-[9px] text-amber-400/70 mb-1">
-          Filters will be applied during export.
+          {translate('designer_filters_export_note', 'Filters will be applied during export.')}
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/70">Grayscale</span>
+          <span className="text-[11px] text-textColor/70">{translate('designer_label_grayscale', 'Grayscale')}</span>
           <button
             type="button"
             role="switch"
@@ -609,7 +614,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/70">Sepia</span>
+          <span className="text-[11px] text-textColor/70">{translate('designer_label_sepia', 'Sepia')}</span>
           <button
             type="button"
             role="switch"
@@ -628,7 +633,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
         </div>
 
         <Slider
-          label="Blur"
+          label={translate('designer_label_blur', 'Blur')}
           suffix="px"
           min={0}
           max={20}
@@ -637,7 +642,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
           onChange={(n) => setFilterVal('blur', n, 0)}
         />
         <Slider
-          label="Brightness"
+          label={translate('designer_label_brightness', 'Brightness')}
           min={0}
           max={3}
           step={0.05}
@@ -645,7 +650,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
           onChange={(n) => setFilterVal('brightness', n, 1)}
         />
         <Slider
-          label="Contrast"
+          label={translate('designer_label_contrast', 'Contrast')}
           min={0}
           max={3}
           step={0.05}
@@ -653,7 +658,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
           onChange={(n) => setFilterVal('contrast', n, 1)}
         />
         <Slider
-          label="Saturate"
+          label={translate('designer_label_saturate', 'Saturate')}
           min={0}
           max={3}
           step={0.05}
@@ -665,7 +670,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       {/* Text animation presets */}
       {clipTrackType === 'text' && (
         <div className="pt-1 border-t border-studioBorder space-y-2">
-          <div className="text-[11px] text-textColor/50">Text Animations</div>
+          <div className="text-[11px] text-textColor/50">{translate('designer_text_animations', 'Text Animations')}</div>
           <div className="flex flex-wrap gap-1">
             {TEXT_ANIMATION_PRESETS.map((preset) => (
               <button
@@ -673,7 +678,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
                 onClick={() => handleApplyTextAnimation(preset.name)}
                 className="px-2 py-1 rounded text-[10px] border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-all"
               >
-                {preset.name}
+                {translate(preset.nameKey, preset.name)}
               </button>
             ))}
           </div>
@@ -683,7 +688,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       {/* Keyframes */}
       <div className="pt-1 border-t border-studioBorder space-y-2">
         <div className="flex items-center justify-between">
-          <div className="text-[11px] text-textColor/50">Keyframes</div>
+          <div className="text-[11px] text-textColor/50">{translate('designer_label_keyframes', 'Keyframes')}</div>
           <span className="text-[10px] text-textColor/30">{keyframes.length}</span>
         </div>
 
@@ -692,7 +697,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
             onClick={handleKenBurns}
             className="w-full px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-btnPrimaryAccent hover:bg-designerAccent/10"
           >
-            Ken Burns Preset
+            {translate('designer_ken_burns_preset', 'Ken Burns Preset')}
           </button>
         )}
 
@@ -725,7 +730,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
             onClick={() => updateClip({ keyframes: [] })}
             className="w-full px-2 py-1 rounded text-[11px] border border-red-400/40 text-dangerText hover:bg-red-400/5"
           >
-            Clear all keyframes
+            {translate('designer_clear_all_keyframes', 'Clear all keyframes')}
           </button>
         )}
       </div>

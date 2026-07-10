@@ -63,7 +63,7 @@ export const ListView = () => {
         <div className="absolute inset-0 flex flex-col overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
           {loading ? (
             <div className="flex-1 flex items-center justify-center text-textColor">
-              {t('loading', 'Loading...')}
+              {t('loading', 'Loading')}
             </div>
           ) : posts.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-textColor text-[16px]">

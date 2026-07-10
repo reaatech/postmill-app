@@ -6,7 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useAnomalies, AnomalyRow } from '../hooks/useAnomalies';
 import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
 import { ChannelAvatar } from '../kit/channel-avatar';
-import { CANONICAL_METRICS, formatCompactNumber } from '../utils';
+import { CANONICAL_METRICS, formatCompactNumber, FetchError } from '../utils';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { AlertRulesModal } from './alert-rules.modal';
 
@@ -14,8 +14,12 @@ import { AlertRulesModal } from './alert-rules.modal';
 // anomalies with a per-row dismiss and — when present — a root-cause post link
 // (4.9). Mounted as the third Insights section (see insights.tab.tsx).
 
-function metricLabel(metric: string): string {
-  return CANONICAL_METRICS.find((m) => m.key === metric)?.label || metric;
+function metricLabel(
+  metric: string,
+  translate: (key: string, fallback: string) => string
+): string {
+  const found = CANONICAL_METRICS.find((m) => m.key === metric);
+  return found ? translate(found.labelKey, found.label) : metric;
 }
 
 // Deep-link matching the notification bell's format (4.5): jump to Insights with
@@ -83,7 +87,7 @@ const AlertCard: FC<{ anomaly: AnomalyRow; onDismiss: (id: string) => void }> = 
       <div className="flex flex-wrap items-baseline gap-x-[16px] gap-y-[4px]">
         <div>
           <div className="text-[11px] text-newTableText uppercase tracking-wide">
-            {metricLabel(anomaly.metric)}
+            {metricLabel(anomaly.metric, t)}
           </div>
           <div className="text-[20px] font-semibold tabular-nums text-textColor">
             {formatCompactNumber(anomaly.value)}
@@ -139,10 +143,11 @@ export const AlertsSection: FC = () => {
   const body = (() => {
     if (isLoading) return <TabSkeleton variant="list" />;
     if (error) {
+      const fe = error as FetchError;
       return (
         <ErrorState
           title={t('analytics_alerts_error', 'Failed to load alerts')}
-          message={error.message}
+          message={fe.messageKey ? t(fe.messageKey, fe.message) : fe.message}
           onRetry={() => mutate()}
         />
       );

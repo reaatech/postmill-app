@@ -4,12 +4,14 @@ import React, { FC, useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
 export const OrganizationSelector: FC<{ asOpenSelect?: boolean }> = ({
   asOpenSelect,
 }) => {
   const fetch = useFetch();
   const user = useUser();
+  const t = useT();
   const load = useCallback(async () => {
     return await (await fetch('/user/organizations')).json();
   }, []);
@@ -46,7 +48,7 @@ export const OrganizationSelector: FC<{ asOpenSelect?: boolean }> = ({
       <div className="hover:text-newTextColor">
         <div className="group text-[12px] relative">
           {asOpenSelect && (
-            <div className="bg-btnPrimary !flex !relative max-w-[500px] mx-auto py-[12px] px-[12px]">Select Organization</div>
+            <div className="bg-btnPrimary !flex !relative max-w-[500px] mx-auto py-[12px] px-[12px]">{t('select_organization', 'Select organization')}</div>
           )}
           {!asOpenSelect && (
             <div className="flex items-center">

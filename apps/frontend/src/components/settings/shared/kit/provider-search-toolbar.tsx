@@ -78,7 +78,7 @@ export const ProviderSearchToolbar: React.FC<ProviderSearchToolbarProps> = ({
                     : 'bg-newBgColor border-newTableBorder text-newTableText hover:bg-boxHover'
                 }`}
               >
-                {f.label}
+                {t('provider_chip_' + f.key, f.label)}
               </button>
             );
           })}

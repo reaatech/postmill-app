@@ -17,6 +17,7 @@ import React, {
   useState,
 } from 'react';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const ACCENT = '#2B5CD3';
 
@@ -113,6 +114,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
   brandColors,
   brandEnforcement,
 }) => {
+  const t = useT();
   const user = useUser();
   const orgId = user?.orgId;
   const [open, setOpen] = useState(false);
@@ -190,7 +192,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
           />
           <span className="font-mono uppercase">{value}</span>
           {enforce && (
-            <span className="text-[10px] text-purple-400 ml-1" title="Brand colors enforced">🔒</span>
+            <span className="text-[10px] text-purple-400 ml-1" title={t('brand_colors_enforced', 'Brand colors enforced')}>🔒</span>
           )}
         </button>
 
@@ -208,7 +210,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                 <input
                   type="text"
                   value={draft}
-                  aria-label="Hex color"
+                  aria-label={t('hex_color', 'Hex color')}
                   spellCheck={false}
                   onChange={(e) => setDraft(e.target.value)}
                   onBlur={() => commitDraft(draft)}
@@ -223,8 +225,8 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                 {showEyedropper && (
                   <button
                     type="button"
-                    aria-label="Pick color from screen"
-                    title="Pick color from screen"
+                    aria-label={t('pick_color_from_screen', 'Pick color from screen')}
+                    title={t('pick_color_from_screen', 'Pick color from screen')}
                     onClick={handleEyedropper}
                     className="w-[30px] h-[30px] rounded-[6px] border border-studioBorder bg-newBgColor hover:border-designerAccent flex items-center justify-center shrink-0 transition-colors"
                   >
@@ -249,8 +251,8 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
             {enforce && brandHexes.length > 0 && (
               <div className="flex flex-col gap-[4px]">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-purple-400 uppercase tracking-wider">Brand (locked)</span>
-                  <span className="text-[10px]" title="Brand colors enforced">🔒</span>
+                  <span className="text-[10px] text-purple-400 uppercase tracking-wider">{t('brand_locked', 'Brand (locked)')}</span>
+                  <span className="text-[10px]" title={t('brand_colors_enforced', 'Brand colors enforced')}>🔒</span>
                 </div>
                 <div className="grid grid-cols-6 gap-[6px]">
                   {brandHexes.map((c) => {
@@ -279,7 +281,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
 
             {!enforce && brandHexes.length > 0 && (
               <div className="flex flex-col gap-[4px]">
-                <span className="text-[10px] text-textColor/40 uppercase tracking-wider">Brand</span>
+                <span className="text-[10px] text-textColor/40 uppercase tracking-wider">{t('brand_label', 'Brand')}</span>
                 <div className="grid grid-cols-6 gap-[6px]">
                   {brandHexes.map((c) => {
                     const active = normalizeHex(value) === c;
@@ -307,7 +309,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
 
             {!enforce && recents.length > 0 && (
               <div className="flex flex-col gap-[4px]">
-                <span className="text-[10px] text-textColor/40 uppercase tracking-wider">Recent</span>
+                <span className="text-[10px] text-textColor/40 uppercase tracking-wider">{t('recent', 'Recent')}</span>
                 <div className="grid grid-cols-6 gap-[6px]">
                   {recents.map((c) => {
                     const active = normalizeHex(value) === c;
@@ -513,6 +515,7 @@ export const Stepper: React.FC<StepperProps> = ({
   step = 1,
   label,
 }) => {
+  const t = useT();
   const id = useId();
   const clamp = (n: number) => Math.min(max, Math.max(min, n));
 
@@ -528,7 +531,7 @@ export const Stepper: React.FC<StepperProps> = ({
       <div className="inline-flex items-center h-[34px] rounded-[8px] bg-newBgColorInner border border-studioBorder overflow-hidden">
         <button
           type="button"
-          aria-label="Decrease"
+          aria-label={t('decrease', 'Decrease')}
           disabled={value <= min}
           onClick={() => bump(-1)}
           className="w-[32px] h-full flex items-center justify-center text-textColor text-[16px] hover:bg-newBgColor disabled:opacity-40 disabled:cursor-not-allowed"
@@ -550,7 +553,7 @@ export const Stepper: React.FC<StepperProps> = ({
         />
         <button
           type="button"
-          aria-label="Increase"
+          aria-label={t('increase', 'Increase')}
           disabled={value >= max}
           onClick={() => bump(1)}
           className="w-[32px] h-full flex items-center justify-center text-textColor text-[16px] hover:bg-newBgColor disabled:opacity-40 disabled:cursor-not-allowed"
@@ -577,6 +580,7 @@ export const FontPicker: React.FC<FontPickerProps> = ({
   onChange,
   fonts,
 }) => {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -623,7 +627,7 @@ export const FontPicker: React.FC<FontPickerProps> = ({
       {open && (
         <ul
           role="listbox"
-          aria-label="Font family"
+          aria-label={t('font_family', 'Font family')}
           className="absolute z-50 mt-[6px] left-0 w-full max-h-[260px] overflow-y-auto p-[4px] rounded-[10px] bg-newBgColorInner border border-studioBorder shadow-menu"
         >
           {fonts.map((family) => {

@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, KeyboardEvent, useCallback, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 // Small bespoke tag input: type comma-separated text (`tag1, tag2`) and each
 // completed token becomes a removable chip. Used by the campaign create/edit
@@ -10,6 +11,7 @@ export const TagsInput: FC<{
   onChange: (tags: string[]) => void;
   placeholder?: string;
 }> = ({ value, onChange, placeholder }) => {
+  const t = useT();
   const [draft, setDraft] = useState('');
 
   const commit = useCallback(
@@ -69,7 +71,7 @@ export const TagsInput: FC<{
             type="button"
             onClick={() => removeTag(idx)}
             className="text-btnPrimary/70 hover:text-btnPrimary"
-            aria-label={`Remove ${tag}`}
+            aria-label={t('remove_tag_name', 'Remove {{tag}}', { tag })}
           >
             ×
           </button>

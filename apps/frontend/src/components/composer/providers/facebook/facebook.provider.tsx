@@ -16,10 +16,12 @@ const postType = [
   {
     value: 'post',
     label: 'Post',
+    labelKey: 'post',
   },
   {
     value: 'story',
     label: 'Story',
+    labelKey: 'story',
   },
 ];
 
@@ -31,7 +33,7 @@ export const FacebookSettings = () => {
   return (
     <>
       <Select
-        label="Post Type"
+        label={t('label_post_type', 'Post Type')}
         {...register('post_type', {
           value: 'post',
         })}
@@ -39,14 +41,17 @@ export const FacebookSettings = () => {
         <option value="">{t('select_post_type', 'Select Post Type...')}</option>
         {postType.map((item) => (
           <option key={item.value} value={item.value}>
-            {item.label}
+            {t(item.labelKey, item.label)}
           </option>
         ))}
       </Select>
 
       {postCurrentType !== 'story' && (
         <Input
-          label={'Embedded URL (only for text Post)'}
+          label={t(
+            'embedded_url_label',
+            'Embedded URL (only for text Post)'
+          )}
           {...register('url')}
         />
       )}

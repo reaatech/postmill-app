@@ -29,7 +29,6 @@ const LANGUAGES = [
   { value: 'pt-BR', label: 'Portuguese (Brazil)' },
   { value: 'ja', label: 'Japanese' },
   { value: 'ar', label: 'Arabic' },
-  { value: 'he', label: 'Hebrew' },
   { value: 'zh-CN', label: 'Chinese (Simplified)' },
   { value: 'zh-TW', label: 'Chinese (Traditional)' },
   { value: 'ko', label: 'Korean' },
@@ -212,6 +211,12 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
               setSelectedChannel('');
             }}
           >
+            {/* Display-only guard: a brand saved with a now-removed language
+                (e.g. legacy 'he') keeps its stored value + profile intact — we
+                only surface a synthetic option so the selector isn't blank. */}
+            {!LANGUAGES.some((lang) => lang.value === language) && (
+              <option value={language}>{language}</option>
+            )}
             {LANGUAGES.map((lang) => (
               <option key={lang.value} value={lang.value}>
                 {lang.label}
@@ -244,13 +249,13 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
           <Select
             name="channelSelector"
             label=""
-            aria-label={t('select_channel', 'Select channel...')}
+            aria-label={t('select_channel', 'Select Channel')}
             disableForm={true}
             hideErrors={true}
             value={selectedChannel}
             onChange={(e) => setSelectedChannel(e.target.value)}
           >
-            <option value="">{t('select_channel', 'Select channel...')}</option>
+            <option value="">{t('select_channel', 'Select Channel')}</option>
             {channels.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -262,7 +267,9 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
         {selectedChannel && (
           <div className="flex flex-col gap-[4px]">
             <div className="text-[13px] text-newTableText">
-              {t('channel_instructions', `Instructions for ${channelName(selectedChannel)}`)}
+              {t('channel_instructions', 'Instructions for {{channel}}', {
+                channel: channelName(selectedChannel),
+              })}
             </div>
             <textarea
               className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"

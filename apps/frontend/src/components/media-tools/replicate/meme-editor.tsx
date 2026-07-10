@@ -6,6 +6,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useReplicateStore } from './replicate.store';
 import { EditorShell, toolbarBtn, toolbarPrimary } from './editor-shell';
 import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
@@ -50,6 +51,7 @@ const fieldInput =
   'w-full px-2 py-1 rounded border border-studioBorder bg-newBgColor text-textColor text-xs focus:outline-none focus:border-designerAccent';
 
 export function MemeEditor() {
+  const t = useT();
   const fetch = useFetch();
   const modals = useModals();
   const toaster = useToaster();
@@ -146,7 +148,7 @@ export function MemeEditor() {
 
   const handleChooseImage = useCallback(() => {
     modals.openModal({
-      title: 'Select base image',
+      title: t('select_base_image', 'Select base image'),
       removeLayout: true,
       children: (close) => (
         <MediaSelectorModal
@@ -159,7 +161,7 @@ export function MemeEditor() {
         />
       ),
     });
-  }, [modals]);
+  }, [modals, t]);
 
   const addLayer = useCallback(() => {
     const id = makeId();
@@ -197,7 +199,7 @@ export function MemeEditor() {
     setSaving(true);
     canvas.toBlob(async (blob) => {
       if (!blob) {
-        toaster.show('Could not render the meme image', 'warning');
+        toaster.show(t('could_not_render_meme', 'Could not render the meme image'), 'warning');
         setSaving(false);
         return;
       }
@@ -206,17 +208,17 @@ export function MemeEditor() {
       if (saveFolderId) formData.append('folderId', saveFolderId);
       try {
         const res = await fetch('/files/upload-simple', { method: 'POST', body: formData });
-        if (!res.ok) throw new Error(await res.text().catch(() => 'Save failed'));
+        if (!res.ok) throw new Error(await res.text().catch(() => t('save_failed', 'Failed to save')));
         const data = await res.json();
         setSavedPath(data.path || data.name);
-        toaster.show('Saved to Files', 'success');
+        toaster.show(t('saved_to_files', 'Saved to Files'), 'success');
       } catch (err) {
-        toaster.show((err as Error).message || 'Could not save the meme', 'warning');
+        toaster.show((err as Error).message || t('could_not_save_meme', 'Could not save the meme'), 'warning');
       } finally {
         setSaving(false);
       }
     }, 'image/png');
-  }, [fetch, saveFolderId, toaster]);
+  }, [fetch, saveFolderId, toaster, t]);
 
   const handleOpenDesigner = useCallback(() => {
     if (savedPath) {
@@ -290,14 +292,14 @@ export function MemeEditor() {
   const toolbar = (
     <>
       <button onClick={handleChooseImage} className={toolbarBtn}>
-        {baseImage ? 'Change image' : 'Choose image'}
+        {baseImage ? t('change_image', 'Change image') : t('choose_image', 'Choose image')}
       </button>
       <button onClick={addLayer} disabled={!baseImage} className={toolbarBtn}>
-        + Text
+        {t('plus_text', '+ Text')}
       </button>
       {savedPath && (
         <button onClick={handleOpenDesigner} className={toolbarBtn}>
-          Open in Designer
+          {t('open_in_designer', 'Open in Designer')}
         </button>
       )}
       <button
@@ -308,7 +310,7 @@ export function MemeEditor() {
         <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
           <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
         </svg>
-        {saving ? 'Saving…' : 'Save to Files'}
+        {saving ? t('saving_ellipsis', 'Saving…') : t('save_to_files', 'Save to Files')}
       </button>
     </>
   );
@@ -316,9 +318,9 @@ export function MemeEditor() {
   const inspector = (
     <div className="p-4 space-y-4">
       <div>
-        <div className={`${fieldLabel} mb-2`}>Layers</div>
+        <div className={`${fieldLabel} mb-2`}>{t('layers', 'Layers')}</div>
         {layers.length === 0 ? (
-          <p className="text-xs text-newTextColor/65">No text yet — add a text layer.</p>
+          <p className="text-xs text-newTextColor/65">{t('no_text_yet_add_layer', 'No text yet — add a text layer.')}</p>
         ) : (
           <div className="space-y-1">
             {layers.map((l, i) => (
@@ -349,7 +351,7 @@ export function MemeEditor() {
 
       {selectedLayer && (
         <div className="space-y-3 border-t border-studioBorder pt-3">
-          <div className={fieldLabel}>Text</div>
+          <div className={fieldLabel}>{t('provider_chip_text', 'Text')}</div>
           <textarea
             value={selectedLayer.text}
             onChange={(e) => updateLayer(selectedLayer.id, { text: e.target.value })}
@@ -358,7 +360,7 @@ export function MemeEditor() {
           />
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <div className={fieldLabel}>Font</div>
+              <div className={fieldLabel}>{t('font', 'Font')}</div>
               <select
                 value={selectedLayer.fontFamily}
                 onChange={(e) => updateLayer(selectedLayer.id, { fontFamily: e.target.value })}
@@ -372,7 +374,7 @@ export function MemeEditor() {
               </select>
             </div>
             <div>
-              <div className={fieldLabel}>Size</div>
+              <div className={fieldLabel}>{t('size', 'Size')}</div>
               <input
                 type="number"
                 min={8}
@@ -384,7 +386,7 @@ export function MemeEditor() {
             </div>
           </div>
           <div>
-            <div className={fieldLabel}>Fill</div>
+            <div className={fieldLabel}>{t('fill_button', 'Fill')}</div>
             <div className="flex gap-1 flex-wrap items-center">
               {DEFAULT_COLORS.map((c) => (
                 <button
@@ -392,7 +394,7 @@ export function MemeEditor() {
                   onClick={() => updateLayer(selectedLayer.id, { fill: c })}
                   className={`w-5 h-5 rounded border ${selectedLayer.fill === c ? 'border-designerAccent' : 'border-studioBorder'}`}
                   style={{ backgroundColor: c }}
-                  aria-label={`Fill ${c}`}
+                  aria-label={t('fill_color_aria', 'Fill {{color}}', { color: c })}
                 />
               ))}
               <input
@@ -404,7 +406,7 @@ export function MemeEditor() {
             </div>
           </div>
           <div>
-            <div className={fieldLabel}>Outline</div>
+            <div className={fieldLabel}>{t('outline', 'Outline')}</div>
             <div className="flex gap-1 flex-wrap items-center">
               {DEFAULT_COLORS.map((c) => (
                 <button
@@ -412,7 +414,7 @@ export function MemeEditor() {
                   onClick={() => updateLayer(selectedLayer.id, { outlineColor: c })}
                   className={`w-5 h-5 rounded border ${selectedLayer.outlineColor === c ? 'border-designerAccent' : 'border-studioBorder'}`}
                   style={{ backgroundColor: c }}
-                  aria-label={`Outline ${c}`}
+                  aria-label={t('outline_color_aria', 'Outline {{color}}', { color: c })}
                 />
               ))}
               <input
@@ -432,7 +434,7 @@ export function MemeEditor() {
                 checked={selectedLayer.bold}
                 onChange={(e) => updateLayer(selectedLayer.id, { bold: e.target.checked })}
               />
-              Bold
+              {t('bold', 'Bold')}
             </label>
             <label className="flex items-center gap-1.5 text-xs text-newTextColor/70">
               <input
@@ -440,17 +442,19 @@ export function MemeEditor() {
                 checked={selectedLayer.italic}
                 onChange={(e) => updateLayer(selectedLayer.id, { italic: e.target.checked })}
               />
-              Italic
+              {t('italic', 'Italic')}
             </label>
           </div>
-          <p className="text-[10px] text-newTextColor/65">Tip: drag the text directly on the canvas to position it.</p>
+          <p className="text-[10px] text-newTextColor/65">
+            {t('meme_drag_tip', 'Tip: drag the text directly on the canvas to position it.')}
+          </p>
         </div>
       )}
     </div>
   );
 
   return (
-    <EditorShell title="Meme Editor" toolbar={toolbar} inspector={inspector}>
+    <EditorShell title={t('meme_editor_title', 'Meme Editor')} toolbar={toolbar} inspector={inspector}>
       {baseImage?.url ? (
         <div
           onMouseMove={handlePointerMove}
@@ -469,7 +473,7 @@ export function MemeEditor() {
         </div>
       ) : (
         <button onClick={handleChooseImage} className={toolbarPrimary}>
-          Choose a base image to start
+          {t('choose_base_image_to_start', 'Choose a base image to start')}
         </button>
       )}
     </EditorShell>

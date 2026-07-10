@@ -10,6 +10,7 @@ import { ColorSwatch, Slider, SegmentedControl } from '../controls';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
 import { useBrandColors } from './use-brand-colors';
 import { MediaSelectorModal } from '../../media-selector-modal';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface BackgroundPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -23,21 +24,22 @@ interface FileItem {
 }
 
 const colorPresets = [
-  { label: 'White', color: '#ffffff' },
-  { label: 'Black', color: '#000000' },
-  { label: 'Blue', color: '#2B5CD3' },
-  { label: 'Dark Blue', color: '#1e2a4a' },
-  { label: 'Red', color: '#e53935' },
-  { label: 'Green', color: '#43a047' },
-  { label: 'Purple', color: '#7b1fa2' },
-  { label: 'Orange', color: '#fb8c00' },
-  { label: 'Gray', color: '#9e9e9e' },
-  { label: 'Light Gray', color: '#f5f5f5' },
+  { label: 'White', labelKey: 'designer_color_white', color: '#ffffff' },
+  { label: 'Black', labelKey: 'designer_color_black', color: '#000000' },
+  { label: 'Blue', labelKey: 'blue', color: '#2B5CD3' },
+  { label: 'Dark Blue', labelKey: 'designer_color_dark_blue', color: '#1e2a4a' },
+  { label: 'Red', labelKey: 'designer_color_red', color: '#e53935' },
+  { label: 'Green', labelKey: 'green', color: '#43a047' },
+  { label: 'Purple', labelKey: 'purple', color: '#7b1fa2' },
+  { label: 'Orange', labelKey: 'orange', color: '#fb8c00' },
+  { label: 'Gray', labelKey: 'designer_color_gray', color: '#9e9e9e' },
+  { label: 'Light Gray', labelKey: 'designer_color_light_gray', color: '#f5f5f5' },
 ];
 
 type Mode = 'color' | 'gradient' | 'image';
 
 export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
+  const t = useT();
   const fetch = useFetch();
   const user = useUser();
   const toaster = useToaster();
@@ -118,17 +120,17 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
 
   // Surface the load failure from an effect, not inline in render.
   useEffect(() => {
-    if (error && !data) toaster.show("Couldn't load files", 'warning');
-  }, [error, data, toaster]);
+    if (error && !data) toaster.show(t('designer_couldnt_load_files', "Couldn't load files"), 'warning');
+  }, [error, data, toaster, t]);
 
   return (
     <div className="flex flex-col gap-3">
       <SegmentedControl
         value={mode}
         options={[
-          { value: 'color', label: 'Color' },
-          { value: 'gradient', label: 'Gradient' },
-          { value: 'image', label: 'Image' },
+          { value: 'color', label: t('color', 'Color') },
+          { value: 'gradient', label: t('designer_gradient', 'Gradient') },
+          { value: 'image', label: t('provider_chip_image', 'Image') },
         ]}
         onChange={(v) => setMode(v as Mode)}
       />
@@ -140,7 +142,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
               <button
                 key={preset.color}
                 onClick={() => setColor(preset.color)}
-                title={preset.label}
+                title={t(preset.labelKey, preset.label)}
                 className={`w-full aspect-square rounded-lg border-2 transition-all ${
                   currentBg === preset.color
                     ? 'border-designerAccent ring-1 ring-designerAccent'
@@ -156,7 +158,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
           </div>
 
           <ColorSwatch
-            label="Custom color"
+            label={t('custom_color', 'Custom color')}
             value={/^#[0-9a-fA-F]{6}$/.test(currentBg) ? currentBg : '#ffffff'}
             onChange={setColor}
             brandColors={brandColors}
@@ -175,20 +177,20 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
           <SegmentedControl
             value={gradientType}
             options={[
-              { value: 'linear', label: 'Linear' },
-              { value: 'radial', label: 'Radial' },
+              { value: 'linear', label: t('designer_linear', 'Linear') },
+              { value: 'radial', label: t('designer_radial', 'Radial') },
             ]}
             onChange={(v) => setGradientType(v as 'linear' | 'radial')}
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <ColorSwatch label="Start" value={stop0} onChange={setStop0} brandColors={brandColors} brandEnforcement={brandEnforcement} />
-            <ColorSwatch label="End" value={stop1} onChange={setStop1} brandColors={brandColors} brandEnforcement={brandEnforcement} />
+            <ColorSwatch label={t('designer_gradient_start', 'Start')} value={stop0} onChange={setStop0} brandColors={brandColors} brandEnforcement={brandEnforcement} />
+            <ColorSwatch label={t('designer_gradient_end', 'End')} value={stop1} onChange={setStop1} brandColors={brandColors} brandEnforcement={brandEnforcement} />
           </div>
 
           {gradientType === 'linear' && (
             <Slider
-              label="Angle"
+              label={t('designer_label_angle', 'Angle')}
               min={0}
               max={360}
               suffix="°"
@@ -201,7 +203,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
             onClick={applyGradient}
             className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
           >
-            Apply gradient
+            {t('designer_apply_gradient', 'Apply gradient')}
           </button>
         </div>
       )}
@@ -213,7 +215,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
               type="text"
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="Image URL…"
+              placeholder={t('designer_placeholder_image_url', 'Image URL…')}
               className="flex-1 h-[36px] px-3 rounded-lg bg-newBgColorInner border border-studioBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
             />
             <button
@@ -221,7 +223,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
               disabled={!imageUrl.trim()}
               className="px-[12px] h-[36px] rounded-lg bg-designerAccent text-white text-[13px] font-medium hover:bg-designerAccent/80 disabled:opacity-50 shrink-0"
             >
-              Use
+              {t('designer_use', 'Use')}
             </button>
           </div>
 
@@ -230,7 +232,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
             onClick={() => setModalOpen(true)}
             className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
           >
-            Choose from media library…
+            {t('designer_choose_from_media_library', 'Choose from media library…')}
           </button>
 
           <MediaSelectorModal
@@ -239,18 +241,18 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
             onSelect={handleModalSelect}
           />
 
-          <div className="text-[11px] text-newTextColor/60">From your files</div>
+          <div className="text-[11px] text-newTextColor/60">{t('designer_from_your_files', 'From your files')}</div>
 
           {isLoading && !data ? (
             <PanelSkeletonGrid count={4} />
           ) : error && !data ? (
             <PanelError
-              message="Couldn't load files"
+              message={t('designer_couldnt_load_files', "Couldn't load files")}
               onRetry={() => mutate()}
             />
           ) : !data?.results?.length ? (
             <div className="text-[12px] text-newTextColor/60 text-center py-4">
-              No files found
+              {t('no_files_found', 'No files found')}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">

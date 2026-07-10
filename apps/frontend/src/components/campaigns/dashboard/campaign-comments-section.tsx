@@ -164,7 +164,7 @@ export const CampaignCommentsSection: FC<CampaignCommentsSectionProps> = ({
       )}
 
       {!error && isLoading && (
-        <div className="text-[13px] text-newTableText py-[24px] text-center">{t('loading', 'Loading…')}</div>
+        <div className="text-[13px] text-newTableText py-[24px] text-center">{t('loading', 'Loading')}</div>
       )}
 
       {!error && !isLoading && comments.length === 0 && (
@@ -204,7 +204,7 @@ export const CampaignCommentsSection: FC<CampaignCommentsSectionProps> = ({
           disabled={loadingMore}
           className="self-center px-[20px] py-[8px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] hover:bg-btnPrimary/90 disabled:opacity-50"
         >
-          {loadingMore ? t('loading', 'Loading…') : t('comment_inbox.load_more', 'Load more')}
+          {loadingMore ? t('loading', 'Loading') : t('comment_inbox.load_more', 'Load more')}
         </button>
       )}
     </div>

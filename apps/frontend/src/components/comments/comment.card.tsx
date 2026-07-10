@@ -186,7 +186,7 @@ export const CommentCard: FC<CommentCardProps> = ({
               className={`inline-block w-[8px] h-[8px] rounded-full ${STATUS_DOT[currentStatus] || STATUS_DOT.needs_reply} ${
                 enableStatusCycle && postId ? 'cursor-pointer hover:opacity-80' : ''
               }`}
-              title={currentStatus.replace(/_/g, ' ')}
+              title={t(`comment_status_${currentStatus}`, currentStatus.replace(/_/g, ' '))}
             />
             {dayjs(comment.platformCreatedAt).fromNow()}
           </span>
@@ -244,7 +244,7 @@ export const CommentCard: FC<CommentCardProps> = ({
             </button>
           )}
           <span className="text-[11px] text-newTableText capitalize">
-            {currentStatus.replace(/_/g, ' ')}
+            {t(`comment_status_${currentStatus}`, currentStatus.replace(/_/g, ' '))}
           </span>
         </div>
 

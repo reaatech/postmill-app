@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
@@ -59,7 +60,7 @@ const useStorageProviders = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage');
-    if (!res.ok) throw new Error('Failed to load storage providers');
+    if (!res.ok) throw createFetchError('failed_to_load_storage_providers', 'Failed to load storage providers');
     return res.json();
   }, [fetch]);
   return useSWR<StorageProviderRow[]>('storage-providers', load, { revalidateOnFocus: false });
@@ -69,7 +70,7 @@ const useStorageUsage = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage/usage');
-    if (!res.ok) throw new Error('Failed to load storage usage');
+    if (!res.ok) throw createFetchError('failed_to_load_storage_usage', 'Failed to load storage usage');
     return res.json();
   }, [fetch]);
   return useSWR<StorageUsageResponse>('storage-usage', load, { revalidateOnFocus: false });
@@ -79,7 +80,7 @@ const useQuotaStatus = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage/quota-status');
-    if (!res.ok) throw new Error('Failed to load quota status');
+    if (!res.ok) throw createFetchError('failed_to_load_quota_status', 'Failed to load quota status');
     return res.json();
   }, [fetch]);
   return useSWR<QuotaStatusResponse>('storage-quota-status', load, { revalidateOnFocus: false });
@@ -89,7 +90,7 @@ const useUsageBreakdown = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage/usage-breakdown');
-    if (!res.ok) throw new Error('Failed to load usage breakdown');
+    if (!res.ok) throw createFetchError('failed_to_load_usage_breakdown', 'Failed to load usage breakdown');
     return res.json();
   }, [fetch]);
   return useSWR<UsageBreakdownResponse>('storage-usage-breakdown', load, { revalidateOnFocus: false });
@@ -169,50 +170,64 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
     const res = await fetch('/settings/storage/' + id + '/mount', { method: 'POST' });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      toaster.show(body?.message || 'Failed to mount storage provider', 'warning');
+      toaster.show(
+        body?.message || t('failed_to_mount_storage_provider', 'Failed to mount storage provider'),
+        'warning',
+      );
       return;
     }
     refresh();
-    toaster.show('Storage provider mounted', 'success');
-  }, [fetch, refresh, toaster]);
+    toaster.show(t('storage_provider_mounted', 'Storage provider mounted'), 'success');
+  }, [fetch, refresh, toaster, t]);
 
   const handleUnmount = useCallback(async (id: string) => {
     const res = await fetch('/settings/storage/' + id + '/unmount', { method: 'POST' });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      toaster.show(body?.message || 'Failed to unmount storage provider', 'warning');
+      toaster.show(
+        body?.message || t('failed_to_unmount_storage_provider', 'Failed to unmount storage provider'),
+        'warning',
+      );
       return;
     }
     refresh();
-    toaster.show('Storage provider unmounted', 'success');
-  }, [fetch, refresh, toaster]);
+    toaster.show(t('storage_provider_unmounted', 'Storage provider unmounted'), 'success');
+  }, [fetch, refresh, toaster, t]);
 
   const handleDelete = useCallback(async (id: string) => {
     const confirmed = await deleteDialog(
-      'Are you sure you want to delete this storage provider?',
-      'Delete Storage Provider',
-      'Delete',
+      t(
+        'confirm_delete_storage_provider',
+        'Are you sure you want to delete this storage provider?',
+      ),
+      t('delete_storage_provider', 'Delete Storage Provider'),
+      t('delete', 'Delete'),
     );
     if (!confirmed) return;
 
     const res = await fetch('/settings/storage/' + id, { method: 'DELETE' });
     if (res.ok) {
       refresh();
-      toaster.show('Storage provider deleted', 'success');
+      toaster.show(t('storage_provider_deleted', 'Storage provider deleted'), 'success');
     } else {
-      toaster.show('Failed to delete storage provider', 'warning');
+      toaster.show(t('failed_to_delete_storage_provider', 'Failed to delete storage provider'), 'warning');
     }
-  }, [fetch, refresh, toaster]);
+  }, [fetch, refresh, toaster, t]);
 
   const handleTest = useCallback(async (id: string) => {
     const res = await fetch('/settings/storage/' + id + '/test', { method: 'POST' });
     const data = await res.json();
     if (data.ok) {
-      toaster.show('Connection test successful!', 'success');
+      toaster.show(t('connection_test_successful', 'Connection test successful!'), 'success');
     } else {
-      toaster.show('Connection test failed: ' + (data.error || 'Unknown error'), 'warning');
+      toaster.show(
+        t('connection_test_failed_reason', 'Connection test failed: {{reason}}', {
+          reason: data.error || t('unknown_error', 'Unknown error'),
+        }),
+        'warning',
+      );
     }
-  }, [fetch, toaster]);
+  }, [fetch, toaster, t]);
 
   const handleSaved = useCallback(() => {
     setShowModal(false);
@@ -268,7 +283,7 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
       .map((type) => ({
         id: `template-${type}`,
         identifier: type,
-        name: PROVIDER_TYPE_LABELS[type] || type,
+        name: t('storage_type_' + type, PROVIDER_TYPE_LABELS[type] || type),
         enabled: false,
         version: 'v1',
       })),
@@ -313,7 +328,15 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
       {/* Quota warning banner */}
       {quotaStatus?.warning && (
         <div className="px-[16px] py-[12px] rounded-[8px] bg-[#2a2a1a] border border-[#f59e0b] text-[#f59e0b] text-[13px]">
-          {'⚠️ You\'re using '}{quotaStatus.percentUsed}% of your storage quota ({formatBytes(quotaStatus.usedBytes)} / {formatBytes(quotaStatus.quotaBytes)})
+          {t(
+            'storage_quota_warning',
+            "⚠️ You're using {{percent}}% of your storage quota ({{used}} / {{quota}})",
+            {
+              percent: quotaStatus.percentUsed,
+              used: formatBytes(quotaStatus.usedBytes),
+              quota: formatBytes(quotaStatus.quotaBytes),
+            },
+          )}
         </div>
       )}
 
@@ -348,7 +371,7 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
               return (
                 <div className="flex flex-col gap-[2px]">
                   <span className="text-[12px] text-newTableText">
-                    {PROVIDER_TYPE_LABELS[p.type] || p.type}
+                    {t('storage_type_' + p.type, PROVIDER_TYPE_LABELS[p.type] || p.type)}
                     {p.bucket ? ` · ${p.bucket}` : ''}
                     {p.region ? ` · ${p.region}` : ''}
                   </span>
@@ -368,10 +391,10 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
               return (
                 <>
                   <button onClick={() => openEdit(localProvider)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
-                    Edit
+                    {t('edit', 'Edit')}
                   </button>
                   <button onClick={() => handleTest(localProvider.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-blue-700 dark:text-blue-400 hover:bg-[#1a2a3a] transition-colors">
-                    Test
+                    {t('test', 'Test')}
                   </button>
                 </>
               );
@@ -382,26 +405,26 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
                 <>
                   {p.mounted ? (
                     <button onClick={() => handleUnmount(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f87171] hover:bg-[#3a2a2a] transition-colors">
-                      Unmount
+                      {t('unmount', 'Unmount')}
                     </button>
                   ) : (
                     <button onClick={() => handleMount(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-textColor hover:bg-[#1a3a1a] transition-colors">
-                      Mount
+                      {t('mount', 'Mount')}
                     </button>
                   )}
                   <button onClick={() => openEdit(p)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
-                    Edit
+                    {t('edit', 'Edit')}
                   </button>
                   <button onClick={() => handleTest(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-blue-700 dark:text-blue-400 hover:bg-[#1a2a3a] transition-colors">
-                    Test
+                    {t('test', 'Test')}
                   </button>
                   {configuredInstances.length > 1 && (
                     <button onClick={() => setMigrateSource(p)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f59e0b] hover:bg-[#3a2a1a] transition-colors">
-                      Migrate
+                      {t('migrate', 'Migrate')}
                     </button>
                   )}
                   <button onClick={() => handleDelete(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f87171] hover:bg-[#3a1a1a] transition-colors">
-                    Delete
+                    {t('delete', 'Delete')}
                   </button>
                 </>
               );
@@ -475,7 +498,7 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
               </div>
             </div>
           ) : (
-            <div className="text-[13px] text-newTableText animate-pulse">{t('loading', 'Loading...')}</div>
+            <div className="text-[13px] text-newTableText animate-pulse">{t('loading', 'Loading')}</div>
           )}
         </div>
       )}

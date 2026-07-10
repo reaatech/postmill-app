@@ -60,7 +60,7 @@ const useSocialComments = (postId: string) => {
       if (res.status === 400 || res.status === 404 || res.status === 501 || res.status === 405) {
         return { comments: [], nextCursor: undefined, unreadCount: 0, notSupported: true };
       }
-      throw new Error('Failed to load comments');
+      throw new Error('failed_to_load_comments');
     }
     return res.json();
   }, [postId, fetch]);
@@ -94,6 +94,11 @@ const CommentItem: FC<{
   const [assignInput, setAssignInput] = useState('');
 
   const currentStatus = comment.status || 'needs_reply';
+  const statusLabels: Record<string, string> = {
+    needs_reply: t('status_needs_reply', 'Needs reply'),
+    handled: t('status_handled', 'Handled'),
+    ignored: t('status_ignored', 'Ignored'),
+  };
 
   const cycleStatus = useCallback(async () => {
     const next = statusCycle[currentStatus];
@@ -161,7 +166,7 @@ const CommentItem: FC<{
             type="button"
             onClick={cycleStatus}
             className={`inline-block w-[8px] h-[8px] rounded-full ${statusColors[currentStatus]} cursor-pointer hover:opacity-80 transition-opacity`}
-            title={currentStatus}
+            title={statusLabels[currentStatus] || currentStatus}
           />
           {sentimentLabel && (
             <span className={`text-[10px] px-[6px] py-[1px] rounded-full border ${sentimentColors[sentimentLabel] || sentimentColors.neutral}`}>
@@ -357,7 +362,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
         body: JSON.stringify({ like: liked }),
       });
       if (!res.ok) {
-        throw new Error('like failed');
+        throw new Error('like_failed');
       }
       let serverCount: number | undefined;
       try {

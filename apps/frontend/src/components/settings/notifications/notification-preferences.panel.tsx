@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 
 export type NotificationChannel = 'email' | 'push' | 'inApp';
 export type NotificationCategory =
@@ -74,7 +75,7 @@ export const useNotificationPreferences = () => {
   const fetch = useFetch();
   const load = useCallback(async (): Promise<NotificationPreferences> => {
     const res = await fetch('/notifications/preferences');
-    if (!res.ok) throw new Error('Failed to load notification preferences');
+    if (!res.ok) throw createFetchError('failed_to_load_notification_preferences', 'Failed to load notification preferences');
     return res.json();
   }, [fetch]);
   return useSWR<NotificationPreferences>('notification-preferences', load, {
@@ -130,13 +131,13 @@ export const NotificationPreferencesPanel: React.FC = () => {
           }),
         });
         if (!res.ok) {
-          toaster.show(t('save_failed', 'Failed to save preferences'), 'warning');
+          toaster.show(t('save_failed', 'Failed to save'), 'warning');
           return;
         }
         const saved = await res.json();
         setLocal(saved);
         mutate(saved, false);
-        toaster.show(t('settings_updated', 'Settings updated'), 'success');
+        toaster.show(t('settings_updated', 'Settings Updated'), 'success');
       } finally {
         setSaving(false);
       }
@@ -205,7 +206,7 @@ export const NotificationPreferencesPanel: React.FC = () => {
       <div className="flex flex-col gap-[16px]">
         <div className="text-[20px]">{t('notifications', 'Notifications')}</div>
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] animate-pulse">
-          {t('loading', 'Loading...')}
+          {t('loading', 'Loading')}
         </div>
       </div>
     );
@@ -217,7 +218,7 @@ export const NotificationPreferencesPanel: React.FC = () => {
         <div className="text-[20px]">{t('notifications', 'Notifications')}</div>
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
           <span className="text-[14px] text-red-500">
-            {t('failed_to_load', 'Failed to load notification preferences')}
+            {t('failed_to_load_preferences', 'Failed to load preferences')}
           </span>
           <button
             className="text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"

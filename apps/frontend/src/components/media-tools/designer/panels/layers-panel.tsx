@@ -2,6 +2,7 @@
 
 import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import type { DesignerElement } from '../designer.store';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface LayersPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -14,19 +15,20 @@ const elementIcon: Record<string, string> = {
   shape: '◇',
 };
 
-const elementLabel = (el: DesignerElement): string => {
+const elementLabel = (el: DesignerElement, t: ReturnType<typeof useT>): string => {
   if (el.name) return el.name;
   if (el.type === 'text') {
     const text = (el.text || '').slice(0, 20);
-    return text ? `"${text}"` : 'Text';
+    return text ? `"${text}"` : t('provider_chip_text', 'Text');
   }
-  if (el.type === 'image') return 'Image';
-  if (el.type === 'icon') return 'Icon';
-  if (el.type === 'shape') return el.shape ? `Shape (${el.shape})` : 'Shape';
-  return 'Element';
+  if (el.type === 'image') return t('provider_chip_image', 'Image');
+  if (el.type === 'icon') return t('layers_panel_icon', 'Icon');
+  if (el.type === 'shape') return el.shape ? t('layers_panel_shape_named', 'Shape ({{shape}})', { shape: el.shape }) : t('layers_panel_shape', 'Shape');
+  return t('layers_panel_element', 'Element');
 };
 
 export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
+  const t = useT();
   const currentOutput = store((s) => s.currentOutput);
   const elements = store(
     (s) =>
@@ -57,8 +59,8 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
 
   const startRename = useCallback((el: DesignerElement) => {
     setEditingId(el.id);
-    setDraftName(elementLabel(el));
-  }, []);
+    setDraftName(elementLabel(el, t));
+  }, [t]);
 
   const commitRename = useCallback(() => {
     if (!editingId) return;
@@ -182,7 +184,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
   if (!elements.length) {
     return (
       <div className="text-[12px] text-newTextColor/60 text-center py-4">
-        No elements on this output
+        {t('layers_panel_no_elements', 'No elements on this output')}
       </div>
     );
   }
@@ -192,7 +194,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
       className="flex flex-col gap-1"
       role="listbox"
       tabIndex={0}
-      aria-label="Layers"
+      aria-label={t('layers_panel_layers', 'Layers')}
       onKeyDown={handlePanelKeyDown}
     >
       {reversed.map((el, reversedIdx) => {
@@ -211,7 +213,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
             role="option"
             tabIndex={isEditing ? -1 : 0}
             aria-selected={isSelected}
-            aria-label={`Layer ${elementLabel(el)}`}
+            aria-label={t('layers_panel_layer_label', 'Layer {{label}}', { label: elementLabel(el, t) })}
             onClick={() => {
               if (!isEditing) {
                 selectElement(el.id);
@@ -252,13 +254,13 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 className="flex-1 h-[22px] px-1.5 rounded-[4px] bg-newBgColor border border-designerAccent text-[11px] text-textColor outline-none"
               />
             ) : (
-              <div className="flex-1 truncate text-[11px]">{elementLabel(el)}</div>
+              <div className="flex-1 truncate text-[11px]">{elementLabel(el, t)}</div>
             )}
 
             {el.originId ? (
-              <span title="Linked — edits here update all formats" className="text-btnPrimaryAccent shrink-0">🔗</span>
+              <span title={t('layers_panel_linked_title', 'Linked — edits here update all formats')} className="text-btnPrimaryAccent shrink-0">🔗</span>
             ) : (
-              <span title="Unlinked — changes stay in this format only" className="text-gray-500 shrink-0">🔓</span>
+              <span title={t('layers_panel_unlinked_title', 'Unlinked — changes stay in this format only')} className="text-gray-500 shrink-0">🔓</span>
             )}
 
             <div className="flex items-center gap-0.5 shrink-0">
@@ -267,8 +269,8 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 data-row-action
                 onClick={(e) => moveDown(e, idx)}
                 className="w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[10px]"
-                title="Move down"
-                aria-label="Move layer down"
+                title={t('move_down', 'Move down')}
+                aria-label={t('layers_panel_move_layer_down', 'Move layer down')}
               >
                 ↑
               </button>
@@ -277,8 +279,8 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 data-row-action
                 onClick={(e) => moveUp(e, idx)}
                 className="w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[10px]"
-                title="Move up"
-                aria-label="Move layer up"
+                title={t('move_up', 'Move up')}
+                aria-label={t('layers_panel_move_layer_up', 'Move layer up')}
               >
                 ↓
               </button>
@@ -292,8 +294,8 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 className={`w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[11px] ${
                   el.hidden ? 'text-newTextColor/20' : 'text-newTextColor/60'
                 }`}
-                title={el.hidden ? 'Show' : 'Hide'}
-                aria-label={el.hidden ? 'Show layer' : 'Hide layer'}
+                title={el.hidden ? t('layers_panel_show', 'Show') : t('layers_panel_hide', 'Hide')}
+                aria-label={el.hidden ? t('layers_panel_show_layer', 'Show layer') : t('layers_panel_hide_layer', 'Hide layer')}
               >
                 {el.hidden ? '◌' : '◎'}
               </button>
@@ -304,8 +306,8 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 className={`w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[10px] ${
                   el.locked ? 'text-btnPrimaryAccent' : 'text-newTextColor/60'
                 }`}
-                title={el.locked ? 'Unlock' : 'Lock'}
-                aria-label={el.locked ? 'Unlock layer' : 'Lock layer'}
+                title={el.locked ? t('layers_panel_unlock', 'Unlock') : t('layers_panel_lock', 'Lock')}
+                aria-label={el.locked ? t('layers_panel_unlock_layer', 'Unlock layer') : t('layers_panel_lock_layer', 'Lock layer')}
               >
                 {el.locked ? '◉' : '○'}
               </button>

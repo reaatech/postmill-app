@@ -143,13 +143,13 @@ const PlugPop: FC<{
           ...acc,
           [field.name]: field.validation
             ? string().matches(convertBackRegex(field.validation), {
-                message: 'Invalid value',
+                message: t('invalid_value', 'Invalid value'),
               })
             : null,
         };
       }, {})
     );
-  }, [plug.fields]);
+  }, [plug.fields, t]);
   const form = useForm({
     resolver: yupResolver(yupSchema),
     values,
@@ -168,10 +168,13 @@ const PlugPop: FC<{
     });
     // Shared fetch doesn't throw on 4xx/5xx — only report success when it saved.
     if (!res.ok) {
-      toaster.show('Failed to update plug', 'warning');
+      toaster.show(
+        t('failed_to_update_plug', 'Failed to update plug'),
+        'warning'
+      );
       return;
     }
-    toaster.show('Plug updated', 'success');
+    toaster.show(t('plug_updated', 'Plug updated'), 'success');
     closeAll();
   }, [closeAll, fetch, plug.methodName, settings.providerId, toaster]);
 
@@ -230,12 +233,15 @@ const PlugItem: FC<{
       });
       // Only flip the toggle when the server actually persisted it.
       if (!res.ok) {
-        toaster.show('Failed to update automation', 'warning');
+        toaster.show(
+          t('failed_to_update_automation', 'Failed to update automation'),
+          'warning'
+        );
         return;
       }
       mutate?.();
     },
-    [data?.id, fetch, mutate, toaster]
+    [data?.id, fetch, mutate, toaster, t]
   );
   return (
     <div className="w-full rounded-[8px] border border-newTableBorder bg-newTableHeader hover:bg-newTableBorder p-[15px] relative">
@@ -259,7 +265,11 @@ const PlugItem: FC<{
       {!!data && (
         <button
           type="button"
-          aria-label={activated ? 'Deactivate plug' : 'Activate plug'}
+          aria-label={
+            activated
+              ? t('deactivate_plug', 'Deactivate plug')
+              : t('activate_plug', 'Activate plug')
+          }
           className="absolute top-[15px] right-[15px] bg-transparent border-0 p-0 m-0 cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
@@ -288,6 +298,7 @@ const Plug = () => {
   const plug = usePlugs();
   const modals = useModals();
   const fetch = useFetch();
+  const t = useT();
   const load = useCallback(async () => {
     return (await fetch(`/integrations/${plug.providerId}/plugs`)).json();
   }, [fetch, plug.providerId]);
@@ -300,7 +311,7 @@ const Plug = () => {
           mutate();
         },
         size: '500px',
-        title: `Auto Plug: ${p.title}`,
+        title: t('auto_plug_title', 'Auto Plug: {{title}}', { title: p.title }),
         children: (
           <PlugPop
             plug={p}
@@ -314,7 +325,7 @@ const Plug = () => {
         ),
       });
     },
-    [modals, mutate, plug.identifier, plug.providerId, plug.name]
+    [modals, mutate, plug.identifier, plug.providerId, plug.name, t]
   );
   if (isLoading) {
     return null;

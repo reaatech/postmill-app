@@ -78,7 +78,7 @@ export const BottomTabBar: FC = () => {
     <>
       <nav
         className="hidden mobile:flex fixed bottom-0 inset-x-0 z-[200] bg-newBgColorInner border-t border-newTableBorder pb-[env(safe-area-inset-bottom)]"
-        aria-label="Primary"
+        aria-label={t('primary', 'Primary')}
       >
         <div className="flex flex-1 items-stretch h-[60px]">
           {primary.map((item) => (
@@ -122,7 +122,7 @@ export const BottomTabBar: FC = () => {
         <div className="mobile:block hidden fixed inset-0 z-[210]">
           <button
             type="button"
-            aria-label="Close menu"
+            aria-label={t('close_menu', 'Close menu')}
             className="absolute inset-0 bg-black/50"
             onClick={() => setMoreOpen(false)}
           />

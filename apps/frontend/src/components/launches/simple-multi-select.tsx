@@ -65,7 +65,9 @@ export const SimpleMultiSelect: FC<{
         <span className="text-[13px] text-textColor">
           {selectedCount === 0
             ? emptyLabel
-            : `${selectedCount} ${t('selected', 'selected')}`}
+            : t('n_selected_count', '{{count}} selected', {
+                count: selectedCount,
+              })}
         </span>
         <div className="flex-1" />
         <svg

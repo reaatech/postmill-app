@@ -8,6 +8,7 @@ import { StockAudioItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
 import { AudioPlayer } from './audio-player';
 import { decodeEntities } from '@gitroom/frontend/components/shared/decode-entities';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const SUGGESTED_SEARCHES = ['Upbeat', 'Cinematic', 'Lo-fi', 'Ambient', 'Corporate'];
 
@@ -17,6 +18,7 @@ interface StockAudioProps {
 }
 
 export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) => {
+  const t = useT();
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -81,7 +83,7 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
   if (lastPage && !lastPage.configured) {
     return (
       <div className="flex items-center justify-center h-full text-newTextColor/60">
-        Stock audio isn&apos;t configured
+        {t('stock_audio_not_configured', "Stock audio isn't configured")}
       </div>
     );
   }
@@ -96,14 +98,14 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search music & audio..."
+          placeholder={t('search_music_audio_placeholder', 'Search music & audio...')}
           className="w-full h-[44px] pl-[38px] pr-[34px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
         />
         {query && (
           <button
             type="button"
             onClick={() => setQuery('')}
-            aria-label="Clear search"
+            aria-label={t('clear_search', 'Clear search')}
             className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/60 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
           >
             ✕
@@ -114,14 +116,14 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
       {error && items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[320px] gap-[10px] text-center px-[20px]">
           <div className="text-[15px] font-[600] text-textColor">
-            Something went wrong{error.status ? ` (HTTP ${error.status})` : ''}
+            {t('something_went_wrong', 'Something went wrong')}{error.status ? ` (HTTP ${error.status})` : ''}
           </div>
           <button
             type="button"
             onClick={() => mutate()}
             className="mt-[6px] px-[16px] h-[36px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] hover:bg-[#1e4ab5]"
           >
-            Try again
+            {t('try_again', 'Try again')}
           </button>
         </div>
       ) : initialLoading ? (
@@ -133,12 +135,14 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
       ) : showEmpty ? (
         <div className="flex flex-col items-center justify-center h-[320px] gap-[10px] text-center px-[20px]">
           <div className="text-[15px] font-[600] text-textColor">
-            {debouncedQuery ? `No audio for "${debouncedQuery}"` : 'Find the perfect track'}
+            {debouncedQuery
+              ? t('no_audio_for_query', 'No audio for "{{query}}"', { query: debouncedQuery })
+              : t('find_perfect_track', 'Find the perfect track')}
           </div>
           <div className="text-[13px] text-newTextColor/65 max-w-[340px]">
             {debouncedQuery
-              ? 'Try a different keyword or one of these popular searches.'
-              : 'Search thousands of free tracks from Jamendo to get started.'}
+              ? t('try_different_keyword', 'Try a different keyword or one of these popular searches.')
+              : t('search_free_tracks_jamendo', 'Search thousands of free tracks from Jamendo to get started.')}
           </div>
           <div className="flex items-center flex-wrap justify-center gap-[8px] mt-[4px]">
             {SUGGESTED_SEARCHES.map((s) => (
@@ -184,7 +188,7 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                   </svg>
-                  {mode === 'select' ? 'Use' : 'Save'}
+                  {mode === 'select' ? t('use', 'Use') : t('save', 'Save')}
                 </button>
               </div>
             ))}
@@ -192,7 +196,7 @@ export const StockAudio: FC<StockAudioProps> = ({ mode = 'browse', onSelect }) =
 
           {hasMore && (
             <div ref={sentinelRef} className="h-[40px] flex items-center justify-center text-[12px] text-newTextColor/60">
-              {isValidating ? 'Loading…' : ''}
+              {isValidating ? t('loading_ellipsis', 'Loading…') : ''}
             </div>
           )}
         </>

@@ -32,7 +32,7 @@ const PromptLibraryDropdown: FC<{
 
   const loadPrompts = useCallback(async () => {
     const res = await fetch('/ai/prompt-library');
-    if (!res.ok) throw new Error('Failed to load prompt library');
+    if (!res.ok) throw new Error('failed_to_load_prompt_library');
     return res.json();
   }, [fetch]);
 
@@ -82,7 +82,7 @@ const PromptLibraryDropdown: FC<{
           content: newContent.trim(),
         }),
       });
-      if (!res.ok) throw new Error('Failed to save prompt');
+      if (!res.ok) throw new Error('failed_to_save_prompt');
       toaster.show(
         t('prompt_saved', 'Prompt saved successfully'),
         'success'
@@ -103,7 +103,7 @@ const PromptLibraryDropdown: FC<{
       setDeleting(id);
       try {
         const res = await fetch(`/ai/prompt-library/${id}`, { method: 'DELETE' });
-        if (!res.ok) throw new Error('Failed to delete prompt');
+        if (!res.ok) throw new Error('failed_to_delete_prompt');
         toaster.show(
           t('prompt_deleted', 'Prompt deleted successfully'),
           'success'

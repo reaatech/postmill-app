@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ExtraField } from '@gitroom/frontend/components/settings/shared/kit/fields';
 import {
   ProviderExtraFieldSpec,
@@ -76,6 +77,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
   editProvider,
   presetType,
 }) => {
+  const translate = useT();
   const fetch = useFetch();
   const [type, setType] = useState(editProvider?.type || presetType || 'S3');
   const [state, setState] = useState<ProviderFormState>({
@@ -137,7 +139,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
       const data = await res.json();
       setTestResult(data);
     } catch {
-      setTestResult({ ok: false, error: 'Test request failed' });
+      setTestResult({ ok: false, error: translate('test_request_failed', 'Test request failed') });
     } finally {
       setTesting(false);
     }
@@ -173,7 +175,10 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
 
       if (!res.ok) {
         const err = await res.json();
-        setTestResult({ ok: false, error: err.message || err.error || 'Save failed' });
+        setTestResult({
+          ok: false,
+          error: err.message || err.error || translate('save_failed', 'Failed to save'),
+        });
         return;
       }
 
@@ -191,13 +196,15 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-newBgColorInner border border-newTableBorder rounded-[16px] p-[24px] w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
         <h3 className="text-[18px] font-medium text-textColor mb-[20px]">
-          {editProvider ? 'Edit Provider' : 'Add Storage Provider'}
+          {editProvider
+            ? translate('edit_provider', 'Edit Provider')
+            : translate('add_storage_provider', 'Add Storage Provider')}
         </h3>
 
         <div className="flex flex-col gap-[16px]">
           <div>
             <label htmlFor="provider-type-group" className="text-[12px] text-newTableText mb-[6px] block">
-              Provider Type
+              {translate('provider_type', 'Provider Type')}
             </label>
             <div id="provider-type-group" role="radiogroup" className="grid grid-cols-3 gap-[8px]">
               {(editProvider
@@ -223,7 +230,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                 >
                   <ProviderIcon identifier={value} name={label} size={36} />
                   <span className="text-[10px] text-newTableText text-center">
-                    {label}
+                    {translate('storage_type_' + value, label)}
                   </span>
                 </button>
               ))}
@@ -250,8 +257,10 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               }`}
             >
               {testResult.ok
-                ? 'Connection successful!'
-                : `Connection failed: ${testResult.error}`}
+                ? translate('connection_successful', 'Connection successful!')
+                : translate('connection_failed_reason', 'Connection failed: {{reason}}', {
+                    reason: testResult.error,
+                  })}
             </div>
           )}
 
@@ -264,7 +273,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               onClick={onClose}
               className="px-[16px] py-[8px] rounded-[8px] bg-btnSimple text-newTableText text-[13px] hover:bg-boxHover transition-colors"
             >
-              Cancel
+              {translate('cancel', 'Cancel')}
             </button>
             {editProvider && (
               <button
@@ -272,7 +281,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                 disabled={testing}
                 className="px-[16px] py-[8px] rounded-[8px] bg-[#1a2a3a] text-blue-700 dark:text-blue-400 text-[13px] hover:bg-[#2a3a4a] transition-colors disabled:opacity-50"
               >
-                {testing ? 'Testing...' : 'Test Connection'}
+                {testing ? translate('testing', 'Testing...') : translate('test_connection', 'Test Connection')}
               </button>
             )}
             <button
@@ -281,10 +290,10 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               className="px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium hover:bg-btnPrimary/80 transition-colors disabled:opacity-50"
             >
               {saving
-                ? 'Saving...'
+                ? translate('saving', 'Saving...')
                 : editProvider
-                  ? 'Update'
-                  : 'Add Provider'}
+                  ? translate('update', 'Update')
+                  : translate('add_provider', 'Add Provider')}
             </button>
           </div>
         </div>

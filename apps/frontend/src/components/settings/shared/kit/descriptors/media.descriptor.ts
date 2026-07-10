@@ -5,6 +5,7 @@ import {
   ProviderSurfaceDescriptor,
   SurfaceFetch,
 } from '../provider-surface.types';
+import { createFetchError } from '../../fetch-error';
 
 /**
  * AI Media provider settings surface descriptor (migrated from
@@ -87,7 +88,7 @@ export const mediaDescriptor: ProviderSurfaceDescriptor<MediaMeta> = {
       fetch('/settings/media/providers'),
       fetch('/settings/media/config'),
     ]);
-    if (!providersRes.ok) throw new Error('Failed to load media providers');
+    if (!providersRes.ok) throw createFetchError('failed_to_load_media_providers', 'Failed to load media providers');
     const providers: MediaProviderCatalogEntry[] = await providersRes.json();
     const configData: { providers?: MediaProviderConfig[] } = configRes.ok
       ? await configRes.json()

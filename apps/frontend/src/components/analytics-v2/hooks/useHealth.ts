@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 // One data-health row from GET /analytics/v2/health (6.6). Shape mirrors the
 // backend `getDataHealth` response (DataHealthItem in analytics.types.ts).
@@ -31,7 +32,7 @@ export const useHealth = () => {
   const load = useCallback(
     async (path: string) => {
       const res = await fetch(path);
-      if (!res.ok) throw new Error('Failed to fetch data health');
+      if (!res.ok) throw createFetchError('health_fetch_failed', 'Failed to fetch data health');
       return res.json() as Promise<HealthItem[]>;
     },
     [fetch]

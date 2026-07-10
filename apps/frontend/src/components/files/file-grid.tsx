@@ -4,6 +4,8 @@ import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import clsx from 'clsx';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import i18next from '@gitroom/react/translation/i18next';
 import type { FileItem } from './file-manager';
 
 // Thumbnail with a graceful fallback: prefer a still thumbnail (doubles as a
@@ -11,6 +13,7 @@ import type { FileItem } from './file-manager';
 // a placeholder icon when the source is missing/unrenderable (broken image).
 const Thumb: FC<{ file: FileItem }> = ({ file }) => {
   const mediaDirectory = useMediaDirectory();
+  const t = useT();
   const [broken, setBroken] = useState(false);
   const isVideo = hasExtension(file.path, 'mp4');
   const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
@@ -66,7 +69,7 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
         muted
         preload="metadata"
       >
-        <track kind="captions" src="" label="No captions" default />
+        <track kind="captions" src="" label={t('no_captions', 'No captions')} default />
       </video>
     );
   }
@@ -83,17 +86,22 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
 
 const formatDate = (d: string) => {
   try {
-    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(d).toLocaleDateString(i18next.resolvedLanguage || 'en', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
   } catch {
     return '';
   }
 };
 
-const fileSize = (bytes: number) => {
+const fileSize = (bytes: number, t: ReturnType<typeof useT>) => {
   if (!bytes) return '';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes < 1024) return t('file_size_bytes', '{{size}} B', { size: bytes });
+  if (bytes < 1024 * 1024)
+    return t('file_size_kb', '{{size}} KB', { size: (bytes / 1024).toFixed(0) });
+  return t('file_size_mb', '{{size}} MB', { size: (bytes / (1024 * 1024)).toFixed(1) });
 };
 
 export const FileGrid: FC<{
@@ -104,6 +112,7 @@ export const FileGrid: FC<{
   standalone?: boolean;
   onSelect?: (items: FileItem[]) => void;
 }> = ({ files, selectedFiles, onToggleSelect, onFileClick, onSelect }) => {
+  const t = useT();
   const handleDragStart = useCallback((e: React.DragEvent, fileId: string) => {
     e.dataTransfer.setData('text/plain', fileId);
     e.dataTransfer.effectAllowed = 'move';
@@ -173,7 +182,7 @@ export const FileGrid: FC<{
               </div>
               <div className="text-[10px] text-newTextColor/65 truncate">
                 {formatDate(file.createdAt)}
-                {file.fileSize ? ` · ${fileSize(file.fileSize)}` : ''}
+                {file.fileSize ? ` · ${fileSize(file.fileSize, t)}` : ''}
               </div>
               {tags.length > 0 && (
                 <div className="flex gap-[4px] mt-[3px] flex-wrap">

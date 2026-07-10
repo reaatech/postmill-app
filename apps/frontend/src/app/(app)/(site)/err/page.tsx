@@ -27,7 +27,7 @@ export default async function Page() {
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
         <h1 className="text-[24px] font-[600] text-textColor">
-          Something went wrong
+          {t('something_went_wrong', 'Something went wrong')}
         </h1>
         <p className="text-[14px] text-newTableText">
           {t(
@@ -41,7 +41,7 @@ export default async function Page() {
             href="/dashboard"
             className="bg-btnSimple text-btnText border border-newTableBorder rounded-[8px] h-[40px] px-[20px] text-[14px] font-[500] flex items-center hover:bg-boxHover transition-colors no-underline"
           >
-            Back to dashboard
+            {t('back_to_dashboard', 'Back to dashboard')}
           </a>
         </div>
       </div>

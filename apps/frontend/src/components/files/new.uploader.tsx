@@ -13,6 +13,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { uniqBy } from 'lodash';
 import { checkUploadLimit } from '@gitroom/helpers/upload-limits.client';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
@@ -63,6 +64,7 @@ export function useUppyUploader(props: {
   const { onUploadSuccess, allowedFileTypes, folderId, onStart, onEnd } = props;
   const setLocked = useLaunchStore((state) => state.setLocked);
   const toast = useToaster();
+  const t = useT();
   const { backendUrl, disableImageCompression, transloadit } =
     useVariables();
   const fetch = useFetch();
@@ -80,6 +82,7 @@ export function useUppyUploader(props: {
   const fetchRef = useRef(fetch);
   const toastRef = useRef(toast);
   const setLockedRef = useRef(setLocked);
+  const tRef = useRef(t);
 
   allowedFileTypesRef.current = allowedFileTypes;
   folderIdRef.current = folderId;
@@ -90,6 +93,7 @@ export function useUppyUploader(props: {
   fetchRef.current = fetch;
   toastRef.current = toast;
   setLockedRef.current = setLocked;
+  tRef.current = t;
 
   const uppyRef = useRef<Uppy | null>(null);
 
@@ -167,12 +171,20 @@ export function useUppyUploader(props: {
 
             if (!isAllowed) {
               const error = new Error(
-                `File type "${fileType}" is not allowed for file "${file.name}". Allowed types: ${allowedFileTypesRef.current}`
+                tRef.current(
+                  'file_type_not_allowed_for_file',
+                  'File type "{{fileType}}" is not allowed for file "{{fileName}}". Allowed types: {{allowedTypes}}',
+                  { fileType, fileName: file.name, allowedTypes: allowedFileTypesRef.current }
+                )
               );
               uppy.log(error.message, 'error');
               uppy.info(error.message, 'error', 5000);
               toastRef.current.show(
-                `File type "${fileType}" is not allowed. Allowed types: ${allowedFileTypesRef.current}`,
+                tRef.current(
+                  'file_type_not_allowed',
+                  'File type "{{fileType}}" is not allowed. Allowed types: {{allowedTypes}}',
+                  { fileType, allowedTypes: allowedFileTypesRef.current }
+                ),
                 'warning'
               );
               uppy.removeFile(file.id);
@@ -200,16 +212,26 @@ export function useUppyUploader(props: {
               continue;
             }
 
+            const maxBytes = file.type?.startsWith('image/')
+              ? limits.image.maxBytes
+              : file.type?.startsWith('video/')
+                ? limits.video.maxBytes
+                : limits.audio.maxBytes;
+            const maxMB = Math.round(maxBytes / MB);
             const error = new Error(
-              `File "${file.name}" ${limitCheck.reason}`
+              tRef.current(
+                'file_upload_limit_exceeded',
+                'File "{{fileName}}" {{reason}}',
+                { fileName: file.name, reason: limitCheck.reason }
+              )
             );
             uppy.log(error.message, 'error');
             uppy.info(error.message, 'error', 5000);
             toastRef.current.show(
-              limitCheck.reason.replace(
-                /Maximum size allowed is (\d+) bytes./,
-                (_: string, bytes: string) =>
-                  `Maximum size allowed is ${Math.round(Number(bytes) / MB)}MB.`,
+              tRef.current(
+                'upload_max_size_toast',
+                'Maximum size allowed is {{size}}MB.',
+                { size: maxMB }
               ),
               'warning'
             );

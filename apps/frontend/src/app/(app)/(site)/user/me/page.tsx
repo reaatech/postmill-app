@@ -8,6 +8,7 @@ import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import i18next from '@gitroom/react/translation/i18next';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import clsx from 'clsx';
 import { ProfileComponent } from '@gitroom/frontend/components/settings/profile.component';
@@ -20,6 +21,8 @@ const tabs = [
   { key: 'security', label: 'Security' },
   { key: 'notifications', label: 'Notifications' },
 ] as const;
+// Keys profile/notifications already exist in translation.json; security is added
+// in the same i18n backfill so all three tabs translate consistently.
 
 export default function ProfilePage() {
   const t = useT();
@@ -84,7 +87,7 @@ export default function ProfilePage() {
         <>
           <ChangePasswordComponent />
           <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] mt-[16px] flex flex-col gap-[24px]">
-            <h4 className="text-[16px] font-[600]">{t('active_sessions', 'Active Sessions')}</h4>
+            <h4 className="text-[16px] font-[600]">{t('active_sessions', 'Active sessions')}</h4>
             <SessionsList />
             <button
               type="button"
@@ -121,30 +124,56 @@ interface Session {
   lastUsedAt: string;
 }
 
-function parseUA(ua: string) {
-  let browser = 'Unknown Browser';
-  let os = 'Unknown OS';
+function parseUA(ua: string, t: ReturnType<typeof useT>) {
+  let browserKey = 'browser_unknown';
+  let browserDefault = 'Unknown Browser';
+  let osKey = 'os_unknown';
+  let osDefault = 'Unknown OS';
   let isMobile = false;
 
-  if (/Edge?|Edg?\//.test(ua)) browser = 'Edge';
-  else if (/Chrome/.test(ua) && !/Edg/.test(ua)) browser = 'Chrome';
-  else if (/Firefox/.test(ua)) browser = 'Firefox';
-  else if (/Safari/.test(ua) && !/Chrome/.test(ua)) browser = 'Safari';
+  if (/Edge?|Edg?\//.test(ua)) {
+    browserKey = 'browser_edge';
+    browserDefault = 'Edge';
+  } else if (/Chrome/.test(ua) && !/Edg/.test(ua)) {
+    browserKey = 'browser_chrome';
+    browserDefault = 'Chrome';
+  } else if (/Firefox/.test(ua)) {
+    browserKey = 'browser_firefox';
+    browserDefault = 'Firefox';
+  } else if (/Safari/.test(ua) && !/Chrome/.test(ua)) {
+    browserKey = 'browser_safari';
+    browserDefault = 'Safari';
+  }
 
-  if (/Windows/.test(ua)) os = 'Windows';
-  else if (/Mac/.test(ua) && !/iPhone|iPad/.test(ua)) os = 'macOS';
-  else if (/Android/.test(ua)) os = 'Android';
-  else if (/iPhone|iPad/.test(ua)) os = 'iOS';
-  else if (/Linux/.test(ua)) os = 'Linux';
+  if (/Windows/.test(ua)) {
+    osKey = 'os_windows';
+    osDefault = 'Windows';
+  } else if (/Mac/.test(ua) && !/iPhone|iPad/.test(ua)) {
+    osKey = 'os_macos';
+    osDefault = 'macOS';
+  } else if (/Android/.test(ua)) {
+    osKey = 'os_android';
+    osDefault = 'Android';
+  } else if (/iPhone|iPad/.test(ua)) {
+    osKey = 'os_ios';
+    osDefault = 'iOS';
+  } else if (/Linux/.test(ua)) {
+    osKey = 'os_linux';
+    osDefault = 'Linux';
+  }
 
   if (/Mobi|Android|iPhone|iPad|iPod/.test(ua)) isMobile = true;
 
-  return { browser, os, isMobile };
+  return {
+    browser: t(browserKey, browserDefault),
+    os: t(osKey, osDefault),
+    isMobile,
+  };
 }
 
 function formatDate(iso: string) {
   try {
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(i18next.resolvedLanguage || 'en', {
       dateStyle: 'medium',
       timeStyle: 'short',
     }).format(new Date(iso));
@@ -168,7 +197,7 @@ const SessionsList: FC = () => {
   const fetch = useFetch();
   const { data, mutate } = useSessions();
   const sessions = data || [];
-  const currentUA = useMemo(() => parseUA(navigator.userAgent), []);
+  const currentUA = useMemo(() => parseUA(navigator.userAgent, t), [t]);
 
   const revokeSession = useCallback(async (id: string) => {
     await fetch(`/user/sessions/${id}/revoke`, { method: 'POST' });
@@ -177,14 +206,20 @@ const SessionsList: FC = () => {
 
   const isCurrentSession = (ua: string | null) => {
     if (!ua) return false;
-    const parsed = parseUA(ua);
+    const parsed = parseUA(ua, t);
     return parsed.browser === currentUA.browser && parsed.os === currentUA.os;
   };
 
   return (
     <div className="flex flex-col gap-[12px]">
       {sessions.map((session) => {
-        const parsed = session.userAgent ? parseUA(session.userAgent) : { browser: 'Unknown', os: 'Unknown', isMobile: false };
+        const parsed = session.userAgent
+          ? parseUA(session.userAgent, t)
+          : {
+              browser: t('unknown', 'Unknown'),
+              os: t('unknown', 'Unknown'),
+              isMobile: false,
+            };
         const current = isCurrentSession(session.userAgent);
 
         return (
@@ -194,7 +229,12 @@ const SessionsList: FC = () => {
             </div>
             <div className="flex-1">
               <p className="text-[14px] font-[500] text-textColor">
-                {current ? t('current_device', 'Current device') : `${parsed.browser} on ${parsed.os}`}
+                {current
+                  ? t('current_device', 'Current device')
+                  : t('browser_on_os', '{{browser}} on {{os}}', {
+                      browser: parsed.browser,
+                      os: parsed.os,
+                    })}
                 {session.ip && !current && (
                   <span className="text-textColor/40 font-[400] ml-[8px] text-[12px]">
                     {session.ip}

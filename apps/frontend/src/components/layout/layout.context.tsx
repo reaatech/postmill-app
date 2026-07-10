@@ -5,6 +5,7 @@ import { FetchWrapperComponent } from '@gitroom/helpers/utils/custom.fetch';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useReturnUrl } from '@gitroom/frontend/app/(app)/auth/return.url.component';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export default function LayoutContext(params: { children: ReactNode }) {
   if (params?.children) {
     // eslint-disable-next-line react/no-children-prop
@@ -28,7 +29,11 @@ export function setClientCookie(cname: string, cvalue: string, exdays: number) {
 export const setCookie = setClientCookie;
 function LayoutContextInner(params: { children: ReactNode }) {
   const returnUrl = useReturnUrl();
+  // useReturnUrl returns a fresh object per render, but its getAndClear member is a
+  // stable useCallback — destructure it so afterRequest's deps stay stable.
+  const { getAndClear: getAndClearReturnUrl } = returnUrl;
   const { backendUrl, isGeneral, isSecured } = useVariables();
+  const t = useT();
   const afterRequest = useCallback(
     async (url: string, options: RequestInit, response: Response) => {
       if (
@@ -50,7 +55,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
         response?.headers?.get('reload') ||
         response?.headers?.get('onboarding');
       if (reloadOrOnboarding) {
-        const getAndClear = returnUrl.getAndClear();
+        const getAndClear = getAndClearReturnUrl();
         if (getAndClear) {
           try {
             const parsed = new URL(getAndClear, window.location.origin);
@@ -85,9 +90,12 @@ function LayoutContextInner(params: { children: ReactNode }) {
       if (response.status === 406) {
         if (
           await deleteDialog(
-            'You are currently on trial, in order to use the feature you must finish the trial',
-            'Finish the trial, charge me now',
-            'Trial',
+            t(
+              'currently_on_trial_finish_to_use_feature',
+              'You are currently on trial, in order to use the feature you must finish the trial'
+            ),
+            t('finish_the_trial_charge_me_now', 'Finish the trial, charge me now'),
+            t('trial', 'Trial'),
 
           )
         ) {
@@ -98,13 +106,14 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
 
       if (response.status === 402) {
+        const paymentMessage = (await response.json()).message;
         if (
           await deleteDialog(
-            (
-              await response.json()
-            ).message,
-            'Move to billing',
-            'Payment Required'
+            t('payment_required_message', '{{message}}', {
+              message: paymentMessage,
+            }),
+            t('move_to_billing', 'Move to billing'),
+            t('payment_required', 'Payment Required')
           )
         ) {
           window.open('/billing', '_blank');
@@ -114,7 +123,7 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
       return true;
     },
-    []
+    [t, isSecured, getAndClearReturnUrl]
   );
   return (
     <FetchWrapperComponent baseUrl={backendUrl} afterRequest={afterRequest}>

@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 export interface PostShortlinkClick {
   short: string;
@@ -22,7 +23,7 @@ export const usePostShortlinkStats = (postId: string) => {
   const load = useCallback(
     async (path: string) => {
       const res = await fetch(path);
-      if (!res.ok) throw new Error('Failed to fetch short-link statistics');
+      if (!res.ok) throw createFetchError('post_shortlink_stats_fetch_failed', 'Failed to fetch short-link statistics');
       return res.json() as Promise<PostShortlinkStats>;
     },
     [fetch]

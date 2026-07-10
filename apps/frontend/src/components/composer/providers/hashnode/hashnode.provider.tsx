@@ -16,31 +16,33 @@ import clsx from 'clsx';
 import { FileComponent } from '@gitroom/frontend/components/files/file.component';
 import { Canonical } from '@gitroom/react/form/canonical';
 import { useShowPostSelector } from '@gitroom/frontend/components/post-url-selector/post.url.selector';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const HashnodeSettings: FC = () => {
   const form = useSettings();
   const { date } = useIntegration();
   const postSelector = useShowPostSelector(date);
+  const t = useT();
   return (
     <>
-      <Input label="Title" {...form.register('title')} />
-      <Input label="Subtitle" {...form.register('subtitle')} />
+      <Input label={t('label_title', 'Title')} {...form.register('title')} />
+      <Input label={t('label_subtitle', 'Subtitle')} {...form.register('subtitle')} />
       <Canonical
         date={date}
-        label="Canonical Link"
+        label={t('label_canonical_link', 'Canonical Link')}
         postSelector={postSelector}
         {...form.register('canonical')}
       />
       <FileComponent
-        label="Cover picture"
-        description="Add a cover picture"
+        label={t('label_cover_picture', 'Cover picture')}
+        description={t('add_a_cover_picture', 'Add a cover picture')}
         {...form.register('main_image')}
       />
       <div className="mt-[20px]">
         <HashnodePublications {...form.register('publication')} />
       </div>
       <div>
-        <HashnodeTags label="Tags" {...form.register('tags')} />
+        <HashnodeTags label={t('tags', 'Tags')} {...form.register('tags')} />
       </div>
     </>
   );

@@ -17,7 +17,12 @@ vi.mock('swr', () => ({
 }));
 
 vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
-  useT: () => (_key: string, fallback: string) => fallback,
+  useT:
+    () =>
+    (_key: string, fallback: string, vars?: Record<string, unknown>) =>
+      vars
+        ? fallback.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(vars[k] ?? ''))
+        : fallback,
 }));
 
 let mockMediaJobs: any = { data: undefined, isLoading: true, error: undefined, mutate: vi.fn() };

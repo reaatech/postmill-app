@@ -1,5 +1,6 @@
 'use client';
 import React, { useEffect, useRef } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface ContextMenuProps {
   x: number;
@@ -12,6 +13,7 @@ interface ContextMenuProps {
 }
 
 export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetType, elementId, store, onClose, onAddImage }) => {
+  const t = useT();
   const menuRef = useRef<HTMLDivElement>(null);
   const s = store.getState();
   const out = s.doc.outputs[s.currentOutput];
@@ -66,45 +68,45 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetType, elem
   const items =
     targetType === 'element' && el
       ? [
-          { label: 'Cut', action: () => { s.setSelectedIds([el.id]); s.cutSelection(); } },
-          { label: 'Copy', action: () => { s.setSelectedIds([el.id]); s.copySelection(); } },
-          { label: 'Paste', action: () => s.paste() },
-          { label: 'Duplicate', action: () => s.duplicateElement(el.id) },
+          { label: t('designer_action_cut_cut', 'Cut'), action: () => { s.setSelectedIds([el.id]); s.cutSelection(); } },
+          { label: t('copy', 'Copy'), action: () => { s.setSelectedIds([el.id]); s.copySelection(); } },
+          { label: t('designer_action_paste_paste', 'Paste'), action: () => s.paste() },
+          { label: t('designer_action_duplicate_duplicate', 'Duplicate'), action: () => s.duplicateElement(el.id) },
           { label: '-', action: null },
-          { label: 'Delete', action: () => s.removeElement(el.id) },
+          { label: t('delete', 'Delete'), action: () => s.removeElement(el.id) },
           { label: '-', action: null },
-          { label: 'Bring to Front', action: () => s.reorder([el.id], 'front') },
-          { label: 'Bring Forward', action: () => s.reorder([el.id], 'forward') },
-          { label: 'Send Backward', action: () => s.reorder([el.id], 'backward') },
-          { label: 'Send to Back', action: () => s.reorder([el.id], 'back') },
+          { label: t('designer_action_bring_front_bring_to_front', 'Bring to Front'), action: () => s.reorder([el.id], 'front') },
+          { label: t('designer_action_bring_forward_bring_forward', 'Bring Forward'), action: () => s.reorder([el.id], 'forward') },
+          { label: t('designer_action_send_backward_send_backward', 'Send Backward'), action: () => s.reorder([el.id], 'backward') },
+          { label: t('designer_action_send_back_send_to_back', 'Send to Back'), action: () => s.reorder([el.id], 'back') },
           { label: '-', action: null },
-          { label: el.locked ? 'Unlock' : 'Lock', action: () => s.updateElement(el.id, { locked: !el.locked }) },
-          { label: el.hidden ? 'Show' : 'Hide', action: () => s.updateElement(el.id, { hidden: !el.hidden }) },
+          { label: el.locked ? t('designer_action_lock_toggle_unlock', 'Unlock') : t('designer_action_lock_toggle_lock', 'Lock'), action: () => s.updateElement(el.id, { locked: !el.locked }) },
+          { label: el.hidden ? t('designer_context_show', 'Show') : t('designer_context_hide', 'Hide'), action: () => s.updateElement(el.id, { hidden: !el.hidden }) },
           { label: '-', action: null },
-          { label: 'Group', action: () => { s.setSelectedIds([el.id]); setTimeout(() => s.groupSelection(), 0); } },
-          { label: 'Ungroup', action: () => { s.setSelectedIds([el.id]); setTimeout(() => s.ungroupSelection(), 0); } },
+          { label: t('group', 'Group'), action: () => { s.setSelectedIds([el.id]); setTimeout(() => s.groupSelection(), 0); } },
+          { label: t('designer_action_ungroup_ungroup', 'Ungroup'), action: () => { s.setSelectedIds([el.id]); setTimeout(() => s.ungroupSelection(), 0); } },
           { label: '-', action: null },
           ...(el.originId
-            ? [{ label: 'Unlink', action: () => s.unlinkElement(el.id) }]
+            ? [{ label: t('designer_context_unlink', 'Unlink'), action: () => s.unlinkElement(el.id) }]
             : el.type !== 'icon'
               ? [{
-                  label: 'Apply to All Formats',
+                  label: t('designer_context_apply_all_formats', 'Apply to All Formats'),
                   action: () => {
                     const newOriginId = `relink-${Date.now()}`;
                     s.relinkElement(el.id, newOriginId);
                   },
                 }]
               : []),
-          ...(el.type === 'image' ? [{ label: 'Set as Background', action: () => { s.setOutputBackground({ type: 'image', src: el.src! }); } }] : []),
+          ...(el.type === 'image' ? [{ label: t('designer_context_set_as_background', 'Set as Background'), action: () => { s.setOutputBackground({ type: 'image', src: el.src! }); } }] : []),
         ]
       : [
-          { label: 'Paste', action: () => s.paste() },
+          { label: t('designer_action_paste_paste', 'Paste'), action: () => s.paste() },
           { label: '-', action: null },
-          { label: 'Select All', action: () => s.setSelectedIds(imageOut?.children.map((c) => c.id) ?? []) },
+          { label: t('designer_action_select_all_select_all', 'Select All'), action: () => s.setSelectedIds(imageOut?.children.map((c) => c.id) ?? []) },
           { label: '-', action: null },
-          { label: 'Add Text', action: () => s.addElement({ id: '', type: 'text', x: 100, y: 100, width: 200, height: 40, rotation: 0, opacity: 1, locked: false, hidden: false, text: 'Text' }) },
-          { label: 'Add Shape', action: () => s.addElement({ id: '', type: 'shape', x: 100, y: 100, width: 200, height: 200, rotation: 0, opacity: 1, locked: false, hidden: false, shape: 'rect' }) },
-          { label: 'Add Image', action: () => onAddImage?.() },
+          { label: t('designer_context_add_text', 'Add Text'), action: () => s.addElement({ id: '', type: 'text', x: 100, y: 100, width: 200, height: 40, rotation: 0, opacity: 1, locked: false, hidden: false, text: 'Text' }) },
+          { label: t('designer_context_add_shape', 'Add Shape'), action: () => s.addElement({ id: '', type: 'shape', x: 100, y: 100, width: 200, height: 200, rotation: 0, opacity: 1, locked: false, hidden: false, shape: 'rect' }) },
+          { label: t('designer_context_add_image', 'Add Image'), action: () => onAddImage?.() },
         ];
 
   return (

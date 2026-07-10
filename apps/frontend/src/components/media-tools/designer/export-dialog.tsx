@@ -7,6 +7,7 @@ import type Konva from 'konva';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useBrandColors } from './panels/use-brand-colors';
@@ -390,6 +391,7 @@ const renderOutputThumbnail = async (output: DesignerOutput): Promise<string | u
 export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
   const fetch = useFetch();
   const toaster = useToaster();
+  const t = useT();
   const dialogRef = useRef<HTMLDivElement>(null);
   useFocusTrap(dialogRef);
 
@@ -489,6 +491,14 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
   const formatDefs = isVideoMode ? VIDEO_FORMATS : FORMATS;
   const activeFormatDef = formatDefs.find((f) => f.value === activeFormat);
+
+  // Format labels are mostly universal file-format acronyms (PNG, JPEG, MP4…) left
+  // untranslated; only the descriptive compound labels carry translatable English words.
+  const formatLabel = (f: FormatDef): string => {
+    if (f.value === 'transparent') return t('designer_format_transparent_png', 'Transparent PNG');
+    if (f.value === 'webp-animated') return t('designer_format_webp_animated', 'Animated WebP');
+    return f.label;
+  };
 
   useEffect(() => {
     const map: Record<string, FormatValue> = {};
@@ -647,7 +657,12 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           }),
         });
         if (!res.ok) {
-          toaster.show(`Failed to enqueue render for ${composition.name || composition.formatId}`, 'warning');
+          toaster.show(
+            t('designer_failed_to_enqueue_render_for_name', 'Failed to enqueue render for {{name}}', {
+              name: composition.name || composition.formatId,
+            }),
+            'warning'
+          );
           continue;
         }
         const { id } = await res.json();
@@ -665,14 +680,14 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       }
 
       if (jobs.length === 0) {
-        setRenderJobs([{ id: '', outputId: '', outputName: '', format: videoFormat, status: 'failed', progress: 0, artifactUrl: null, thumbnailUrl: null, error: 'No video renders could be enqueued' }]);
+        setRenderJobs([{ id: '', outputId: '', outputName: '', format: videoFormat, status: 'failed', progress: 0, artifactUrl: null, thumbnailUrl: null, error: t('designer_no_video_renders_could_be_enqueued', 'No video renders could be enqueued') }]);
         return;
       }
 
       setRenderJobs(jobs);
       setStep('video-rendering');
     } catch (err) {
-      setRenderJobs([{ id: '', outputId: '', outputName: '', format: videoFormat, status: 'failed', progress: 0, artifactUrl: null, thumbnailUrl: null, error: (err as Error).message || 'Failed to start render' }]);
+      setRenderJobs([{ id: '', outputId: '', outputName: '', format: videoFormat, status: 'failed', progress: 0, artifactUrl: null, thumbnailUrl: null, error: (err as Error).message || t('designer_failed_to_start_render', 'Failed to start render') }]);
     } finally {
       setIsEnqueuing(false);
     }
@@ -704,7 +719,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               status: data.status,
               artifactUrl: data.status === 'completed' ? data.artifactUrl || null : job.artifactUrl,
               thumbnailUrl: data.status === 'completed' ? data.thumbnailUrl || null : job.thumbnailUrl,
-              error: data.status === 'failed' ? data.errorMessage || 'Render failed' : job.error,
+              error: data.status === 'failed' ? data.errorMessage || t('designer_render_failed', 'Render failed') : job.error,
             };
           })
         );
@@ -796,7 +811,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             file,
             provider: null,
             integration: null,
-            integrationName: 'No supported channel — skipped',
+            integrationName: t('designer_no_supported_channel_skipped', 'No supported channel — skipped'),
             checked: false,
             altText: file.alt || altFromElements || '',
             missingAlt: !hasAlt && hasImageElements,
@@ -815,7 +830,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             file,
             provider,
             integration: null,
-            integrationName: `No connected ${provider} accounts — skipped`,
+            integrationName: t('designer_no_connected_provider_accounts_skipped', 'No connected {{provider}} accounts — skipped', { provider }),
             checked: false,
             altText: file.alt || altFromElements || '',
             missingAlt: !hasAlt && hasImageElements,
@@ -839,7 +854,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       }
       setDraftRows(rows);
     } catch {
-      toaster.show('Failed to load integrations', 'warning');
+      toaster.show(t('designer_failed_to_load_integrations', 'Failed to load integrations'), 'warning');
     } finally {
       setDraftLoading(false);
     }
@@ -907,21 +922,30 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
         } else {
           failed++;
           toaster.show(
-            `Failed to create draft for ${row.integrationName}`,
+            t('designer_failed_to_create_draft_for', 'Failed to create draft for {{name}}', {
+              name: row.integrationName,
+            }),
             'warning'
           );
         }
       } catch {
         failed++;
         toaster.show(
-          `Failed to create draft for ${row.integrationName}`,
+          t('designer_failed_to_create_draft_for', 'Failed to create draft for {{name}}', {
+            name: row.integrationName,
+          }),
           'warning'
         );
       }
     }
 
     if (created > 0) {
-      toaster.show(`${created} draft${created > 1 ? 's' : ''} created`, 'success');
+      toaster.show(
+        t('designer_n_drafts_created', '{{count}} draft created', {
+          count: created,
+        }),
+        'success'
+      );
     }
     if (failed === 0 && created > 0) {
       onClose();
@@ -1037,7 +1061,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       if (allPdf) {
         const pdfBlob = await renderPdfOnServer();
         if (!pdfBlob) {
-          toaster.show('PDF render failed', 'warning');
+          toaster.show(t('designer_pdf_render_failed', 'PDF render failed'), 'warning');
           return;
         }
         const pdfName =
@@ -1095,7 +1119,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               });
             }
           } catch (err) {
-            toaster.show((err as Error).message || 'Export failed', 'warning');
+            toaster.show((err as Error).message || t('designer_export_failed', 'Export failed'), 'warning');
             setExporting(false);
             return;
           }
@@ -1103,15 +1127,20 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       }
 
       if (!results.length) {
-        toaster.show('Export failed', 'warning');
+        toaster.show(t('designer_export_failed', 'Export failed'), 'warning');
         return;
       }
 
       setSavedFiles(results);
-      toaster.show(`Exported ${results.length} file${results.length > 1 ? 's' : ''}`, 'success');
+      toaster.show(
+        t('designer_exported_n_files', 'Exported {{count}} file', {
+          count: results.length,
+        }),
+        'success'
+      );
       setStep('done');
     } catch {
-      toaster.show('Export failed', 'warning');
+      toaster.show(t('designer_export_failed', 'Export failed'), 'warning');
     } finally {
       setExporting(false);
     }
@@ -1132,13 +1161,13 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
   return (
     <div ref={dialogRef} className="flex flex-col gap-4 w-[420px] max-w-full">
-      <div className="text-[16px] font-semibold text-textColor">Export Design</div>
+      <div className="text-[16px] font-semibold text-textColor">{t('designer_export_design_title', 'Export Design')}</div>
 
       {/* ---- Step 1: Options ---- */}
       {step === 'options' && (
         <>
           <div className="flex flex-col gap-2">
-            <div className="text-[13px] font-medium text-textColor mb-1">Format</div>
+            <div className="text-[13px] font-medium text-textColor mb-1">{t('designer_format_label', 'Format')}</div>
 
             {selectedOutputs.map((output) => {
               const fmt = outputFormats[output.id] || 'png';
@@ -1158,7 +1187,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   >
                     {formatDefs.map((f) => (
                       <option key={f.value} value={f.value}>
-                        {f.label}
+                        {formatLabel(f)}
                       </option>
                     ))}
                   </select>
@@ -1174,7 +1203,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     onClick={() => setFormatForAll(f.value)}
                     className="px-2 py-0.5 rounded-[4px] text-[10px] border border-studioBorder text-newTextColor/65 hover:text-textColor hover:border-newTextColor/40 transition-all"
                   >
-                    All {f.label}
+                    {t('designer_all_format', 'All {{format}}', { format: formatLabel(f) })}
                   </button>
                 ))}
               </div>
@@ -1184,7 +1213,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           {activeFormatDef?.showQuality && (
             <div className="flex flex-col gap-1">
               <div className="flex justify-between text-[13px] font-medium text-textColor mb-1">
-                <span>Quality</span>
+                <span>{t('designer_quality_label', 'Quality')}</span>
                 <span className="text-newTextColor/60">{Math.round(quality * 100)}%</span>
               </div>
               <input
@@ -1201,7 +1230,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
           {activeFormatDef?.showScale && (
             <div className="flex flex-col gap-1">
-              <div className="text-[13px] font-medium text-textColor mb-1">Scale</div>
+              <div className="text-[13px] font-medium text-textColor mb-1">{t('designer_scale_label', 'Scale')}</div>
               <div className="flex gap-2">
                 {SCALES.map((s) => (
                   <button
@@ -1230,29 +1259,29 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               />
               <span className="text-[13px] text-textColor">
                 {exportAll
-                  ? `Export all ${doc.outputs.length} outputs`
-                  : 'Export current output'}
+                  ? t('designer_export_all_n_outputs', 'Export all {{count}} outputs', { count: doc.outputs.length })
+                  : t('designer_export_current_output', 'Export current output')}
               </span>
             </label>
           )}
 
           {!multiOutput && (
             <div className="text-[13px] text-newTextColor/60">
-              Exporting current output
+              {t('designer_exporting_current_output', 'Exporting current output')}
             </div>
           )}
 
           {brandEnforcement && brandViolations.length > 0 && (
             <div className="rounded-[6px] border border-red-400/30 bg-red-400/10 p-2">
               <div className="text-[12px] text-dangerText font-medium mb-1">
-                Off-brand elements detected
+                {t('designer_off_brand_elements_detected', 'Off-brand elements detected')}
               </div>
               <ul className="text-[11px] text-newTextColor/60 list-disc pl-4 space-y-0.5 max-h-[100px] overflow-y-auto">
                 {brandViolations.slice(0, 4).map((v, i) => (
-                  <li key={i}>{v}</li>
+                  <li key={i}>{t(v.key, v.text, v.vars)}</li>
                 ))}
                 {brandViolations.length > 4 && (
-                  <li>…and {brandViolations.length - 4} more</li>
+                  <li>{t('designer_and_n_more', '…and {{count}} more', { count: brandViolations.length - 4 })}</li>
                 )}
               </ul>
               {canAdminOverride && (
@@ -1266,7 +1295,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     className="accent-purple-500 w-[14px] h-[14px]"
                   />
                   <span className="text-[11px] text-newTextColor/70">
-                    Admin override — allow export
+                    {t('designer_admin_override_allow_export', 'Admin override — allow export')}
                   </span>
                 </label>
               )}
@@ -1278,14 +1307,14 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={onClose}
               className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              Cancel
+              {t('cancel', 'Cancel')}
             </button>
             <button
               onClick={goToFolder}
               disabled={!isBrandCompliant}
               className="px-4 h-[38px] rounded-[6px] bg-designerAccent text-white text-[13px] font-medium hover:bg-designerAccent/80 disabled:opacity-50 transition-all"
             >
-              Next: Choose Folder
+              {t('designer_next_choose_folder', 'Next: Choose Folder')}
             </button>
           </div>
         </>
@@ -1294,7 +1323,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       {/* ---- Step 2: Folder ---- */}
       {step === 'folder' && (
         <>
-          <div className="text-[13px] font-medium text-textColor">Choose destination folder</div>
+          <div className="text-[13px] font-medium text-textColor">{t('designer_choose_destination_folder', 'Choose destination folder')}</div>
 
           <div className="max-h-[260px] overflow-y-auto border border-studioBorder rounded-[8px] p-[8px] bg-newBgColorInner">
             <button
@@ -1318,7 +1347,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                 />
                 <path d="M1 6H15" stroke="currentColor" strokeWidth="1.3" />
               </svg>
-              <span className="flex-1 truncate">All Files (root)</span>
+              <span className="flex-1 truncate">{t('designer_all_files_root', 'All Files (root)')}</span>
             </button>
             {folders && renderFolderTree(folders)}
           </div>
@@ -1328,7 +1357,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               type="text"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
-              placeholder="New folder name..."
+              placeholder={t('designer_new_folder_name_placeholder', 'New folder name...')}
               className="flex-1 h-[36px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleCreateFolder();
@@ -1338,7 +1367,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={handleCreateFolder}
               className="px-[12px] h-[36px] rounded-[8px] bg-btnSimple text-textColor text-[13px] hover:bg-boxHover transition-all"
             >
-              Create
+              {t('designer_create', 'Create')}
             </button>
           </div>
 
@@ -1347,13 +1376,13 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={goToOptions}
               className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              Back
+              {t('back', 'Back')}
             </button>
             <button
               onClick={goToExport}
               className="px-4 h-[38px] rounded-[6px] bg-designerAccent text-white text-[13px] font-medium hover:bg-designerAccent/80 transition-all"
             >
-              Next: Export {outputCount} file{outputCount > 1 ? 's' : ''}
+              {t('designer_next_export_n_files', 'Next: Export {{count}} file', { count: outputCount })}
             </button>
           </div>
         </>
@@ -1363,7 +1392,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       {step === 'export' && (
         <>
           <div className="text-[13px] font-medium text-textColor">
-            Export {outputCount} file{outputCount > 1 ? 's' : ''}
+            {t('designer_export_n_files', 'Export {{count}} file', { count: outputCount })}
             {outputCount === 1
               ? ` (${(outputFormats[selectedOutputs[0].id] || 'png').toUpperCase()}${outputFormats[selectedOutputs[0].id] !== 'pdf' ? `, ${scale}x` : ''})`
               : ''}
@@ -1415,7 +1444,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
                   <img
                     src={p.dataUrl}
-                    alt={`Output ${p.idx + 1}`}
+                    alt={t('designer_output_n_alt', 'Output {{n}}', { n: p.idx + 1 })}
                     className="w-full h-full object-contain"
                   />
                 </div>
@@ -1427,14 +1456,16 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={goToFolder}
               className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              Back
+              {t('back', 'Back')}
             </button>
             <button
               onClick={handleExport}
               disabled={exporting}
               className="px-4 h-[38px] rounded-[6px] bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 disabled:opacity-50 transition-all"
             >
-              {exporting ? 'Exporting...' : `Export ${outputCount} file${outputCount > 1 ? 's' : ''}`}
+              {exporting
+                ? t('designer_exporting_ellipsis', 'Exporting...')
+                : t('designer_export_n_files', 'Export {{count}} file', { count: outputCount })}
             </button>
           </div>
         </>
@@ -1455,11 +1486,12 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               />
             </svg>
             <div className="text-[15px] font-semibold text-textColor">
-              Saved to /files
+              {t('designer_saved_to_files', 'Saved to /files')}
             </div>
             <div className="text-[13px] text-newTextColor/60 text-center">
-              {savedFiles.length} file{savedFiles.length > 1 ? 's' : ''} exported
-              {selectedFolderId ? ' to the selected folder' : ''}
+              {selectedFolderId
+                ? t('designer_n_files_exported_to_folder', '{{count}} file exported to the selected folder', { count: savedFiles.length })
+                : t('designer_n_files_exported', '{{count}} file exported', { count: savedFiles.length })}
             </div>
 
             {previews.length > 0 && (
@@ -1472,7 +1504,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
                     <img
                       src={p.dataUrl}
-                      alt={`Output ${p.idx + 1}`}
+                      alt={t('designer_output_n_alt', 'Output {{n}}', { n: p.idx + 1 })}
                       className="w-full h-full object-contain"
                     />
                   </div>
@@ -1486,13 +1518,13 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={onClose}
               className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              Close
+              {t('close', 'Close')}
             </button>
             <button
               onClick={goToDraftPosts}
               className="px-4 h-[38px] rounded-[6px] bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 transition-all"
             >
-              Create draft posts
+              {t('designer_create_draft_posts', 'Create draft posts')}
             </button>
           </div>
         </>
@@ -1502,18 +1534,17 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       {step === 'draft-posts' && (
         <>
           <div className="text-[15px] font-semibold text-textColor">
-            Create Draft Posts
+            {t('designer_create_draft_posts_title', 'Create Draft Posts')}
           </div>
           <div className="text-[12px] text-newTextColor/60">
-            Turn these into draft posts — this will create{' '}
-            <strong>{confirmedDraftCount}</strong> draft
-            {confirmedDraftCount !== 1 ? 's' : ''}
+            {t('designer_turn_into_drafts_prefix', 'Turn these into draft posts — this will create')}{' '}
+            <strong>{confirmedDraftCount}</strong> {t('designer_draft_plural_suffix', 'draft', { count: confirmedDraftCount })}
           </div>
 
           <div className="max-h-[300px] overflow-y-auto flex flex-col gap-2">
             {draftLoading && (
               <div className="text-[12px] text-newTextColor/60 text-center py-4">
-                Loading integrations...
+                {t('designer_loading_integrations_ellipsis', 'Loading integrations...')}
               </div>
             )}
 
@@ -1568,13 +1599,13 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                       {row.missingAlt && !isSkipped && (
                         <div className="mt-1">
                           <span className="text-[10px] text-yellow-500 font-medium">
-                            Missing alt text
+                            {t('designer_missing_alt_text', 'Missing alt text')}
                           </span>
                           <input
                             type="text"
                             value={row.altText}
                             onChange={(e) => setAltText(idx, e.target.value)}
-                            placeholder="Alt text (recommended)..."
+                            placeholder={t('designer_alt_text_recommended_placeholder', 'Alt text (recommended)...')}
                             className="w-full mt-1 h-[24px] px-[8px] rounded-[4px] bg-newBgColor border border-yellow-500/40 text-[11px] text-textColor outline-none focus:border-yellow-500"
                           />
                         </div>
@@ -1582,7 +1613,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
                       {!row.missingAlt && row.altText && !isSkipped && (
                         <div className="text-[10px] text-newTextColor/65 truncate mt-0.5">
-                          Alt: {row.altText}
+                          {t('designer_alt_prefix', 'Alt: {{text}}', { text: row.altText })}
                         </div>
                       )}
                     </div>
@@ -1601,7 +1632,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
           {!draftLoading && draftRows.length === 0 && (
             <div className="text-[12px] text-newTextColor/60 text-center py-4">
-              No outputs to create drafts for
+              {t('designer_no_outputs_to_create_drafts_for', 'No outputs to create drafts for')}
             </div>
           )}
 
@@ -1610,7 +1641,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={onClose}
               className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              Skip / Done
+              {t('designer_skip_slash_done', 'Skip / Done')}
             </button>
             <button
               onClick={handleCreateDraftPosts}
@@ -1618,8 +1649,8 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               className="px-4 h-[38px] rounded-[6px] bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 disabled:opacity-50 transition-all"
             >
               {draftCreating
-                ? 'Creating...'
-                : `Create ${confirmedDraftCount} draft${confirmedDraftCount !== 1 ? 's' : ''}`}
+                ? t('designer_creating_ellipsis', 'Creating...')
+                : t('designer_create_n_drafts', 'Create {{count}} draft', { count: confirmedDraftCount })}
             </button>
           </div>
         </>
@@ -1628,14 +1659,14 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       {/* ---- Step 6: Video Render Options ---- */}
       {step === 'video-render' && (
         <>
-          <div className="text-[15px] font-semibold text-textColor">Render Video</div>
+          <div className="text-[15px] font-semibold text-textColor">{t('designer_render_video_title', 'Render Video')}</div>
           <div className="text-[12px] text-newTextColor/60">
-            Render composition as video via the server render pipeline.
+            {t('designer_render_composition_description', 'Render composition as video via the server render pipeline.')}
           </div>
 
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <div className="text-[13px] font-medium text-textColor">Format</div>
+              <div className="text-[13px] font-medium text-textColor">{t('designer_format_label', 'Format')}</div>
               <div className="flex gap-2">
                 {(['mp4', 'webm', 'gif', 'webp-animated'] as const).map((f) => (
                   <button
@@ -1654,7 +1685,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="text-[13px] font-medium text-textColor">Quality</div>
+              <div className="text-[13px] font-medium text-textColor">{t('designer_quality_label', 'Quality')}</div>
               <div className="flex gap-2">
                 {(['low', 'medium', 'high'] as const).map((q) => (
                   <button
@@ -1666,14 +1697,18 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                         : 'border border-studioBorder text-textColor hover:bg-boxHover'
                     }`}
                   >
-                    {q}
+                    {q === 'low'
+                      ? t('designer_quality_low', 'low')
+                      : q === 'medium'
+                        ? t('designer_quality_medium', 'medium')
+                        : t('designer_quality_high', 'high')}
                   </button>
                 ))}
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="text-[13px] font-medium text-textColor">Bitrate</div>
+              <div className="text-[13px] font-medium text-textColor">{t('designer_bitrate_label', 'Bitrate')}</div>
               <div className="flex items-center gap-2">
                 <input
                   type="range"
@@ -1691,7 +1726,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             </div>
 
             <div className="flex flex-col gap-1">
-              <div className="text-[13px] font-medium text-textColor">Poster / Thumbnail</div>
+              <div className="text-[13px] font-medium text-textColor">{t('designer_poster_thumbnail_label', 'Poster / Thumbnail')}</div>
               <div className="flex items-center gap-2">
                 <input
                   type="file"
@@ -1711,10 +1746,10 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                         setPosterSource('custom');
                         setPosterUrl(data.path);
                       } else {
-                        toaster.show('Poster upload failed', 'warning');
+                        toaster.show(t('designer_poster_upload_failed', 'Poster upload failed'), 'warning');
                       }
                     } catch {
-                      toaster.show('Poster upload failed', 'warning');
+                      toaster.show(t('designer_poster_upload_failed', 'Poster upload failed'), 'warning');
                     } finally {
                       setPosterUploading(false);
                     }
@@ -1726,7 +1761,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     onClick={() => setPosterUrl('')}
                     className="text-[11px] text-dangerText hover:text-red-300"
                   >
-                    Clear
+                    {t('clear', 'Clear')}
                   </button>
                 )}
               </div>
@@ -1736,7 +1771,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             </div>
 
             <div className="text-[11px] text-newTextColor/65 mt-1">
-              Video renders are processed asynchronously. You can check progress on this screen after starting.
+              {t('designer_video_renders_async_description', 'Video renders are processed asynchronously. You can check progress on this screen after starting.')}
             </div>
           </div>
 
@@ -1745,14 +1780,14 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={goToFolder}
               className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              Back
+              {t('back', 'Back')}
             </button>
             <button
               onClick={startVideoRender}
               disabled={isEnqueuing}
               className="px-4 h-[38px] rounded-[6px] bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 disabled:opacity-50 transition-all"
             >
-              {isEnqueuing ? 'Enqueuing...' : 'Start Render'}
+              {isEnqueuing ? t('designer_enqueuing_ellipsis', 'Enqueuing...') : t('designer_start_render', 'Start Render')}
             </button>
           </div>
 
@@ -1766,13 +1801,13 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       {step === 'video-rendering' && (
         <>
           <div className="flex flex-col items-center gap-3 py-4">
-            <div className="text-[15px] font-semibold text-textColor">Rendering Video</div>
+            <div className="text-[15px] font-semibold text-textColor">{t('designer_rendering_video_title', 'Rendering Video')}</div>
 
             {renderStatus === 'rendering' && (
               <>
                 <div className="w-full">
                   <div className="flex justify-between text-[12px] text-newTextColor/60 mb-1">
-                    <span>Processing...</span>
+                    <span>{t('designer_processing_ellipsis', 'Processing...')}</span>
                     <span>{renderProgress}%</span>
                   </div>
                   <div className="w-full h-[8px] rounded-[4px] bg-newBgColorInner border border-studioBorder overflow-hidden">
@@ -1793,7 +1828,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                       strokeDasharray="31.4 31.4"
                     />
                   </svg>
-                  Processing video render...
+                  {t('designer_processing_video_render_ellipsis', 'Processing video render...')}
                 </div>
               </>
             )}
@@ -1804,7 +1839,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <circle cx="12" cy="12" r="11" fill="#22c55e" stroke="none" />
                   <path d="M7 12.5l3 3 7-7" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
-                <div className="text-[14px] text-textColor font-medium">Render Complete</div>
+                <div className="text-[14px] text-textColor font-medium">{t('designer_render_complete', 'Render Complete')}</div>
                 <div className="w-full flex flex-col gap-1">
                   {renderJobs.filter((j) => j.status === 'completed' && j.artifactUrl).map((j) => (
                     <a
@@ -1821,7 +1856,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
                 {renderedPosterUrl && (
                   <div className="w-full flex flex-col gap-2 mt-1">
-                    <div className="text-[13px] font-medium text-textColor">Poster / Thumbnail</div>
+                    <div className="text-[13px] font-medium text-textColor">{t('designer_poster_thumbnail_label', 'Poster / Thumbnail')}</div>
                     <div className="flex items-center gap-3">
                       <button
                         type="button"
@@ -1834,7 +1869,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                         {/* eslint-disable-next-line @next/next/no-img-element -- data URL preview */}
                         <img
                           src={renderedPosterUrl}
-                          alt="Rendered poster"
+                          alt={t('designer_rendered_poster_alt', 'Rendered poster')}
                           className="w-full h-full object-cover"
                         />
                       </button>
@@ -1850,7 +1885,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                               : 'border border-studioBorder text-textColor hover:bg-boxHover'
                           }`}
                         >
-                          Use rendered poster
+                          {t('designer_use_rendered_poster', 'Use rendered poster')}
                         </button>
                         <label
                           className={`text-[12px] px-3 py-1.5 rounded-[5px] cursor-pointer transition-all ${
@@ -1877,17 +1912,17 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                                   setPosterSource('custom');
                                   setPosterUrl(data.path);
                                 } else {
-                                  toaster.show('Poster upload failed', 'warning');
+                                  toaster.show(t('designer_poster_upload_failed', 'Poster upload failed'), 'warning');
                                 }
                               } catch {
-                                toaster.show('Poster upload failed', 'warning');
+                                toaster.show(t('designer_poster_upload_failed', 'Poster upload failed'), 'warning');
                               } finally {
                                 setPosterUploading(false);
                               }
                             }}
                             className="hidden"
                           />
-                          {posterUploading ? 'Uploading...' : 'Upload custom'}
+                          {posterUploading ? t('designer_uploading_ellipsis', 'Uploading...') : t('designer_upload_custom', 'Upload custom')}
                         </label>
                       </div>
                     </div>
@@ -1905,7 +1940,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <circle cx="12" cy="12" r="11" fill="#ef4444" stroke="none" />
                   <path d="M8 8l8 8M16 8l-8 8" stroke="white" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                <div className="text-[14px] text-dangerText font-medium">Render Failed</div>
+                <div className="text-[14px] text-dangerText font-medium">{t('designer_render_failed_title', 'Render Failed')}</div>
                 {renderError && (
                   <div className="text-[12px] text-newTextColor/60 text-center">{renderError}</div>
                 )}
@@ -1921,14 +1956,14 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               }}
               className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              Back
+              {t('back', 'Back')}
             </button>
             {renderStatus === 'completed' && (
               <button
                 onClick={handleVideoDone}
                 className="px-4 h-[38px] rounded-[6px] bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 transition-all"
               >
-                Done
+                {t('done', 'Done')}
               </button>
             )}
             {renderStatus === 'failed' && (
@@ -1936,7 +1971,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                 onClick={startVideoRender}
                 className="px-4 h-[38px] rounded-[6px] bg-green-600 text-white text-[13px] font-medium hover:bg-green-700 transition-all"
               >
-                Retry
+                {t('retry', 'Retry')}
               </button>
             )}
           </div>

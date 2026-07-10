@@ -7,6 +7,7 @@ import {
   RecommendationItem,
 } from '@gitroom/frontend/components/analytics-v2/hooks/useRecommendations';
 import { EmptyState, TabSkeleton } from '@gitroom/frontend/components/analytics-v2/kit/states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const priorityClass = (priority: number) => {
   const base = 'text-[10px] font-semibold px-[6px] py-[2px] rounded-full border';
@@ -17,6 +18,7 @@ const priorityClass = (priority: number) => {
 
 export const RecommendationsStrip: FC = () => {
   const router = useRouter();
+  const t = useT();
   const { data, isLoading } = useRecommendations();
 
   if (isLoading) return <TabSkeleton variant="list" />;
@@ -35,7 +37,11 @@ export const RecommendationsStrip: FC = () => {
           >
             <div className="flex items-center gap-[8px]">
               <span className={priorityClass(item.priority)}>
-                {item.priority === 1 ? 'High' : item.priority === 2 ? 'Medium' : 'Low'}
+                {item.priority === 1
+                  ? t('priority_high', 'High')
+                  : item.priority === 2
+                    ? t('priority_medium', 'Medium')
+                    : t('priority_low', 'Low')}
               </span>
               <span className="text-[11px] text-newTableText capitalize">
                 {item.type.replace(/_/g, ' ')}

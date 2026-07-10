@@ -7,6 +7,10 @@ const push = vi.fn();
 const mockShow = vi.fn();
 const mockGenerate = vi.fn();
 
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT: () => (_key: string, fallback: string) => fallback,
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
 }));

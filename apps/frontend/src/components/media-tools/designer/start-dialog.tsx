@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useCallback, useMemo, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
 import { MyDesignsPanel } from './panels/my-designs-panel';
 import { TemplatesPanel } from './panels/templates-panel';
@@ -23,6 +24,7 @@ type Step = 'home' | 'formats' | 'custom';
 // existing design/template, or create a New one and pick ≥1 format. This
 // replaces the silent "blank → Instagram Post" default.
 export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) => {
+  const translate = useT();
   const [step, setStep] = useState<Step>('home');
   const [mode, setMode] = useState<'image' | 'video'>('image');
   const [tab, setTab] = useState<'my-designs' | 'templates'>('my-designs');
@@ -109,9 +111,9 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
       <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-studioBorder bg-newBgColorInner shadow-2xl">
         {step === 'home' && (
           <div className="p-6">
-            <h2 className="text-[20px] font-bold text-textColor mb-1">Start a design</h2>
+            <h2 className="text-[20px] font-bold text-textColor mb-1">{translate('designer_start_a_design_title', 'Start a design')}</h2>
             <p className="text-[13px] text-textColor/50 mb-5">
-              Create a new design or open an existing one.
+              {translate('designer_start_dialog_subtitle', 'Create a new design or open an existing one.')}
             </p>
 
             <div className="grid grid-cols-2 gap-3 mb-6">
@@ -120,16 +122,16 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                 className="flex flex-col items-start gap-1 p-4 rounded-xl border border-studioBorder hover:border-designerAccent hover:bg-designerAccent/5 transition-colors text-left"
               >
                 <span className="text-[22px]">🖼️</span>
-                <span className="text-[14px] font-semibold text-textColor">New Photo</span>
-                <span className="text-[11px] text-textColor/50">Image design, one or more formats</span>
+                <span className="text-[14px] font-semibold text-textColor">{translate('designer_new_photo', 'New Photo')}</span>
+                <span className="text-[11px] text-textColor/50">{translate('designer_new_photo_description', 'Image design, one or more formats')}</span>
               </button>
               <button
                 onClick={() => startNew('video')}
                 className="flex flex-col items-start gap-1 p-4 rounded-xl border border-studioBorder hover:border-designerAccent hover:bg-designerAccent/5 transition-colors text-left"
               >
                 <span className="text-[22px]">🎬</span>
-                <span className="text-[14px] font-semibold text-textColor">New Video</span>
-                <span className="text-[11px] text-textColor/50">Video design with a timeline</span>
+                <span className="text-[14px] font-semibold text-textColor">{translate('designer_new_video', 'New Video')}</span>
+                <span className="text-[11px] text-textColor/50">{translate('designer_new_video_description', 'Video design with a timeline')}</span>
               </button>
             </div>
 
@@ -144,7 +146,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                       : 'text-textColor/50 hover:text-textColor/80'
                   }`}
                 >
-                  {t === 'my-designs' ? 'Recent Designs' : 'Templates'}
+                  {t === 'my-designs' ? translate('designer_recent_designs', 'Recent Designs') : translate('designer_templates', 'Templates')}
                 </button>
               ))}
             </div>
@@ -162,19 +164,21 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-[18px] font-bold text-textColor">
-                Choose {mode === 'video' ? 'a video format' : 'formats'}
+                {mode === 'video'
+                  ? translate('designer_choose_a_video_format', 'Choose a video format')
+                  : translate('designer_choose_formats', 'Choose formats')}
               </h2>
               <button
                 onClick={() => setStep('home')}
                 className="text-[13px] text-textColor/50 hover:text-textColor transition-colors"
               >
-                ← Back
+                {translate('designer_back_arrow', '← Back')}
               </button>
             </div>
             <p className="text-[12px] text-textColor/50 mb-4">
               {mode === 'video'
-                ? 'Pick one format for your video.'
-                : 'Pick one or more — each becomes a linked output tab. (min 1)'}
+                ? translate('designer_pick_one_format_for_video', 'Pick one format for your video.')
+                : translate('designer_pick_one_or_more_formats', 'Pick one or more — each becomes a linked output tab. (min 1)')}
             </p>
 
             <div className="overflow-y-auto max-h-[46vh] -mx-1 px-1 py-1">
@@ -233,14 +237,14 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                 onClick={() => setStep('custom')}
                 className="text-[13px] text-btnPrimaryAccent hover:underline"
               >
-                Custom size…
+                {translate('designer_custom_size_ellipsis', 'Custom size…')}
               </button>
               <button
                 onClick={createFromFormats}
                 disabled={selected.length === 0}
                 className="px-5 py-2.5 rounded-lg text-[14px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                Create{selected.length ? ` (${selected.length})` : ''}
+                {translate('designer_create', 'Create')}{selected.length ? ` (${selected.length})` : ''}
               </button>
             </div>
           </div>
@@ -249,12 +253,12 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
         {step === 'custom' && (
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[18px] font-bold text-textColor">Custom size</h2>
+              <h2 className="text-[18px] font-bold text-textColor">{translate('designer_custom_size_title', 'Custom size')}</h2>
               <button
                 onClick={() => setStep('formats')}
                 className="text-[13px] text-textColor/50 hover:text-textColor transition-colors"
               >
-                ← Back
+                {translate('designer_back_arrow', '← Back')}
               </button>
             </div>
             <div className="flex items-center gap-2 mb-5">
@@ -262,7 +266,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                 type="number"
                 value={cw}
                 onChange={(e) => setCw(e.target.value)}
-                placeholder="W"
+                placeholder={translate('designer_width_short', 'W')}
                 className="w-full h-[40px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <span className="text-textColor/40">×</span>
@@ -270,7 +274,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                 type="number"
                 value={ch}
                 onChange={(e) => setCh(e.target.value)}
-                placeholder="H"
+                placeholder={translate('designer_height_short', 'H')}
                 className="w-full h-[40px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
               />
             </div>
@@ -279,7 +283,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                 onClick={createCustom}
                 className="px-5 py-2.5 rounded-lg text-[14px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80 transition-colors"
               >
-                Create {mode === 'video' ? 'video' : 'design'}
+                {mode === 'video' ? translate('designer_create_video', 'Create video') : translate('designer_create_design', 'Create design')}
               </button>
             </div>
           </div>

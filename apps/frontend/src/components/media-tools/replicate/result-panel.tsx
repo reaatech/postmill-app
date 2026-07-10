@@ -5,12 +5,24 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useReplicateStore } from './replicate.store';
 import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { VideoPlayer } from './players/video-player';
 import { ElapsedTimer } from './elapsed-timer';
 import { useGenerate } from './use-generate';
 import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 
 type Medium = 'image' | 'video' | 'audio';
+
+function mediumNoun(t: (key: string, fallback: string) => string, medium: Medium): string {
+  switch (medium) {
+    case 'image':
+      return t('media_noun_image', 'image');
+    case 'video':
+      return t('media_noun_video', 'video');
+    case 'audio':
+      return t('media_noun_audio', 'audio');
+  }
+}
 
 function useJobPoll(jobId: string | null) {
   const fetch = useFetch();
@@ -80,19 +92,20 @@ function ActionOverlay({
   onRegenerate: () => void;
   onNew: () => void;
 }) {
+  const t = useT();
   const btn =
     'flex items-center justify-center w-9 h-9 rounded-full bg-black/60 backdrop-blur text-white hover:bg-black/80 transition-colors';
   return (
     <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
       {onDownload && (
-        <button type="button" onClick={onDownload} className={btn} title="Download">
+        <button type="button" onClick={onDownload} className={btn} title={t('download', 'Download')}>
           ⤓
         </button>
       )}
-      <button type="button" onClick={onRegenerate} className={btn} title="Regenerate">
+      <button type="button" onClick={onRegenerate} className={btn} title={t('regenerate', 'Regenerate')}>
         ⟳
       </button>
-      <button type="button" onClick={onNew} className={btn} title="New">
+      <button type="button" onClick={onNew} className={btn} title={t('new_label', 'New')}>
         ＋
       </button>
     </div>
@@ -100,6 +113,7 @@ function ActionOverlay({
 }
 
 function DetailsCard() {
+  const t = useT();
   const meta = useReplicateStore((s) => s.resultMeta);
   const estimate = useReplicateStore((s) => s.estimate);
   if (!meta) return null;
@@ -110,12 +124,12 @@ function DetailsCard() {
     <div className="mt-4 rounded-xl border border-studioBorder bg-newBgColorInner p-3">
       <div className="flex gap-6 mb-2">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-newTextColor/65">Model</div>
+          <div className="text-[10px] uppercase tracking-wider text-newTextColor/65">{t('model', 'Model')}</div>
           <div className="text-sm text-textColor">{meta.modelName}</div>
         </div>
         {estimate && !estimate.approximate && (
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-newTextColor/65">Est. cost</div>
+            <div className="text-[10px] uppercase tracking-wider text-newTextColor/65">{t('est_cost', 'Est. cost')}</div>
             <div className="text-sm text-green-700 dark:text-green-400">${estimate.usd.toFixed(4)}</div>
           </div>
         )}
@@ -139,6 +153,7 @@ function DetailsCard() {
 }
 
 export function ResultPanel({ medium }: { medium: Medium }) {
+  const t = useT();
   const runState = useReplicateStore((s) => s.runState);
   const result = useReplicateStore((s) => s.result);
   const error = useReplicateStore((s) => s.error);
@@ -168,10 +183,10 @@ export function ResultPanel({ medium }: { medium: Medium }) {
       setRunState('success');
     }
     if (jobData?.status === 'failed') {
-      setError('Generation failed');
+      setError(t('generation_failed', 'Generation failed'));
       setRunState('error');
     }
-  }, [jobData, setResult, setRunState, setError, resultJobId]);
+  }, [jobData, setResult, setRunState, setError, resultJobId, t]);
 
   const handleNew = useCallback(() => {
     setResult(null);
@@ -191,12 +206,12 @@ export function ResultPanel({ medium }: { medium: Medium }) {
         const data = await res.json();
         if (data.path) setSavedPaths((prev) => ({ ...prev, [url]: data.path }));
       } catch {
-        setError('Failed to save to Files');
+        setError(t('failed_to_save_to_files', 'Failed to save to Files'));
       } finally {
         setSaving(false);
       }
     },
-    [fetch, saveFolderId, setError]
+    [fetch, saveFolderId, setError, t]
   );
 
   const handleDownload = useCallback((url: string) => {
@@ -221,8 +236,10 @@ export function ResultPanel({ medium }: { medium: Medium }) {
       <Frame>
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-studioBorder py-20 text-center">
           <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
-          <p className="text-newTextColor/70">Nothing generated yet</p>
-          <p className="text-xs text-newTextColor/65">Pick a model and configure it to get started.</p>
+          <p className="text-newTextColor/70">{t('nothing_generated_yet', 'Nothing generated yet')}</p>
+          <p className="text-xs text-newTextColor/65">
+            {t('pick_model_configure_start', 'Pick a model and configure it to get started.')}
+          </p>
         </div>
       </Frame>
     );
@@ -234,19 +251,21 @@ export function ResultPanel({ medium }: { medium: Medium }) {
       <Frame>
         <div className="flex flex-col gap-2">
           <div className="text-xs text-newTextColor/65">
-            Example of <span className="text-btnPrimaryAccent">{selectedModel.id}</span>
+            {t('example_of', 'Example of')} <span className="text-btnPrimaryAccent">{selectedModel.id}</span>
           </div>
           {selectedModel.coverImageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external provider asset
             <img
               src={selectedModel.coverImageUrl}
-              alt="Model example"
+              alt={t('model_example_alt', 'Model example')}
               className="w-full rounded-2xl border border-studioBorder object-contain max-h-[60vh]"
             />
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-studioBorder py-20">
               <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
-              <p className="text-xs text-newTextColor/65">No example available — generate to see output.</p>
+              <p className="text-xs text-newTextColor/65">
+                {t('no_example_available', 'No example available — generate to see output.')}
+              </p>
             </div>
           )}
         </div>
@@ -260,9 +279,13 @@ export function ResultPanel({ medium }: { medium: Medium }) {
       <Frame>
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-studioBorder py-20">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-designerAccent" />
-          <p className="text-newTextColor/80">Generating your {medium}…</p>
+          <p className="text-newTextColor/80">
+            {t('generating_your_medium', 'Generating your {{medium}}…', { medium: mediumNoun(t, medium) })}
+          </p>
           <p className="text-xs text-newTextColor/65">
-            {medium === 'image' ? 'This usually takes 10–30 seconds.' : 'This can take a few minutes.'}
+            {medium === 'image'
+              ? t('takes_10_30_seconds', 'This usually takes 10–30 seconds.')
+              : t('takes_few_minutes', 'This can take a few minutes.')}
           </p>
           <ElapsedTimer />
         </div>
@@ -279,26 +302,29 @@ export function ResultPanel({ medium }: { medium: Medium }) {
     return (
       <Frame>
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-16 px-6">
-          <p className="text-dangerText text-center">{error || 'Generation failed'}</p>
+          <p className="text-dangerText text-center">{error || t('generation_failed', 'Generation failed')}</p>
           {!isInputError && (
             <p className="text-xs text-newTextColor/65 text-center max-w-sm">
-              If a generation fails for no clear reason, check your{' '}
+              {t('check_replicate_balance_prefix', 'If a generation fails for no clear reason, check your')}{' '}
               <a
                 href="https://replicate.com/account/billing"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-btnPrimaryAccent underline"
               >
-                Replicate balance
+                {t('replicate_balance_link', 'Replicate balance')}
               </a>{' '}
-              — low or empty credit causes rate-limiting and failed runs.
+              {t(
+                'check_replicate_balance_suffix',
+                '— low or empty credit causes rate-limiting and failed runs.'
+              )}
             </p>
           )}
           <button
             onClick={() => generate()}
             className="px-4 py-2 rounded-lg bg-btnSimple text-textColor text-sm hover:bg-boxHover transition-colors"
           >
-            Retry
+            {t('retry', 'Retry')}
           </button>
         </div>
       </Frame>
@@ -315,7 +341,10 @@ export function ResultPanel({ medium }: { medium: Medium }) {
         <div className="flex flex-col gap-3">
           {selectedCategory === 'caption' && (
             <p className="text-xs text-newTextColor/70">
-              Captions are burned into the video — the output is an MP4, not a subtitle file.
+              {t(
+                'captions_burned_note',
+                'Captions are burned into the video — the output is an MP4, not a subtitle file.'
+              )}
             </p>
           )}
 
@@ -324,7 +353,11 @@ export function ResultPanel({ medium }: { medium: Medium }) {
               {urls.map((url, i) => (
                 <div key={url} className="group relative">
                   {/* eslint-disable-next-line @next/next/no-img-element -- external provider result */}
-                  <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-2xl border border-studioBorder" />
+                  <img
+                    src={url}
+                    alt={t('result_number_alt', 'Result {{number}}', { number: i + 1 })}
+                    className="w-full rounded-2xl border border-studioBorder"
+                  />
                   <ActionOverlay
                     onDownload={() => handleDownload(url)}
                     onRegenerate={() => generate()}
@@ -367,14 +400,14 @@ export function ResultPanel({ medium }: { medium: Medium }) {
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
                   </svg>
-                  {saving ? 'Saving…' : 'Save to Files'}
+                  {saving ? t('saving_ellipsis', 'Saving…') : t('save_to_files', 'Save to Files')}
                 </button>
               ) : (
                 <button
                   onClick={openInFiles}
                   className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
                 >
-                  Open in Files
+                  {t('open_in_files', 'Open in Files')}
                 </button>
               )}
               {['image', 'audio', 'video'].includes(result.kind) && (
@@ -387,7 +420,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
                   }
                   className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-btnPrimaryAccent text-xs hover:bg-designerAccent/30 transition-colors"
                 >
-                  Open in Designer
+                  {t('open_in_designer', 'Open in Designer')}
                 </button>
               )}
             </div>
@@ -399,24 +432,24 @@ export function ResultPanel({ medium }: { medium: Medium }) {
                 onClick={() => navigator.clipboard.writeText(result.text!)}
                 className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
               >
-                Copy
+                {t('copy', 'Copy')}
               </button>
               <button
                 onClick={() => downloadBlob(result.text!, 'transcript.txt', 'text/plain')}
                 className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
               >
-                Download .txt
+                {t('download_txt', 'Download .txt')}
               </button>
               {result.segments && result.segments.length > 0 && (
                 <button
                   onClick={() => downloadBlob(generateSrt(result.segments!), 'transcript.srt', 'text/plain')}
                   className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
                 >
-                  Download .srt
+                  {t('download_srt', 'Download .srt')}
                 </button>
               )}
               <button onClick={handleNew} className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors">
-                New
+                {t('new_label', 'New')}
               </button>
             </div>
           )}

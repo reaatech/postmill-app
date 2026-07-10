@@ -4,6 +4,7 @@ import {
   ProviderSurfaceDescriptor,
   SurfaceFetch,
 } from '../provider-surface.types';
+import { createFetchError } from '../../fetch-error';
 
 /**
  * AI / LLM provider settings surface descriptor (migrated from
@@ -90,8 +91,8 @@ export const aiDescriptor: ProviderSurfaceDescriptor<AiMeta> = {
       fetch('/settings/ai/config'),
       fetch('/settings/ai/providers'),
     ]);
-    if (!configRes.ok) throw new Error('Failed to load AI config');
-    if (!providersRes.ok) throw new Error('Failed to load AI providers');
+    if (!configRes.ok) throw createFetchError('failed_to_load_ai_config', 'Failed to load AI config');
+    if (!providersRes.ok) throw createFetchError('failed_to_load_ai_providers', 'Failed to load AI providers');
 
     const config: OrgConfigResponse = await configRes.json();
     const providers: ProviderInfo[] = await providersRes.json();

@@ -2,6 +2,7 @@
 
 import React, { FC, useCallback, useMemo, useState } from 'react';
 import type { DesignerElement } from '../designer.store';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface IconsPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -55,6 +56,7 @@ const ICONS: IconDef[] = [
 const SIZE = 120;
 
 export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
+  const t = useT();
   const [query, setQuery] = useState('');
   const fill = '#2B5CD3';
 
@@ -100,13 +102,13 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search icons…"
+        placeholder={t('icons_panel_search_icons_placeholder', 'Search icons…')}
         className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-studioBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
       />
 
       {filtered.length === 0 ? (
         <div className="text-[12px] text-newTextColor/60 text-center py-4">
-          No icons found
+          {t('icons_panel_no_icons_found', 'No icons found')}
         </div>
       ) : (
         <div className="grid grid-cols-4 gap-2">

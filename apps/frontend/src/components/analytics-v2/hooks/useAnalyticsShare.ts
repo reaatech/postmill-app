@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 export interface AnalyticsShareConfigBody {
   integrations?: string[];
@@ -28,7 +29,7 @@ export const useAnalyticsShare = () => {
   const load = useCallback(
     async (path: string) => {
       const res = await fetch(path);
-      if (!res.ok) throw new Error('Failed to load share config');
+      if (!res.ok) throw createFetchError('share_config_fetch_failed', 'Failed to load share config');
       return res.json() as Promise<AnalyticsShareConfig>;
     },
     [fetch]
@@ -48,7 +49,7 @@ export const useAnalyticsShare = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config),
       });
-      if (!res.ok) throw new Error('Failed to update share');
+      if (!res.ok) throw createFetchError('share_update_failed', 'Failed to update share');
       const data = (await res.json()) as AnalyticsShareConfig;
       await mutate(data, { revalidate: false });
       return data;
@@ -58,7 +59,7 @@ export const useAnalyticsShare = () => {
 
   const disable = useCallback(async () => {
     const res = await fetch(key, { method: 'DELETE' });
-    if (!res.ok) throw new Error('Failed to disable share');
+    if (!res.ok) throw createFetchError('share_disable_failed', 'Failed to disable share');
     await mutate();
   }, [fetch, mutate]);
 

@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useReplicateStore } from './replicate.store';
 
 // Category → execution routing (mirrors the backend allowlist execution modes).
@@ -59,6 +60,7 @@ export function missingRequiredFields(
  */
 export function useGenerate() {
   const fetch = useFetch();
+  const t = useT();
 
   return useCallback(async () => {
     const store = useReplicateStore.getState();
@@ -69,7 +71,11 @@ export function useGenerate() {
     const inputSchema = model.inputSchema as { required?: string[] } | undefined;
     const missing = missingRequiredFields(inputSchema, store.formInput);
     if (missing.length > 0) {
-      store.setError(`Missing required fields: ${missing.join(', ')}`);
+      store.setError(
+        t('missing_required_fields_note', 'Missing required fields: {{fields}}', {
+          fields: missing.join(', '),
+        })
+      );
       store.setRunState('error');
       return;
     }
@@ -94,7 +100,7 @@ export function useGenerate() {
             ? 'video'
             : 'audio';
       } else {
-        throw new Error('Unknown category');
+        throw new Error(t('unknown_category', 'Unknown category'));
       }
 
       const res = await fetch(`/media/replicate${endpoint}`, {
@@ -120,11 +126,11 @@ export function useGenerate() {
         store.setResult({ kind: operation as 'image' | 'video' | 'audio', urls: [], jobId: data.jobId });
         store.addToHistory({ jobId: data.jobId, modelId: model.id });
       } else {
-        throw new Error(data.error || 'Generation failed');
+        throw new Error(data.error || t('generation_failed', 'Generation failed'));
       }
     } catch (err: any) {
-      store.setError(err?.message || 'Generation failed');
+      store.setError(err?.message || t('generation_failed', 'Generation failed'));
       store.setRunState('error');
     }
-  }, [fetch]);
+  }, [fetch, t]);
 }

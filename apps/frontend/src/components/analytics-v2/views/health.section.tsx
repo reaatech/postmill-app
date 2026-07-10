@@ -5,6 +5,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useHealth, HealthItem } from '../hooks/useHealth';
 import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
 import { ChannelAvatar } from '../kit/channel-avatar';
+import { FetchError } from '../utils';
 
 // Data-health panel (6.6, trust surface). Lists every integration with whether
 // its provider exposes analytics, its last snapshot date, window coverage, and
@@ -91,10 +92,11 @@ export const HealthSection: FC = () => {
   }
 
   if (error) {
+    const fe = error as FetchError;
     return (
       <ErrorState
         title={t('analytics_health_error', 'Failed to load channel health')}
-        message={error.message}
+        message={fe.messageKey ? t(fe.messageKey, fe.message) : fe.message}
         onRetry={() => mutate()}
       />
     );

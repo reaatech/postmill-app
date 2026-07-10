@@ -9,6 +9,15 @@ const mockRetry = vi.fn();
 const mockDismiss = vi.fn();
 const mockShow = vi.fn();
 
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT:
+    () =>
+    (_key: string, fallback: string, vars?: Record<string, unknown>) =>
+      vars
+        ? fallback.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(vars[k] ?? ''))
+        : fallback,
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
 }));
@@ -126,7 +135,7 @@ describe('AttentionFeed', () => {
     mockHook.mockReturnValue({ data: { items }, isLoading: false, retryPost: mockRetry, dismissAnomaly: mockDismiss });
 
     render(<AttentionFeed />);
-    fireEvent.click(await screen.findByText('Show 2 failed posts'));
+    fireEvent.click(await screen.findByText(/Show 2 failed post/));
 
     expect(screen.getByText('X / @acct')).toBeTruthy();
     expect(screen.getByText('LinkedIn')).toBeTruthy();

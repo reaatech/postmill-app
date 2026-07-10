@@ -2,6 +2,7 @@
 
 import React, { FC, ReactNode } from 'react';
 import { readableTextColor } from '@gitroom/frontend/components/shared/readable-text-color';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 type Entry = { viewBox?: string; color?: string; node?: ReactNode; full?: boolean; src?: string };
 
@@ -199,6 +200,7 @@ const ProviderIcon: FC<{
   name?: string;
   size?: number;
 }> = ({ identifier, name, size = 28 }) => {
+  const t = useT();
   const icon = ICONS[identifier];
   // Larger, rounded, masked tile: full-bleed icons fill the mask edge-to-edge;
   // bare single-glyph logos get a larger glyph centred on the tile.
@@ -212,7 +214,7 @@ const ProviderIcon: FC<{
       className="inline-flex items-center justify-center shrink-0 overflow-hidden text-textColor bg-newBgColor ring-1 ring-inset ring-newTableBorder"
       style={{ width: size, height: size, borderRadius: radius }}
       role="img"
-      aria-label={name ? `${name} icon` : `${identifier} icon`}
+      aria-label={t('provider_icon_label', '{{name}} icon', { name: name || identifier })}
     >
       {icon?.src ? (
         // eslint-disable-next-line @next/next/no-img-element

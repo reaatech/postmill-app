@@ -3,6 +3,7 @@
 import React, { FC, useCallback, useMemo } from 'react';
 import clsx from 'clsx';
 import { EmptyState } from './empty-state';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export interface Column<T> {
   key: string;
@@ -111,6 +112,7 @@ export function DataTable<T>({
   onRowClick,
   className,
 }: DataTableProps<T>) {
+  const t = useT();
   const totalPages = total !== undefined ? Math.ceil(total / limit) : 0;
 
   const allSelected = useMemo(() => {
@@ -189,14 +191,14 @@ export function DataTable<T>({
           className,
         )}
       >
-        <div className="text-[var(--negative,#f97066)] text-[14px]">Failed to load data</div>
+        <div className="text-[var(--negative,#f97066)] text-[14px]">{t('failed_to_load_data', 'Failed to load data')}</div>
         {error.message && <div className="text-[12px] text-newTableText">{error.message}</div>}
         {onRetry && (
           <button
             onClick={onRetry}
             className="px-[12px] py-[6px] text-[12px] rounded-[6px] bg-newTableHeader border border-newTableBorder hover:border-newTableText/30 transition-colors"
           >
-            Try again
+            {t('try_again', 'Try again')}
           </button>
         )}
       </div>
@@ -208,7 +210,7 @@ export function DataTable<T>({
       <div className={clsx(className)}>
         <EmptyState
           icon={emptyState?.icon}
-          title={emptyState?.title || 'No data'}
+          title={emptyState?.title || t('no_data', 'No data')}
           description={emptyState?.description}
           action={emptyState?.action}
         />
@@ -232,7 +234,7 @@ export function DataTable<T>({
                 <th className="w-[40px] py-[14px] px-[16px] text-left">
                   <input
                     type="checkbox"
-                    aria-label="Select all rows"
+                    aria-label={t('select_all_rows', 'Select all rows')}
                     checked={allSelected && data.length > 0}
                     onChange={handleSelectAll}
                     className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer"
@@ -293,7 +295,7 @@ export function DataTable<T>({
                     <td className="py-[14px] px-[16px]" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        aria-label="Select row"
+                        aria-label={t('select_row', 'Select row')}
                         checked={isSelected}
                         onChange={() => handleSelect(id)}
                         className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer"
@@ -325,7 +327,7 @@ export function DataTable<T>({
       {total !== undefined && totalPages > 1 && (
         <div className="flex items-center justify-between px-[16px] py-[12px] border-t border-newTableBorder/60">
           <div className="text-[12px] text-newTableText">
-            {startItem}–{endItem} of {total}
+            {t('data_table_range_of_total', '{{startItem}}–{{endItem}} of {{total}}', { startItem, endItem, total })}
           </div>
           <div className="flex items-center gap-[8px]">
             <button
@@ -333,14 +335,14 @@ export function DataTable<T>({
               onClick={() => onPageChange?.(page! - 1)}
               className="px-[8px] py-[4px] text-[12px] rounded-[6px] bg-newTableHeader border border-newTableBorder disabled:opacity-30 hover:border-newTableText/30 transition-colors"
             >
-              Previous
+              {t('previous', 'Previous')}
             </button>
             <button
               disabled={!hasNextPage}
               onClick={() => onPageChange?.(page! + 1)}
               className="px-[8px] py-[4px] text-[12px] rounded-[6px] bg-newTableHeader border border-newTableBorder disabled:opacity-30 hover:border-newTableText/30 transition-colors"
             >
-              Next
+              {t('next', 'Next')}
             </button>
           </div>
         </div>

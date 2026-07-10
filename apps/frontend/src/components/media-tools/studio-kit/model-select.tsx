@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useStudioModels } from './hooks';
 
 // Searchable model combobox for hub studios. Populates from the live provider catalog
@@ -21,6 +22,7 @@ export const ModelSelect: FC<{
   staticOptions?: Option[];
   onChange: (value: string) => void;
 }> = ({ provider, operation, value, staticOptions = [], onChange }) => {
+  const t = useT();
   const { data: fetched, isLoading } = useStudioModels(provider, operation, true);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -62,9 +64,13 @@ export const ModelSelect: FC<{
     <div className="relative">
       <input
         type="text"
-        aria-label="Model"
+        aria-label={t('model', 'Model')}
         value={open ? query : selectedLabel}
-        placeholder={isLoading ? 'Loading models…' : 'Search or type a model id…'}
+        placeholder={
+          isLoading
+            ? t('loading_models', 'Loading models…')
+            : t('search_or_type_model_id', 'Search or type a model id…')
+        }
         onFocus={() => {
           setOpen(true);
           setQuery('');
@@ -86,7 +92,7 @@ export const ModelSelect: FC<{
               }}
               className="block w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-boxHover transition-colors"
             >
-              Use “{trimmed}”
+              {t('use_typed_model', 'Use “{{model}}”', { model: trimmed })}
             </button>
           )}
           {filtered.map((o) => (

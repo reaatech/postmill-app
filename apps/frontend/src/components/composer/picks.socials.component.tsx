@@ -163,7 +163,7 @@ export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
             </div>
           ) : (
             <div className="text-newTableText">
-              {t('select_channels', 'Select channels')}
+              {t('select_channels', 'Select Channels')}
             </div>
           )}
           {selectedList.length > 0 && (
@@ -171,7 +171,7 @@ export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
               {selectedList.length}{' '}
               {selectedList.length === 1
                 ? t('channel', 'channel')
-                : t('channels', 'channels')}
+                : t('channels', 'Channels')}
             </span>
           )}
           <DropdownArrowIcon rotated={open} />

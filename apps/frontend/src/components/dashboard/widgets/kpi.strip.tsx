@@ -5,6 +5,7 @@ import { StatTile } from '@gitroom/frontend/components/analytics-v2/kit/stat-til
 import { useOverview } from '@gitroom/frontend/components/analytics-v2/hooks/useOverview';
 import { useDashboardSummary } from '../hooks/useDashboardSummary';
 import { KPI } from '@gitroom/frontend/components/analytics-v2/utils';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const staticKPI = (label: string, total: number): KPI => ({
   metric: label,
@@ -23,6 +24,7 @@ interface KpiStripProps {
 }
 
 export const KpiStrip: FC<KpiStripProps> = ({ from, to, integrationIds }) => {
+  const t = useT();
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: overview, isLoading: overviewLoading } = useOverview({
     from,
@@ -34,27 +36,36 @@ export const KpiStrip: FC<KpiStripProps> = ({ from, to, integrationIds }) => {
   const kpis = useMemo(() => {
     const engagement = overview?.kpis?.[0];
     return [
-      { kpi: engagement ?? staticKPI('Engagement (7d)', 0), accent: 'var(--chart-1, #2b5cd3)' },
+      {
+        kpi: engagement ?? staticKPI(t('kpi_engagement_7d', 'Engagement (7d)'), 0),
+        accent: 'var(--chart-1, #2b5cd3)',
+      },
       {
         kpi: staticKPI(
-          'Published (7d)',
+          t('kpi_published_7d', 'Published (7d)'),
           summaryLoading ? 0 : (summary?.publishedNext7 ?? 0)
         ),
         accent: 'var(--chart-2, #32d583)',
       },
       {
-        kpi: staticKPI('Scheduled', summaryLoading ? 0 : (summary?.scheduledPosts ?? 0)),
+        kpi: staticKPI(
+          t('kpi_scheduled', 'Scheduled'),
+          summaryLoading ? 0 : (summary?.scheduledPosts ?? 0)
+        ),
         accent: 'var(--chart-5, #ffac30)',
       },
       {
         kpi: staticKPI(
-          'Unread replies',
+          t('kpi_unread_replies', 'Unread replies'),
           summaryLoading ? 0 : (summary?.commentUnreadCount ?? 0)
         ),
         accent: 'var(--chart-3, #1d9bf0)',
       },
       {
-        kpi: staticKPI('Channels', summary?.channelsConnected ?? integrationIds.length),
+        kpi: staticKPI(
+          t('channels', 'Channels'),
+          summary?.channelsConnected ?? integrationIds.length
+        ),
         accent: 'var(--chart-6, #8b90ff)',
       },
     ];
@@ -66,6 +77,7 @@ export const KpiStrip: FC<KpiStripProps> = ({ from, to, integrationIds }) => {
     summary?.channelsConnected,
     summaryLoading,
     integrationIds.length,
+    t,
   ]);
 
   const loading = summaryLoading || overviewLoading;

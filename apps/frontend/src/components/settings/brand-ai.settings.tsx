@@ -7,6 +7,7 @@ import { Slider } from '@gitroom/react/form/slider';
 import { Select } from '@gitroom/react/form/select';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 
 interface BrandProfile {
   instructions?: string;
@@ -90,7 +91,6 @@ const LANGUAGES = [
   { value: 'pt-BR', label: 'Portuguese (Brazil)' },
   { value: 'ja', label: 'Japanese' },
   { value: 'ar', label: 'Arabic' },
-  { value: 'he', label: 'Hebrew' },
   { value: 'zh-CN', label: 'Chinese (Simplified)' },
   { value: 'zh-TW', label: 'Chinese (Traditional)' },
   { value: 'ko', label: 'Korean' },
@@ -109,7 +109,7 @@ const useBrandProfile = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/ai/brand-profile');
-    if (!res.ok) throw new Error('Failed to load brand profile');
+    if (!res.ok) throw createFetchError('failed_to_load_brand_profile', 'Failed to load brand profile');
     return res.json();
   }, [fetch]);
   return useSWR<BrandProfile>('ai-brand-profile', load, {
@@ -126,7 +126,7 @@ const useUsage = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/ai/usage');
-    if (!res.ok) throw new Error('Failed to load AI usage');
+    if (!res.ok) throw createFetchError('failed_to_load_ai_usage', 'Failed to load AI usage');
     return res.json();
   }, [fetch]);
   return useSWR<UsageResponse>('ai-usage', load, {
@@ -143,7 +143,7 @@ const usePromptTemplates = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/ai/prompt-templates');
-    if (!res.ok) throw new Error('Failed to load prompt templates');
+    if (!res.ok) throw createFetchError('failed_to_load_prompt_templates', 'Failed to load prompt templates');
     return res.json();
   }, [fetch]);
   return useSWR<PromptTemplate[]>('ai-prompt-templates', load, {
@@ -160,7 +160,7 @@ const usePromptLibrary = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/ai/prompt-library');
-    if (!res.ok) throw new Error('Failed to load prompt library');
+    if (!res.ok) throw createFetchError('failed_to_load_prompt_library', 'Failed to load prompt library');
     return res.json();
   }, [fetch]);
   return useSWR<PromptLibraryItem[]>('ai-prompt-library', load, {
@@ -177,7 +177,7 @@ const useMediaProviders = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/ai/media-providers');
-    if (!res.ok) throw new Error('Failed to load media providers');
+    if (!res.ok) throw createFetchError('failed_to_load_media_providers', 'Failed to load media providers');
     return res.json();
   }, [fetch]);
   return useSWR<MediaProviderSummaryEntry[]>('ai-media-providers', load, {
@@ -246,7 +246,7 @@ export const BrandVoiceSection = () => {
   if (isLoading) {
     return (
       <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }
@@ -310,7 +310,11 @@ export const BrandVoiceSection = () => {
         {selectedPlatform && (
           <div className="flex flex-col gap-[4px]">
             <div className="text-[13px] text-newTableText">
-              {t('platform_instructions', `Instructions for ${PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label || selectedPlatform}`)}
+              {t('platform_instructions', 'Instructions for {{platform}}', {
+                platform:
+                  PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label ||
+                  selectedPlatform,
+              })}
             </div>
             <textarea
               className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
@@ -339,7 +343,7 @@ export const BrandVoiceSection = () => {
                       });
                     }}
                     className="text-red-500 hover:opacity-80 ml-[4px]"
-                    aria-label={`Remove ${platform} override`}
+                    aria-label={t('remove_platform_override', 'Remove {{platform}} override', { platform })}
                   >
                     ×
                   </button>
@@ -367,6 +371,12 @@ export const BrandVoiceSection = () => {
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
           >
+            {/* Display-only guard: a brand saved with a now-removed language
+                (e.g. legacy 'he') keeps its stored value intact — we only
+                surface a synthetic option so the selector isn't blank. */}
+            {!LANGUAGES.some((lang) => lang.value === language) && (
+              <option value={language}>{language}</option>
+            )}
             {LANGUAGES.map((lang) => (
               <option key={lang.value} value={lang.value}>
                 {lang.label}
@@ -395,7 +405,7 @@ export const UsageSection = () => {
   if (isLoading) {
     return (
       <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }
@@ -509,7 +519,7 @@ export const PromptTemplatesSection = () => {
       mutate();
       setEditingKey(null);
       setEditingContent('');
-      toaster.show(t('template_saved', 'Template saved'), 'success');
+      toaster.show(t('template_saved', 'Template saved successfully'), 'success');
     },
     [editingContent, fetch, mutate, toaster, t],
   );
@@ -524,7 +534,7 @@ export const PromptTemplatesSection = () => {
         return;
       }
       mutate();
-      toaster.show(t('template_deleted', 'Template deleted'), 'success');
+      toaster.show(t('template_deleted', 'Template deleted successfully'), 'success');
     },
     [fetch, mutate, toaster, t],
   );
@@ -549,7 +559,7 @@ export const PromptTemplatesSection = () => {
   if (isLoading) {
     return (
       <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }
@@ -570,7 +580,7 @@ export const PromptTemplatesSection = () => {
           className="text-[13px] text-textColor hover:underline shrink-0"
           onClick={() => setShowNew(!showNew)}
         >
-          {showNew ? t('cancel', 'Cancel') : t('add_template', '+ Add Template')}
+          {showNew ? t('cancel', 'Cancel') : t('add_template', 'Add Template')}
         </button>
       </div>
 
@@ -672,7 +682,7 @@ className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px]
         ))}
         {(!data || data.length === 0) && (
           <div className="text-[12px] text-newTableText">
-            {t('no_templates', 'No templates yet')}
+            {t('no_templates', 'No post templates created yet')}
           </div>
         )}
       </div>
@@ -726,7 +736,7 @@ export const PromptLibrarySection = () => {
   if (isLoading) {
     return (
       <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }
@@ -825,7 +835,7 @@ export const MediaProvidersSection = () => {
   if (isLoading) {
     return (
       <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }

@@ -7,6 +7,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { StockPreviewModal } from './stock-preview-modal';
 import { StockPhotoItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
   { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
@@ -22,7 +23,29 @@ const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
   { value: 'brown', label: 'Brown', swatch: '#795548' },
 ];
 
-const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'People', 'Abstract'];
+// Maps a swatch's stable API `value` to its translation key (labels themselves
+// live at module scope and can't call the translation hook).
+const COLOR_KEY: Record<string, string> = {
+  black_and_white: 'color_bw',
+  black: 'color_black',
+  white: 'color_white',
+  gray: 'color_gray',
+  red: 'color_red',
+  orange: 'color_orange',
+  yellow: 'color_yellow',
+  green: 'color_green',
+  blue: 'color_blue',
+  purple: 'color_purple',
+  brown: 'color_brown',
+};
+
+const SUGGESTED_SEARCHES: { key: string; label: string }[] = [
+  { key: 'suggested_search_nature', label: 'Nature' },
+  { key: 'suggested_search_city', label: 'City' },
+  { key: 'suggested_search_technology', label: 'Technology' },
+  { key: 'suggested_search_people', label: 'People' },
+  { key: 'suggested_search_abstract', label: 'Abstract' },
+];
 
 interface StockPhotosProps {
   mode?: 'browse' | 'select';
@@ -42,6 +65,7 @@ interface StockPhotosProps {
 }
 
 export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
+  const t = useT();
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -103,7 +127,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
   if (lastPage && !lastPage.configured) {
     return (
       <div className="flex items-center justify-center h-full text-newTextColor/60">
-        Stock browsing isn&apos;t configured
+        {t('stock_browsing_not_configured', "Stock browsing isn't configured")}
       </div>
     );
   }
@@ -120,14 +144,14 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search photos..."
+            placeholder={t('search_photos_placeholder', 'Search photos...')}
             className="w-full h-[44px] pl-[38px] pr-[34px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-btnPrimary text-textColor"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
-              aria-label="Clear search"
+              aria-label={t('clear_search', 'Clear search')}
               className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/60 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
             >
               ✕
@@ -138,13 +162,13 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
           <select
             value={orientation}
             onChange={e => setOrientation(e.target.value)}
-            aria-label="Filter by orientation"
+            aria-label={t('filter_by_orientation', 'Filter by orientation')}
             className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
           >
-            <option value="">All orientations</option>
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-            <option value="squarish">Square</option>
+            <option value="">{t('all_orientations', 'All orientations')}</option>
+            <option value="landscape">{t('landscape', 'Landscape')}</option>
+            <option value="portrait">{t('portrait', 'Portrait')}</option>
+            <option value="squarish">{t('square', 'Square')}</option>
           </select>
           <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/60 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -164,16 +188,18 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
               : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
           }`}
         >
-          All
+          {t('all', 'All')}
         </button>
-        {COLOR_SWATCHES.map((c) => (
+        {COLOR_SWATCHES.map((c) => {
+          const colorLabel = t(COLOR_KEY[c.value] ?? c.value, c.label);
+          return (
           <button
             key={c.value}
             type="button"
             onClick={() => setColor((cur) => (cur === c.value ? '' : c.value))}
             aria-pressed={color === c.value}
-            aria-label={`Color: ${c.label}`}
-            title={c.label}
+            aria-label={t('color_name', 'Color: {{color}}', { color: colorLabel })}
+            title={colorLabel}
             className={`relative w-[30px] h-[30px] rounded-full border transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary hover:scale-110 ${
               color === c.value ? 'border-btnPrimary ring-2 ring-btnPrimary/40' : 'border-newColColor'
             }`}
@@ -183,7 +209,8 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
               style={{ background: c.swatch }}
             />
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Content states */}
@@ -193,19 +220,19 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.34 3.94l-7.5 12.99A1.5 1.5 0 004.14 19.5h15.72a1.5 1.5 0 001.3-2.25l-7.5-12.99a1.5 1.5 0 00-2.6 0z" />
           </svg>
           <div className="text-[15px] font-[600] text-textColor">
-            Something went wrong{error.status ? ` (HTTP ${error.status})` : ''}
+            {t('something_went_wrong', 'Something went wrong')}{error.status ? ` (HTTP ${error.status})` : ''}
           </div>
           <div className="text-[13px] text-newTextColor/65 max-w-[320px]">
             {error.status === 401 || error.status === 403
-              ? 'Your session may have expired — try signing in again.'
-              : "We couldn't reach the photo library. Give it another go in a moment."}
+              ? t('session_may_have_expired', 'Your session may have expired — try signing in again.')
+              : t('could_not_reach_photo_library', "We couldn't reach the photo library. Give it another go in a moment.")}
           </div>
           <button
             type="button"
             onClick={() => mutate()}
             className="mt-[6px] px-[16px] h-[36px] rounded-[8px] bg-btnPrimary text-white text-[13px] hover:bg-[#1e4ab5] focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
           >
-            Try again
+            {t('try_again', 'Try again')}
           </button>
         </div>
       ) : initialLoading ? (
@@ -228,22 +255,24 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M18 4.5h.008v.008H18V4.5zm.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15A2.25 2.25 0 002.25 6.75v10.5A2.25 2.25 0 004.5 19.5z" />
           </svg>
           <div className="text-[15px] font-[600] text-textColor">
-            {debouncedQuery ? `No photos for "${debouncedQuery}"` : 'Find the perfect photo'}
+            {debouncedQuery
+              ? t('no_photos_for_query', 'No photos for "{{query}}"', { query: debouncedQuery })
+              : t('find_perfect_photo', 'Find the perfect photo')}
           </div>
           <div className="text-[13px] text-newTextColor/65 max-w-[340px]">
             {debouncedQuery
-              ? 'Try a different keyword or one of these popular searches.'
-              : 'Search millions of free, high-quality photos from Unsplash to get started.'}
+              ? t('try_different_keyword', 'Try a different keyword or one of these popular searches.')
+              : t('search_free_photos_unsplash', 'Search millions of free, high-quality photos from Unsplash to get started.')}
           </div>
           <div className="flex items-center flex-wrap justify-center gap-[8px] mt-[4px]">
             {SUGGESTED_SEARCHES.map((s) => (
               <button
-                key={s}
+                key={s.key}
                 type="button"
-                onClick={() => setQuery(s)}
+                onClick={() => setQuery(s.label)}
                 className="h-[30px] px-[14px] rounded-full border border-newColColor text-[12px] text-newTextColor/70 hover:text-btnPrimary hover:border-btnPrimary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
               >
-                {s}
+                {t(s.key, s.label)}
               </button>
             ))}
           </div>
@@ -310,7 +339,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
                 </div>
                 <div className="p-[8px]">
                   <div className="text-[11px] text-newTextColor/60 truncate">
-                    by{' '}
+                    {t('by', 'by')}{' '}
                     <a
                       href={photo.authorUrl}
                       target="_blank"

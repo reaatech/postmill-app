@@ -4,6 +4,7 @@ import React, { FC, useCallback, useRef, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface AiPanelProps {
   store: any;
@@ -21,6 +22,7 @@ type GenStatus = 'idle' | 'queued' | 'generating' | 'failed';
 export const AiPanel: FC<AiPanelProps> = ({ store }) => {
   const fetch = useFetch();
   const toaster = useToaster();
+  const t = useT();
   const { toolAvailable } = useMediaToolsStatus();
   const textToImageAvailable = toolAvailable('text-to-image');
 
@@ -50,19 +52,19 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
       });
       if (!res.ok) {
         setStatus('failed');
-        setErrorMessage('Image generation failed. Please try again.');
+        setErrorMessage(t('ai_panel_generation_failed_retry', 'Image generation failed. Please try again.'));
         return;
       }
       const data = (await res.json()) as GeneratedImage | false;
       if (!data) {
         // Credit-blocked or empty generation.
         setStatus('failed');
-        setErrorMessage('Image generation was blocked or returned empty.');
+        setErrorMessage(t('ai_panel_generation_blocked_empty', 'Image generation was blocked or returned empty.'));
         return;
       }
       setResults((prev) => [data, ...prev]);
       setStatus('idle');
-      toaster.show('Image generated', 'success');
+      toaster.show(t('ai_panel_image_generated', 'Image generated'), 'success');
     } catch (e) {
       // Aborts are user-initiated cancels — return to idle silently.
       if (controller.signal.aborted) {
@@ -70,18 +72,18 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
         return;
       }
       setStatus('failed');
-      setErrorMessage('Generation failed. Please try again.');
+      setErrorMessage(t('ai_panel_generation_failed_retry_short', 'Generation failed. Please try again.'));
     } finally {
       abortRef.current = null;
     }
-  }, [prompt, fetch, toaster, inFlight, textToImageAvailable]);
+  }, [prompt, fetch, toaster, inFlight, textToImageAvailable, t]);
 
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
     setStatus('idle');
-    toaster.show('Generation cancelled', 'success');
-  }, [toaster]);
+    toaster.show(t('ai_panel_generation_cancelled', 'Generation cancelled'), 'success');
+  }, [toaster, t]);
 
   const handleAddToCanvas = useCallback(
     (item: GeneratedImage) => {
@@ -113,14 +115,14 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
           naturalWidth,
           naturalHeight,
         });
-        toaster.show('Image added to canvas', 'success');
+        toaster.show(t('ai_panel_image_added_to_canvas', 'Image added to canvas'), 'success');
       };
       img.onerror = () => {
-        toaster.show('Could not load generated image', 'warning');
+        toaster.show(t('ai_panel_could_not_load_generated_image', 'Could not load generated image'), 'warning');
       };
       img.src = item.path;
     },
-    [store, toaster]
+    [store, toaster, t]
   );
 
   const handleKeyDown = useCallback(
@@ -137,7 +139,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
     return (
       <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
         <div className="text-[12px] text-newTextColor/60">
-          Configure an image-generation provider in Settings → Content → Media Defaults to use the AI panel.
+          {t('ai_panel_configure_provider', 'Configure an image-generation provider in Settings → Content → Media Defaults to use the AI panel.')}
         </div>
       </div>
     );
@@ -151,7 +153,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Describe the image..."
+          placeholder={t('ai_panel_describe_image_placeholder', 'Describe the image...')}
           className="flex-1 h-[36px] px-[10px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
         />
         {inFlight ? (
@@ -159,7 +161,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             onClick={handleCancel}
             className="px-[12px] h-[36px] rounded-[6px] border border-studioBorder text-textColor text-[13px] font-medium hover:bg-boxHover shrink-0"
           >
-            Cancel
+            {t('cancel', 'Cancel')}
           </button>
         ) : (
           <button
@@ -167,7 +169,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             disabled={!prompt.trim()}
             className="px-[12px] h-[36px] rounded-[6px] bg-designerAccent text-white text-[13px] font-medium hover:bg-designerAccent/80 disabled:opacity-50 shrink-0"
           >
-            Generate
+            {t('generate', 'Generate')}
           </button>
         )}
       </div>
@@ -178,7 +180,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             className="w-[10px] h-[10px] rounded-full bg-[#EAB308] motion-safe:animate-pulse"
             aria-hidden="true"
           />
-          Queued…
+          {t('ai_panel_queued', 'Queued…')}
         </div>
       )}
 
@@ -188,7 +190,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             className="w-[14px] h-[14px] rounded-full border-2 border-studioBorder border-t-designerAccent motion-safe:animate-spin"
             aria-hidden="true"
           />
-          Generating…
+          {t('ai_panel_generating', 'Generating…')}
         </div>
       )}
 
@@ -201,7 +203,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             ⚠
           </div>
           <div className="text-[12px] text-newTextColor/60">
-            {errorMessage || 'Generation failed.'}
+            {errorMessage || t('ai_panel_generation_failed', 'Generation failed.')}
           </div>
           <button
             type="button"
@@ -209,7 +211,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             disabled={!prompt.trim()}
             className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors disabled:opacity-50"
           >
-            Try again
+            {t('try_again', 'Try again')}
           </button>
         </div>
       )}
@@ -221,7 +223,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
               key={item.id}
               onClick={() => handleAddToCanvas(item)}
               className="relative group rounded-[6px] overflow-hidden border border-studioBorder hover:border-designerAccent transition-all"
-              title="Click to add to canvas"
+              title={t('ai_panel_click_to_add_to_canvas', 'Click to add to canvas')}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- external media file */}
               <img
@@ -231,7 +233,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
                 <span className="text-white text-[12px] font-medium opacity-0 group-hover:opacity-100 transition-all">
-                  Add to Canvas
+                  {t('ai_panel_add_to_canvas', 'Add to Canvas')}
                 </span>
               </div>
             </button>

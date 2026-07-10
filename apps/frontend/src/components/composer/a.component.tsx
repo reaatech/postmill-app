@@ -1,14 +1,16 @@
 'use client';
 
 import { FC } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export const AComponent: FC<{
   editor: any;
   currentValue: string;
 }> = ({ editor }) => {
+  const t = useT();
   const mark = () => {
     const previousUrl = editor?.getAttributes('link')?.href;
-    const url = window.prompt('URL', previousUrl);
+    const url = window.prompt(t('url', 'URL'), previousUrl);
 
     // cancelled
     if (url === null) {
@@ -36,7 +38,7 @@ export const AComponent: FC<{
   return (
     <div
       data-tooltip-id="tooltip"
-      data-tooltip-content="Link"
+      data-tooltip-content={t('link', 'Link')}
       onClick={mark}
       className="select-none cursor-pointer rounded-[6px] w-[30px] h-[30px] bg-newColColor flex justify-center items-center"
     >

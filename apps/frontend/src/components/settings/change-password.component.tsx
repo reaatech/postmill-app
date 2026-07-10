@@ -42,7 +42,7 @@ const ChangePasswordComponent: FC = () => {
 
       if (!response.ok) {
         const data = await response.json();
-        setError(data.message || t('error_occurred', 'An error occurred'));
+        setError(data.message || t('error_occurred', 'An error occurred. Please try again.'));
         setLoading(false);
         return;
       }
@@ -52,7 +52,7 @@ const ChangePasswordComponent: FC = () => {
       setNewPassword('');
       setConfirmPassword('');
     } catch {
-      setError(t('error_occurred', 'An error occurred'));
+      setError(t('error_occurred', 'An error occurred. Please try again.'));
     }
     setLoading(false);
   }, [currentPassword, newPassword, confirmPassword, fetch, toaster, t]);

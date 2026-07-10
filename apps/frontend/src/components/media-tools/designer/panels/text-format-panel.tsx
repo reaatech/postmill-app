@@ -15,6 +15,7 @@ import {
 import { DESIGNER_FONTS, ensureFontLoaded } from '../fonts';
 import { useBrandColors } from './use-brand-colors';
 import { useBrandFonts, useCustomFonts } from './use-brand-fonts';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const RUN_STYLE_KEYS = new Set(['fill', 'fontFamily', 'fontSize', 'fontWeight', 'fontStyle']);
 
@@ -134,6 +135,7 @@ const DEFAULT_SHADOW: DesignerTextShadow = {
 };
 
 export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
+  const t = useT();
   const selectedIds = store((s) => s.selectedIds);
   const out = store(
     (s) =>
@@ -294,15 +296,15 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
     <div
       className="flex flex-col gap-4"
       role="region"
-      aria-label="Text formatting"
+      aria-label={t('designer_text_formatting', 'Text formatting')}
     >
       <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-        Text Format
+        {t('designer_text_format', 'Text Format')}
       </div>
 
       {/* Font family (C2) — grouped with search */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="text-font-family" className="text-[11px] text-newTextColor/60">Font family</label>
+        <label htmlFor="text-font-family" className="text-[11px] text-newTextColor/60">{t('designer_label_font_family', 'Font family')}</label>
         <div className="relative" ref={fontWrapRef}>
           <button
             id="text-font-family"
@@ -333,7 +335,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
                 <input
                   ref={fontSearchInputRef}
                   type="text"
-                  placeholder="Search fonts..."
+                  placeholder={t('designer_placeholder_search_fonts', 'Search fonts...')}
                   value={fontSearch}
                   onChange={(e) => setFontSearch(e.target.value)}
                   className="w-full h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none focus:border-designerAccent placeholder:text-textColor/30"
@@ -342,13 +344,13 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               <div className="max-h-[300px] overflow-y-auto p-[4px]">
                 {grouped.length === 0 && (
                   <div className="px-[10px] py-[16px] text-[12px] text-textColor/40 text-center">
-                    No fonts found
+                    {t('designer_no_fonts_found', 'No fonts found')}
                   </div>
                 )}
                 {grouped.map((group) => (
                   <div key={group.category} className="mb-[2px]">
                     <div className="px-[10px] py-[4px] text-[10px] font-semibold text-textColor/40 uppercase tracking-wider">
-                      {CATEGORY_LABELS[group.category] || group.category}
+                      {t(`designer_font_category_${group.category.replace(/-/g, '_')}`, CATEGORY_LABELS[group.category] || group.category)}
                     </div>
                     {group.fonts.map((font) => {
                       const active = font.family === currentFont;
@@ -383,12 +385,12 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Bold / Italic (C2) */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="text-style" className="text-[11px] text-newTextColor/60">Style</label>
+        <label htmlFor="text-style" className="text-[11px] text-newTextColor/60">{t('designer_label_style', 'Style')}</label>
         <SegmentedControl
           id="text-style"
           value={styleValue}
           options={[
-            { value: 'n', label: 'Normal' },
+            { value: 'n', label: t('designer_style_normal', 'Normal') },
             { value: 'b', label: <span className="font-bold">B</span> },
             { value: 'i', label: <span className="italic">I</span> },
             { value: 'bi', label: <span className="font-bold italic">BI</span> },
@@ -406,7 +408,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text-font-size" className="text-[11px] text-newTextColor/60">Size</label>
+          <label htmlFor="text-font-size" className="text-[11px] text-newTextColor/60">{t('size', 'Size')}</label>
           <input
             id="text-font-size"
             type="number"
@@ -424,7 +426,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text-font-weight" className="text-[11px] text-newTextColor/60">Weight</label>
+          <label htmlFor="text-font-weight" className="text-[11px] text-newTextColor/60">{t('designer_label_weight', 'Weight')}</label>
           <select
             id="text-font-weight"
             value={element.fontWeight || 400}
@@ -445,7 +447,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       <div className="flex flex-col gap-1.5">
         <ColorSwatch
-          label="Color"
+          label={t('color', 'Color')}
           value={safeColor}
           onChange={(hex) => update({ fill: hex })}
           brandColors={brandColors}
@@ -454,7 +456,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="text-align" className="text-[11px] text-newTextColor/60">Align</label>
+        <label htmlFor="text-align" className="text-[11px] text-newTextColor/60">{t('designer_label_align', 'Align')}</label>
         <SegmentedControl
           id="text-align"
           value={element.align || 'left'}
@@ -469,7 +471,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="text-line-height" className="text-[11px] text-newTextColor/60">Line height</label>
+          <label htmlFor="text-line-height" className="text-[11px] text-newTextColor/60">{t('designer_label_line_height', 'Line height')}</label>
           <input
             id="text-line-height"
             type="number"
@@ -489,7 +491,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="text-letter-spacing" className="text-[11px] text-newTextColor/60">
-            Letter spacing
+            {t('designer_label_letter_spacing', 'Letter spacing')}
           </label>
           <input
             id="text-letter-spacing"
@@ -509,15 +511,15 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       {/* Text path (C2) — Arc slider, Wave, Circle presets + custom SVG path */}
       <div className="flex flex-col gap-2">
-        <label htmlFor="text-path" className="text-[11px] text-newTextColor/60">Text Path</label>
+        <label htmlFor="text-path" className="text-[11px] text-newTextColor/60">{t('designer_label_text_path', 'Text Path')}</label>
         <SegmentedControl
           id="text-path"
           value={pathMode}
           options={[
-            { value: 'arc', label: 'Arc' },
-            { value: 'wave', label: 'Wave' },
-            { value: 'circle', label: 'Circle' },
-            { value: 'custom', label: 'Custom' },
+            { value: 'arc', label: t('designer_path_arc', 'Arc') },
+            { value: 'wave', label: t('designer_path_wave', 'Wave') },
+            { value: 'circle', label: t('designer_mask_circle', 'Circle') },
+            { value: 'custom', label: t('designer_path_custom', 'Custom') },
           ]}
           onChange={(v) => {
             const w = element.width;
@@ -546,13 +548,13 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               const value = e.target.value;
               update({ textPath: value || undefined, curve: 0 });
             }}
-            placeholder="M 0,50 Q 50,0 100,50 ..."
+            placeholder={t('designer_placeholder_custom_path', 'M 0,50 Q 50,0 100,50 ...')}
             className="w-full h-[80px] px-[8px] py-[6px] rounded-[6px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none focus:border-designerAccent resize-none font-mono"
           />
         )}
         {pathMode === 'arc' && (
           <Slider
-            label="Arc Angle"
+            label={t('designer_label_arc_angle', 'Arc Angle')}
             min={-90}
             max={90}
             value={element.curve ?? 0}
@@ -566,7 +568,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
       <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Drop shadow
+            {t('designer_label_drop_shadow', 'Drop shadow')}
           </span>
           <button
             type="button"
@@ -589,7 +591,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         {shadow && (
           <div className="flex flex-col gap-3">
             <ColorSwatch
-              label="Shadow color"
+              label={t('designer_label_shadow_color', 'Shadow color')}
               value={isValidHex(shadow.color) ? shadow.color : '#000000'}
               onChange={(hex) =>
                 update({ textShadow: { ...shadow, color: hex } })
@@ -598,7 +600,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               brandEnforcement={brandEnforcement}
             />
             <Slider
-              label="Blur"
+              label={t('designer_label_blur', 'Blur')}
               min={0}
               max={40}
               value={shadow.blur}
@@ -606,7 +608,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               onCommit={() => store.getState().pushHistory()}
             />
             <Slider
-              label="Offset X"
+              label={t('designer_label_offset_x', 'Offset X')}
               min={-40}
               max={40}
               value={shadow.offsetX}
@@ -614,7 +616,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               onCommit={() => store.getState().pushHistory()}
             />
             <Slider
-              label="Offset Y"
+              label={t('designer_label_offset_y', 'Offset Y')}
               min={-40}
               max={40}
               value={shadow.offsetY}
@@ -629,7 +631,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
       <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-            Outline
+            {t('designer_label_outline', 'Outline')}
           </span>
           <button
             type="button"
@@ -654,7 +656,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         {outline && (
           <div className="flex flex-col gap-3">
             <ColorSwatch
-              label="Outline color"
+              label={t('designer_label_outline_color', 'Outline color')}
               value={isValidHex(outline.color) ? outline.color : '#000000'}
               onChange={(hex) =>
                 update({ textStroke: { ...outline, color: hex } })
@@ -663,7 +665,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               brandEnforcement={brandEnforcement}
             />
             <Stepper
-              label="Width"
+              label={t('designer_label_width', 'Width')}
               min={0}
               max={20}
               step={1}

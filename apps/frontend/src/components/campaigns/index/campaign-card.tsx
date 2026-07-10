@@ -48,7 +48,7 @@ export const CampaignCard: FC<CampaignCardProps> = ({
     `campaign-engagement-${campaign.id}`,
     async () => {
       const r = await fetch(`/campaigns/${campaign.id}/engagement`);
-      if (!r.ok) throw new Error('Failed to load campaign engagement');
+      if (!r.ok) throw new Error(t('failed_to_load_campaign_engagement', 'Failed to load campaign engagement'));
       return r.json();
     },
     { revalidateOnFocus: false },
@@ -91,9 +91,9 @@ export const CampaignCard: FC<CampaignCardProps> = ({
           <p className="text-[12px] text-newTableText">{campaign.description}</p>
         )}
         <div className="flex gap-[16px] text-[12px] text-newTableText flex-wrap">
-          <span>{campaign._count.posts} {t('posts', 'posts')}</span>
+          <span>{campaign._count.posts} {t('posts', 'Posts')}</span>
           {campaign.startDate && (
-            <span>{dayjs(campaign.startDate).format('MMM D')} - {campaign.endDate ? dayjs(campaign.endDate).format('MMM D, YYYY') : t('ongoing', 'Ongoing')}</span>
+            <span>{dayjs(campaign.startDate).format(t('campaign_card_start_date_format', 'MMM D'))} - {campaign.endDate ? dayjs(campaign.endDate).format(t('campaign_date_format', 'MMM D, YYYY')) : t('ongoing', 'Ongoing')}</span>
           )}
           {campaign.client && (
             <span>{t('client', 'Client')}: {campaign.client}</span>

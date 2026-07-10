@@ -3,8 +3,10 @@
 import React, { FC } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { ModelSelect } from './model-select';
+import { studioFieldKey, studioOptionKey } from './i18n-keys';
 import type { FileFieldValue, StudioField, StudioFieldValue } from './types';
 
 interface StudioFormProps {
@@ -13,14 +15,19 @@ interface StudioFormProps {
   onChange: (name: string, value: StudioFieldValue) => void;
   provider: string;
   operation: string;
+  // Studio namespace + tab key derive stable, collision-free i18n keys for the
+  // descriptor's field/option text (§3.6). tabKey is required because multiple
+  // tabs can share an `operation`.
+  keyNs: string;
+  tabKey: string;
 }
 
-const Label: FC<{ field: StudioField }> = ({ field }) => {
-  if (!field.label) return null;
+const Label: FC<{ label?: string; required?: boolean }> = ({ label, required }) => {
+  if (!label) return null;
   return (
     <label className="block text-[12px] text-newTextColor/70 mb-[6px]">
-      {field.label}
-      {field.required && <span className="text-amber-600 ml-[3px]">*</span>}
+      {label}
+      {required && <span className="text-amber-600 ml-[3px]">*</span>}
     </label>
   );
 };
@@ -35,11 +42,13 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
 }) => {
   const modals = useModals();
   const toaster = useToaster();
+  const t = useT();
   const display = value?.url || value?.fileId;
+  const kind = t(`media_kind_${field.accept}`, field.accept);
 
   const choose = () => {
     modals.openModal({
-      title: `Select ${field.accept} file`,
+      title: t('studio_media_select_title', 'Select {{kind}} file', { kind }),
       removeLayout: true,
       children: (close: () => void) => (
         <MediaSelectorModal
@@ -48,7 +57,10 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
           kinds={[field.accept]}
           onSelect={(item) => {
             if (item.type !== field.accept) {
-              toaster.show(`Please choose a ${field.accept} file`, 'warning');
+              toaster.show(
+                t('studio_media_wrong_kind', 'Please choose a {{kind}} file', { kind }),
+                'warning'
+              );
               return;
             }
             onChange({ fileId: item.fileId, url: item.url, type: item.type });
@@ -66,14 +78,18 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
         onClick={choose}
         className={`${inputClass} text-left ${display ? 'text-textColor' : 'text-newTextColor/65'}`}
       >
-        {display ? <span className="truncate block">{display}</span> : `Choose ${field.accept}…`}
+        {display ? (
+          <span className="truncate block">{display}</span>
+        ) : (
+          t('studio_media_choose', 'Choose {{kind}}…', { kind })
+        )}
       </button>
       {display && (
         <button
           type="button"
           onClick={() => onChange(undefined)}
           className="px-[10px] rounded-[8px] text-newTextColor/65 hover:text-red-500 transition-colors"
-          aria-label="Clear"
+          aria-label={t('clear', 'Clear')}
         >
           ✕
         </button>
@@ -82,15 +98,26 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
   );
 };
 
-export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, provider, operation }) => {
+export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, provider, operation, keyNs, tabKey }) => {
+  const t = useT();
   return (
     <div className="flex flex-col gap-[16px]">
       {fields.map((field) => {
         const value = values[field.name];
-        const a11yLabel = field.label ?? field.name;
+        const label = field.label
+          ? t(studioFieldKey(keyNs, tabKey, field.name, 'label'), field.label)
+          : undefined;
+        const placeholder =
+          'placeholder' in field && field.placeholder
+            ? t(studioFieldKey(keyNs, tabKey, field.name, 'placeholder'), field.placeholder)
+            : undefined;
+        const help = field.help
+          ? t(studioFieldKey(keyNs, tabKey, field.name, 'help'), field.help)
+          : undefined;
+        const a11yLabel = label ?? field.name;
         return (
           <div key={field.name}>
-            <Label field={field} />
+            <Label label={label} required={field.required} />
 
             {(field.type === 'prompt' || field.type === 'text') &&
               (field.type === 'prompt' ? (
@@ -98,7 +125,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                   aria-label={a11yLabel}
                   value={(value as string) ?? ''}
                   onChange={(e) => onChange(field.name, e.target.value)}
-                  placeholder={field.placeholder}
+                  placeholder={placeholder}
                   rows={4}
                   className={`${inputClass} resize-y min-h-[88px]`}
                 />
@@ -108,7 +135,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                   aria-label={a11yLabel}
                   value={(value as string) ?? ''}
                   onChange={(e) => onChange(field.name, e.target.value)}
-                  placeholder={field.placeholder}
+                  placeholder={placeholder}
                   className={inputClass}
                 />
               ))}
@@ -129,9 +156,9 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                   onChange={(e) => onChange(field.name, e.target.value)}
                   className={inputClass}
                 >
-                  {(field.options ?? []).map((o) => (
+                  {(field.options ?? []).map((o, i) => (
                     <option key={o.value} value={o.value}>
-                      {o.label}
+                      {t(studioOptionKey(keyNs, tabKey, field.name, i), o.label)}
                     </option>
                   ))}
                 </select>
@@ -180,7 +207,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                     className={`block w-[16px] h-[16px] rounded-full bg-white transition-transform ${(value as boolean) ?? (field.default as boolean) ? 'translate-x-[16px]' : ''}`}
                   />
                 </span>
-                {field.help || field.label}
+                {help || label}
               </button>
             )}
 
@@ -192,8 +219,8 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
               />
             )}
 
-            {field.help && field.type !== 'toggle' && (
-              <div className="text-[11px] text-newTextColor/60 mt-[5px]">{field.help}</div>
+            {help && field.type !== 'toggle' && (
+              <div className="text-[11px] text-newTextColor/60 mt-[5px]">{help}</div>
             )}
           </div>
         );

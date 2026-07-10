@@ -19,7 +19,7 @@ const MoltbookSettings: FC = () => {
     <div>
       <Input
         label={t('submolt', 'Submolt')}
-        placeholder="general"
+        placeholder={t('moltbook_channel_placeholder', 'general')}
         {...form.register('submolt')}
       />
       <FirstCommentField />

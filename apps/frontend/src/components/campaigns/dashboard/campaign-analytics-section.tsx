@@ -6,7 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
 import { TabSkeleton, EmptyState, ErrorState } from '@gitroom/frontend/components/analytics-v2/kit/states';
-import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
+import { metricLabelT } from '@gitroom/frontend/components/campaigns/metric-labels';
 import {
   useCampaignAnalytics,
   resolveCampaignAnalyticsRange,
@@ -56,8 +56,10 @@ export const CampaignAnalyticsSection: FC<CampaignAnalyticsSectionProps> = ({
 
   const windowLabel = useMemo(() => {
     if (!data?.window) return '';
-    return `${dayjs(data.window.from).format('MMM D')} – ${dayjs(data.window.to).format('MMM D, YYYY')}`;
-  }, [data]);
+    const fromFmt = t('campaign_analytics_window_from_format', 'MMM D');
+    const toFmt = t('campaign_date_format', 'MMM D, YYYY');
+    return `${dayjs(data.window.from).format(fromFmt)} – ${dayjs(data.window.to).format(toFmt)}`;
+  }, [data, t]);
 
   // 6.1 — weekly rollup lets the series extend past the 90-day daily window, so
   // the label is honest: plain "last 90 days" only while every point is daily,
@@ -107,7 +109,7 @@ export const CampaignAnalyticsSection: FC<CampaignAnalyticsSectionProps> = ({
         <div className="flex flex-col gap-[16px]">
           <div>
             <div className="text-[12px] font-medium text-newTableText mb-[8px]">
-              {metricLabel(primary.metric)}
+              {metricLabelT(primary.metric, t)}
             </div>
             <div className="w-full aspect-[16/9] sm:aspect-[21/9] max-h-[320px]">
               <LineChart series={primary.series} height={300} />
@@ -117,7 +119,7 @@ export const CampaignAnalyticsSection: FC<CampaignAnalyticsSectionProps> = ({
           {channelBars.labels.length > 0 && (
             <div>
               <div className="text-[12px] font-medium text-newTableText mb-[8px]">
-                {t('by_channel', 'By channel')}
+                {t('by_channel', 'By Channel')}
               </div>
               <div className="w-full aspect-[4/3] max-h-[260px]">
                 <BarChart labels={channelBars.labels} values={channelBars.values} height={250} />

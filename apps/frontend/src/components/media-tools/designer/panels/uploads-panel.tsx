@@ -9,6 +9,7 @@ import type { DesignerElement, StickerFrame } from '../designer.store';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
 import { fitWithin } from './fit-within';
 import { MediaSelectorModal } from '../../media-selector-modal';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 async function decodeStickerFrames(src: string): Promise<StickerFrame[]> {
   if (typeof window === 'undefined' || !('ImageDecoder' in window)) {
@@ -69,6 +70,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
   const fetch = useFetch();
   const user = useUser();
   const toaster = useToaster();
+  const t = useT();
   const [modalOpen, setModalOpen] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
 
@@ -94,8 +96,8 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
   // Surface the load failure from an effect, not inline in render.
   useEffect(() => {
-    if (error && !data) toaster.show("Couldn't load uploads", 'warning');
-  }, [error, data, toaster]);
+    if (error && !data) toaster.show(t('uploads_panel_couldnt_load_uploads', "Couldn't load uploads"), 'warning');
+  }, [error, data, toaster, t]);
 
   const imageFiles = data?.results?.filter((f) => {
     const ext = f.name.split('.').pop()?.toLowerCase() || '';
@@ -266,18 +268,18 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       mutate();
       addAudioClip(uploaded);
     } catch {
-      toaster.show('Audio upload failed', 'warning');
+      toaster.show(t('uploads_panel_audio_upload_failed', 'Audio upload failed'), 'warning');
     } finally {
       setUploadingFile(false);
     }
-  }, [addAudioClip, mutate, toaster]);
+  }, [addAudioClip, mutate, toaster, t, fetch]);
 
   const handleStickerUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const ext = file.name.split('.').pop()?.toLowerCase();
     if (!ext || !['gif','webp'].includes(ext)) {
-      toaster.show('Stickers must be GIF or WebP', 'warning');
+      toaster.show(t('uploads_panel_stickers_must_be_gif_or_webp', 'Stickers must be GIF or WebP'), 'warning');
       return;
     }
     setUploadingFile(true);
@@ -290,11 +292,11 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       mutate();
       addStickerClip(uploaded);
     } catch {
-      toaster.show('Sticker upload failed', 'warning');
+      toaster.show(t('uploads_panel_sticker_upload_failed', 'Sticker upload failed'), 'warning');
     } finally {
       setUploadingFile(false);
     }
-  }, [addStickerClip, mutate, toaster]);
+  }, [addStickerClip, mutate, toaster, t, fetch]);
 
   const handleModalSelect = useCallback(async (item: {
     source: 'stock' | 'file';
@@ -377,7 +379,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
         onClick={() => setModalOpen(true)}
         className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
       >
-        Browse media library…
+        {t('browse_media_library', 'Browse media library…')}
       </button>
 
       <MediaSelectorModal
@@ -389,10 +391,10 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       {isLoading && !data ? (
         <PanelSkeletonGrid count={6} />
       ) : error && !data ? (
-        <PanelError message="Couldn't load uploads" onRetry={() => mutate()} />
+        <PanelError message={t('uploads_panel_couldnt_load_uploads', "Couldn't load uploads")} onRetry={() => mutate()} />
       ) : !data?.results?.length ? (
         <div className="text-[12px] text-newTextColor/60 text-center py-4">
-          No uploaded files found
+          {t('uploads_panel_no_uploaded_files_found', 'No uploaded files found')}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -434,7 +436,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
       {audioFiles.length > 0 && (
         <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Audio</div>
+          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">{t('audio', 'Audio')}</div>
           {audioFiles.map((file) => (
             <button
               key={file.id}
@@ -443,7 +445,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
             >
               <span className="text-[12px]">🔊</span>
               <span className="text-[11px] text-textColor truncate flex-1">{file.name}</span>
-              <span className="text-[10px] text-btnPrimaryAccent">Add</span>
+              <span className="text-[10px] text-btnPrimaryAccent">{t('add', 'Add')}</span>
             </button>
           ))}
         </div>
@@ -451,7 +453,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
       {stickerFiles.length > 0 && (
         <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Stickers</div>
+          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">{t('uploads_panel_stickers', 'Stickers')}</div>
           <div className="grid grid-cols-3 gap-2">
             {stickerFiles.map((file) => (
               <button
@@ -474,17 +476,19 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
       {stockAudio && (
         <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Stock audio</div>
+          <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">{t('uploads_panel_stock_audio', 'Stock audio')}</div>
           {!stockAudio.configured ? (
             <div className="text-[11px] text-newTextColor/60 space-y-1">
-              <p>Stock audio isn't configured.</p>
+              <p>{t('uploads_panel_stock_audio_not_configured', "Stock audio isn't configured.")}</p>
               <p>
-                Set <code className="text-textColor/60">JAMENDO_CLIENT_ID</code> to enable stock audio.
+                {t('uploads_panel_set_env_prefix', 'Set')}{' '}
+                <code className="text-textColor/60">JAMENDO_CLIENT_ID</code>{' '}
+                {t('uploads_panel_set_env_suffix', 'to enable stock audio.')}
               </p>
             </div>
           ) : stockAudio.results?.length === 0 ? (
             <div className="text-[11px] text-newTextColor/60">
-              No stock audio found
+              {t('uploads_panel_no_stock_audio_found', 'No stock audio found')}
             </div>
           ) : (
             <div className="flex flex-col gap-1">
@@ -496,7 +500,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
                 >
                   <span className="text-[12px]">🎵</span>
                   <span className="text-[11px] text-textColor truncate flex-1">{item.name}</span>
-                  <span className="text-[10px] text-btnPrimaryAccent">Add</span>
+                  <span className="text-[10px] text-btnPrimaryAccent">{t('add', 'Add')}</span>
                 </button>
               ))}
             </div>
@@ -505,7 +509,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       )}
 
       <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-        <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Upload audio</div>
+        <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">{t('uploads_panel_upload_audio', 'Upload audio')}</div>
         <input
           type="file"
           accept="audio/*"
@@ -516,7 +520,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       </div>
 
       <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
-        <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">Upload sticker</div>
+        <div className="text-[11px] text-newTextColor/65 uppercase tracking-wider">{t('uploads_panel_upload_sticker', 'Upload sticker')}</div>
         <input
           type="file"
           accept="image/gif,image/webp"

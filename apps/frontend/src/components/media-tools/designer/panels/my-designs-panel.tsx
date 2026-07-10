@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface MyDesign {
   id: string;
@@ -21,6 +22,7 @@ interface MyDesignsPanelProps {
 export const MyDesignsPanel: FC<MyDesignsPanelProps> = ({ onOpen, onClose }) => {
   const fetch = useFetch();
   const user = useUser();
+  const t = useT();
 
   const { data, error, isLoading, mutate } = useSWR(
     `my-designs-${user.orgId}`,
@@ -42,7 +44,7 @@ export const MyDesignsPanel: FC<MyDesignsPanelProps> = ({ onOpen, onClose }) => 
   }
 
   if (error && !data) {
-    return <PanelError message="Failed to load designs" onRetry={() => mutate()} />;
+    return <PanelError message={t('my_designs_panel_failed_to_load', 'Failed to load designs')} onRetry={() => mutate()} />;
   }
 
   const designs: MyDesign[] = data?.designs || [];
@@ -51,7 +53,7 @@ export const MyDesignsPanel: FC<MyDesignsPanelProps> = ({ onOpen, onClose }) => 
     <div className="p-4">
       {designs.length === 0 ? (
         <div className="text-[12px] text-newTextColor/60 text-center py-8">
-          No designs yet. Start one from a format or template!
+          {t('my_designs_panel_no_designs_yet', 'No designs yet. Start one from a format or template!')}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-3">
@@ -73,7 +75,7 @@ export const MyDesignsPanel: FC<MyDesignsPanelProps> = ({ onOpen, onClose }) => 
                 />
               ) : (
                 <div className="w-full aspect-square bg-studioBorder/10 flex items-center justify-center text-newTextColor/30 text-xs">
-                  No preview
+                  {t('my_designs_panel_no_preview', 'No preview')}
                 </div>
               )}
               <div className="p-2">

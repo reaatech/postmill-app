@@ -11,6 +11,15 @@ dayjs.extend(relativeTime);
 
 const mockPush = vi.hoisted(() => vi.fn());
 
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT:
+    () =>
+    (_key: string, fallback: string, vars?: Record<string, unknown>) =>
+      vars
+        ? fallback.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(vars[k] ?? ''))
+        : fallback,
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
 }));

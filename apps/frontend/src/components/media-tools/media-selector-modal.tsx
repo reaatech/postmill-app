@@ -48,6 +48,17 @@ const TAB_TO_KIND: Record<(typeof ALL_TABS)[number], MediaKind | null> = {
   'My Files': null,
 };
 
+// Tabs are compared/keyed by their canonical English value (ALL_TABS) — only the
+// displayed label is translated, via this lookup.
+const TAB_LABEL_KEYS: Record<(typeof ALL_TABS)[number], string> = {
+  'Stock Photos': 'stock_photos_tab',
+  'Stock Videos': 'stock_videos_tab',
+  'Stock Vectors': 'stock_vectors_tab',
+  'Stock Stickers': 'stock_stickers_tab',
+  'Stock Icons': 'stock_icons_tab',
+  'My Files': 'my_files_tab',
+};
+
 const useFocusTrap = (
   containerRef: React.RefObject<HTMLElement | null>,
   open: boolean,
@@ -246,17 +257,19 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
           body: formData,
         });
         if (!res.ok) {
-          const text = await res.text().catch(() => 'Upload failed');
+          const text = await res.text().catch(() => t('upload_failed', 'Upload failed'));
           throw new Error(text);
         }
       }
       toaster.show(
-        `Uploaded ${fileList.length} file${fileList.length === 1 ? '' : 's'}`,
+        t('uploaded_n_files', 'Uploaded {{count}} file', {
+          count: fileList.length,
+        }),
         'success'
       );
       setMyFilesRefreshKey((k) => k + 1);
     } catch (err) {
-      toaster.show((err as Error).message || 'Upload failed', 'warning');
+      toaster.show((err as Error).message || t('upload_failed', 'Upload failed'), 'warning');
     } finally {
       setIsUploading(false);
       setIsDragOver(false);
@@ -300,20 +313,20 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
         ref={containerRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Select media"
+        aria-label={t('select_media_aria', 'Select media')}
         className={clsx(
           'bg-newBgColor border border-studioBorder rounded-xl flex flex-col',
           multiple ? 'w-[760px] max-h-[680px]' : 'w-[720px] max-h-[600px]'
         )}
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-studioBorder">
-          <div className="flex gap-1" role="tablist" aria-label="Media source">
+          <div className="flex gap-1" role="tablist" aria-label={t('media_source_aria', 'Media source')}>
             {tabs.map((tab) => (
               <button
                 key={tab}
                 role="tab"
                 aria-selected={activeTab === tab}
-                aria-label={tab}
+                aria-label={t(TAB_LABEL_KEYS[tab], tab)}
                 className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
                   activeTab === tab
                     ? 'bg-[#2B5CD3] text-white'
@@ -321,15 +334,15 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
                 }`}
                 onClick={() => setActiveTab(tab)}
               >
-                {tab}
+                {t(TAB_LABEL_KEYS[tab], tab)}
               </button>
             ))}
           </div>
           <button
             className="text-newTextColor/60 hover:text-textColor text-lg"
             onClick={onClose}
-            aria-label="Close media selector"
-            title="Close media selector"
+            aria-label={t('close_media_selector', 'Close media selector')}
+            title={t('close_media_selector', 'Close media selector')}
           >
             ✕
           </button>
@@ -374,7 +387,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
                 {isUploading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    <span className="text-sm text-textColor">Uploading…</span>
+                    <span className="text-sm text-textColor">{t('uploading_ellipsis', 'Uploading…')}</span>
                   </>
                 ) : (
                   <>
@@ -401,12 +414,12 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
                       />
                     </svg>
                     <span className="text-sm text-textColor">
-                      Drop files here or click to upload
+                      {t('drop_files_click_upload', 'Drop files here or click to upload')}
                     </span>
                     <span className="text-xs text-newTextColor/65">
                       {myFilesFolderId
-                        ? 'Uploading to the selected folder'
-                        : 'Uploading to All Files'}
+                        ? t('uploading_to_selected_folder', 'Uploading to the selected folder')
+                        : t('uploading_to_all_files', 'Uploading to All Files')}
                     </span>
                   </>
                 )}
@@ -444,7 +457,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
                     <div className="w-6 h-6 rounded bg-newColColor" />
                   )}
                   <span className="text-xs text-textColor truncate max-w-[120px]">
-                    {item.name || item.url.split('/').pop() || 'Selected'}
+                    {item.name || item.url.split('/').pop() || t('selected', 'Selected')}
                   </span>
                   <button
                     type="button"

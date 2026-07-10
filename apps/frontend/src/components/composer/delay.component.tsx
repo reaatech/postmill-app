@@ -88,7 +88,9 @@ export const DelayComponent: FC<{
         data-tooltip-content={
           !currentDelay
             ? t('delay_comment', 'Delay comment')
-            : `${t('delay_comment_by', 'Comment delayed by')} ${getCurrentDelayLabel()}`
+            : t('delay_comment_by_label', 'Comment delayed by {{label}}', {
+                label: getCurrentDelayLabel() || '',
+              })
         }
         className={clsx(
           'cursor-pointer flex items-center gap-[4px] border-0 p-0 bg-transparent',
@@ -123,7 +125,7 @@ export const DelayComponent: FC<{
                 value={customValue}
                 onChange={(e) => setCustomValue(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
-                placeholder="Custom min"
+                placeholder={t('custom_min_placeholder', 'Custom min')}
                 className={clsx(
                   'flex-1 w-full h-[32px] px-[8px] rounded-[4px] bg-newBgColor border text-[13px] outline-none focus:border-[#2B5CD3]',
                   isCustomDelay ? 'border-[#2B5CD3]' : 'border-newTextColor/10'

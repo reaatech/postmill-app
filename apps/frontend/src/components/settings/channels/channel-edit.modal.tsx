@@ -4,6 +4,7 @@ import React, { FC, useCallback, useMemo, useState } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useVpnConfig } from '@gitroom/frontend/components/settings/vpn/hooks/useVpnConfig';
@@ -187,7 +188,7 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
     setSaving(true);
     try {
       const res = await fetch(`/channels/config/${config.id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('failed');
+      if (!res.ok) throw createFetchError('channel_remove_failed', 'Failed to remove channel');
       toaster.show(t('channel_removed', 'Channel removed'), 'success');
       onSaved();
       onClose();

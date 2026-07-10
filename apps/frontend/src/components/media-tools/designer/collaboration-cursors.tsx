@@ -1,4 +1,5 @@
 import React from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { ImageAwareness } from './collaboration';
 
 export interface PeerTimelineState {
@@ -28,13 +29,14 @@ export const CollaborationCursors: React.FC<Props> = ({
   durationMs,
   store,
 }) => {
+  const t = useT();
   if (connectedCount <= 1) return null;
 
   if (mode === 'video' && peers && durationMs) {
     return (
       <div className="absolute inset-0 pointer-events-none z-50">
         <div className="absolute top-2 right-2 bg-green-500/20 border border-green-500/30 rounded px-2 py-0.5 text-xs text-green-700 dark:text-green-400">
-          {connectedCount} connected
+          {t('peers_connected_count', '{{count}} connected', { count: connectedCount })}
         </div>
         {peers.map((peer, i) => (
           <div key={i} className="absolute bottom-0 left-0 right-0 z-40" style={{ bottom: '6px' }}>
@@ -45,7 +47,7 @@ export const CollaborationCursors: React.FC<Props> = ({
                 backgroundColor: peer.color || colorForIndex(i),
                 opacity: 0.7,
               }}
-              title={`Peer playhead: ${peer.playheadMs}ms`}
+              title={t('peer_playhead_ms', 'Peer playhead: {{ms}}ms', { ms: peer.playheadMs })}
             >
               <div
                 className="w-2 h-2 rotate-45 -translate-x-1/2 -translate-y-full"
@@ -67,7 +69,7 @@ export const CollaborationCursors: React.FC<Props> = ({
   return (
     <div className="absolute inset-0 pointer-events-none z-50">
       <div className="absolute top-2 right-2 bg-green-500/20 border border-green-500/30 rounded px-2 py-0.5 text-xs text-green-700 dark:text-green-400">
-        {connectedCount} connected
+        {t('peers_connected_count', '{{count}} connected', { count: connectedCount })}
       </div>
 
       {peerImages?.map((peer, i) => {
@@ -101,8 +103,10 @@ export const CollaborationCursors: React.FC<Props> = ({
                 className="absolute left-3 top-3 px-1.5 py-0.5 rounded text-[10px] text-white whitespace-nowrap"
                 style={{ backgroundColor: color }}
               >
-                Peer {i + 1}
-                {peer.selectedIds?.length ? ` · ${peer.selectedIds.length} selected` : ''}
+                {t('peer_number', 'Peer {{n}}', { n: i + 1 })}
+                {peer.selectedIds?.length
+                  ? t('peer_selected_count', ' · {{count}} selected', { count: peer.selectedIds.length })
+                  : ''}
               </span>
             </div>
 

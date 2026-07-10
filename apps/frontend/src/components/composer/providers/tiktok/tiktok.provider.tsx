@@ -118,7 +118,9 @@ const TikTokSettings: FC<{
           <div>{tiktokRestrictionNotice}</div>
         </div>
       )}
-      {isTitle && <Input label="Title" {...register('title')} maxLength={89} />}
+      {isTitle && (
+        <Input label={t('title', 'Title')} {...register('title')} maxLength={89} />
+      )}
       <Select
         label={t('label_who_can_see_this_video', 'Who can see this video?')}
         disabled={isUploadMode}
@@ -153,7 +155,7 @@ const TikTokSettings: FC<{
           </option>
         ))}
       </Select>
-      {isUploadMode && <div className="-mt-[23px] mb-[23px] text-red-600">After posting you fill find a notification inside your Inbox about your post (not content studio)</div>}
+      {isUploadMode && <div className="-mt-[23px] mb-[23px] text-red-600">{t('tiktok_upload_notification_note', 'After posting you fill find a notification inside your Inbox about your post (not content studio)')}</div>}
       <Select
         label={t('label_auto_add_music', 'Auto add music')}
         {...register('autoAddMusic', {

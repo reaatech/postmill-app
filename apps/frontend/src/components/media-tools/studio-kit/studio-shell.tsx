@@ -5,10 +5,12 @@ import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fullscreen-button';
 import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { StudioForm } from './studio-form';
 import { StudioLanding } from './studio-landing';
 import { RenderQueue } from './render-queue';
 import { useStudioStatus, useStudioJobs, useStudioGenerate } from './hooks';
+import { studioNs, studioTabKey, studioTabDescKey } from './i18n-keys';
 import type {
   FileFieldValue,
   StudioDescriptor,
@@ -69,6 +71,9 @@ function buildBody(tab: StudioTab, values: Record<string, StudioFieldValue>): St
 export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
   const { provider, title, tabs } = descriptor;
   const toaster = useToaster();
+  // `t` is the tabs.map loop var below — bind the hook as `translate` (§3.5).
+  const translate = useT();
+  const keyNs = studioNs(provider, title);
   const { data: status } = useStudioStatus(provider);
   const configured = !!status?.configured;
 
@@ -97,10 +102,13 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
     setGenerating(true);
     try {
       await generate(buildBody(tab, values));
-      toaster.show('Render started', 'success');
+      toaster.show(translate('studio_render_started', 'Render started'), 'success');
       mutateJobs();
     } catch (err) {
-      toaster.show((err as Error).message || 'Failed to start the render', 'warning');
+      toaster.show(
+        (err as Error).message || translate('studio_render_start_failed', 'Failed to start the render'),
+        'warning'
+      );
     } finally {
       setGenerating(false);
     }
@@ -121,15 +129,21 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-[14px] text-center px-[20px]">
         <div className="text-[42px]">🎬</div>
-        <h2 className="text-[18px] font-[600] text-textColor">{title} isn&apos;t configured</h2>
+        <h2 className="text-[18px] font-[600] text-textColor">
+          {translate('studio_not_configured_title', "{{title}} isn't configured", { title })}
+        </h2>
         <p className="text-[13px] text-newTextColor/65 max-w-[360px]">
-          Add your {title} credentials to start generating, then come back here.
+          {translate(
+            'studio_not_configured_body',
+            'Add your {{title}} credentials to start generating, then come back here.',
+            { title }
+          )}
         </p>
         <a
           href="/settings/content/ai-media"
           className="mt-[4px] px-[16px] py-[9px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[500] hover:bg-[#2B5CD3]/80 transition-all"
         >
-          Configure {title}
+          {translate('studio_configure_provider', 'Configure {{title}}', { title })}
         </a>
       </div>
     );
@@ -157,7 +171,7 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
                     : 'border-studioBorder text-newTextColor/70 hover:bg-boxHover hover:text-textColor hover:border-[#2B5CD3]'
                 }`}
               >
-                {t.label}
+                {translate(studioTabKey(keyNs, t.key), t.label)}
               </button>
             ))}
           </div>
@@ -171,13 +185,19 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
             <Custom provider={provider} onGenerated={() => mutateJobs()} />
           ) : (
             <div className="max-w-[640px] mx-auto flex flex-col gap-[18px]">
-              {tab.description && <p className="text-[13px] text-newTextColor/70">{tab.description}</p>}
+              {tab.description && (
+                <p className="text-[13px] text-newTextColor/70">
+                  {translate(studioTabDescKey(keyNs, tab.key), tab.description)}
+                </p>
+              )}
               <StudioForm
                 fields={tab.fields}
                 values={values}
                 onChange={setValue}
                 provider={provider}
                 operation={tab.operation}
+                keyNs={keyNs}
+                tabKey={tab.key}
               />
               <button
                 type="button"
@@ -185,7 +205,7 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
                 disabled={!canGenerate || generating}
                 className="self-start px-[20px] py-[10px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[600] hover:bg-[#2B5CD3]/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {generating ? 'Starting…' : 'Generate'}
+                {generating ? translate('starting_ellipsis', 'Starting…') : translate('generate', 'Generate')}
               </button>
             </div>
           )}
@@ -193,11 +213,13 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
 
         <div className="w-[320px] mobile:w-full shrink-0 border-l mobile:border-l-0 mobile:border-t border-studioBorder flex flex-col min-h-0">
           <div className="flex items-center justify-between px-[14px] h-[44px] border-b border-studioBorder shrink-0">
-            <span className="text-[12px] font-[600] uppercase tracking-wider text-newTableText">Render queue</span>
+            <span className="text-[12px] font-[600] uppercase tracking-wider text-newTableText">
+              {translate('studio_render_queue', 'Render queue')}
+            </span>
             <button
               type="button"
               onClick={() => mutateJobs()}
-              aria-label="Refresh queue"
+              aria-label={translate('studio_refresh_queue', 'Refresh queue')}
               className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-newTextColor/65 hover:text-textColor hover:bg-boxHover transition-all"
             >
               ⟳

@@ -444,27 +444,35 @@ export const Filters = () => {
     resolve: (id: string) => string | undefined
   ) =>
     ids.length === 1
-      ? `${label}: ${resolve(ids[0]) || ids[0]}`
-      : `${label}: ${ids.length}`;
+      ? t('filter_applied_label', '{{label}}: {{value}}', {
+          label,
+          value: resolve(ids[0]) || ids[0],
+        })
+      : t('filter_applied_label', '{{label}}: {{value}}', {
+          label,
+          value: ids.length,
+        });
 
   const appliedChips: { key: string; label: string; onClear: () => void }[] = [];
   if (calendar.listState !== 'all') {
     appliedChips.push({
       key: 'status',
-      label: `${t('status', 'Status')}: ${
-        listStateOptions.find((o) => o.value === calendar.listState)?.label
-      }`,
+      label: t('filter_applied_label', '{{label}}: {{value}}', {
+        label: t('status', 'Status:'),
+        value: listStateOptions.find((o) => o.value === calendar.listState)?.label || '',
+      }),
       onClear: () => calendar.setListState('all'),
     });
   }
   if (calendar.engagementFilter !== 'all') {
     appliedChips.push({
       key: 'engagement',
-      label: `${t('engagement', 'Engagement')}: ${
-        engagementFilterOptions.find(
-          (o) => o.value === calendar.engagementFilter
-        )?.label
-      }`,
+      label: t('filter_applied_label', '{{label}}: {{value}}', {
+        label: t('engagement', 'Engagement'),
+        value:
+          engagementFilterOptions.find((o) => o.value === calendar.engagementFilter)
+            ?.label || '',
+      }),
       onClear: () => calendar.setEngagementFilter('all'),
     });
   }
@@ -522,9 +530,11 @@ export const Filters = () => {
   if (calendar.mediaTypeFilter !== 'all') {
     appliedChips.push({
       key: 'media',
-      label: `${t('media', 'Media')}: ${
-        mediaTypeOptions.find((o) => o.value === calendar.mediaTypeFilter)?.label
-      }`,
+      label: t('filter_applied_label', '{{label}}: {{value}}', {
+        label: t('media', 'Media'),
+        value:
+          mediaTypeOptions.find((o) => o.value === calendar.mediaTypeFilter)?.label || '',
+      }),
       onClear: () => calendar.setMediaTypeFilter('all'),
     });
   }
@@ -567,17 +577,22 @@ export const Filters = () => {
   if (calendar.contentSearch.trim()) {
     appliedChips.push({
       key: 'search',
-      label: `${t('search', 'Search')}: "${calendar.contentSearch.trim()}"`,
+      label: t('filter_search_label', '{{label}}: "{{value}}"', {
+        label: t('search', 'Search'),
+        value: calendar.contentSearch.trim(),
+      }),
       onClear: () => calendar.setContentSearch(''),
     });
   }
   if (calendar.customer) {
     appliedChips.push({
       key: 'customer',
-      label: `${t('customer', 'Customer')}: ${
-        calendar.integrations.find((i) => i?.customer?.id === calendar.customer)
-          ?.customer?.name || ''
-      }`,
+      label: t('filter_applied_label', '{{label}}: {{value}}', {
+        label: t('customer', 'Customer:'),
+        value:
+          calendar.integrations.find((i) => i?.customer?.id === calendar.customer)
+            ?.customer?.name || '',
+      }),
       onClear: () => setCustomer(''),
     });
   }
@@ -1047,7 +1062,7 @@ export const Filters = () => {
               <>
                 {/* Status filter — applies to both the calendar and the list view. */}
                 <div className="flex flex-col gap-[8px]">
-                  {sectionHeader(t('status', 'Status'), 'status')}
+                  {sectionHeader(t('status', 'Status:'), 'status')}
                   <div className="flex w-full p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500]">
                     {listStateOptions.map((option) => (
                       <button type="button"
@@ -1217,7 +1232,7 @@ export const Filters = () => {
                 {/* Customer / client */}
                 {hasCustomers && (
                   <div className="flex flex-col gap-[8px]">
-                    {sectionHeader(t('customer', 'Customer'), 'customer')}
+                    {sectionHeader(t('customer', 'Customer:'), 'customer')}
                     <SelectCustomer
                       customer={calendar.customer as string}
                       onChange={(customer: string) => setCustomer(customer)}

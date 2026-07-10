@@ -4,6 +4,7 @@ import React, { FC } from 'react';
 import { ColorSwatch, Slider, Stepper } from '../controls';
 import type { DesignerElement, DesignerTextShadow } from '../designer.store';
 import { useBrandColors } from './use-brand-colors';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface ShapeInspectorProps {
   element: DesignerElement;
@@ -23,6 +24,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
   ids,
   store,
 }) => {
+  const t = useT();
   const updateElements = store((s: any) => s.updateElements);
   const brandColors = useBrandColors();
   const brandEnforcement = store((s: any) => s.brandEnforcement);
@@ -34,11 +36,11 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
   return (
     <div className="space-y-3">
       <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-        Shape
+        {t('designer_shape_heading', 'Shape')}
       </div>
 
       <ColorSwatch
-        label="Fill"
+        label={t('fill_button', 'Fill')}
         value={element.fill || '#2B5CD3'}
         onChange={(hex) => set({ fill: hex })}
         brandColors={brandColors}
@@ -46,16 +48,16 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
       />
 
       <div className="space-y-2">
-        <div className="text-[11px] text-textColor/50">Stroke</div>
+        <div className="text-[11px] text-textColor/50">{t('designer_label_stroke', 'Stroke')}</div>
         <ColorSwatch
-          label="Color"
+          label={t('color', 'Color')}
           value={element.stroke || '#000000'}
           onChange={(hex) => set({ stroke: hex })}
           brandColors={brandColors}
           brandEnforcement={brandEnforcement}
         />
         <Stepper
-          label="Width"
+          label={t('designer_label_width', 'Width')}
           min={0}
           max={40}
           value={element.strokeWidth || 0}
@@ -64,7 +66,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
       </div>
 
       <Stepper
-        label="Corner radius"
+        label={t('designer_label_corner_radius', 'Corner radius')}
         min={0}
         value={element.borderRadius || 0}
         onChange={(n) => set({ borderRadius: n })}
@@ -72,7 +74,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
 
       <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/50">Shadow</span>
+          <span className="text-[11px] text-textColor/50">{t('designer_label_shadow', 'Shadow')}</span>
           <button
             type="button"
             role="switch"
@@ -96,7 +98,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
         {shadow && (
           <div className="flex flex-col gap-3">
             <ColorSwatch
-              label="Shadow color"
+              label={t('designer_label_shadow_color', 'Shadow color')}
               value={shadow.color || '#000000'}
               onChange={(hex) =>
                 set({
@@ -107,7 +109,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
               brandEnforcement={brandEnforcement}
             />
             <Slider
-              label="Blur"
+              label={t('designer_label_blur', 'Blur')}
               min={0}
               max={40}
               value={shadow.blur}
@@ -118,7 +120,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
               }
             />
             <Slider
-              label="Offset X"
+              label={t('designer_label_offset_x', 'Offset X')}
               min={-40}
               max={40}
               value={shadow.offsetX}
@@ -129,7 +131,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
               }
             />
             <Slider
-              label="Offset Y"
+              label={t('designer_label_offset_y', 'Offset Y')}
               min={-40}
               max={40}
               value={shadow.offsetY}

@@ -2,7 +2,7 @@
 
 import { FC, Fragment } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { PostDetail } from './utils';
+import { PostDetail, FetchError } from './utils';
 import { usePostDetail } from './hooks/usePostDetail';
 import { usePostShortlinkStats } from './hooks/usePostShortlinkStats';
 import { PostDetailChart } from './post.detail.chart';
@@ -74,7 +74,12 @@ export const PostDetailBody: FC<PostDetailBodyProps> = ({
             <p className="text-[var(--negative,#f97066)] text-[14px] mb-[4px]">
               {t('failed_to_load_post_details', 'Failed to load post details')}
             </p>
-            <p className="text-[12px] text-newTableText opacity-60">{error.message}</p>
+            <p className="text-[12px] text-newTableText opacity-60">
+              {(() => {
+                const fe = error as FetchError;
+                return fe.messageKey ? t(fe.messageKey, fe.message) : fe.message;
+              })()}
+            </p>
           </div>
         )}
         {postDetail && (

@@ -26,7 +26,6 @@ const getCountryCodeForFlag = (languageCode: string) => {
   if (languageCode === 'es') return 'ES';
   if (languageCode === 'ar') return 'SA';
   if (languageCode === 'zh') return 'CN';
-  if (languageCode === 'he') return 'IL';
   if (languageCode === 'ja') return 'JP';
   if (languageCode === 'ko') return 'KR';
   if (languageCode === 'vi') return 'VN';
@@ -71,7 +70,7 @@ export const ChangeLanguageComponent = () => {
     setCookie(language);
     i18next.changeLanguage(language);
     modals.closeCurrent();
-    const rtlLanguages = ['he', 'ar'];
+    const rtlLanguages = ['ar'];
     const dir = rtlLanguages.includes(language) ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', dir);
   };

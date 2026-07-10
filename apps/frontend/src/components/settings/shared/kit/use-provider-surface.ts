@@ -58,7 +58,7 @@ export function useProviderSurface<Meta = any>(
         body: JSON.stringify({ enabled }),
       });
       if (!res.ok) {
-        toaster.show(t('save_failed', 'Failed to save configuration'), 'warning');
+        toaster.show(t('save_failed', 'Failed to save'), 'warning');
         return false;
       }
       mutate();
@@ -100,7 +100,7 @@ export function useProviderSurface<Meta = any>(
         body: JSON.stringify(body),
       });
       if (!res.ok) {
-        toaster.show(t('save_failed', 'Failed to save configuration'), 'warning');
+        toaster.show(t('save_failed', 'Failed to save'), 'warning');
         return false;
       }
       toaster.show(t('saved', 'Configuration saved'), 'success');
@@ -130,7 +130,7 @@ export function useProviderSurface<Meta = any>(
           }
         }
         if (ok) {
-          toaster.show(t('connection_successful', 'Connection successful'), 'success');
+          toaster.show(t('connection_successful', 'Connection successful!'), 'success');
           return true;
         }
         toaster.show(t('connection_failed', 'Connection failed'), 'warning');

@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Button } from '@gitroom/react/form/button';
 import {
@@ -28,18 +29,30 @@ interface ModelDefaultsResponse {
   categories: ModelDefaultRow[];
 }
 
-const CATEGORY_LABELS: Record<AiModelCategory, string> = {
-  'low-reasoning': 'Low Reasoning',
-  'high-reasoning': 'High Reasoning',
-  vision: 'Vision',
-  workflow: 'Workflow',
+const CATEGORY_LABELS: Record<AiModelCategory, [string, string]> = {
+  'low-reasoning': ['ai_category_low_reasoning', 'Low Reasoning'],
+  'high-reasoning': ['ai_category_high_reasoning', 'High Reasoning'],
+  vision: ['ai_category_vision', 'Vision'],
+  workflow: ['ai_category_workflow', 'Workflow'],
 };
 
-const CATEGORY_HELP: Record<AiModelCategory, string> = {
-  'low-reasoning': 'Used for utility text, prompts, slide breakdowns, and embeddings.',
-  'high-reasoning': 'Used for generation, agents, MCP, and any reasoning-heavy task.',
-  vision: 'Used for image understanding and focal-point detection.',
-  workflow: 'Reserved for future agentic workflow steps.',
+const CATEGORY_HELP: Record<AiModelCategory, [string, string]> = {
+  'low-reasoning': [
+    'ai_category_help_low_reasoning',
+    'Used for utility text, prompts, slide breakdowns, and embeddings.',
+  ],
+  'high-reasoning': [
+    'ai_category_help_high_reasoning',
+    'Used for generation, agents, MCP, and any reasoning-heavy task.',
+  ],
+  vision: [
+    'ai_category_help_vision',
+    'Used for image understanding and focal-point detection.',
+  ],
+  workflow: [
+    'ai_category_help_workflow',
+    'Reserved for future agentic workflow steps.',
+  ],
 };
 
 const useModelDefaults = () => {
@@ -85,10 +98,10 @@ const AiDefaultRow: React.FC<{
       <div className="flex justify-between items-start">
         <div>
           <div className="text-[14px] font-[600] text-textColor">
-            {CATEGORY_LABELS[row.category]}
+            {t(CATEGORY_LABELS[row.category][0], CATEGORY_LABELS[row.category][1])}
           </div>
           <div className="text-[12px] text-newTextColor/60">
-            {CATEGORY_HELP[row.category]}
+            {t(CATEGORY_HELP[row.category][0], CATEGORY_HELP[row.category][1])}
           </div>
         </div>
         {!empty && row.source === 'stored' && (
@@ -106,7 +119,11 @@ const AiDefaultRow: React.FC<{
         options={options}
         isLoading={isLoading}
         disabled={empty}
-        label={`Default model for ${CATEGORY_LABELS[row.category]}`}
+        label={t(
+          'default_model_for_category',
+          'Default model for {{category}}',
+          { category: t(CATEGORY_LABELS[row.category][0], CATEGORY_LABELS[row.category][1]) }
+        )}
         value={value}
         onChange={(newValue) => {
           if (!newValue) return;
@@ -159,7 +176,7 @@ export const ModelDefaultsTab: React.FC = () => {
           const res = await fetch(`/settings/ai/defaults/${category}`, {
             method: 'DELETE',
           });
-          if (!res.ok) throw new Error('Failed to reset default');
+          if (!res.ok) throw createFetchError('failed_to_reset_default', 'Failed to reset default');
         } else {
           const res = await fetch(`/settings/ai/defaults/${category}`, {
             method: 'PUT',
@@ -169,7 +186,7 @@ export const ModelDefaultsTab: React.FC = () => {
               model: value.model,
             }),
           });
-          if (!res.ok) throw new Error('Failed to save default');
+          if (!res.ok) throw createFetchError('failed_to_save_default', 'Failed to save default');
         }
         await mutate();
         toaster.show(t('default_saved', 'Default saved'), 'success');
@@ -186,7 +203,7 @@ export const ModelDefaultsTab: React.FC = () => {
   );
 
   if (isLoading || !data) {
-    return <div className="text-newTextColor/60 text-[14px]">{t('loading', 'Loading…')}</div>;
+    return <div className="text-newTextColor/60 text-[14px]">{t('loading', 'Loading')}</div>;
   }
 
   return (

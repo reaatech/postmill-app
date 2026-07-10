@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
+import { createFetchError } from '../../shared/fetch-error';
 
 export interface VpnProviderCapabilityInfo {
   wireguard: boolean;
@@ -52,7 +53,7 @@ export const useVpnConfig = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/vpn/config');
-    if (!res.ok) throw new Error('Failed to load VPN config');
+    if (!res.ok) throw createFetchError('failed_to_load_vpn_config', 'Failed to load VPN config');
     return res.json();
   }, [fetch]);
   return useSWR<VpnConfigResponse>('org-vpn-config', load, {
@@ -64,7 +65,7 @@ export const useVpnProviders = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/vpn/providers');
-    if (!res.ok) throw new Error('Failed to load VPN providers');
+    if (!res.ok) throw createFetchError('failed_to_load_vpn_providers', 'Failed to load VPN providers');
     return res.json();
   }, [fetch]);
   return useSWR<VpnConfigResponse>('org-vpn-providers', load, {

@@ -42,7 +42,7 @@ const SkoolLabelSelectInner: FC<{
   return (
     <Select
       name={name}
-      label="Select Label"
+      label={t('select_label', 'Select Label')}
       onChange={onChangeInner}
       value={currentLabel}
     >

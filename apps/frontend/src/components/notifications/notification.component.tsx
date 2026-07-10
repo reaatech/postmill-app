@@ -41,7 +41,7 @@ const NotificationRow: FC<{
   const t = useT();
   const createdAt = dayjs(notification.createdAt);
   const isWithin24h = dayjs().diff(createdAt, 'hour') < 24;
-  const fullDate = createdAt.format('MMM D, YYYY h:mm A');
+  const fullDate = createdAt.format(t('notification_full_date_format', 'MMM D, YYYY h:mm A'));
   const isUnread = !notification.readAt;
 
   return (
@@ -243,6 +243,7 @@ export const NotificationOpenComponent: FC<{
 
 const NotificationComponent = () => {
   const fetch = useFetch();
+  const t = useT();
   const [show, setShow] = useState(false);
 
   const loadUnreadCount = useCallback(async (): Promise<{ total: number }> => {
@@ -267,7 +268,7 @@ const NotificationComponent = () => {
     <div className="relative cursor-pointer select-none" ref={ref}>
       <button
         type="button"
-        aria-label="Notifications"
+        aria-label={t('notifications', 'Notifications')}
         onClick={changeShow}
         className="relative cursor-pointer"
       >

@@ -3,7 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
-import { MetricDetailResponse } from '../utils';
+import { MetricDetailResponse, createFetchError } from '../utils';
 
 interface MetricDrillParams {
   metric: string;
@@ -33,7 +33,7 @@ export const useMetricDrill = (params: MetricDrillParams) => {
 
   const load = useCallback(async (path: string) => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to fetch metric drill');
+    if (!res.ok) throw createFetchError('metric_drill_fetch_failed', 'Failed to fetch metric drill');
     return res.json() as Promise<MetricDetailResponse>;
   }, [fetch]);
 

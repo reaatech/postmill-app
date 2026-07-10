@@ -1,6 +1,8 @@
 import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
 import nextTypescript from 'eslint-config-next/typescript';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
+import i18next from 'eslint-plugin-i18next';
+import i18nextHtmlEntities from 'eslint-plugin-i18next/lib/options/htmlEntities.js';
 
 // ESLint 9 flat config. eslint-config-next 16 ships native flat configs and
 // peer-requires eslint >=9, so they are spread in directly (no FlatCompat).
@@ -72,6 +74,130 @@ const eslintConfig = [
       // no accepted role for that shape, so these two are tracked as warnings.
       'jsx-a11y/no-noninteractive-element-interactions': 'warn',
       'jsx-a11y/no-noninteractive-tabindex': 'warn',
+    },
+  },
+  {
+    // i18n literal-string audit for the Next.js frontend (dev/I18N_UPDATE.md §S0/§G1).
+    // OPT-IN: enabled only with I18N_LINT=1 (e.g. `I18N_LINT=1 pnpm exec eslint apps/frontend/src`).
+    // Off by default because the residual warnings are dominated by known false positives
+    // (label fallbacks on internally-translated components), and CI's eslint.yml uploads
+    // SARIF to GitHub code scanning — a warn-level default floods it with ~13k alerts and
+    // fails the code-scanning PR gate. Promote to always-on 'error' (full G1) only after
+    // the false-positive allowlist is complete.
+    files: ['apps/frontend/src/**/*.{js,jsx,ts,tsx}'],
+    plugins: { i18next },
+    rules: {
+      'i18next/no-literal-string': [
+        process.env.I18N_LINT ? 'warn' : 'off',
+        {
+          // Catch JSX text, JSX attributes, and non-JSX literals (e.g. hook
+          // throws, option labels) so the report covers the whole UI surface.
+          mode: 'all',
+          message: 'literal string should be translated (i18n)',
+          'jsx-attributes': {
+            exclude: [
+              // Defaults provided by the plugin.
+              'className',
+              'styleName',
+              'style',
+              'type',
+              'key',
+              'id',
+              'width',
+              'height',
+              // Non-user-facing / technical identifiers.
+              'name',
+              'data-.*',
+              'src',
+              'href',
+              'to',
+              'target',
+              'rel',
+              'role',
+              // Bespoke form primitives translate internally: `translationKey` is
+              // the i18n key; `label` is its English fallback passed alongside.
+              'translationKey',
+              'autoComplete',
+              'autoCapitalize',
+              // Next.js <Script> and similar enum props.
+              'strategy',
+              // Color values (hex / named colors) are design tokens, not copy.
+              'color',
+              // fetch/CopilotKit credential mode is a technical enum.
+              'credentials',
+              // aria-* is technical except aria-label, which is user-facing.
+              'aria-(?!label).*',
+            ],
+          },
+          callees: {
+            exclude: [
+              // Defaults provided by the plugin.
+              'i18n(ext)?',
+              't',
+              'require',
+              // react-hook-form field registration — the string is a field name.
+              'register',
+              '.*\\.register',
+              'addEventListener',
+              'removeEventListener',
+              'postMessage',
+              'getElementById',
+              'dispatch',
+              'commit',
+              'includes',
+              'indexOf',
+              'endsWith',
+              'startsWith',
+              // Translation helpers used in this codebase.
+              'i18n\\.t',
+              'i18next\\.t',
+              'getT',
+              // Logging is never user-facing UI copy.
+              'console.*',
+              'Logger.*',
+              // DOM APIs whose string arguments are technical identifiers.
+              'setAttribute',
+              'removeAttribute',
+              'querySelector',
+              'querySelectorAll',
+              'classList\\..*',
+              'window\\.open',
+              // Network / cookie APIs with technical string args.
+              'fetch',
+              'useCookie',
+              'getCookie',
+              'setCookie',
+              'mutate',
+              'searchParams\\..*',
+              // Analytics / event APIs with technical event names.
+              'gtag',
+              // Standard library / locale APIs with technical string args.
+              'Intl\\..*',
+              'countries\\.getName',
+              // SWR cache keys / class-name helpers are technical identifiers.
+              'useSWR(?:<.*>)?',
+              'useSWRInfinite(?:<.*>)?',
+              'cn',
+              'clsx',
+              'twMerge',
+              'classNames',
+            ],
+          },
+          words: {
+            exclude: [
+              // Defaults provided by the plugin.
+              '[0-9!-/:-@[-`{-~]+',
+              '[A-Z_-]+',
+              i18nextHtmlEntities,
+              /^\p{Emoji}+$/u,
+              // Next.js directives and strict mode pragma.
+              'use client',
+              'use server',
+              'use strict',
+            ],
+          },
+        },
+      ],
     },
   },
 ];

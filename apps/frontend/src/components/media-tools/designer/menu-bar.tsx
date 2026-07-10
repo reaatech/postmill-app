@@ -4,11 +4,15 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import clsx from 'clsx';
 import {
   actionLabel,
+  actionLabelKey,
   menuLabel,
+  menuLabelKey,
   MENU_ORDER,
+  submenuLabelKey,
   type DesignerAction,
   type DesignerMenu,
 } from './actions';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface MenuBarProps {
   actions: DesignerAction[];
@@ -44,6 +48,7 @@ const ItemButton: FC<{ action: DesignerAction; onRun: () => void; indent?: boole
   onRun,
   indent,
 }) => {
+  const t = useT();
   const disabled = action.enabled ? !action.enabled() : false;
   const checked = action.checked ? action.checked() : undefined;
   return (
@@ -69,7 +74,7 @@ const ItemButton: FC<{ action: DesignerAction; onRun: () => void; indent?: boole
       <span className="w-[14px] shrink-0 text-btnPrimaryAccent text-[12px]">
         {checked ? '✓' : ''}
       </span>
-      <span className="flex-1 truncate">{actionLabel(action)}</span>
+      <span className="flex-1 truncate">{t(actionLabelKey(action), actionLabel(action))}</span>
       {action.shortcut && (
         <span className="text-[11px] text-textColor/40 shrink-0">{action.shortcut}</span>
       )}
@@ -78,6 +83,7 @@ const ItemButton: FC<{ action: DesignerAction; onRun: () => void; indent?: boole
 };
 
 const Dropdown: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items, onClose }) => {
+  const t = useT();
   const entries = buildEntries(items);
   // Flip to right-aligned if a left-aligned dropdown would spill off the right
   // edge (the designer root is overflow-hidden, so spillover gets clipped).
@@ -107,7 +113,7 @@ const Dropdown: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items,
             ) : (
               <div>
                 <div className="px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-textColor/35">
-                  {entry.name}
+                  {t(submenuLabelKey(entry.name), entry.name)}
                 </div>
                 {entry.items.map((it) => (
                   <ItemButton key={it.id} action={it} onRun={onClose} indent />
@@ -122,6 +128,7 @@ const Dropdown: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items,
 };
 
 export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
+  const t = useT();
   const [open, setOpen] = useState<DesignerMenu | 'more' | null>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -129,10 +136,10 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
   const menus = useMemo(() => {
     return MENU_ORDER.map((m) => ({
       menu: m,
-      label: menuLabel(m),
+      label: t(menuLabelKey(m), menuLabel(m)),
       items: actions.filter((a) => a.menu === m),
     })).filter((g) => g.items.length > 0);
-  }, [actions]);
+  }, [actions, t]);
 
   const overflowMenus = menus.slice(visibleOnMobile);
 
@@ -187,7 +194,7 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
             role="menuitem"
             aria-haspopup="menu"
             aria-expanded={open === 'more'}
-            aria-label="More menus"
+            aria-label={t('designer_more_menus', 'More menus')}
             onClick={() => setOpen((cur) => (cur === 'more' ? null : 'more'))}
             className={clsx(
               'px-2.5 py-1 rounded text-[15px] leading-none transition-colors',
@@ -221,6 +228,7 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
 
 // Inline variant (no absolute positioning) for the mobile ☰ overflow sheet.
 const DropdownInline: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items, onClose }) => {
+  const t = useT();
   const entries = buildEntries(items);
   return (
     <div>
@@ -234,7 +242,7 @@ const DropdownInline: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ 
             ) : (
               <div>
                 <div className="px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-textColor/35">
-                  {entry.name}
+                  {t(submenuLabelKey(entry.name), entry.name)}
                 </div>
                 {entry.items.map((it) => (
                   <ItemButton key={it.id} action={it} onRun={onClose} indent />

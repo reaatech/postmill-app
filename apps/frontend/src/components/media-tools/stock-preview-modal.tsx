@@ -15,6 +15,7 @@ import {
 } from './stock.types';
 import { SaveToFilesModal } from './save-to-files-modal';
 import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 // Premium BYOK content packs mint a licensed download URL from the item id at
 // import time (mint-then-ingest). Keep in sync with the backend registry.
@@ -67,6 +68,7 @@ async function rasterizeSvgUrlToPngBlob(url: string, size = 512): Promise<Blob> 
 }
 
 export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialItem, type }) => {
+  const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
@@ -197,7 +199,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
-        toaster.show(msg || 'Could not save this item', 'warning');
+        toaster.show(msg || t('could_not_save_item', 'Could not save this item'), 'warning');
         return;
       }
       const savedFile = await res.json();
@@ -225,11 +227,11 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
         ),
       });
     } catch {
-      toaster.show('Could not save this item', 'warning');
+      toaster.show(t('could_not_save_item', 'Could not save this item'), 'warning');
     } finally {
       setPosting(false);
     }
-  }, [posting, fetch, modal, toaster, item, type]);
+  }, [posting, fetch, modal, toaster, item, type, t]);
 
   const renderPreview = () => {
     if (type === 'video') {
@@ -239,7 +241,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
           poster={(item as StockVideoItem).thumbUrl}
           controls
           className="w-full rounded-[8px] max-h-[60vh]"
-          aria-label="Stock video preview"
+          aria-label={t('stock_video_preview_aria', 'Stock video preview')}
         >
           <track kind="captions" srcLang="en" label="English" />
         </video>
@@ -294,8 +296,13 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       const requiresAttribution = /cc-by/i.test(icon.license);
       return (
         <div className="text-[12px] text-newTextColor/60">
-          {icon.prefix} · License: {icon.license}
-          {requiresAttribution && ' · Attribution required'}
+          {icon.prefix} · {t('license_label', 'License:')} {icon.license}
+          {requiresAttribution && (
+            <>
+              {' · '}
+              {t('attribution_required', 'Attribution required')}
+            </>
+          )}
         </div>
       );
     }
@@ -303,7 +310,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
     if (item.source === 'pixabay') {
       return (
         <div className="text-[12px] text-newTextColor/60">
-          Powered by{' '}
+          {t('powered_by', 'Powered by')}{' '}
           <a
             href="https://pixabay.com"
             target="_blank"
@@ -317,14 +324,14 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
     }
 
     if (item.source === 'giphy') {
-      return <div className="text-[12px] text-newTextColor/60">Powered by GIPHY</div>;
+      return <div className="text-[12px] text-newTextColor/60">{t('powered_by_giphy', 'Powered by GIPHY')}</div>;
     }
 
     if (CONTENT_PACK_SOURCES.has(item.source)) {
       return (
         <div className="text-[12px] text-newTextColor/60">
           {CONTENT_PACK_LABELS[item.source] || item.source} (BYOK) ·{' '}
-          {item.license || 'Premium content pack'}
+          {item.license || t('premium_content_pack', 'Premium content pack')}
         </div>
       );
     }
@@ -338,13 +345,21 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
         <div className="flex-1 min-w-0">{renderPreview()}</div>
         <div className="w-[240px] shrink-0 flex flex-col gap-[12px]">
           <div className="text-[12px] text-newTextColor/60 uppercase tracking-wider font-[600]">
-            {type === 'photo' ? 'Photo' : type === 'video' ? 'Video' : type === 'vector' ? 'Vector' : type === 'sticker' ? 'Sticker' : 'Icon'}
+            {type === 'photo'
+              ? t('photo', 'Photo')
+              : type === 'video'
+              ? t('provider_chip_video', 'Video')
+              : type === 'vector'
+              ? t('vector', 'Vector')
+              : type === 'sticker'
+              ? t('sticker', 'Sticker')
+              : t('icon', 'Icon')}
           </div>
           <div className="text-[13px] text-textColor">
             {item.width} × {item.height}
           </div>
           <div className="text-[13px] text-textColor">
-            by{' '}
+            {t('by', 'by')}{' '}
             <a
               href={item.authorUrl}
               target="_blank"
@@ -370,7 +385,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" />
               </svg>
-              {posting ? 'Saving…' : 'Save & Post'}
+              {posting ? t('saving_ellipsis', 'Saving…') : t('save_and_post', 'Save & Post')}
             </button>
           ) : (
             <button
@@ -380,7 +395,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
               </svg>
-              Open in Designer
+              {t('open_in_designer', 'Open in Designer')}
             </button>
           )}
           <button
@@ -390,14 +405,14 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
               <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
             </svg>
-            Save to Files
+            {t('save_to_files', 'Save to Files')}
           </button>
         </div>
       </div>
 
       {related && related.length > 0 && (
         <div>
-          <div className="text-[14px] font-[600] text-textColor mb-[12px]">Related</div>
+          <div className="text-[14px] font-[600] text-textColor mb-[12px]">{t('related', 'Related')}</div>
           <div className="flex gap-[10px] overflow-x-auto pb-[8px]">
             {(related.results || related).slice(0, 8).map((rel: any) => (
               <button

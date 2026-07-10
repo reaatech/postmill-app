@@ -180,13 +180,13 @@ export const KnowledgeBase = () => {
     }),
       });
       if (!res.ok) {
-        toaster.show('Failed to save vector store settings', 'warning');
+        toaster.show(t('failed_to_save_vector_store_settings', 'Failed to save vector store settings'), 'warning');
         return;
       }
       toaster.show(t('vec_settings_saved', 'Vector store settings saved'), 'success');
       mutateStatus();
     } catch {
-      toaster.show('Failed to save vector store settings', 'warning');
+      toaster.show(t('failed_to_save_vector_store_settings', 'Failed to save vector store settings'), 'warning');
     } finally {
       setVecSaving(false);
     }
@@ -214,7 +214,7 @@ export const KnowledgeBase = () => {
       const data = await res.json();
       setVecTestResult(data);
     } catch {
-      setVecTestResult({ ok: false, error: 'Connection test failed' });
+      setVecTestResult({ ok: false, error: t('connection_test_failed', 'Connection test failed') });
     } finally {
       setVecTesting(false);
     }
@@ -233,7 +233,7 @@ export const KnowledgeBase = () => {
       });
       if (!res.ok) {
         const err = await res.json();
-        toaster.show(err.message || 'Failed to index content', 'warning');
+        toaster.show(err.message || t('failed_to_index_content', 'Failed to index content'), 'warning');
         return;
       }
       toaster.show(t('content_indexed', 'Content indexed successfully'), 'success');
@@ -242,7 +242,7 @@ export const KnowledgeBase = () => {
       mutateStatus();
       mutateItems();
     } catch {
-      toaster.show('Failed to index content', 'warning');
+      toaster.show(t('failed_to_index_content', 'Failed to index content'), 'warning');
     } finally {
       setAdding(false);
     }
@@ -254,14 +254,14 @@ export const KnowledgeBase = () => {
         method: 'DELETE',
       });
       if (!res.ok) {
-        toaster.show('Failed to delete item', 'warning');
+        toaster.show(t('failed_to_delete_item', 'Failed to delete item'), 'warning');
         return;
       }
       toaster.show(t('item_deleted', 'Item deleted'), 'success');
       mutateStatus();
       mutateItems();
     } catch {
-      toaster.show('Failed to delete item', 'warning');
+      toaster.show(t('failed_to_delete_item', 'Failed to delete item'), 'warning');
     }
   }, [fetch, toaster, t, mutateStatus, mutateItems]);
 
@@ -275,13 +275,13 @@ export const KnowledgeBase = () => {
         body: JSON.stringify({ query: searchQuery.trim(), limit: 10 }),
       });
       if (!res.ok) {
-        toaster.show('Search failed', 'warning');
+        toaster.show(t('search_failed', 'Search failed'), 'warning');
         return;
       }
       const data = await res.json();
       setSearchResults(data.results || []);
     } catch {
-      toaster.show('Search failed', 'warning');
+      toaster.show(t('search_failed', 'Search failed'), 'warning');
     } finally {
       setSearching(false);
     }
@@ -294,18 +294,20 @@ export const KnowledgeBase = () => {
         method: 'POST',
       });
       if (!res.ok) {
-        toaster.show('Backfill failed', 'warning');
+        toaster.show(t('backfill_failed', 'Backfill failed'), 'warning');
         return;
       }
       const data = await res.json();
       toaster.show(
-        t('backfill_completed', `Backfill completed — indexed ${data.indexed || 0} new sources`),
+        t('backfill_completed', 'Backfill completed — indexed {{count}} new sources', {
+          count: data.indexed || 0,
+        }),
         'success',
       );
       mutateStatus();
       mutateItems();
     } catch {
-      toaster.show('Backfill failed', 'warning');
+      toaster.show(t('backfill_failed', 'Backfill failed'), 'warning');
     } finally {
       setBackfilling(false);
     }
@@ -314,7 +316,7 @@ export const KnowledgeBase = () => {
   if (statusLoading) {
     return (
       <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }
@@ -351,7 +353,7 @@ export const KnowledgeBase = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-[16px]">
           <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[4px]">
             <span className="text-[11px] text-newTableText uppercase tracking-wider">
-              {t('status', 'Status')}
+              {t('status', 'Status:')}
             </span>
             <span className="text-[14px] font-semibold">
               {status?.enabled ? (
@@ -430,7 +432,7 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={pgUrl}
                   onChange={(e) => setPgUrl(e.target.value)}
-                  placeholder={pgConfigured ? t('configured_leave_blank', '•••• configured — leave blank to keep') : 'postgres://user:pass@host:5432/db'}
+                  placeholder={pgConfigured ? t('configured_leave_blank', '•••• configured — leave blank to keep') : t('pg_url_placeholder', 'postgres://user:pass@host:5432/db')}
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -439,7 +441,7 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={pgTable}
                   onChange={(e) => setPgTable(e.target.value)}
-                  placeholder="postmill_rag"
+                  placeholder={t('rag_table_placeholder', 'postmill_rag')}
                 />
               </div>
             </>
@@ -453,7 +455,7 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={qdrantUrl}
                   onChange={(e) => setQdrantUrl(e.target.value)}
-                  placeholder="https://your-cluster.qdrant.io:6333"
+                  placeholder={t('qdrant_url_placeholder', 'https://your-cluster.qdrant.io:6333')}
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -473,7 +475,7 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={qdrantCollection}
                   onChange={(e) => setQdrantCollection(e.target.value)}
-                  placeholder="postmill_rag"
+                  placeholder={t('rag_table_placeholder', 'postmill_rag')}
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -483,9 +485,9 @@ export const KnowledgeBase = () => {
                   onChange={(e) => setDistance(e.target.value)}
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
-                  <option value="Cosine">Cosine</option>
-                  <option value="Euclid">Euclidean</option>
-                  <option value="Dot">Dot Product</option>
+                  <option value="Cosine">{t('distance_cosine', 'Cosine')}</option>
+                  <option value="Euclid">{t('distance_euclidean', 'Euclidean')}</option>
+                  <option value="Dot">{t('distance_dot_product', 'Dot Product')}</option>
                 </select>
               </div>
             </>
@@ -501,7 +503,7 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={pineconeApiKey}
                   onChange={(e) => setPineconeApiKey(e.target.value)}
-                  placeholder={pineconeConfigured ? t('configured_leave_blank', '•••• configured — leave blank to keep') : 'pcsk_...'}
+                  placeholder={pineconeConfigured ? t('configured_leave_blank', '•••• configured — leave blank to keep') : t('pinecone_api_key_placeholder', 'pcsk_...')}
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -510,7 +512,7 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={pineconeIndex}
                   onChange={(e) => setPineconeIndex(e.target.value)}
-                  placeholder="postmill-rag"
+                  placeholder={t('pinecone_index_placeholder', 'postmill-rag')}
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -519,7 +521,7 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={pineconeHost}
                   onChange={(e) => setPineconeHost(e.target.value)}
-                  placeholder="idx-xxxx.svc.region.pinecone.io"
+                  placeholder={t('pinecone_host_placeholder', 'idx-xxxx.svc.region.pinecone.io')}
                 />
               </div>
             </>
@@ -560,10 +562,10 @@ export const KnowledgeBase = () => {
                   onChange={(e) => setChunkStrategy(e.target.value)}
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
-                  <option value="fixed-size">Fixed Size</option>
-                  <option value="semantic">Semantic</option>
-                  <option value="recursive">Recursive</option>
-                  <option value="sliding-window">Sliding Window</option>
+                  <option value="fixed-size">{t('chunk_strategy_fixed_size', 'Fixed Size')}</option>
+                  <option value="semantic">{t('chunk_strategy_semantic', 'Semantic')}</option>
+                  <option value="recursive">{t('chunk_strategy_recursive', 'Recursive')}</option>
+                  <option value="sliding-window">{t('chunk_strategy_sliding_window', 'Sliding Window')}</option>
                 </select>
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -599,9 +601,9 @@ export const KnowledgeBase = () => {
                   onChange={(e) => setFusionStrategy(e.target.value)}
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
-                  <option value="rrf">Reciprocal Rank Fusion (RRF)</option>
-                  <option value="weighted-sum">Weighted Sum</option>
-                  <option value="normalized">Normalized Score</option>
+                  <option value="rrf">{t('fusion_strategy_rrf', 'Reciprocal Rank Fusion (RRF)')}</option>
+                  <option value="weighted-sum">{t('fusion_strategy_weighted_sum', 'Weighted Sum')}</option>
+                  <option value="normalized">{t('fusion_strategy_normalized', 'Normalized Score')}</option>
                 </select>
               </div>
               {fusionStrategy === 'rrf' && (

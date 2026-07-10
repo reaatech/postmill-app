@@ -5,6 +5,10 @@ import { UsageWidget } from './usage.widget';
 import { useUsage } from '../hooks/useUsage';
 import { useAiUsage } from '../hooks/useAiUsage';
 
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT: () => (_key: string, fallback: string) => fallback,
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));

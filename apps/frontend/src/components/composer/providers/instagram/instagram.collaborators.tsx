@@ -17,10 +17,12 @@ const postType = [
   {
     value: 'post',
     label: 'Post / Reel',
+    labelKey: 'post_reel',
   },
   {
     value: 'story',
     label: 'Story',
+    labelKey: 'story',
   },
 ];
 
@@ -28,10 +30,12 @@ const graduationStrategies = [
   {
     value: 'MANUAL',
     label: 'Manual',
+    labelKey: 'manual',
   },
   {
     value: 'SS_PERFORMANCE',
     label: 'Auto (based on performance)',
+    labelKey: 'auto_based_on_performance',
   },
 ];
 const InstagramCollaborators: FC<{
@@ -44,7 +48,7 @@ const InstagramCollaborators: FC<{
   return (
     <>
       <Select
-        label="Post Type"
+        label={t('label_post_type', 'Post Type')}
         {...register('post_type', {
           value: 'post',
         })}
@@ -52,14 +56,17 @@ const InstagramCollaborators: FC<{
         <option value="">{t('select_post_type', 'Select Post Type...')}</option>
         {postType.map((item) => (
           <option key={item.value} value={item.value}>
-            {item.label}
+            {t(item.labelKey, item.label)}
           </option>
         ))}
       </Select>
 
       {postCurrentType !== 'story' && (
         <InstagramCollaboratorsTags
-          label="Collaborators (max 3) - accounts can't be private"
+          label={t(
+            'collaborators_label',
+            "Collaborators (max 3) - accounts can't be private"
+          )}
           {...register('collaborators', {
             value: [],
           })}
@@ -77,14 +84,14 @@ const InstagramCollaborators: FC<{
 
           {isTrialReel && (
             <Select
-              label="Graduation Strategy"
+              label={t('graduation_strategy', 'Graduation Strategy')}
               {...register('graduation_strategy', {
                 value: 'MANUAL',
               })}
             >
               {graduationStrategies.map((item) => (
                 <option key={item.value} value={item.value}>
-                  {item.label}
+                  {t(item.labelKey, item.label)}
                 </option>
               ))}
             </Select>

@@ -78,11 +78,11 @@ export const CampaignDiscussionSection: FC<CampaignDiscussionSectionProps> = ({
 
       {error ? (
         <div className="text-[13px] text-amber-600">
-          {t('failed_to_load_discussion', 'Failed to load the discussion.')}
+          {t('failed_to_load_discussion', 'Failed to load discussion')}
         </div>
       ) : isLoading ? (
         <div className="text-[13px] text-newTableText">
-          {t('loading', 'Loading…')}
+          {t('loading', 'Loading')}
         </div>
       ) : count === 0 ? (
         <div className="text-[13px] text-newTableText">

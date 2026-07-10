@@ -66,13 +66,13 @@ const SaveSetModal: FC<{
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-[16px]">
       <div>
         <Input
-          label="Template Name"
+          label={t('label_template_name', 'Template Name')}
           translationKey="label_template_name"
           name="setName"
           value={name}
           disableForm
           onChange={(e) => setName(e.target.value)}
-          placeholder="Enter a name for this set"
+          placeholder={t('enter_a_name_for_this_set', 'Enter a name for this set')}
         />
       </div>
       <div className="flex gap-2 justify-end">
@@ -147,7 +147,7 @@ export const Sets: FC = () => {
           {...(params?.id ? { set: JSON.parse(params.content) } : {})}
           addEditSets={(data: any) => {
             modal.openModal({
-              title: 'Save as Template',
+              title: t('save_as_template', 'Save as Template'),
               children: (
                 <SaveSetModal
                   initialValue={params?.name || ''}
@@ -308,13 +308,13 @@ export const Sets: FC = () => {
                         )}
                       </div>
                     ) : (
-                      <span className="text-[11px] text-newTableText">{t('no_channels', 'No channels')}</span>
+                      <span className="text-[11px] text-newTableText">{t('no_channels', 'No channels yet')}</span>
                     )}
                     <span className="text-[11px] text-newTableText">
-                      · {postCount} {postCount === 1 ? t('post', 'post') : t('posts_lower', 'posts')}
+                      · {postCount} {postCount === 1 ? t('post', 'Post') : t('posts_lower', 'posts')}
                     </span>
                     <span className="text-[11px] text-newTableText">
-                      · {dayjs(s.createdAt).format('MMM D, YYYY')}
+                      · {dayjs(s.createdAt).format(t('set_date_format', 'MMM D, YYYY'))}
                     </span>
                   </div>
                 </div>

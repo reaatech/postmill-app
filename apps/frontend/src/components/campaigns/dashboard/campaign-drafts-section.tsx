@@ -35,10 +35,10 @@ interface DraftPost {
 const stripHtml = (html?: string) =>
   (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
-const APPROVAL_PILL: Record<string, { status: 'amber' | 'green' | 'red'; label: string }> = {
-  pending: { status: 'amber', label: 'Pending' },
-  approved: { status: 'green', label: 'Approved' },
-  rejected: { status: 'red', label: 'Rejected' },
+const APPROVAL_PILL: Record<string, { status: 'amber' | 'green' | 'red'; labelKey: string; label: string }> = {
+  pending: { status: 'amber', labelKey: 'approval_pending', label: 'Pending' },
+  approved: { status: 'green', labelKey: 'approval_approved', label: 'Approved' },
+  rejected: { status: 'red', labelKey: 'approval_rejected', label: 'Rejected' },
 };
 
 // Dedicated Drafts section — the campaign's saved (DRAFT-state) posts, grouped by
@@ -59,7 +59,7 @@ export const CampaignDraftsSection: FC<{
     '/integrations/list',
     async () => {
       const r = await fetch('/integrations/list');
-      if (!r.ok) throw new Error('Failed to load channels');
+      if (!r.ok) throw new Error(t('failed_to_load_channels', 'Failed to load channels'));
       return (await r.json()).integrations;
     },
     { revalidateOnFocus: false }
@@ -129,7 +129,7 @@ export const CampaignDraftsSection: FC<{
 
       {isLoading ? (
         <div className="text-[13px] text-newTableText text-center py-[24px]">
-          {t('loading', 'Loading…')}
+          {t('loading', 'Loading')}
         </div>
       ) : count === 0 ? (
         <div className="text-[13px] text-newTableText text-center py-[24px]">
@@ -172,14 +172,14 @@ export const CampaignDraftsSection: FC<{
                       </span>
                     )}
                   </div>
-                  <StatusPill status={pill.status} label={t(status, pill.label)} />
+                  <StatusPill status={pill.status} label={t(pill.labelKey, pill.label)} />
                 </div>
                 <div className="text-[13px] text-textColor line-clamp-2 min-h-[36px]">
-                  {content || t('no_content', 'No content')}
+                  {content || t('no_content', 'no content')}
                 </div>
                 <div className="text-[12px] text-newTableText">
                   {first?.publishDate
-                    ? dayjs(first.publishDate).format('MMM D, YYYY HH:mm')
+                    ? dayjs(first.publishDate).format(t('campaign_draft_date_format', 'MMM D, YYYY h:mm A'))
                     : t('unscheduled', 'Unscheduled')}
                 </div>
               </button>

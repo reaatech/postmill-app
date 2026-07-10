@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useInboxPreview } from '../hooks/useInboxPreview';
 import { ChannelAvatar } from '@gitroom/frontend/components/analytics-v2/kit/channel-avatar';
 import { EmptyState, TabSkeleton } from '@gitroom/frontend/components/analytics-v2/kit/states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 dayjs.extend(relativeTime);
 
@@ -17,6 +18,7 @@ const snippet = (content: string, max = 60) => {
 
 export const InboxWidget: FC = () => {
   const router = useRouter();
+  const t = useT();
   const { data, isLoading } = useInboxPreview(4);
 
   const comments = data?.comments ?? [];
@@ -28,10 +30,12 @@ export const InboxWidget: FC = () => {
     <div className="flex flex-col gap-[8px]">
       <div className="flex items-center gap-[8px] mb-[4px]">
         <span className="text-[13px] font-medium text-textColor">
-          {comments.length} unread
+          {t('n_unread', '{{count}} unread', { count: comments.length })}
         </span>
         {comments.length > 4 && (
-          <span className="text-[11px] text-newTableText">showing 4</span>
+          <span className="text-[11px] text-newTableText">
+            {t('showing_4', 'showing 4')}
+          </span>
         )}
       </div>
       {comments.map((comment) => (

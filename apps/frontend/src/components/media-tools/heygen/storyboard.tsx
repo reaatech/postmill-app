@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
@@ -18,12 +19,6 @@ interface SceneState {
   background?: { type: 'color' | 'image' | 'video'; color?: string; fileId?: string; previewUrl?: string };
 }
 
-const DIMENSIONS = [
-  { key: '16:9', label: 'Landscape 16:9', width: 1280, height: 720 },
-  { key: '9:16', label: 'Portrait 9:16', width: 720, height: 1280 },
-  { key: '1:1', label: 'Square 1:1', width: 1080, height: 1080 },
-];
-
 let sceneCounter = 0;
 const newScene = (): SceneState => ({ key: `scene-${++sceneCounter}`, inputText: '' });
 
@@ -34,10 +29,17 @@ interface StoryboardProps {
 }
 
 export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }) => {
+  const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
   const mediaDirectory = useMediaDirectory();
+
+  const DIMENSIONS = [
+    { key: '16:9', label: t('heygen_dimension_landscape_16_9', 'Landscape 16:9'), width: 1280, height: 720 },
+    { key: '9:16', label: t('heygen_dimension_portrait_9_16', 'Portrait 9:16'), width: 720, height: 1280 },
+    { key: '1:1', label: t('heygen_dimension_square_1_1', 'Square 1:1'), width: 1080, height: 1080 },
+  ];
 
   const [scenes, setScenes] = useState<SceneState[]>([newScene()]);
   const [dimensionKey, setDimensionKey] = useState('16:9');
@@ -88,9 +90,9 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
   const validation = (() => {
     for (let i = 0; i < scenes.length; i++) {
       const s = scenes[i];
-      if (!s.avatar) return `Scene ${i + 1} needs an avatar`;
-      if (!s.voice) return `Scene ${i + 1} needs a voice`;
-      if (!s.inputText.trim()) return `Scene ${i + 1} needs a script`;
+      if (!s.avatar) return t('heygen_scene_needs_avatar', 'Scene {{number}} needs an avatar', { number: i + 1 });
+      if (!s.voice) return t('heygen_scene_needs_voice', 'Scene {{number}} needs a voice', { number: i + 1 });
+      if (!s.inputText.trim()) return t('heygen_scene_needs_script', 'Scene {{number}} needs a script', { number: i + 1 });
     }
     return null;
   })();
@@ -124,13 +126,13 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
         }),
       });
       if (!res.ok) {
-        toaster.show('Failed to start the render', 'warning');
+        toaster.show(t('heygen_failed_to_start_render', 'Failed to start the render'), 'warning');
         return;
       }
-      toaster.show('Render started — track it in the queue', 'success');
+      toaster.show(t('heygen_render_started_track_queue', 'Render started — track it in the queue'), 'success');
       onGenerated();
     } catch {
-      toaster.show('Failed to start the render', 'warning');
+      toaster.show(t('heygen_failed_to_start_render', 'Failed to start the render'), 'warning');
     } finally {
       setGenerating(false);
     }
@@ -143,7 +145,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Video title (optional)"
+          placeholder={t('heygen_video_title_optional', 'Video title (optional)')}
           className="flex-1 min-w-[180px] h-[38px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
         />
         <select
@@ -165,11 +167,11 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
             className="shrink-0 w-[260px] rounded-[12px] border border-studioBorder bg-newBgColorInner flex flex-col"
           >
             <div className="flex items-center justify-between px-[10px] py-[8px] border-b border-studioBorder">
-              <span className="text-[12px] font-[600] text-textColor">Scene {index + 1}</span>
+              <span className="text-[12px] font-[600] text-textColor">{t('heygen_scene_number', 'Scene {{number}}', { number: index + 1 })}</span>
               <div className="flex items-center gap-[2px]">
-                <button type="button" aria-label="Move left" disabled={index === 0} onClick={() => moveScene(index, -1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">‹</button>
-                <button type="button" aria-label="Move right" disabled={index === scenes.length - 1} onClick={() => moveScene(index, 1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">›</button>
-                <button type="button" aria-label="Remove scene" disabled={scenes.length === 1} onClick={() => removeScene(scene.key)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-dangerText hover:bg-boxHover disabled:opacity-30">✕</button>
+                <button type="button" aria-label={t('heygen_move_left', 'Move left')} disabled={index === 0} onClick={() => moveScene(index, -1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">‹</button>
+                <button type="button" aria-label={t('heygen_move_right', 'Move right')} disabled={index === scenes.length - 1} onClick={() => moveScene(index, 1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">›</button>
+                <button type="button" aria-label={t('heygen_remove_scene', 'Remove scene')} disabled={scenes.length === 1} onClick={() => removeScene(scene.key)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-dangerText hover:bg-boxHover disabled:opacity-30">✕</button>
               </div>
             </div>
 
@@ -188,8 +190,8 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[12px] text-textColor truncate">{scene.avatar?.name || 'Pick avatar'}</div>
-                  <div className="text-[10px] text-newTextColor/60">Avatar</div>
+                  <div className="text-[12px] text-textColor truncate">{scene.avatar?.name || t('heygen_pick_avatar', 'Pick avatar')}</div>
+                  <div className="text-[10px] text-newTextColor/60">{t('heygen_avatar_label', 'Avatar')}</div>
                 </div>
               </button>
 
@@ -199,8 +201,8 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                 className="flex items-center justify-between gap-[8px] px-[10px] py-[8px] rounded-[8px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
               >
                 <div className="min-w-0">
-                  <div className="text-[12px] text-textColor truncate">{scene.voice?.name || 'Pick voice'}</div>
-                  <div className="text-[10px] text-newTextColor/60">Voice</div>
+                  <div className="text-[12px] text-textColor truncate">{scene.voice?.name || t('heygen_pick_voice', 'Pick voice')}</div>
+                  <div className="text-[10px] text-newTextColor/60">{t('heygen_voice_label', 'Voice')}</div>
                 </div>
                 <span className="text-newTextColor/60">🎙️</span>
               </button>
@@ -208,7 +210,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               <textarea
                 value={scene.inputText}
                 onChange={(e) => patchScene(scene.key, { inputText: e.target.value })}
-                placeholder="What should the avatar say?"
+                placeholder={t('heygen_what_should_avatar_say', 'What should the avatar say?')}
                 rows={4}
                 className="w-full px-[10px] py-[8px] rounded-[8px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
               />
@@ -217,7 +219,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               <div className="flex items-center gap-[6px]">
                 <input
                   type="color"
-                  aria-label="Background color"
+                  aria-label={t('heygen_background_color', 'Background color')}
                   value={scene.background?.type === 'color' ? scene.background.color || '#000000' : '#000000'}
                   onChange={(e) => patchScene(scene.key, { background: { type: 'color', color: e.target.value } })}
                   className="w-[32px] h-[32px] rounded-[6px] border border-studioBorder bg-transparent cursor-pointer"
@@ -227,12 +229,14 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                   onClick={() => setBgPickerScene(scene.key)}
                   className="flex-1 px-[10px] h-[32px] rounded-[8px] border border-studioBorder text-[11px] text-newTextColor/70 hover:border-[#2B5CD3] hover:text-textColor transition-all truncate"
                 >
-                  {scene.background && scene.background.type !== 'color' ? 'Image/Video bg ✓' : 'Image/Video bg'}
+                  {scene.background && scene.background.type !== 'color'
+                    ? t('heygen_image_video_bg_set', 'Image/Video bg ✓')
+                    : t('heygen_image_video_bg', 'Image/Video bg')}
                 </button>
                 {scene.background && (
                   <button
                     type="button"
-                    aria-label="Clear background"
+                    aria-label={t('heygen_clear_background', 'Clear background')}
                     onClick={() => patchScene(scene.key, { background: undefined })}
                     className="w-[28px] h-[32px] flex items-center justify-center rounded-[6px] text-newTextColor/65 hover:text-dangerText"
                   >
@@ -241,7 +245,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                 )}
               </div>
               {scene.background?.previewUrl && scene.background.type !== 'color' && (
-                <div className="text-[10px] text-newTextColor/60 truncate">bg: {scene.background.previewUrl}</div>
+                <div className="text-[10px] text-newTextColor/60 truncate">{t('heygen_bg_url', 'bg: {{url}}', { url: scene.background.previewUrl })}</div>
               )}
             </div>
           </div>
@@ -254,7 +258,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
           className="shrink-0 w-[88px] rounded-[12px] border-[2px] border-dashed border-studioBorder hover:border-[#2B5CD3] text-newTextColor/65 hover:text-btnPrimaryAccent flex flex-col items-center justify-center gap-[6px] transition-all"
         >
           <span className="text-[26px] leading-none">＋</span>
-          <span className="text-[11px]">Scene</span>
+          <span className="text-[11px]">{t('heygen_scene_label', 'Scene')}</span>
         </button>
       </div>
 
@@ -265,7 +269,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
           disabled={generating || !!validation}
           className="px-[20px] h-[42px] rounded-[10px] bg-[#2B5CD3] text-white text-[14px] font-[600] hover:bg-[#2B5CD3]/80 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
         >
-          {generating ? 'Starting…' : `Generate video → Files`}
+          {generating ? t('heygen_starting', 'Starting…') : t('heygen_generate_video_to_files', 'Generate video → Files')}
         </button>
         {validation && <span className="text-[12px] text-amber-600">{validation}</span>}
       </div>
@@ -276,11 +280,11 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
         onSelect={(item) => {
           if (!bgPickerScene) return;
           if (item.source !== 'file' || !item.fileId) {
-            toaster.show('Save the asset to Files first, then pick it as a background', 'warning');
+            toaster.show(t('heygen_save_asset_to_files_first', 'Save the asset to Files first, then pick it as a background'), 'warning');
             return;
           }
           if (item.type !== 'image' && item.type !== 'video') {
-            toaster.show('Background must be an image or video', 'warning');
+            toaster.show(t('heygen_background_must_be_image_or_video', 'Background must be an image or video'), 'warning');
             return;
           }
           patchScene(bgPickerScene, {

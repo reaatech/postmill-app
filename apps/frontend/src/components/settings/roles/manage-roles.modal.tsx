@@ -52,7 +52,7 @@ export const ManageRolesModal: React.FC = () => {
     (role: RoleItem) => {
       setEditor({
         mode: 'create',
-        name: `${role.name} (${t('copy', 'Copy')})`,
+        name: t('role_name_copy', '{{name}} (Copy)', { name: role.name }),
         description: role.description || '',
         permissionIds: role.permissions.map((rp) => rp.permission.id),
       });
@@ -121,7 +121,7 @@ export const ManageRolesModal: React.FC = () => {
 
       {rolesLoading && !rolesError && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] animate-pulse">
-          {t('loading', 'Loading...')}
+          {t('loading', 'Loading')}
         </div>
       )}
 

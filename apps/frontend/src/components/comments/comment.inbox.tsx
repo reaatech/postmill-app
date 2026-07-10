@@ -242,7 +242,11 @@ export const CommentInbox: FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px] min-w-0">
-      <PageHeader title="Inbox" description="Manage and respond to replies across channels" action={syncAction} />
+      <PageHeader
+        title={t('inbox', 'Inbox')}
+        description={t('inbox_description', 'Manage and respond to replies across channels')}
+        action={syncAction}
+      />
 
       {filterBar}
 
@@ -272,7 +276,7 @@ export const CommentInbox: FC = () => {
           disabled={loadingMore}
           className="self-center px-[20px] py-[8px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] transition-colors hover:bg-btnPrimary/90 disabled:opacity-50"
         >
-          {loadingMore ? t('loading', 'Loading…') : t('comment_inbox.load_more', 'Load more')}
+          {loadingMore ? t('loading', 'Loading') : t('comment_inbox.load_more', 'Load more')}
         </button>
       )}
     </div>

@@ -76,7 +76,7 @@ export const useMenuItem = () => {
       path: '/posts',
     },
     {
-      name: 'Agent',
+      name: t('agent', 'Agent'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -156,7 +156,7 @@ export const useMenuItem = () => {
         !permissions.hasPermission('media', 'read'),
     },
     {
-      name: 'Media',
+      name: t('media', 'Media'),
       icon: (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
           <rect x="2" y="2" width="20" height="20" rx="2.18" />
@@ -361,6 +361,7 @@ export const TopMenu: FC = () => {
   const user = useUser();
   const { firstMenu, secondMenu } = useMenuItem();
   const { isGeneral, billingEnabled } = useVariables();
+  const t = useT();
   return (
     <>
       <div className="flex flex-1 flex-col minCustom:gap-[16px] blurMe">
@@ -386,7 +387,7 @@ export const TopMenu: FC = () => {
                     : item.path;
                 const label =
                   item.name === 'Billing' && user?.isLifetime
-                    ? 'Lifetime'
+                    ? t('lifetime', 'Lifetime')
                     : item.name;
                 return (
                   <MenuItem
@@ -419,7 +420,7 @@ export const TopMenu: FC = () => {
                 : item.path;
             const label =
               item.name === 'Billing' && user?.isLifetime
-                ? 'Lifetime'
+                ? t('lifetime', 'Lifetime')
                 : item.name;
             return (
               <MenuItem

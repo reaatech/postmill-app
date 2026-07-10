@@ -4,6 +4,7 @@ import { FC } from 'react';
 import { DayDetailResponse } from '../utils';
 import { Drawer } from '../kit/drawer';
 import { ChannelAvatar } from '../kit/channel-avatar';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface DayDetailPanelProps {
   data?: DayDetailResponse;
@@ -12,6 +13,7 @@ interface DayDetailPanelProps {
 }
 
 export const DayDetailPanel: FC<DayDetailPanelProps> = ({ data, open, onClose }) => {
+  const t = useT();
   if (!data) return null;
 
   return (
@@ -35,7 +37,7 @@ export const DayDetailPanel: FC<DayDetailPanelProps> = ({ data, open, onClose })
 
           {data.byChannel.length > 0 && (
             <div>
-              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">By Channel</h4>
+              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">{t('by_channel', 'By Channel')}</h4>
               <div className="space-y-[6px]">
                 {data.byChannel.map((ch) => (
                   <div key={ch.integrationId} className="flex items-center gap-[10px] px-[12px] py-[8px] bg-newTableHeader rounded-[8px]">
@@ -52,7 +54,7 @@ export const DayDetailPanel: FC<DayDetailPanelProps> = ({ data, open, onClose })
 
           {data.posts.length > 0 && (
             <div>
-              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">Posts on this day</h4>
+              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">{t('posts_on_this_day', 'Posts on this day')}</h4>
               <div className="space-y-[6px]">
                 {data.posts.map((post) => (
                   <div key={post.postId} className="px-[12px] py-[8px] bg-newTableHeader rounded-[8px]">

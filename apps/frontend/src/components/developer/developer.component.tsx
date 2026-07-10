@@ -37,12 +37,13 @@ const CopyButton = ({
   label: string;
 }) => {
   const toaster = useToaster();
+  const t = useT();
   return (
     <button
       type="button"
       onClick={() => {
         copy(text);
-        toaster.show(`${label} copied to clipboard`, 'success');
+        toaster.show(t('label_copied_to_clipboard', '{{label}} copied to clipboard', { label }), 'success');
       }}
       className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
     >
@@ -125,7 +126,9 @@ export const DeveloperComponent: FC = () => {
         setPicturePath(imported.path);
       } catch (err) {
         toaster.show(
-          `${t('import_failed', 'Import failed')}: ${(err as Error).message}`,
+          t('import_failed_with_message', 'Import failed: {{message}}', {
+            message: (err as Error).message,
+          }),
           'warning'
         );
       } finally {
@@ -141,7 +144,7 @@ export const DeveloperComponent: FC = () => {
 
   const createApp = useCallback(async () => {
     if (!name || !redirectUrl) {
-      toaster.show('Name and Redirect URL are required', 'warning');
+      toaster.show(t('name_and_redirect_url_required', 'Name and Redirect URL are required'), 'warning');
       return;
     }
     try {
@@ -160,16 +163,19 @@ export const DeveloperComponent: FC = () => {
       if (result.clientSecret) {
         setPlaintextSecret(result.clientSecret);
         toaster.show(
-          'App created! Copy your client secret now - it will only be shown once.',
+          t(
+            'app_created_copy_secret_now',
+            'App created! Copy your client secret now - it will only be shown once.'
+          ),
           'success'
         );
       }
       setCreating(false);
       mutate();
     } catch {
-      toaster.show('Failed to create app', 'warning');
+      toaster.show(t('failed_to_create_app', 'Failed to create app'), 'warning');
     }
-  }, [name, description, redirectUrl, pictureId, fetch, mutate, toaster]);
+  }, [name, description, redirectUrl, pictureId, fetch, mutate, toaster, t]);
 
   const updateApp = useCallback(async () => {
     try {
@@ -182,21 +188,23 @@ export const DeveloperComponent: FC = () => {
           pictureId,
         }),
       });
-      toaster.show('App updated', 'success');
+      toaster.show(t('app_updated', 'App updated'), 'success');
       setEditing(false);
       mutate();
     } catch {
-      toaster.show('Failed to update app', 'warning');
+      toaster.show(t('failed_to_update_app', 'Failed to update app'), 'warning');
     }
-  }, [name, description, redirectUrl, pictureId, fetch, mutate, toaster]);
+  }, [name, description, redirectUrl, pictureId, fetch, mutate, toaster, t]);
 
   const rotateSecret = useCallback(async () => {
     const approved = await decision.open({
-      title: 'Rotate Client Secret?',
-      description:
-        'This will generate a new client secret and invalidate the current one. Any integrations using the old secret will stop working.',
-      approveLabel: 'Rotate',
-      cancelLabel: 'Cancel',
+      title: t('rotate_client_secret_title', 'Rotate Client Secret?'),
+      description: t(
+        'rotate_client_secret_description',
+        'This will generate a new client secret and invalidate the current one. Any integrations using the old secret will stop working.'
+      ),
+      approveLabel: t('rotate', 'Rotate'),
+      cancelLabel: t('cancel', 'Cancel'),
     });
     if (!approved) return;
     try {
@@ -206,34 +214,36 @@ export const DeveloperComponent: FC = () => {
       if (result.clientSecret) {
         setPlaintextSecret(result.clientSecret);
         toaster.show(
-          'Secret rotated! Copy your new client secret now.',
+          t('secret_rotated_copy_now', 'Secret rotated! Copy your new client secret now.'),
           'success'
         );
         mutate();
       }
     } catch {
-      toaster.show('Failed to rotate secret', 'warning');
+      toaster.show(t('failed_to_rotate_secret', 'Failed to rotate secret'), 'warning');
     }
-  }, [decision, fetch, mutate, toaster]);
+  }, [decision, fetch, mutate, toaster, t]);
 
   const deleteApp = useCallback(async () => {
     const approved = await decision.open({
-      title: 'Delete OAuth App?',
-      description:
-        'This will delete the OAuth application and revoke all user authorizations. This action cannot be undone.',
-      approveLabel: 'Delete',
-      cancelLabel: 'Cancel',
+      title: t('delete_oauth_app_title', 'Delete OAuth App?'),
+      description: t(
+        'delete_oauth_app_description',
+        'This will delete the OAuth application and revoke all user authorizations. This action cannot be undone.'
+      ),
+      approveLabel: t('delete', 'Delete'),
+      cancelLabel: t('cancel', 'Cancel'),
     });
     if (!approved) return;
     try {
       await fetch('/user/oauth-app', { method: 'DELETE' });
-      toaster.show('OAuth app deleted', 'success');
+      toaster.show(t('oauth_app_deleted', 'OAuth app deleted'), 'success');
       setPlaintextSecret(null);
       mutate();
     } catch {
-      toaster.show('Failed to delete app', 'warning');
+      toaster.show(t('failed_to_delete_app', 'Failed to delete app'), 'warning');
     }
-  }, [decision, fetch, mutate, toaster]);
+  }, [decision, fetch, mutate, toaster, t]);
 
   if (app === undefined) {
     return null;
@@ -328,7 +338,7 @@ export const DeveloperComponent: FC = () => {
                 className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] text-textColor outline-none"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My Application"
+                placeholder={t('my_application_placeholder', 'My Application')}
                 maxLength={100}
               />
             </div>
@@ -340,7 +350,7 @@ export const DeveloperComponent: FC = () => {
                 className="bg-newBgColorInner border border-newBorder rounded-[8px] p-[16px] text-textColor outline-none min-h-[80px]"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe what your app does"
+                placeholder={t('describe_what_your_app_does', 'Describe what your app does')}
                 maxLength={500}
               />
             </div>
@@ -353,7 +363,7 @@ export const DeveloperComponent: FC = () => {
                   // eslint-disable-next-line @next/next/no-img-element -- external OAuth app logo
                   <img
                     src={picturePath}
-                    alt="App logo"
+                    alt={t('app_logo', 'App logo')}
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (
@@ -369,7 +379,7 @@ export const DeveloperComponent: FC = () => {
                 >
                   {importing
                     ? t('importing', 'Importing…')
-                    : t('choose_image', 'Choose Image')}
+                    : t('choose_image', 'Choose image')}
                 </button>
               </div>
             </div>
@@ -381,7 +391,7 @@ export const DeveloperComponent: FC = () => {
                 className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] text-textColor outline-none"
                 value={redirectUrl}
                 onChange={(e) => setRedirectUrl(e.target.value)}
-                placeholder="https://yourapp.com/callback"
+                placeholder={t('redirect_url_placeholder', 'https://yourapp.com/callback')}
               />
             </div>
             <div className="flex gap-[8px]">
@@ -456,7 +466,7 @@ export const DeveloperComponent: FC = () => {
                 className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] text-textColor outline-none"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="My Application"
+                placeholder={t('my_application_placeholder', 'My Application')}
                 maxLength={100}
               />
             </div>
@@ -468,7 +478,7 @@ export const DeveloperComponent: FC = () => {
                 className="bg-newBgColorInner border border-newBorder rounded-[8px] p-[16px] text-textColor outline-none min-h-[80px]"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Describe what your app does"
+                placeholder={t('describe_what_your_app_does', 'Describe what your app does')}
                 maxLength={500}
               />
             </div>
@@ -481,7 +491,7 @@ export const DeveloperComponent: FC = () => {
                   // eslint-disable-next-line @next/next/no-img-element -- external OAuth app logo
                   <img
                     src={picturePath}
-                    alt="App logo"
+                    alt={t('app_logo', 'App logo')}
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (
@@ -497,7 +507,7 @@ export const DeveloperComponent: FC = () => {
                 >
                   {importing
                     ? t('importing', 'Importing…')
-                    : t('choose_image', 'Choose Image')}
+                    : t('choose_image', 'Choose image')}
                 </button>
               </div>
             </div>
@@ -509,7 +519,7 @@ export const DeveloperComponent: FC = () => {
                 className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] text-textColor outline-none"
                 value={redirectUrl}
                 onChange={(e) => setRedirectUrl(e.target.value)}
-                placeholder="https://yourapp.com/callback"
+                placeholder={t('redirect_url_placeholder', 'https://yourapp.com/callback')}
               />
             </div>
             <div className="flex gap-[8px]">
@@ -609,7 +619,7 @@ export const DeveloperComponent: FC = () => {
             </div>
           </div>
           <div className="flex gap-[8px]">
-            <CopyButton text={app.clientId} label={t('copy_id', 'Copy ID')} />
+            <CopyButton text={app.clientId} label={t('copy_id', 'Copy Channel ID')} />
             {plaintextSecret && (
               <CopyButton
                 text={plaintextSecret}

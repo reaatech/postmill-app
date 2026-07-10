@@ -4,6 +4,7 @@ import React, { FC, useCallback } from 'react';
 import type { DesignerElement, VideoClip } from '../designer.store';
 import { ensureFontLoaded } from '../fonts';
 import { TEXT_STYLE_PRESETS, type TextStylePreset } from '../text-styles';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface TextPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -17,7 +18,15 @@ const CATEGORY_LABELS: Record<TextStylePreset['category'], string> = {
   caption: 'Captions',
 };
 
+const CATEGORY_LABEL_KEYS: Record<TextStylePreset['category'], string> = {
+  heading: 'text_panel_headings',
+  subheading: 'text_panel_subheadings',
+  body: 'text_panel_body',
+  caption: 'text_panel_captions',
+};
+
 export const TextPanel: FC<TextPanelProps> = ({ store, onClose }) => {
+  const translate = useT();
   const addText = useCallback(
     (preset: TextStylePreset) => {
       const state = store.getState();
@@ -95,7 +104,7 @@ export const TextPanel: FC<TextPanelProps> = ({ store, onClose }) => {
         return (
           <div key={category} className="flex flex-col gap-2">
             <div className="text-[11px] text-newTextColor/60 uppercase tracking-wider">
-              {CATEGORY_LABELS[category]}
+              {translate(CATEGORY_LABEL_KEYS[category], CATEGORY_LABELS[category])}
             </div>
             <div className="flex flex-col gap-2">
               {presets.map((preset) => (

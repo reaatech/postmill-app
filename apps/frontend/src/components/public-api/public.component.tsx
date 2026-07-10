@@ -28,7 +28,7 @@ const getMcpConfig = (
   method: 'header' | 'path',
   mcpBase: string,
   apiKey: string
-): { config: string; hint: string } => {
+): { config: string; hint: string; hintKey: string } => {
   const urlWithKey = `${mcpBase}/mcp/${apiKey}`;
   const urlBase = `${mcpBase}/mcp`;
   const bearer = `Bearer ${apiKey}`;
@@ -41,11 +41,13 @@ const getMcpConfig = (
         return {
           config: `claude mcp add postmill --transport http "${urlWithKey}"`,
           hint: 'Run this command in your terminal.',
+          hintKey: 'run_in_terminal',
         };
       case 'Cursor':
         return {
           config: json({ mcpServers: { postmill: { url: urlWithKey } } }),
           hint: 'Add to .cursor/mcp.json in your project root.',
+          hintKey: 'add_to_cursor_mcp_json',
         };
       case 'VS Code / Copilot':
         return {
@@ -53,6 +55,7 @@ const getMcpConfig = (
             servers: { postmill: { type: 'http', url: urlWithKey } },
           }),
           hint: 'Add to .vscode/mcp.json in your project root.',
+          hintKey: 'add_to_vscode_mcp_json',
         };
       case 'Windsurf':
         return {
@@ -60,26 +63,31 @@ const getMcpConfig = (
             mcpServers: { postmill: { serverUrl: urlWithKey } },
           }),
           hint: 'Add to ~/.codeium/windsurf/mcp_config.json',
+          hintKey: 'add_to_windsurf_mcp_config',
         };
       case 'Amp':
         return {
           config: `amp mcp add postmill ${urlWithKey}`,
           hint: 'Run this command in your terminal.',
+          hintKey: 'run_in_terminal',
         };
       case 'Codex':
         return {
           config: `# ~/.codex/config.toml\n\n[mcp_servers.postmill]\nurl = "${urlWithKey}"`,
           hint: 'Add to ~/.codex/config.toml',
+          hintKey: 'add_to_codex_config_toml',
         };
       case 'Gemini CLI':
         return {
           config: json({ mcpServers: { postmill: { url: urlWithKey } } }),
           hint: 'Add to ~/.gemini/settings.json',
+          hintKey: 'add_to_gemini_settings',
         };
       case 'Warp':
         return {
           config: json({ postmill: { url: urlWithKey } }),
           hint: 'Settings > MCP Servers > + Add, then paste this config.',
+          hintKey: 'warp_mcp_settings_hint',
         };
     }
   }
@@ -89,6 +97,7 @@ const getMcpConfig = (
       return {
         config: `claude mcp add --transport http postmill ${urlBase} --header "Authorization: ${bearer}"`,
         hint: 'Run this command in your terminal.',
+        hintKey: 'run_in_terminal',
       };
     case 'Cursor':
       return {
@@ -98,6 +107,7 @@ const getMcpConfig = (
           },
         }),
         hint: 'Add to .cursor/mcp.json in your project root.',
+        hintKey: 'add_to_cursor_mcp_json',
       };
     case 'VS Code / Copilot':
       return {
@@ -111,6 +121,7 @@ const getMcpConfig = (
           },
         }),
         hint: 'Add to .vscode/mcp.json in your project root.',
+        hintKey: 'add_to_vscode_mcp_json',
       };
     case 'Windsurf':
       return {
@@ -123,6 +134,7 @@ const getMcpConfig = (
           },
         }),
         hint: 'Add to ~/.codeium/windsurf/mcp_config.json',
+        hintKey: 'add_to_windsurf_mcp_config',
       };
     case 'Amp':
       return {
@@ -132,11 +144,13 @@ const getMcpConfig = (
           },
         }),
         hint: 'Add to your Amp settings.json',
+        hintKey: 'add_to_amp_settings',
       };
     case 'Codex':
       return {
         config: `# ~/.codex/config.toml\n\n[mcp_servers.postmill]\nurl = "${urlBase}"\nhttp_headers = { "Authorization" = "${bearer}" }`,
         hint: 'Add to ~/.codex/config.toml',
+        hintKey: 'add_to_codex_config_toml',
       };
     case 'Gemini CLI':
       return {
@@ -146,6 +160,7 @@ const getMcpConfig = (
           },
         }),
         hint: 'Add to ~/.gemini/settings.json',
+        hintKey: 'add_to_gemini_settings',
       };
     case 'Warp':
       return {
@@ -153,6 +168,7 @@ const getMcpConfig = (
           postmill: { url: urlBase, headers: { Authorization: bearer } },
         }),
         hint: 'Settings > MCP Servers > + Add, then paste this config.',
+        hintKey: 'warp_mcp_settings_hint',
       };
   }
 };
@@ -165,12 +181,13 @@ const CopyButton = ({
   label: string;
 }) => {
   const toaster = useToaster();
+  const t = useT();
   return (
     <button
       type="button"
       onClick={() => {
         copy(text);
-        toaster.show(`${label} copied to clipboard`, 'success');
+        toaster.show(t('label_copied_to_clipboard', '{{label}} copied to clipboard', { label }), 'success');
       }}
       className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
     >
@@ -204,7 +221,7 @@ const McpSection = ({
   const [method, setMethod] = useState<'header' | 'path'>('header');
   const [revealed, setRevealed] = useState(false);
 
-  const { config, hint } = getMcpConfig(
+  const { config, hint, hintKey } = getMcpConfig(
     activeClient,
     method,
     mcpBase,
@@ -249,7 +266,7 @@ const McpSection = ({
           <div className="text-[13px] text-newTableText mt-[2px]">
             {t(
               'connect_your_mcp_client_to_postiz_to_schedule_your_posts_faster',
-              'Connect Postmill MCP server to your client (Http streaming) to schedule your posts faster.'
+              'Connect Postmill MCP server to your client (Http streaming) to schedule your posts faster!'
             )}
           </div>
         </div>
@@ -316,7 +333,7 @@ const McpSection = ({
         <div className="flex flex-col gap-[8px]">
           <div className="text-[12px] text-newTableText font-[500]">
             {method === 'header'
-              ? hint
+              ? t(hintKey, hint)
               : t(
                   'remote_server_url_hint',
                   'Paste this URL into your remote MCP client (ChatGPT, Claude, etc.).'
@@ -375,14 +392,17 @@ const McpSection = ({
 
 const localCliSteps = [
   {
+    labelKey: 'cli_step_install_cli',
     label: 'Install the CLI',
     code: 'npm install -g postmill',
   },
   {
+    labelKey: 'cli_step_run_auth_login',
     label: 'Run: postmill auth:login',
     code: 'postmill auth:login',
   },
   {
+    labelKey: 'cli_step_install_skill',
     label: 'Install the Postmill skill for your AI agent',
     code: 'npx skills add gitroomhq/postmill-agent',
   },
@@ -390,14 +410,17 @@ const localCliSteps = [
 
 const ciCliSteps = [
   {
+    labelKey: 'cli_step_install_cli',
     label: 'Install the CLI',
     code: 'npm install -g postmill',
   },
   {
+    labelKey: 'cli_step_set_env_var',
     label: 'Set your API key as an environment variable',
     code: 'export POSTMILL_API_KEY="{API_KEY}"',
   },
   {
+    labelKey: 'cli_step_install_skill',
     label: 'Install the Postmill skill for your AI agent',
     code: 'npx skills add gitroomhq/postmill-agent',
   },
@@ -492,7 +515,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
         {displaySteps.map((step, i) => (
           <div key={step.label} className="flex flex-col gap-[6px]">
             <div className="text-[13px] font-[600] text-newTableText">
-              {i + 1}. {step.label}
+              {i + 1}. {t(step.labelKey, step.label)}
             </div>
             <pre className="bg-newBgColorInner border border-newBorder rounded-[8px] p-[16px] text-[13px] whitespace-pre-wrap break-all overflow-x-auto leading-[1.6]">
               {step.code}

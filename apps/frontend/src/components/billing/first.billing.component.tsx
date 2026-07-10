@@ -75,10 +75,15 @@ const JoinOver: FC<{ onShowYouTube: () => void }> = ({ onShowYouTube }) => {
               src="/icons/platforms/youtube.svg"
               width={22.5}
               height={16}
-              alt="YouTube"
+              alt={t('youtube', 'YouTube')}
             />
           </div>
-          <div>See the power of Postmill (click here)</div>
+          <div>
+            {t(
+              'billing_see_the_power_of_postiz',
+              'See the power of Postmill (click here)'
+            )}
+          </div>
         </button>
       </div>
 
@@ -150,12 +155,15 @@ export const FirstBillingComponent = () => {
 
   const showYouTube = () => {
     modals.openModal({
-      title: 'Grow Fast With Postmill (Play the video)',
+      title: t(
+        'billing_grow_fast_with_postiz_play_video',
+        'Grow Fast With Postmill (Play the video)'
+      ),
       children: (
         <iframe
           className="h-full aspect-video min-w-[800px]"
           src="https://www.youtube.com/embed/BdsCVvEYgHU?si=vvhaZJ8I5oXXvVJS?autoplay=1"
-          title="Postmill Tutorial"
+          title={t('billing_postiz_tutorial', 'Postmill Tutorial')}
           allow="autoplay"
           allowFullScreen
         />
@@ -382,10 +390,15 @@ export const BillingFeatures: FC<{ tier: string }> = ({ tier }) => {
   const renderFeature = (feature: FeatureItem) => {
     const translatedText = t(feature.key, feature.defaultValue);
     if (feature.prefix === 'unlimited') {
-      return `${t('billing_unlimited', 'Unlimited')} ${translatedText}`;
+      return t('billing_unlimited_feature', 'Unlimited {{feature}}', {
+        feature: translatedText,
+      });
     }
     if (feature.prefix !== undefined) {
-      return `${feature.prefix} ${translatedText}`;
+      return t('billing_feature_with_prefix', '{{prefix}} {{feature}}', {
+        prefix: feature.prefix,
+        feature: translatedText,
+      });
     }
     return translatedText;
   };

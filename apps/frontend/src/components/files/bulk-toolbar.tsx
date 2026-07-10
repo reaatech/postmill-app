@@ -7,6 +7,7 @@ import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { FileItem } from './file-manager';
 
 const loadDims = (src: string) =>
@@ -38,6 +39,7 @@ export const BulkToolbar: FC<{
   const router = useRouter();
   const mediaDirectory = useMediaDirectory();
   const toaster = useToaster();
+  const t = useT();
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
   const [opening, setOpening] = useState(false);
@@ -55,12 +57,16 @@ export const BulkToolbar: FC<{
       return isImage;
     });
     if (designable.length === 0) {
-      toaster.show('Select images or videos to open in the Designer', 'warning');
+      toaster.show(t('select_images_or_videos_to_open_in_designer', 'Select images or videos to open in the Designer'), 'warning');
       return;
     }
     if (designable.length < selectedFiles.length) {
       toaster.show(
-        `Opening ${designable.length} of ${selectedFiles.length} (skipped audio/documents)`,
+        t(
+          'opening_count_of_total_skipped_audio_documents',
+          'Opening {{designable}} of {{total}} (skipped audio/documents)',
+          { designable: designable.length, total: selectedFiles.length }
+        ),
         'success'
       );
     }
@@ -97,7 +103,7 @@ export const BulkToolbar: FC<{
     });
     onClearSelection();
     onRefresh();
-    toaster.show(`${selectedFiles.length} files deleted`, 'success');
+    toaster.show(t('files_deleted_count', '{{count}} files deleted', { count: selectedFiles.length }), 'success');
   }, [selectedFiles, fetch, onClearSelection, onRefresh, toaster]);
 
   const handleBulkMove = useCallback(async () => {
@@ -112,7 +118,7 @@ export const BulkToolbar: FC<{
     setShowMoveDialog(false);
     onClearSelection();
     onRefresh();
-    toaster.show(`${selectedFiles.length} files moved`, 'success');
+    toaster.show(t('files_moved_count', '{{count}} files moved', { count: selectedFiles.length }), 'success');
   }, [selectedFiles, targetFolderId, fetch, onClearSelection, onRefresh, toaster]);
 
   const collectFolders = (items: FolderItem[], depth = 0): { id: string; name: string; depth: number }[] => {
@@ -129,7 +135,7 @@ export const BulkToolbar: FC<{
   return (
     <div className="flex items-center gap-[8px] px-[12px] py-[8px] mb-[10px] bg-[#2B5CD3]/10 rounded-[8px] border border-[#2B5CD3]/20">
       <div className="text-[13px] text-textColor font-[500]">
-        {selectedFiles.length} selected
+        {t('selected_files_count', '{{count}} selected', { count: selectedFiles.length })}
       </div>
       <div className="flex-1" />
       <button
@@ -141,25 +147,25 @@ export const BulkToolbar: FC<{
           <path d="M12 20h9" />
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
         </svg>
-        {opening ? 'Opening…' : 'Open all in Designer'}
+        {opening ? t('opening_ellipsis', 'Opening…') : t('open_all_in_designer', 'Open all in Designer')}
       </button>
       <button
         onClick={() => setShowMoveDialog(true)}
         className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-textColor border border-newColColor hover:bg-boxHover transition-all"
       >
-        Move to Folder
+        {t('move_to_folder', 'Move to Folder')}
       </button>
       <button
         onClick={handleBulkDelete}
         className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-dangerText border border-newColColor hover:bg-boxHover transition-all"
       >
-        Delete
+        {t('delete', 'Delete')}
       </button>
       <button
         onClick={onClearSelection}
         className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-textColor/60 hover:text-textColor transition-all"
       >
-        Clear
+        {t('clear', 'Clear')}
       </button>
 
       {showMoveDialog && (
@@ -167,12 +173,12 @@ export const BulkToolbar: FC<{
           className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50"
           role="button"
           tabIndex={0}
-          aria-label="Close move dialog"
+          aria-label={t('close_move_dialog', 'Close move dialog')}
           onClick={(e) => { if (e.target === e.currentTarget) setShowMoveDialog(false); }}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') setShowMoveDialog(false); }}
         >
           <div className="bg-newBgColorInner border border-newBorder rounded-[12px] p-[20px] min-w-[300px] shadow-menu">
-            <div className="text-[14px] font-[600] text-textColor mb-[12px]">Move to Folder</div>
+            <div className="text-[14px] font-[600] text-textColor mb-[12px]">{t('move_to_folder', 'Move to Folder')}</div>
             <div className="space-y-[4px] max-h-[250px] overflow-y-auto scrollbar scrollbar-thumb-newColColor">
               <button
                 onClick={() => setTargetFolderId(null)}
@@ -181,7 +187,7 @@ export const BulkToolbar: FC<{
                   targetFolderId === null ? 'bg-[#2B5CD3]/20 text-textColor' : 'text-textColor hover:bg-boxHover'
                 )}
               >
-                Root (no folder)
+                {t('root_no_folder', 'Root (no folder)')}
               </button>
               {collectFolders(foldersData).map((f) => (
                 <button
@@ -202,13 +208,13 @@ export const BulkToolbar: FC<{
                 onClick={() => setShowMoveDialog(false)}
                 className="px-[14px] py-[8px] rounded-[8px] text-[13px] text-textColor border border-newColColor hover:bg-boxHover transition-all"
               >
-                Cancel
+                {t('cancel', 'Cancel')}
               </button>
               <button
                 onClick={handleBulkMove}
                 className="px-[14px] py-[8px] rounded-[8px] text-[13px] text-white bg-[#2B5CD3] hover:bg-[#2B5CD3]/80 transition-all"
               >
-                Move
+                {t('move', 'Move')}
               </button>
             </div>
           </div>

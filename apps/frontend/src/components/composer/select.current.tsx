@@ -74,14 +74,18 @@ export const SelectCurrent: FC = () => {
   const contentRef = useRef<HTMLDivElement>(null);
   const hasScroll = useHasScroll(contentRef);
 
+  const t = useT();
+
   const removeSocial = useCallback(
     (sIntegration: Integrations) => async (e: any) => {
       e.stopPropagation();
       e.preventDefault();
       const open = await modals.open({
-        title: 'Remove Social Account',
-        description:
-          'Are you sure you want to remove this social from scheduling?',
+        title: t('remove_social_account', 'Remove Social Account'),
+        description: t(
+          'remove_social_description',
+          'Are you sure you want to remove this social from scheduling?'
+        ),
       });
 
       if (!open) {
@@ -105,7 +109,7 @@ export const SelectCurrent: FC = () => {
         >
           <button
             type="button"
-            aria-label="Global (all channels)"
+            aria-label={t('global_all_channels', 'Global (all channels)')}
             onClick={() => {
               setHide(true);
               setCurrent('global');

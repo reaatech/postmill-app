@@ -3,6 +3,7 @@ import {
   ProviderSurfaceDescriptor,
   SurfaceFetch,
 } from '../provider-surface.types';
+import { createFetchError } from '../../fetch-error';
 import {
   ShortlinkProviderInfo,
   ShortlinksConfigResponse,
@@ -55,7 +56,7 @@ export const shortlinksDescriptor: ProviderSurfaceDescriptor<ShortlinkProviderIn
 
   load: async (fetch: SurfaceFetch) => {
     const res = await fetch('/settings/shortlinks/config');
-    if (!res.ok) throw new Error('Failed to load shortlinks config');
+    if (!res.ok) throw createFetchError('failed_to_load_shortlinks_config', 'Failed to load shortlinks config');
     const config: ShortlinksConfigResponse = await res.json();
 
     const rows: ProviderRow<ShortlinkProviderInfo>[] = (config.providers ?? []).map(

@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import clsx from 'clsx';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
-import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
+import { metricLabelT } from '@gitroom/frontend/components/campaigns/metric-labels';
 import { readableTextColor } from '@gitroom/frontend/components/shared/readable-text-color';
 
 const stripHtml = (html?: string | null): string =>
@@ -122,9 +122,9 @@ const formatNumber = (value: number | null | undefined): string => {
   return n.toLocaleString();
 };
 
-const formatDate = (value: string | Date | null | undefined): string => {
+const formatDate = (value: string | Date | null | undefined, format: string): string => {
   if (!value) return '—';
-  return dayjs(value).format('MMM D, YYYY');
+  return dayjs(value).format(format);
 };
 
 const DownloadIcon: FC<{ className?: string }> = ({ className }) => (
@@ -233,7 +233,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
     setCreatingShare(true);
     try {
       const res = await fetch(`/campaigns/${campaign.id}/share`, { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to create share link');
+      if (!res.ok) throw new Error(t('failed_to_create_share_link', 'Failed to create share link'));
       const data = await res.json();
       const token = data.shareToken || data.token || data.id;
       if (!token) throw new Error('No share token returned');
@@ -254,7 +254,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
         await navigator.clipboard.writeText(text);
         toast.show(t('copied_to_clipboard', 'Copied to clipboard'), 'success');
       } catch {
-        toast.show(t('copy_failed', 'Could not copy'), 'warning');
+        toast.show(t('copy_failed', 'Copy failed'), 'warning');
       }
     },
     [toast, t]
@@ -299,14 +299,14 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
       >
         <h1 className="text-[28px] font-[600]">{campaign.name}</h1>
         <p className="text-[14px] opacity-90">
-          {t('campaign_report', 'Campaign Report')} &bull; {dayjs().format('MMM D, YYYY')}
+          {t('campaign_report', 'Campaign Report')} &bull; {dayjs().format(t('campaign_report_header_date_format', 'MMM D, YYYY'))}
         </p>
         {campaign.description && <p className="text-[13px] opacity-90 max-w-[720px]">{campaign.description}</p>}
         {(campaign.startDate || campaign.endDate) && (
           <p className="text-[13px] opacity-90">
-            {campaign.startDate ? formatDate(campaign.startDate) : ''}
+            {campaign.startDate ? formatDate(campaign.startDate, t('campaign_report_date_format', 'MMM D, YYYY')) : ''}
             {campaign.startDate && campaign.endDate ? ' — ' : ''}
-            {campaign.endDate ? formatDate(campaign.endDate) : ''}
+            {campaign.endDate ? formatDate(campaign.endDate, t('campaign_report_date_format', 'MMM D, YYYY')) : ''}
           </p>
         )}
       </div>
@@ -328,7 +328,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
           <div className="flex flex-wrap items-baseline justify-between gap-[8px]">
             <h2 className="text-[16px] font-[600] text-textColor">{t('performance', 'Performance')}</h2>
             <span className="text-[12px] text-newTableText">
-              {t('post_metrics_trend', 'Post metrics')} · {metricLabel(trend.metric)}
+              {t('post_metrics_trend', 'Post metrics')} · {metricLabelT(trend.metric, t)}
             </span>
           </div>
           <div className="w-full aspect-[16/9] sm:aspect-[21/9] max-h-[320px]">
@@ -337,7 +337,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
           {analyticsChannelBars.labels.length > 0 && (
             <div>
               <div className="text-[12px] font-medium text-newTableText mb-[8px]">
-                {t('by_channel', 'By channel')}
+                {t('by_channel', 'By Channel')}
               </div>
               <div className="w-full aspect-[4/3] max-h-[260px]">
                 <BarChart labels={analyticsChannelBars.labels} values={analyticsChannelBars.values} height={250} />
@@ -396,7 +396,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
             {report.goals.map((goal, idx) => (
               <div key={`${goal.metric}-${goal.target}-${idx}`} className="flex flex-col gap-[6px]">
                 <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-textColor capitalize">{metricLabel(goal.metric)}</span>
+                  <span className="text-textColor capitalize">{metricLabelT(goal.metric, t)}</span>
                   <span className="text-newTableText">
                     {formatNumber(goal.current)} / {formatNumber(goal.target)} ({goal.pct}%)
                   </span>
@@ -440,10 +440,10 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
                     <td className="py-[12px] px-[16px] text-[13px] text-textColor">{post.integration?.name || '—'}</td>
                     <td className="py-[12px] px-[16px] text-[13px]">
                       <span className={clsx('px-[8px] py-[2px] rounded-full text-[11px] font-medium', statePillClass(post.state))}>
-                        {post.state}
+                        {t(`post_state_${post.state.toLowerCase()}`, post.state)}
                       </span>
                     </td>
-                    <td className="py-[12px] px-[16px] text-[13px] text-newTableText">{formatDate(post.publishDate)}</td>
+                    <td className="py-[12px] px-[16px] text-[13px] text-newTableText">{formatDate(post.publishDate, t('campaign_report_date_format', 'MMM D, YYYY'))}</td>
                     <td className="py-[12px] px-[16px] text-[13px] text-right tabular-nums text-textColor">{formatNumber(post.lastViews)}</td>
                     <td className="py-[12px] px-[16px] text-[13px] text-right tabular-nums text-textColor">{formatNumber(post.lastLikes)}</td>
                     <td className="py-[12px] px-[16px] text-[13px] text-right tabular-nums text-textColor">{formatNumber(post.lastComments)}</td>

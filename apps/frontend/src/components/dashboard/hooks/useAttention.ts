@@ -4,16 +4,19 @@ import { useCallback } from 'react';
 import useSWR, { mutate as globalMutate } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { AttentionItemDto, AttentionResponseDto } from '@gitroom/nestjs-libraries/dtos/dashboard/attention.dto';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '../dashboard.utils';
 
 export type { AttentionItemDto, AttentionResponseDto };
 
 export const useAttention = () => {
   const fetch = useFetch();
+  const t = useT();
   const load = useCallback(
     async (url: string): Promise<AttentionResponseDto> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load attention');
+        throw createFetchError('attention_fetch_failed', 'Failed to load attention');
       }
       return res.json();
     },
@@ -37,12 +40,17 @@ export const useAttention = () => {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `Retry failed (${res.status})`);
+        throw new Error(
+          body.message ||
+            t('retry_failed_with_status', 'Retry failed ({{status}})', {
+              status: res.status,
+            })
+        );
       }
       await mutate();
       await globalMutate('/dashboard/summary');
     },
-    [fetch, mutate]
+    [fetch, mutate, t]
   );
 
   const dismissAnomaly = useCallback(
@@ -52,11 +60,16 @@ export const useAttention = () => {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `Dismiss failed (${res.status})`);
+        throw new Error(
+          body.message ||
+            t('dismiss_failed_with_status', 'Dismiss failed ({{status}})', {
+              status: res.status,
+            })
+        );
       }
       await mutate();
     },
-    [fetch, mutate]
+    [fetch, mutate, t]
   );
 
   return {

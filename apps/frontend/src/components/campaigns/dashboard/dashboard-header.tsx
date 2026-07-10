@@ -186,9 +186,9 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
           <div className="flex flex-wrap items-center gap-[12px] text-[12px] text-newTableText">
             {(campaign.startDate || campaign.endDate) && (
               <span>
-                {campaign.startDate ? dayjs(campaign.startDate).format('MMM D, YYYY') : t('no_start_date', 'No start date')}
+                {campaign.startDate ? dayjs(campaign.startDate).format(t('campaign_date_format', 'MMM D, YYYY')) : t('no_start_date', 'No start date')}
                 {' — '}
-                {campaign.endDate ? dayjs(campaign.endDate).format('MMM D, YYYY') : t('ongoing', 'Ongoing')}
+                {campaign.endDate ? dayjs(campaign.endDate).format(t('campaign_date_format', 'MMM D, YYYY')) : t('ongoing', 'Ongoing')}
               </span>
             )}
             {campaign.client && (
@@ -198,7 +198,7 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
               <span>{t('project', 'Project')}: {campaign.project}</span>
             )}
             <span>{t('created_by', 'Created by')} {createdByElement}</span>
-            <span>{t('created_on', 'Created on')} {dayjs(campaign.createdAt).format('MMM D, YYYY')}</span>
+            <span>{t('created_on', 'Created on')} {dayjs(campaign.createdAt).format(t('campaign_date_format', 'MMM D, YYYY'))}</span>
           </div>
           {!!campaign.tags?.length && (
             <div className="flex flex-wrap items-center gap-[6px]">
