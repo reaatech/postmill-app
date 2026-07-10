@@ -19,7 +19,9 @@ on:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # PR path is install + build + auth + gating specs (~15 min); 30 leaves headroom
+    # for the manual (workflow_dispatch) audit sweep without letting anything idle for long.
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17-alpine
@@ -123,6 +125,7 @@ jobs:
 
       - name: Authenticate personas
         working-directory: e2e
+        timeout-minutes: 10
         run: |
           # Re-verify the backend is still reachable right before login (guards against
           # a step-boundary process reap). curl the way the browser does — 127.0.0.1.
@@ -137,13 +140,20 @@ jobs:
 
       - name: Regression specs (GATING)
         working-directory: e2e
+        timeout-minutes: 10
         run: |
           npx playwright test --config playwright.audit.config.ts --project=admin --project=member \
             tests/93-metadata-titles.spec.ts tests/94-setup-rbac.spec.ts tests/95-contrast.spec.ts
 
-      - name: Crawl + exercise + a11y (informational, non-gating)
+      # The full-surface sweep (crawl + exercise + axe) is long, noisy (✘ flags are
+      # informational-by-design), and can hang on a stuck route — it has no place in a
+      # PR gate. Run it manually (workflow_dispatch) when a fresh audit report is wanted;
+      # the hard step timeout means a hang can never ride the job to its 40-min ceiling.
+      - name: Crawl + exercise + a11y (manual audit sweep only)
+        if: github.event_name == 'workflow_dispatch'
         working-directory: e2e
         continue-on-error: true
+        timeout-minutes: 20
         run: |
           npx playwright test --config playwright.audit.config.ts --project=admin \
             tests/40-crawl-all-routes.spec.ts tests/46-exercise-interactions.spec.ts tests/92-a11y.spec.ts
