@@ -131,8 +131,8 @@ export const DashboardKpis: FC<DashboardKpisProps> = ({ dashboard }) => {
 
   const states = [
     { key: 'DRAFT', label: t('draft', 'Draft'), color: 'bg-newTableText/20 text-newTableText' },
-    { key: 'QUEUE', label: t('scheduled', 'Scheduled'), color: 'bg-designerAccent/10 text-designerAccent' },
-    { key: 'PUBLISHED', label: t('published', 'Published'), color: 'bg-green-500/10 text-green-400' },
+    { key: 'QUEUE', label: t('scheduled', 'Scheduled'), color: 'bg-designerAccent/10 text-btnPrimaryAccent' },
+    { key: 'PUBLISHED', label: t('published', 'Published'), color: 'bg-green-500/10 text-green-800 dark:text-green-400' },
   ];
 
   return (

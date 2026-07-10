@@ -828,7 +828,7 @@ const ToolCallCard: FC<{
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
-        className="mt-[8px] text-[11px] text-btnPrimary hover:underline"
+        className="mt-[8px] text-[11px] text-btnPrimaryAccent hover:underline"
       >
         {expanded ? t('hide_details', 'Hide details') : t('show_details', 'Show details')}
       </button>
@@ -1051,13 +1051,13 @@ const MediaJobStatusCard: FC<{ provider: string; jobId: string }> = ({
       {job.status === 'completed' && job.artifactUrl && (
         <Link
           href={`/files?highlight=${job.fileId || ''}`}
-          className="ml-[8px] text-btnPrimary hover:underline"
+          className="ml-[8px] text-btnPrimaryAccent hover:underline"
         >
           {t('view_in_library', 'View in library')}
         </Link>
       )}
       {job.status === 'failed' && job.error && (
-        <div className="text-red-500/80 mt-[4px]">{job.error}</div>
+        <div className="text-red-600 dark:text-red-400 mt-[4px]">{job.error}</div>
       )}
     </div>
   );

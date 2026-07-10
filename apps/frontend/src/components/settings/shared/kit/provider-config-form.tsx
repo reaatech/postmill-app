@@ -172,7 +172,7 @@ export function ProviderConfigForm<Meta = any>({
               href={website}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-btnPrimary hover:underline whitespace-nowrap"
+              className="text-btnPrimaryAccent hover:underline whitespace-nowrap"
             >
               {t('visit_website', 'Visit website')} ↗
             </a>
@@ -261,8 +261,8 @@ export function ProviderConfigForm<Meta = any>({
         <div
           className={`text-[13px] px-[12px] py-[8px] rounded-[4px] ${
             testResult === 'success'
-              ? 'bg-green-900/20 text-green-400'
-              : 'bg-red-900/20 text-red-400'
+              ? 'bg-green-900/20 text-green-900 dark:text-green-400'
+              : 'bg-red-900/20 text-dangerText'
           }`}
         >
           {testResult === 'success'
@@ -274,7 +274,7 @@ export function ProviderConfigForm<Meta = any>({
       <div className="flex items-center justify-between">
         {isConfigured && descriptor.features.remove !== false && (
           <button
-            className="text-[13px] px-[16px] py-[8px] rounded-[8px] border border-red-500/50 text-red-500 hover:bg-red-500/10"
+            className="text-[13px] px-[16px] py-[8px] rounded-[8px] border border-red-500/50 text-red-700 dark:text-red-400 hover:bg-red-500/10"
             onClick={handleRemove}
           >
             {t('remove', 'Remove')}

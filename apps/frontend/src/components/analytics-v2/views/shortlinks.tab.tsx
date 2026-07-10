@@ -31,7 +31,7 @@ export const ShortlinksTab = ({ from, to }: ShortlinksTabProps) => {
         key: 'shortUrl',
         header: t('short_url', 'Short URL'),
         render: (link: any) => (
-          <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" className="text-btnPrimary hover:underline">
+          <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" className="text-btnPrimaryAccent hover:underline">
             {link.shortUrl}
           </a>
         ),

@@ -165,7 +165,7 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
             onChange={(e) => setBrushSize(Number(e.target.value))}
             className="w-24 accent-designerAccent"
           />
-          <span className="text-xs text-newTextColor/50">{brushSize}px</span>
+          <span className="text-xs text-newTextColor/65">{brushSize}px</span>
         </div>
         <button
           onClick={clearMask}

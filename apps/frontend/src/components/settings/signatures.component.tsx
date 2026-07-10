@@ -227,14 +227,14 @@ const AddOrEditSignature: FC<{
             <button
               type="button"
               onClick={() => setShowMedia(true)}
-              className="text-[12px] text-btnPrimary hover:underline"
+              className="text-[12px] text-btnPrimaryAccent hover:underline"
             >
               {t('replace', 'Replace')}
             </button>
             <button
               type="button"
               onClick={() => setPicture(null)}
-              className="text-[12px] text-red-400 hover:underline"
+              className="text-[12px] text-dangerText hover:underline"
             >
               {t('remove', 'Remove')}
             </button>
@@ -457,7 +457,7 @@ export const SignaturesComponent: FC<{
 
       {!isLoading && error && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
-          <span className="text-[14px] text-red-400">
+          <span className="text-[14px] text-dangerText">
             {t('failed_loading_signatures', 'Failed to load signatures')}
           </span>
           <button
@@ -525,7 +525,7 @@ export const SignaturesComponent: FC<{
                       {sig.name || sig.content.slice(0, 40) + (sig.content.length > 40 ? '…' : '')}
                     </span>
                     {sig.autoAdd && (
-                      <span className="text-[10px] px-[6px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary shrink-0">
+                      <span className="text-[10px] px-[6px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimaryAccent shrink-0">
                         {t('auto', 'Auto')}
                       </span>
                     )}
@@ -564,7 +564,7 @@ export const SignaturesComponent: FC<{
                   {!!appendSignature && (
                     <button
                       onClick={applySignature(sig)}
-                      className="text-[12px] text-btnPrimary hover:underline"
+                      className="text-[12px] text-btnPrimaryAccent hover:underline"
                     >
                       {t('use', 'Use')}
                     </button>
@@ -577,7 +577,7 @@ export const SignaturesComponent: FC<{
                   </button>
                   <button
                     onClick={deleteSignature(sig)}
-                    className="text-[12px] text-red-400 hover:underline"
+                    className="text-[12px] text-dangerText hover:underline"
                   >
                     {t('delete', 'Delete')}
                   </button>

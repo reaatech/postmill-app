@@ -316,7 +316,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                   onClick={(e) => handleRemove(e, i)}
                   title="Remove format"
                   aria-label="Remove format"
-                  className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[9px] text-red-400 hover:bg-red-500/20"
+                  className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[9px] text-dangerText hover:bg-red-500/20"
                 >
                   ×
                 </button>
@@ -361,7 +361,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                       }}
                       className={`flex-1 text-left text-[12px] ${
                         i === currentOutput
-                          ? 'text-designerAccent font-medium'
+                          ? 'text-btnPrimaryAccent font-medium'
                           : 'text-textColor'
                       }`}
                     >
@@ -388,7 +388,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                           closePopover();
                         }}
                         aria-label="Remove format"
-                        className="w-5 h-5 flex items-center justify-center rounded text-[10px] text-red-400 hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100"
+                        className="w-5 h-5 flex items-center justify-center rounded text-[10px] text-dangerText hover:bg-red-500/20 opacity-0 group-hover/item:opacity-100"
                       >
                         ×
                       </button>
@@ -413,7 +413,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
             }
           }}
           aria-label="Add format"
-          className="shrink-0 flex items-center justify-center rounded-md border-2 border-dashed border-studioBorder text-textColor/50 hover:border-designerAccent hover:text-designerAccent text-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+          className="shrink-0 flex items-center justify-center rounded-md border-2 border-dashed border-studioBorder text-textColor/50 hover:border-designerAccent hover:text-btnPrimaryAccent text-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
           style={{ width: 40, height: THUMB_H }}
         >
           +
@@ -440,7 +440,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 ),
               );
             }}
-            className="w-full text-left px-2 py-1.5 rounded text-[11px] text-designerAccent hover:bg-designerAccent/10 mb-2 border border-designerAccent/30"
+            className="w-full text-left px-2 py-1.5 rounded text-[11px] text-btnPrimaryAccent hover:bg-designerAccent/10 mb-2 border border-designerAccent/30"
           >
             Recommended set (IG Post + Story + Linked + X)
           </button>
@@ -464,7 +464,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                             already
                               ? 'text-textColor/25 cursor-not-allowed'
                               : pendingFormats.has(p.id)
-                                ? 'text-designerAccent bg-designerAccent/10 cursor-pointer hover:bg-designerAccent/15'
+                                ? 'text-btnPrimaryAccent bg-designerAccent/10 cursor-pointer hover:bg-designerAccent/15'
                                 : 'text-textColor cursor-pointer hover:bg-studioBorder/10'
                           }`}
                         >

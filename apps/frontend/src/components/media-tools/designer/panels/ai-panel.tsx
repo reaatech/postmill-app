@@ -173,7 +173,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
       </div>
 
       {status === 'queued' && (
-        <div className="flex items-center justify-center gap-2 py-6 text-newTextColor/50 text-[13px]">
+        <div className="flex items-center justify-center gap-2 py-6 text-newTextColor/65 text-[13px]">
           <span
             className="w-[10px] h-[10px] rounded-full bg-[#EAB308] motion-safe:animate-pulse"
             aria-hidden="true"
@@ -183,7 +183,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
       )}
 
       {status === 'generating' && (
-        <div className="flex items-center justify-center gap-2 py-6 text-newTextColor/50 text-[13px]">
+        <div className="flex items-center justify-center gap-2 py-6 text-newTextColor/65 text-[13px]">
           <span
             className="w-[14px] h-[14px] rounded-full border-2 border-studioBorder border-t-designerAccent motion-safe:animate-spin"
             aria-hidden="true"

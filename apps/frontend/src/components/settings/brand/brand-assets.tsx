@@ -126,7 +126,7 @@ export const BrandAssets = ({
               <button
                 onClick={() => setPalette((p) => p.filter((x) => x !== c))}
                 aria-label={`Remove ${c}`}
-                className="absolute -top-[6px] -right-[6px] w-[16px] h-[16px] rounded-full bg-newBgColorInner border border-newTableBorder text-[10px] text-red-400 opacity-0 group-hover/sw:opacity-100 transition-opacity flex items-center justify-center"
+                className="absolute -top-[6px] -right-[6px] w-[16px] h-[16px] rounded-full bg-newBgColorInner border border-newTableBorder text-[10px] text-dangerText opacity-0 group-hover/sw:opacity-100 transition-opacity flex items-center justify-center"
               >
                 ×
               </button>
@@ -141,17 +141,19 @@ export const BrandAssets = ({
             type="color"
             value={newColor}
             onChange={(e) => setNewColor(e.target.value)}
+            aria-label="Brand color"
             className="w-[36px] h-[32px] rounded-[6px] border border-newTableBorder bg-transparent cursor-pointer p-0"
           />
           <input
             type="text"
             value={newColor}
             onChange={(e) => setNewColor(e.target.value)}
+            aria-label="Hex color value"
             className="w-[110px] bg-newBgColor border border-newTableBorder rounded-[8px] px-[10px] py-[6px] text-[13px] text-textColor outline-none"
           />
           <button
             onClick={addColor}
-            className="text-[12px] text-btnPrimary hover:underline"
+            className="text-[12px] text-btnPrimaryAccent hover:underline"
           >
             {t('add_color', 'Add colour')}
           </button>
@@ -186,7 +188,7 @@ export const BrandAssets = ({
                 />
                 <button
                   onClick={() => setAssets((list) => list.filter((_, idx) => idx !== i))}
-                  className="text-[11px] text-red-400 hover:underline self-start"
+                  className="text-[11px] text-dangerText hover:underline self-start"
                 >
                   {t('remove', 'Remove')}
                 </button>

@@ -198,11 +198,14 @@ describe('CampaignsService', () => {
     expect(result[0]).toHaveProperty('integrationIds');
   });
 
-  it('strips shareToken/shareEnabled from dashboard response', async () => {
+  it('keeps shareToken/shareEnabled on the authenticated dashboard response', async () => {
+    // The dashboard header's share control needs the token/state to build & toggle the
+    // public link. This is the authenticated, org-scoped surface (get/list and the public
+    // report still strip it — see toPublicJson / the strip tests above).
     const { service } = makeService();
     const dash = await service.getDashboard('c1', 'org1');
-    expect(dash.campaign).not.toHaveProperty('shareToken');
-    expect(dash.campaign).not.toHaveProperty('shareEnabled');
+    expect(dash.campaign).toHaveProperty('shareToken');
+    expect(dash.campaign).toHaveProperty('shareEnabled');
     expect(dash.campaign).toHaveProperty('createdBy');
   });
 

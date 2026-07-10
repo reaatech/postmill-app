@@ -203,6 +203,7 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
           <Select
             name="brandLanguage"
             label=""
+            aria-label={t('brand_language', 'Language')}
             disableForm={true}
             hideErrors={true}
             value={language}
@@ -243,6 +244,7 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
           <Select
             name="channelSelector"
             label=""
+            aria-label={t('select_channel', 'Select channel...')}
             disableForm={true}
             hideErrors={true}
             value={selectedChannel}

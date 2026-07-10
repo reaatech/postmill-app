@@ -261,11 +261,11 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
       ) : error && !data ? (
         <PanelError message={`Couldn't load ${tab}`} onRetry={() => mutate()} />
       ) : data && !data.configured ? (
-        <div className="text-[12px] text-newTextColor/40 text-center py-4">
+        <div className="text-[12px] text-newTextColor/60 text-center py-4">
           Stock browsing isn't configured
         </div>
       ) : !(data?.results || []).length ? (
-        <div className="text-[12px] text-newTextColor/40 text-center py-4">
+        <div className="text-[12px] text-newTextColor/60 text-center py-4">
           No {tab} found{debouncedQuery ? ` for "${debouncedQuery}"` : ''}
         </div>
       ) : (
@@ -308,9 +308,9 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
                 />
               </div>
               <div className="p-1.5">
-                <div className="text-[10px] text-newTextColor/40 truncate">
+                <div className="text-[10px] text-newTextColor/60 truncate">
                   by{' '}
-                  <a href={item.authorUrl} target="_blank" rel="noopener noreferrer" className="text-designerAccent hover:underline">
+                  <a href={item.authorUrl} target="_blank" rel="noopener noreferrer" className="text-btnPrimaryAccent hover:underline">
                     {item.author}
                   </a>
                 </div>

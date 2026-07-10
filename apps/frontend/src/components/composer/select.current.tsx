@@ -105,6 +105,7 @@ export const SelectCurrent: FC = () => {
         >
           <button
             type="button"
+            aria-label="Global (all channels)"
             onClick={() => {
               setHide(true);
               setCurrent('global');

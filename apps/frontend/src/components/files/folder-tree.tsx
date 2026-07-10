@@ -211,7 +211,7 @@ export const FolderTree: FC<{
             </span>
           )}
 
-          <span className="text-[11px] text-newTextColor/40 group-hover:text-newTextColor/60">{folder._count?.files || 0}</span>
+          <span className="text-[11px] text-newTextColor/60 group-hover:text-newTextColor/60">{folder._count?.files || 0}</span>
         </div>
 
         {hasChildren && !isCollapsed && (
@@ -237,6 +237,7 @@ export const FolderTree: FC<{
           <div className="text-[13px] font-[600] text-textColor">Folders</div>
           <button
             onClick={() => { setNewFolderParent(null); setNewFolderName(''); }}
+            aria-label="New folder"
             className="p-[4px] rounded-[4px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover transition-all"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
@@ -324,7 +325,7 @@ export const FolderTree: FC<{
           <div className="border-t border-newBorder my-[4px]" />
           <button
             onClick={() => handleDelete(contextMenu.folderId)}
-            className="w-full text-left px-[12px] py-[8px] text-[13px] text-red-400 hover:bg-boxHover transition-all"
+            className="w-full text-left px-[12px] py-[8px] text-[13px] text-dangerText hover:bg-boxHover transition-all"
           >
             Delete
           </button>

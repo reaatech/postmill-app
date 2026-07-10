@@ -38,7 +38,7 @@ export class StudioErrorBoundary extends Component<Props, State> {
           <div className="flex flex-col items-center justify-center h-full min-h-[320px] gap-[12px] text-center px-[20px] bg-studioBg rounded-[12px]">
             <div className="text-[42px]">🎬</div>
             <h2 className="text-[18px] font-[600] text-textColor">This studio hit a snag</h2>
-            <p className="text-[13px] text-newTextColor/55 max-w-[360px]">
+            <p className="text-[13px] text-newTextColor/70 max-w-[360px]">
               {this.state.error?.message || 'Something went wrong while loading the studio.'}
             </p>
             <button

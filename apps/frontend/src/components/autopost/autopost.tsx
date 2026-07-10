@@ -114,6 +114,10 @@ const AddOrEditAutopost: FC<{ data?: any; reload: () => void }> = ({ data, reloa
 
   const sendTest = useCallback(async () => {
     const u = form.getValues('url');
+    if (!u || !u.trim()) {
+      toast.show(t('enter_rss_url', 'Enter an RSS feed URL first'), 'warning');
+      return;
+    }
     try {
       const { success, url: newUrl } = await (await fetch(`/autopost/send?url=${encodeURIComponent(u)}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -275,7 +279,7 @@ export const Autopost: FC = () => {
 
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
-            <div className="text-red-400 text-[14px]">{t('failed_loading_autopost', 'Failed to load auto post rules')}</div>
+            <div className="text-dangerText text-[14px]">{t('failed_loading_autopost', 'Failed to load auto post rules')}</div>
             <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
@@ -339,7 +343,7 @@ export const Autopost: FC = () => {
                   </div>
                   <div className="flex justify-end gap-[8px]">
                     <button onClick={addEdit(r)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
-                    <button onClick={deleteRule(r)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
+                    <button onClick={deleteRule(r)} className="text-[12px] text-dangerText hover:underline">{t('delete', 'Delete')}</button>
                   </div>
                 </div>
               ))}

@@ -169,7 +169,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               <div className="flex items-center gap-[2px]">
                 <button type="button" aria-label="Move left" disabled={index === 0} onClick={() => moveScene(index, -1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">‹</button>
                 <button type="button" aria-label="Move right" disabled={index === scenes.length - 1} onClick={() => moveScene(index, 1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">›</button>
-                <button type="button" aria-label="Remove scene" disabled={scenes.length === 1} onClick={() => removeScene(scene.key)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-red-400 hover:bg-boxHover disabled:opacity-30">✕</button>
+                <button type="button" aria-label="Remove scene" disabled={scenes.length === 1} onClick={() => removeScene(scene.key)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-dangerText hover:bg-boxHover disabled:opacity-30">✕</button>
               </div>
             </div>
 
@@ -184,12 +184,12 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                     // eslint-disable-next-line @next/next/no-img-element -- external provider asset
                     <img src={scene.avatar.previewImageUrl} alt={scene.avatar.name} className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-newTextColor/40 text-[18px]">＋</span>
+                    <span className="text-newTextColor/60 text-[18px]">＋</span>
                   )}
                 </div>
                 <div className="min-w-0">
                   <div className="text-[12px] text-textColor truncate">{scene.avatar?.name || 'Pick avatar'}</div>
-                  <div className="text-[10px] text-newTextColor/40">Avatar</div>
+                  <div className="text-[10px] text-newTextColor/60">Avatar</div>
                 </div>
               </button>
 
@@ -200,9 +200,9 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               >
                 <div className="min-w-0">
                   <div className="text-[12px] text-textColor truncate">{scene.voice?.name || 'Pick voice'}</div>
-                  <div className="text-[10px] text-newTextColor/40">Voice</div>
+                  <div className="text-[10px] text-newTextColor/60">Voice</div>
                 </div>
-                <span className="text-newTextColor/40">🎙️</span>
+                <span className="text-newTextColor/60">🎙️</span>
               </button>
 
               <textarea
@@ -234,14 +234,14 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                     type="button"
                     aria-label="Clear background"
                     onClick={() => patchScene(scene.key, { background: undefined })}
-                    className="w-[28px] h-[32px] flex items-center justify-center rounded-[6px] text-newTextColor/50 hover:text-red-400"
+                    className="w-[28px] h-[32px] flex items-center justify-center rounded-[6px] text-newTextColor/65 hover:text-dangerText"
                   >
                     ✕
                   </button>
                 )}
               </div>
               {scene.background?.previewUrl && scene.background.type !== 'color' && (
-                <div className="text-[10px] text-newTextColor/40 truncate">bg: {scene.background.previewUrl}</div>
+                <div className="text-[10px] text-newTextColor/60 truncate">bg: {scene.background.previewUrl}</div>
               )}
             </div>
           </div>
@@ -251,7 +251,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
         <button
           type="button"
           onClick={() => setScenes((prev) => [...prev, newScene()])}
-          className="shrink-0 w-[88px] rounded-[12px] border-[2px] border-dashed border-studioBorder hover:border-[#2B5CD3] text-newTextColor/50 hover:text-[#2B5CD3] flex flex-col items-center justify-center gap-[6px] transition-all"
+          className="shrink-0 w-[88px] rounded-[12px] border-[2px] border-dashed border-studioBorder hover:border-[#2B5CD3] text-newTextColor/65 hover:text-btnPrimaryAccent flex flex-col items-center justify-center gap-[6px] transition-all"
         >
           <span className="text-[26px] leading-none">＋</span>
           <span className="text-[11px]">Scene</span>

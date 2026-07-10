@@ -140,7 +140,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                   onClick={() => setTab(t)}
                   className={`px-3 py-2 text-[13px] font-medium transition-colors ${
                     tab === t
-                      ? 'text-designerAccent border-b-2 border-designerAccent'
+                      ? 'text-btnPrimaryAccent border-b-2 border-designerAccent'
                       : 'text-textColor/50 hover:text-textColor/80'
                   }`}
                 >
@@ -231,7 +231,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
             <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-studioBorder">
               <button
                 onClick={() => setStep('custom')}
-                className="text-[13px] text-designerAccent hover:underline"
+                className="text-[13px] text-btnPrimaryAccent hover:underline"
               >
                 Custom size…
               </button>

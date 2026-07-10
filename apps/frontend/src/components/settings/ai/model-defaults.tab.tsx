@@ -106,6 +106,7 @@ const AiDefaultRow: React.FC<{
         options={options}
         isLoading={isLoading}
         disabled={empty}
+        label={`Default model for ${CATEGORY_LABELS[row.category]}`}
         value={value}
         onChange={(newValue) => {
           if (!newValue) return;
@@ -113,7 +114,7 @@ const AiDefaultRow: React.FC<{
         }}
       />
       {empty ? (
-        <div className="text-[11px] text-newTextColor/45">
+        <div className="text-[11px] text-newTextColor/60">
           {t(
             'no_ai_providers_enabled',
             'No AI providers enabled — enable one in Settings → AI to set a default.'
@@ -121,7 +122,7 @@ const AiDefaultRow: React.FC<{
         </div>
       ) : (
         isAuto && (
-          <div className="text-[11px] text-newTextColor/45">
+          <div className="text-[11px] text-newTextColor/60">
             {t('auto_default', 'Auto — picks a model from your enabled providers.')}
           </div>
         )

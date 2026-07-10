@@ -160,7 +160,7 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
             <button
               type="button"
               onClick={copyAll}
-              className="text-[12px] text-btnPrimary hover:underline"
+              className="text-[12px] text-btnPrimaryAccent hover:underline"
             >
               {t('copy_selected', 'Copy Selected')}
             </button>
@@ -168,7 +168,7 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
               <button
                 type="button"
                 onClick={applySelected}
-                className="text-[12px] text-btnPrimary hover:underline"
+                className="text-[12px] text-btnPrimaryAccent hover:underline"
               >
                 {t('apply_to_post', 'Apply to Post')}
               </button>
@@ -217,6 +217,7 @@ export const AiHashtags: FC<HashtagsProps> = ({ onSelect }) => {
     <button
       type="button"
       onClick={openModal}
+      aria-label={t('hashtags', 'Hashtags')}
       className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
     >
       <div className="flex gap-[5px] items-center">

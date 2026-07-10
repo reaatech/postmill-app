@@ -18,16 +18,19 @@ export const ProfileComponent: FC<{
       <h4 className="text-[16px] font-[600]">{t('profile', 'Profile')}</h4>
       <Input
         label={t('full_name', 'Full Name')}
+        aria-label={t('full_name', 'Full Name')}
         {...form.register('fullname')}
       />
       <Input
         label={t('last_name', 'Last Name')}
+        aria-label={t('last_name', 'Last Name')}
         {...form.register('lastName')}
       />
       <div className="flex flex-col gap-[8px]">
         <label className="text-[14px] font-[500]">{t('bio', 'Bio')}</label>
         <textarea
           {...form.register('bio')}
+          aria-label={t('bio', 'Bio')}
           rows={3}
           className="bg-newBgColor border border-newTableBorder rounded-[6px] px-[12px] py-[8px] text-[13px] text-textColor outline-none resize-none"
         />

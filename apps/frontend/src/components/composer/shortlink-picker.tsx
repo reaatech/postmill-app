@@ -138,7 +138,7 @@ export const ShortlinkPicker: FC<{
         onClick={() => setIsOpen(!isOpen)}
         className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1 cursor-pointer border-0 p-0 bg-transparent"
       >
-        <div className={clsx('cursor-pointer', enabled && 'text-[#2B5CD3]')}>
+        <div className={clsx('cursor-pointer', enabled && 'text-btnPrimaryAccent')}>
           <LinkIcon />
         </div>
         <div className="cursor-pointer max-w-[160px] truncate whitespace-nowrap">
@@ -158,7 +158,7 @@ export const ShortlinkPicker: FC<{
             }}
             className={clsx(
               'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center border-0 bg-transparent text-left',
-              !enabled && 'text-[#2B5CD3]'
+              !enabled && 'text-btnPrimaryAccent'
             )}
           >
             {t('no_short_links', 'No short links')}
@@ -172,7 +172,7 @@ export const ShortlinkPicker: FC<{
                 onClick={() => activate(provider.identifier)}
                 className={clsx(
                   'h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex flex-col justify-center border-0 bg-transparent text-left',
-                  selected && 'text-[#2B5CD3]'
+                  selected && 'text-btnPrimaryAccent'
                 )}
               >
                 <span className="truncate">{provider.name}</span>

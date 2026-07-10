@@ -174,7 +174,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
             onClick={() => setAspectLocked((v) => !v)}
             className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
               aspectLocked
-                ? 'bg-designerAccent/20 text-designerAccent'
+                ? 'bg-designerAccent/20 text-btnPrimaryAccent'
                 : 'text-textColor/40 hover:text-textColor'
             }`}
           >

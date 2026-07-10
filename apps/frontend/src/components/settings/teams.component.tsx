@@ -12,6 +12,7 @@ import { useForm, FormProvider } from 'react-hook-form';
 import { Select } from '@gitroom/react/form/select';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.team.member.dto';
+import { CreateTeamUserDto } from '@gitroom/nestjs-libraries/dtos/settings/create-team-user.dto';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import copy from 'copy-to-clipboard';
@@ -28,10 +29,11 @@ const CreateUserForm = ({ onDone }: { onDone: () => void }) => {
   const toast = useToaster();
   const t = useT();
   const { data: rolesList } = useRoles();
-  const form = useForm({ values: { email: '', password: '', roleId: '' }, mode: 'onChange' });
+  const resolver = useMemo(() => classValidatorResolver(CreateTeamUserDto), []);
+  const form = useForm({ values: { email: '', password: '', roleId: '' }, resolver, mode: 'onChange' });
 
   const submit = useCallback(async (values: { email: string; password: string; roleId: string }) => {
-    await fetch('/settings/team/create-user', {
+    const res = await fetch('/settings/team/create-user', {
       method: 'POST',
       body: JSON.stringify({
         email: values.email,
@@ -39,6 +41,14 @@ const CreateUserForm = ({ onDone }: { onDone: () => void }) => {
         ...(values.roleId ? { roleId: values.roleId } : {}),
       }),
     });
+    // Guard the success path — the shared fetch does not throw on 4xx, so an unconditional
+    // success toast + onDone() previously fired even on a 400 (spurious "created", swallowed error).
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as any));
+      const msg = Array.isArray(body?.message) ? body.message.join(', ') : body?.message;
+      toast.show(msg || t('create_user_failed', 'Failed to create user'), 'warning');
+      return;
+    }
     toast.show(t('user_created', 'User created successfully'), 'success');
     onDone();
   }, [fetch, toast, t, onDone]);
@@ -97,7 +107,7 @@ const InviteMemberForm = ({ onDone }: { onDone: () => void }) => {
           ))}
         </Select>
         <div className="flex gap-[5px] items-center">
-          <input type="checkbox" {...form.register('sendEmail')} className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer" />
+          <input type="checkbox" aria-label={t('send_invitation_via_email', 'Send invitation via email?')} {...form.register('sendEmail')} className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer" />
           <span className="text-[13px]">{t('send_invitation_via_email', 'Send invitation via email?')}</span>
         </div>
         <Button type="submit" className="mt-[18px]">{t('send_invitation_link', 'Send Invitation')}</Button>
@@ -262,6 +272,7 @@ export const TeamsComponent = () => {
           />
         </div>
         <select
+          aria-label={t('filter_by_role', 'Filter by role')}
           value={roleFilter}
           onChange={(e) => { setRoleFilter(e.target.value); setPage(0); }}
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
@@ -272,6 +283,7 @@ export const TeamsComponent = () => {
           ))}
         </select>
         <select
+          aria-label={t('sort_by', 'Sort by')}
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as 'name' | 'joined')}
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
@@ -298,7 +310,7 @@ export const TeamsComponent = () => {
 
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
-            <div className="text-red-400 text-[14px]">{t('failed_loading_team', 'Failed to load team')}</div>
+            <div className="text-dangerText text-[14px]">{t('failed_loading_team', 'Failed to load team')}</div>
             <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
@@ -331,6 +343,7 @@ export const TeamsComponent = () => {
                   render: (m: any) =>
                     canManageMember(m) ? (
                       <select
+                        aria-label={`${t('role', 'Role')} — ${m.user.profile?.name || m.user.email}`}
                         value={m.roleId || ''}
                         onChange={changeRole(m)}
                         className="bg-newBgColor border border-newTableBorder rounded-[8px] px-[8px] py-[4px] text-[13px] outline-none"
@@ -360,7 +373,7 @@ export const TeamsComponent = () => {
                   align: 'right',
                   render: (m: any) =>
                     canManageMember(m) ? (
-                      <button onClick={remove(m)} className="text-[12px] text-red-400 hover:text-red-300 transition-colors">
+                      <button onClick={remove(m)} className="text-[12px] text-dangerText hover:text-red-300 transition-colors">
                         {t('remove', 'Remove')}
                       </button>
                     ) : (

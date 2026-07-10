@@ -592,7 +592,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   {providerInfo.type}
                 </span>
               )}
-              <span className="text-[11px] text-newTextColor/40">
+              <span className="text-[11px] text-newTextColor/60">
                 {folder._count?.files || 0}
               </span>
             </button>
@@ -1172,7 +1172,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <button
                     key={f.value}
                     onClick={() => setFormatForAll(f.value)}
-                    className="px-2 py-0.5 rounded-[4px] text-[10px] border border-studioBorder text-newTextColor/50 hover:text-textColor hover:border-newTextColor/40 transition-all"
+                    className="px-2 py-0.5 rounded-[4px] text-[10px] border border-studioBorder text-newTextColor/65 hover:text-textColor hover:border-newTextColor/40 transition-all"
                   >
                     All {f.label}
                   </button>
@@ -1244,7 +1244,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
           {brandEnforcement && brandViolations.length > 0 && (
             <div className="rounded-[6px] border border-red-400/30 bg-red-400/10 p-2">
-              <div className="text-[12px] text-red-400 font-medium mb-1">
+              <div className="text-[12px] text-dangerText font-medium mb-1">
                 Off-brand elements detected
               </div>
               <ul className="text-[11px] text-newTextColor/60 list-disc pl-4 space-y-0.5 max-h-[100px] overflow-y-auto">
@@ -1512,7 +1512,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
           <div className="max-h-[300px] overflow-y-auto flex flex-col gap-2">
             {draftLoading && (
-              <div className="text-[12px] text-newTextColor/40 text-center py-4">
+              <div className="text-[12px] text-newTextColor/60 text-center py-4">
                 Loading integrations...
               </div>
             )}
@@ -1559,7 +1559,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     <div className="flex-1 min-w-0">
                       <div
                         className={`text-[12px] truncate ${
-                          isSkipped ? 'text-newTextColor/40' : 'text-textColor'
+                          isSkipped ? 'text-newTextColor/60' : 'text-textColor'
                         }`}
                       >
                         {row.output.name || row.output.formatId} → {row.integrationName}
@@ -1581,7 +1581,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                       )}
 
                       {!row.missingAlt && row.altText && !isSkipped && (
-                        <div className="text-[10px] text-newTextColor/50 truncate mt-0.5">
+                        <div className="text-[10px] text-newTextColor/65 truncate mt-0.5">
                           Alt: {row.altText}
                         </div>
                       )}
@@ -1600,7 +1600,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           </div>
 
           {!draftLoading && draftRows.length === 0 && (
-            <div className="text-[12px] text-newTextColor/40 text-center py-4">
+            <div className="text-[12px] text-newTextColor/60 text-center py-4">
               No outputs to create drafts for
             </div>
           )}
@@ -1724,18 +1724,18 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                 {posterUrl && (
                   <button
                     onClick={() => setPosterUrl('')}
-                    className="text-[11px] text-red-400 hover:text-red-300"
+                    className="text-[11px] text-dangerText hover:text-red-300"
                   >
                     Clear
                   </button>
                 )}
               </div>
               {posterUrl && (
-                <div className="text-[10px] text-newTextColor/50 truncate">{posterUrl}</div>
+                <div className="text-[10px] text-newTextColor/65 truncate">{posterUrl}</div>
               )}
             </div>
 
-            <div className="text-[11px] text-newTextColor/50 mt-1">
+            <div className="text-[11px] text-newTextColor/65 mt-1">
               Video renders are processed asynchronously. You can check progress on this screen after starting.
             </div>
           </div>
@@ -1757,7 +1757,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           </div>
 
           {renderError && (
-            <div className="text-[12px] text-red-400 mt-2">{renderError}</div>
+            <div className="text-[12px] text-dangerText mt-2">{renderError}</div>
           )}
         </>
       )}
@@ -1812,7 +1812,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                       href={j.artifactUrl || undefined}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-[12px] text-designerAccent hover:underline truncate"
+                      className="text-[12px] text-btnPrimaryAccent hover:underline truncate"
                     >
                       {j.outputName}
                     </a>
@@ -1892,7 +1892,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                       </div>
                     </div>
                     {posterUrl && (
-                      <div className="text-[10px] text-newTextColor/50 truncate">{posterUrl}</div>
+                      <div className="text-[10px] text-newTextColor/65 truncate">{posterUrl}</div>
                     )}
                   </div>
                 )}
@@ -1905,7 +1905,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <circle cx="12" cy="12" r="11" fill="#ef4444" stroke="none" />
                   <path d="M8 8l8 8M16 8l-8 8" stroke="white" strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                <div className="text-[14px] text-red-400 font-medium">Render Failed</div>
+                <div className="text-[14px] text-dangerText font-medium">Render Failed</div>
                 {renderError && (
                   <div className="text-[12px] text-newTextColor/60 text-center">{renderError}</div>
                 )}

@@ -10,9 +10,33 @@ import clsx from 'clsx';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
 import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
+import { readableTextColor } from '@gitroom/frontend/components/shared/readable-text-color';
 
 const stripHtml = (html?: string | null): string =>
   (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+// A tagged-item icon that degrades to an initial-avatar when the image is
+// missing OR fails to load (a stale/deleted media URL on this public report
+// otherwise shows a broken-image icon to the client).
+const ItemIcon: FC<{ icon?: string | null; name: string }> = ({ icon, name }) => {
+  const [failed, setFailed] = useState(false);
+  if (icon && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={icon}
+        alt=""
+        onError={() => setFailed(true)}
+        className="w-[24px] h-[24px] rounded-full object-cover"
+      />
+    );
+  }
+  return (
+    <div className="w-[24px] h-[24px] rounded-full bg-newTableHeader flex items-center justify-center text-[11px] font-medium text-newTableText">
+      {name.charAt(0).toUpperCase()}
+    </div>
+  );
+};
 
 interface ReportEngagement {
   totalViews: number;
@@ -270,16 +294,16 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
       `}</style>
 
       <div
-        className="rounded-[12px] p-[24px] text-textColor flex flex-col gap-[8px]"
-        style={{ backgroundColor: color }}
+        className="rounded-[12px] p-[24px] flex flex-col gap-[8px]"
+        style={{ backgroundColor: color, color: readableTextColor(color) }}
       >
         <h1 className="text-[28px] font-[600]">{campaign.name}</h1>
         <p className="text-[14px] opacity-90">
           {t('campaign_report', 'Campaign Report')} &bull; {dayjs().format('MMM D, YYYY')}
         </p>
-        {campaign.description && <p className="text-[13px] opacity-80 max-w-[720px]">{campaign.description}</p>}
+        {campaign.description && <p className="text-[13px] opacity-90 max-w-[720px]">{campaign.description}</p>}
         {(campaign.startDate || campaign.endDate) && (
-          <p className="text-[13px] opacity-80">
+          <p className="text-[13px] opacity-90">
             {campaign.startDate ? formatDate(campaign.startDate) : ''}
             {campaign.startDate && campaign.endDate ? ' — ' : ''}
             {campaign.endDate ? formatDate(campaign.endDate) : ''}
@@ -478,14 +502,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
                   <ul className="flex flex-col gap-[8px]">
                     {items.map((item) => (
                       <li key={item.id} className="flex items-center gap-[8px]">
-                        {item.icon ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={item.icon} alt="" className="w-[24px] h-[24px] rounded-full object-cover" />
-                        ) : (
-                          <div className="w-[24px] h-[24px] rounded-full bg-newTableHeader flex items-center justify-center text-[11px] font-medium text-newTableText">
-                            {item.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                        <ItemIcon icon={item.icon} name={item.name} />
                         <div className="flex flex-col min-w-0">
                           <span className="text-[13px] text-textColor truncate">{item.name}</span>
                           {item.subtitle && <span className="text-[11px] text-newTableText truncate">{item.subtitle}</span>}
@@ -506,11 +523,11 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
 function statePillClass(state: string): string {
   switch (state?.toUpperCase()) {
     case 'PUBLISHED':
-      return 'bg-green-500/10 text-green-500';
+      return 'bg-green-500/10 text-green-700 dark:text-green-400';
     case 'QUEUE':
-      return 'bg-blue-500/10 text-blue-500';
+      return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
     case 'DRAFT':
-      return 'bg-amber-500/10 text-amber-500';
+      return 'bg-amber-500/10 text-amber-700 dark:text-amber-400';
     default:
       return 'bg-newTableText/10 text-newTableText';
   }

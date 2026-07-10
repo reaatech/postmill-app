@@ -384,7 +384,7 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
             <>
               <Button
                 type="button"
-                className="!bg-transparent border border-red-500/30 text-red-400 text-[12px]"
+                className="!bg-transparent border border-red-500/30 text-dangerText text-[12px]"
                 onClick={handleDelete}
                 disabled={saving}
               >

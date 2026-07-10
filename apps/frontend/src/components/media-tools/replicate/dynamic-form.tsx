@@ -12,7 +12,7 @@ import {
 } from './field-classification';
 
 function RequiredMark({ required }: { required?: boolean }) {
-  return required ? <span className="text-red-400 ml-1">*</span> : null;
+  return required ? <span className="text-dangerText ml-1">*</span> : null;
 }
 
 const inputClass =
@@ -82,7 +82,7 @@ function PromptField({
           type="button"
           onClick={enhance}
           disabled={busy}
-          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-designerAccent/15 text-designerAccent hover:bg-designerAccent/25 disabled:opacity-50 transition-colors"
+          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-designerAccent/15 text-btnPrimaryAccent hover:bg-designerAccent/25 disabled:opacity-50 transition-colors"
         >
           <span>✨</span>
           {busy ? 'Enhancing…' : mode === 'negative' ? 'Build negatives' : 'Enhance'}
@@ -100,7 +100,7 @@ function PromptField({
       />
       {note && <p className="text-[10px] text-amber-600 mt-1">{note}</p>}
       {!note && schema.description && (
-        <p className="text-[10px] text-newTextColor/50 mt-1">{schema.description}</p>
+        <p className="text-[10px] text-newTextColor/65 mt-1">{schema.description}</p>
       )}
     </div>
   );
@@ -180,7 +180,7 @@ function AdvancedField({
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
           {label}
-          <span className="text-[10px] text-newTextColor/50 tabular-nums">
+          <span className="text-[10px] text-newTextColor/65 tabular-nums">
             {value !== undefined ? String(value) : ''}
           </span>
         </div>
@@ -220,7 +220,7 @@ function AdvancedField({
         className={inputClass}
       />
       {schema.description && (
-        <p className="text-[10px] text-newTextColor/50 mt-1">{schema.description}</p>
+        <p className="text-[10px] text-newTextColor/65 mt-1">{schema.description}</p>
       )}
     </div>
   );
@@ -293,7 +293,7 @@ export function DynamicForm() {
 
   if (primary.length === 0 && advanced.length === 0) {
     return (
-      <div className="text-sm text-newTextColor/50 text-center py-4">
+      <div className="text-sm text-newTextColor/65 text-center py-4">
         No configurable parameters for this model.
       </div>
     );
@@ -314,7 +314,7 @@ export function DynamicForm() {
           >
             <span className={`transition-transform ${advancedOpen ? 'rotate-90' : ''}`}>▸</span>
             Advanced settings
-            <span className="text-newTextColor/50">({advanced.length})</span>
+            <span className="text-newTextColor/65">({advanced.length})</span>
           </button>
           {advancedOpen && (
             <div className="mt-3">

@@ -156,15 +156,16 @@ describe('AnalyticsDashboard', () => {
   it('renders the six inline analytics tab buttons (no kebab)', () => {
     render(<AnalyticsDashboard />);
 
-    expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Channels' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Posts' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Insights' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Links' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Watchlist' })).toBeTruthy();
+    // Tabs carry role="tab" (a11y: they live in a role="tablist").
+    expect(screen.getByRole('tab', { name: 'Overview' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Channels' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Posts' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Insights' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Links' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Watchlist' })).toBeTruthy();
     // Best time / Recommendations are now Insights sections, not top-level tabs.
-    expect(screen.queryByRole('button', { name: 'Best time' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Recommendations' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Best time' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Recommendations' })).toBeNull();
   });
 
   it('shows InsightsTab when tab=insights', () => {

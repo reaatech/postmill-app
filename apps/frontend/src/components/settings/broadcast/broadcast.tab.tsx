@@ -87,6 +87,7 @@ export const BroadcastTab: React.FC = () => {
             <div className="flex flex-col gap-[4px]">
               <label className="text-[13px] text-textColor">{t('type', 'Type')}</label>
               <select
+                aria-label={t('type', 'Type')}
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"

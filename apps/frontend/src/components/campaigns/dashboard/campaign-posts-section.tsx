@@ -344,7 +344,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
               setSort('newest');
               setPage(0);
             }}
-            className="text-[13px] text-btnPrimary hover:underline"
+            className="text-[13px] text-btnPrimaryAccent hover:underline"
           >
             {t('clear_filters', 'Clear filters')}
           </button>

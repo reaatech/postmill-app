@@ -132,7 +132,7 @@ const PromptLibraryDropdown: FC<{
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="text-[11px] text-[#2B5CD3] hover:underline"
+          className="text-[11px] text-btnPrimaryAccent hover:underline"
         >
           {showAddForm ? t('cancel', 'Cancel') : t('add_new', 'Add New')}
         </button>
@@ -174,7 +174,7 @@ const PromptLibraryDropdown: FC<{
         )}
 
         {!isLoading && (!data || data.length === 0) && (
-          <div className="text-[12px] text-newTextColor/50 p-[16px] text-center">
+          <div className="text-[12px] text-newTextColor/65 p-[16px] text-center">
             {t(
               'no_saved_prompts',
               'No saved prompts yet. Click "Add New" to create one.'
@@ -196,7 +196,7 @@ const PromptLibraryDropdown: FC<{
                 <div className="text-[12px] font-[500] truncate">
                   {item.title}
                 </div>
-                <div className="text-[11px] text-newTextColor/50 truncate">
+                <div className="text-[11px] text-newTextColor/65 truncate">
                   {item.content.slice(0, 60)}
                   {item.content.length > 60 ? '...' : ''}
                 </div>
@@ -207,7 +207,7 @@ const PromptLibraryDropdown: FC<{
                   deletePrompt(item.id);
                 }}
                 disabled={deleting === item.id}
-                className="opacity-0 group-hover:opacity-100 ml-[8px] text-[11px] text-red-400 hover:text-red-500 disabled:opacity-50 shrink-0"
+                className="opacity-0 group-hover:opacity-100 ml-[8px] text-[11px] text-dangerText hover:text-red-500 disabled:opacity-50 shrink-0"
               >
                 {deleting === item.id ? (
                   <Loading height={12} width={12} type="spin" color="#ef4444" />

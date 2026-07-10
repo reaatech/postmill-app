@@ -190,7 +190,7 @@ export const CampaignsPage: FC = () => {
           <button
             type="button"
             onClick={() => { setFilters(DEFAULT_CAMPAIGN_FILTERS); setPage(0); }}
-            className="text-[13px] text-btnPrimary hover:underline"
+            className="text-[13px] text-btnPrimaryAccent hover:underline"
           >
             {t('clear_filters', 'Clear filters')}
           </button>

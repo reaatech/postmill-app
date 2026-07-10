@@ -292,6 +292,7 @@ export const BrandVoiceSection = () => {
           <Select
             name="platformSelector"
             label=""
+            aria-label={t('platform_overrides', 'Per-Platform Overrides')}
             disableForm={true}
             hideErrors={true}
             value={selectedPlatform}
@@ -360,6 +361,7 @@ export const BrandVoiceSection = () => {
           <Select
             name="brandLanguage"
             label=""
+            aria-label={t('brand_language', 'Language')}
             disableForm={true}
             hideErrors={true}
             value={language}
@@ -658,7 +660,7 @@ className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px]
                     {t('edit', 'Edit')}
                   </button>
                   <button
-                    className="text-[12px] text-red-500 hover:underline"
+                    className="text-[12px] text-red-600 dark:text-red-500 hover:underline"
                     onClick={() => handleDelete(template.key)}
                   >
                     {t('delete', 'Delete')}
@@ -798,7 +800,7 @@ export const PromptLibrarySection = () => {
               </span>
             </div>
             <button
-              className="text-[12px] text-red-500 hover:underline ml-[12px] shrink-0"
+              className="text-[12px] text-red-600 dark:text-red-500 hover:underline ml-[12px] shrink-0"
               onClick={() => handleDelete(item.id)}
             >
               {t('delete', 'Delete')}

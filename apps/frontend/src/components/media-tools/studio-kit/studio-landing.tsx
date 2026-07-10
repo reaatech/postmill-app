@@ -27,14 +27,14 @@ export function StudioLanding({
           </span>
 
           <div className="flex items-center gap-[8px]">
-            <span className="inline-flex items-center gap-[6px] px-[10px] py-[4px] rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-600 text-[11px] font-[600] uppercase tracking-wider">
+            <span className="inline-flex items-center gap-[6px] px-[10px] py-[4px] rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-800 dark:text-amber-400 text-[11px] font-[600] uppercase tracking-wider">
               <span className="w-[6px] h-[6px] rounded-full bg-amber-500" />
               Not configured
             </span>
           </div>
 
           <h1 className="text-[28px] mobile:text-[23px] font-[700] text-textColor leading-tight">{title}</h1>
-          <p className="text-[16px] font-[600] text-[#2B5CD3]">{landing.tagline}</p>
+          <p className="text-[16px] font-[600] text-btnPrimaryAccent">{landing.tagline}</p>
 
           {landing.badges?.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-[6px]">
@@ -88,7 +88,7 @@ export function StudioLanding({
             <div className="grid grid-cols-2 mobile:grid-cols-1 gap-x-[20px] gap-y-[12px]">
               {landing.highlights.map((h) => (
                 <div key={h} className="flex items-start gap-[10px]">
-                  <span className="mt-[1px] inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 rounded-full bg-[#2B5CD3]/15 text-[#2B5CD3]">
+                  <span className="mt-[1px] inline-flex items-center justify-center w-[18px] h-[18px] shrink-0 rounded-full bg-[#2B5CD3]/15 text-btnPrimaryAccent">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M20 6 9 17l-5-5" />
                     </svg>
@@ -100,7 +100,7 @@ export function StudioLanding({
           </div>
         )}
 
-        <p className="mt-[20px] text-center text-[12px] text-newTextColor/45">
+        <p className="mt-[20px] text-center text-[12px] text-newTextColor/60">
           Credentials are encrypted at rest and never leave your workspace.
         </p>
       </div>

@@ -690,7 +690,7 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
                     'group/rail relative flex items-center gap-[10px] rounded-e-[6px] text-[13px] text-textColor transition-colors',
                     collapsed ? 'justify-center px-[8px] py-[10px]' : 'ps-[10px] pe-[12px] py-[8px]',
                     active ? 'bg-boxHover' : 'hover:bg-boxHover',
-                    !enabled && !active && 'opacity-45 hover:opacity-100'
+                    !enabled && !active && 'opacity-60 hover:opacity-100'
                   )}
                 >
                   <span

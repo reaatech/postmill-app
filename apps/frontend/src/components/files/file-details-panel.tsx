@@ -165,7 +165,7 @@ export const FileDetailsPanel: FC<{
                 role="button"
                 tabIndex={0}
                 aria-label="Edit name"
-                className="mt-[4px] text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate"
+                className="mt-[4px] text-[13px] text-textColor cursor-pointer hover:text-btnPrimaryAccent truncate"
                 onClick={() => setEditingName(true)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingName(true); } }}
               >
@@ -193,12 +193,12 @@ export const FileDetailsPanel: FC<{
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[12px] bg-[#2B5CD3]/15 text-[12px] text-[#2B5CD3]"
+                  className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[12px] bg-[#2B5CD3]/15 text-[12px] text-btnPrimaryAccent"
                 >
                   {tag}
                   <button
                     onClick={() => handleRemoveTag(tag)}
-                    className="hover:text-red-400 transition-all"
+                    className="hover:text-dangerText transition-all"
                   >
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                       <path d="M7.5 2.5L2.5 7.5M2.5 2.5L7.5 7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -282,7 +282,7 @@ export const FileDetailsPanel: FC<{
             </button>
             <button
               onClick={handleDelete}
-              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-red-400 hover:bg-boxHover transition-all"
+              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-dangerText hover:bg-boxHover transition-all"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M2 3.5H12M4.5 3.5V2.5C4.5 2.22386 4.72386 2 5 2H9C9.27614 2 9.5 2.22386 9.5 2.5V3.5M5.5 6.5V10.5M8.5 6.5V10.5M3.16667 3.5L3.83333 11.6667C3.87363 12.1289 4.26222 12.5 4.72727 12.5H9.27273C9.73778 12.5 10.1264 12.1289 10.1667 11.6667L10.8333 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />

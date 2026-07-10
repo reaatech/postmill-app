@@ -157,7 +157,7 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
         />
         <div className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 && (
-            <div className="px-4 py-6 text-center text-xs text-newTextColor/50">No commands</div>
+            <div className="px-4 py-6 text-center text-xs text-newTextColor/65">No commands</div>
           )}
           {filtered.map((a, i) => (
             <button
@@ -169,7 +169,7 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
               }`}
             >
               <span>{a.label}</span>
-              {a.hint && <span className="text-[10px] text-newTextColor/50">{a.hint}</span>}
+              {a.hint && <span className="text-[10px] text-newTextColor/65">{a.hint}</span>}
             </button>
           ))}
         </div>

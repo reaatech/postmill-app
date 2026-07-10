@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { ParseCuidPipe } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -96,7 +96,7 @@ export class SocialCommentsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async replyToComment(
     @Param('id', ParseCuidPipe) id: string,
-    @Param('commentId', ParseCuidPipe) commentId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
     @Body() body: ReplyCommentDto,
     @Headers('x-idempotency-key') idempotencyKey: string | undefined,
     @GetOrgFromRequest() org: Organization,
@@ -119,7 +119,7 @@ export class SocialCommentsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async likeComment(
     @Param('id', ParseCuidPipe) id: string,
-    @Param('commentId', ParseCuidPipe) commentId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
     @Body() body: LikeCommentDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -143,7 +143,7 @@ export class SocialCommentsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async updateCommentStatus(
     @Param('id', ParseCuidPipe) id: string,
-    @Param('commentId', ParseCuidPipe) commentId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
     @Body() body: UpdateCommentStatusDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -156,7 +156,7 @@ export class SocialCommentsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async assignComment(
     @Param('id', ParseCuidPipe) id: string,
-    @Param('commentId', ParseCuidPipe) commentId: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
     @Body() body: AssignCommentDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,

@@ -975,7 +975,7 @@ export const Designer: FC<DesignerProps> = ({
         <MenuBar actions={actions} />
 
         <div className="mobile:hidden flex items-center text-[11px] min-w-0 shrink-0">
-          {isSaving && <span className="text-newTextColor/40">Saving…</span>}
+          {isSaving && <span className="text-newTextColor/60">Saving…</span>}
           {!isSaving && !isDirty && currentDesignId && (
             <span className="text-green-500">Saved</span>
           )}
@@ -1008,7 +1008,7 @@ export const Designer: FC<DesignerProps> = ({
             <button
               className={`px-2.5 py-1 text-xs rounded border transition-colors ${
                 collabEnabled
-                  ? 'bg-green-500/20 border-green-500/30 text-green-400'
+                  ? 'bg-green-500/20 border-green-500/30 text-green-700 dark:text-green-400'
                   : 'border-studioBorder text-textColor/70 hover:text-textColor'
               }`}
               onClick={() => setCollabEnabled(!collabEnabled)}
@@ -1076,7 +1076,7 @@ export const Designer: FC<DesignerProps> = ({
               }}
               className={`w-9 h-9 flex items-center justify-center rounded-lg text-[15px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
                 activePanel === p.id
-                  ? 'bg-designerAccent/20 text-designerAccent'
+                  ? 'bg-designerAccent/20 text-btnPrimaryAccent'
                   : 'text-textColor/60 hover:bg-studioBorder/30 hover:text-textColor'
               }`}
               title={p.label}

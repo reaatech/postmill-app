@@ -121,9 +121,9 @@ const CommentItem: FC<{
 
   const sentimentLabel = (comment as any).sentiment as string | undefined;
   const sentimentColors: Record<string, string> = {
-    positive: 'bg-green-500/20 text-green-400 border-green-500/30',
-    negative: 'bg-red-500/20 text-red-400 border-red-500/30',
-    neutral: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+    positive: 'bg-green-500/20 text-green-800 dark:text-green-400 border-green-500/30',
+    negative: 'bg-red-500/20 text-dangerText border-red-500/30',
+    neutral: 'bg-gray-500/20 text-gray-800 dark:text-gray-400 border-gray-500/30',
   };
 
   return (
@@ -181,7 +181,7 @@ const CommentItem: FC<{
             onClick={() => onLike(comment, !likedByMe)}
             className={`flex items-center gap-[3px] text-[11px] ${
               likedByMe ? 'text-red-500' : 'text-newTableText'
-            } hover:text-red-400 transition-colors disabled:opacity-50`}
+            } hover:text-dangerText transition-colors disabled:opacity-50`}
           >
             <HeartIcon filled={likedByMe} />
             {likeCount > 0 && likeCount}
@@ -215,7 +215,7 @@ const CommentItem: FC<{
               type="button"
               onClick={handleAssign}
               disabled={!assignInput.trim()}
-              className="text-[11px] text-btnPrimary hover:underline disabled:opacity-50"
+              className="text-[11px] text-btnPrimaryAccent hover:underline disabled:opacity-50"
             >
               {t('save', 'Save')}
             </button>
@@ -416,7 +416,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
                   e.stopPropagation();
                   setExpandedDepths(prev => ({ ...prev, [comment.platformCommentId]: true }));
                 }}
-                className="text-[11px] text-btnPrimary hover:underline ms-[28px] mt-[4px]"
+                className="text-[11px] text-btnPrimaryAccent hover:underline ms-[28px] mt-[4px]"
               >
                 {t('show_more_replies', 'Show more replies')} ({children.length})
               </button>
@@ -486,7 +486,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
           type="button"
           onClick={handleSummarize}
           disabled={summarizing || allComments.length === 0}
-          className="text-[12px] text-btnPrimary hover:underline disabled:opacity-50"
+          className="text-[12px] text-btnPrimaryAccent hover:underline disabled:opacity-50"
         >
           {summarizing
             ? t('summarizing', 'Summarizing...')
@@ -532,7 +532,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
           type="button"
           onClick={loadMore}
           disabled={loadingMore}
-          className="self-center text-[12px] text-btnPrimary hover:underline disabled:opacity-50 mt-[4px]"
+          className="self-center text-[12px] text-btnPrimaryAccent hover:underline disabled:opacity-50 mt-[4px]"
         >
           {loadingMore
             ? t('loading_comments', 'Loading replies...')

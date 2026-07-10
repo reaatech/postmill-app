@@ -102,7 +102,7 @@ export const BrandPicker = () => {
               onClick={() => select(null)}
               className={clsx(
                 'w-full text-left h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center bg-transparent border-none text-textColor',
-                !brandId && 'text-[#2B5CD3]'
+                !brandId && 'text-btnPrimaryAccent'
               )}
             >
               {t('no_brand', 'No Brand')}
@@ -115,7 +115,7 @@ export const BrandPicker = () => {
                 onClick={() => select(brand.id)}
                 className={clsx(
                   'w-full text-left h-[40px] py-[8px] px-[20px] -mx-[12px] hover:bg-newBgColor cursor-pointer flex items-center bg-transparent border-none text-textColor',
-                  brandId === brand.id && 'text-[#2B5CD3]'
+                  brandId === brand.id && 'text-btnPrimaryAccent'
                 )}
               >
                 <span className="truncate">

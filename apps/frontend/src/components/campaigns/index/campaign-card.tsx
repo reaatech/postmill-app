@@ -107,7 +107,7 @@ export const CampaignCard: FC<CampaignCardProps> = ({
             {campaign.tags.map((tag) => (
               <span
                 key={tag}
-                className="px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary text-[11px]"
+                className="px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimaryAccent text-[11px]"
               >
                 {tag}
               </span>

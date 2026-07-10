@@ -390,7 +390,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
 
       <button
         onClick={() => setMediaModalOpen(true)}
-        className="w-full px-3 py-2 rounded-md text-[12px] border border-designerAccent text-designerAccent hover:bg-designerAccent/10 transition-colors"
+        className="w-full px-3 py-2 rounded-md text-[12px] border border-designerAccent text-btnPrimaryAccent hover:bg-designerAccent/10 transition-colors"
       >
         Replace image…
       </button>
@@ -414,7 +414,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-textColor/50">Focal point</span>
           <button
-            className="text-[10px] text-designerAccent"
+            className="text-[10px] text-btnPrimaryAccent"
             onClick={() => set({ focalPoint: { x: 0.5, y: 0.5 } })}
           >
             Center
@@ -755,7 +755,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                 }}
                 className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-[20px] transition-all ${
                   active
-                    ? 'border-designerAccent bg-designerAccent/10 text-designerAccent'
+                    ? 'border-designerAccent bg-designerAccent/10 text-btnPrimaryAccent'
                     : 'border-studioBorder bg-newBgColorInner text-textColor/60 hover:border-designerAccent hover:text-textColor'
                 }`}
               >
@@ -813,7 +813,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         {element.mask && (
           <button
             onClick={() => updateElement(element.id, { mask: undefined })}
-            className="w-full px-3 py-2 rounded-md text-[12px] border border-red-400/40 text-red-400 hover:bg-red-400/10 transition-colors"
+            className="w-full px-3 py-2 rounded-md text-[12px] border border-red-400/40 text-dangerText hover:bg-red-400/10 transition-colors"
           >
             Remove frame
           </button>
@@ -840,7 +840,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
             <span className="text-[11px] text-textColor/50">Crop</span>
             {element.crop && (
               <button
-                className="text-[10px] text-designerAccent"
+                className="text-[10px] text-btnPrimaryAccent"
                 onClick={() =>
                   updateElement(element.id, { crop: undefined })
                 }
@@ -1006,7 +1006,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
             )}
 
             {inpaintMaskUrl && !masking && (
-              <div className="text-[10px] text-green-400">Mask ready</div>
+              <div className="text-[10px] text-green-700 dark:text-green-400">Mask ready</div>
             )}
 
             <button

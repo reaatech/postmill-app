@@ -278,6 +278,8 @@ export const Filters = () => {
     <div className="flex flex-row p-[4px] border border-newTableBorder rounded-[8px] text-[14px] font-[500]">
       <button type="button"
         onClick={setCalendarView}
+        aria-label={t('calendar_view', 'Calendar view')}
+        aria-pressed={!isListView}
         className={clsx(
           'pt-[6px] pb-[5px] cursor-pointer flex justify-center items-center w-[34px] text-center rounded-[6px]',
           !isListView && 'text-textItemFocused bg-boxFocused'
@@ -302,6 +304,8 @@ export const Filters = () => {
       </button>
       <button type="button"
         onClick={setList}
+        aria-label={t('list_view', 'List view')}
+        aria-pressed={isListView}
         className={clsx(
           'pt-[6px] pb-[5px] flex justify-center items-center cursor-pointer w-[34px] text-center rounded-[6px]',
           isListView && 'text-textItemFocused bg-boxFocused'
@@ -667,7 +671,7 @@ export const Filters = () => {
           <button
             type="button"
             onClick={chip.onClear}
-            className="text-[11px] font-[600] text-btnPrimary hover:underline"
+            className="text-[11px] font-[600] text-btnPrimaryAccent hover:underline"
           >
             {t('clear', 'Clear')}
           </button>
@@ -772,6 +776,7 @@ export const Filters = () => {
           Always mounted so it can slide in/out; pointer-events off when closed. */}
       <div
         aria-hidden={!drawerOpen}
+        inert={!drawerOpen}
         className={clsx(
           'fixed inset-0 z-[210] flex justify-end',
           !drawerOpen && 'pointer-events-none'

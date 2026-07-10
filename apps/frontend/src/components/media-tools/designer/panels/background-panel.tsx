@@ -239,7 +239,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
             onSelect={handleModalSelect}
           />
 
-          <div className="text-[11px] text-newTextColor/40">From your files</div>
+          <div className="text-[11px] text-newTextColor/60">From your files</div>
 
           {isLoading && !data ? (
             <PanelSkeletonGrid count={4} />
@@ -249,7 +249,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
               onRetry={() => mutate()}
             />
           ) : !data?.results?.length ? (
-            <div className="text-[12px] text-newTextColor/40 text-center py-4">
+            <div className="text-[12px] text-newTextColor/60 text-center py-4">
               No files found
             </div>
           ) : (

@@ -181,7 +181,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
 
   if (!elements.length) {
     return (
-      <div className="text-[12px] text-newTextColor/40 text-center py-4">
+      <div className="text-[12px] text-newTextColor/60 text-center py-4">
         No elements on this output
       </div>
     );
@@ -230,7 +230,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 : 'text-newTextColor/60 hover:bg-studioBorder/10 hover:text-textColor'
             }`}
           >
-            <div className="w-5 h-5 flex items-center justify-center text-[11px] font-bold text-designerAccent shrink-0">
+            <div className="w-5 h-5 flex items-center justify-center text-[11px] font-bold text-btnPrimaryAccent shrink-0">
               {elementIcon[el.type] || '?'}
             </div>
 
@@ -256,7 +256,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
             )}
 
             {el.originId ? (
-              <span title="Linked — edits here update all formats" className="text-designerAccent shrink-0">🔗</span>
+              <span title="Linked — edits here update all formats" className="text-btnPrimaryAccent shrink-0">🔗</span>
             ) : (
               <span title="Unlinked — changes stay in this format only" className="text-gray-500 shrink-0">🔓</span>
             )}
@@ -302,7 +302,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 data-row-action
                 onClick={(e) => toggleLock(e, el.id)}
                 className={`w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[10px] ${
-                  el.locked ? 'text-designerAccent' : 'text-newTextColor/40'
+                  el.locked ? 'text-btnPrimaryAccent' : 'text-newTextColor/60'
                 }`}
                 title={el.locked ? 'Unlock' : 'Lock'}
                 aria-label={el.locked ? 'Unlock layer' : 'Lock layer'}

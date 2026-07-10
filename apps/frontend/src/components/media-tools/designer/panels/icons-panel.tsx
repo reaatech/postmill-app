@@ -105,7 +105,7 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
       />
 
       {filtered.length === 0 ? (
-        <div className="text-[12px] text-newTextColor/40 text-center py-4">
+        <div className="text-[12px] text-newTextColor/60 text-center py-4">
           No icons found
         </div>
       ) : (
@@ -130,7 +130,7 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
                   })
                 )
               }
-              className="aspect-square flex items-center justify-center rounded-lg border border-studioBorder bg-newBgColorInner text-designerAccent hover:border-designerAccent hover:bg-studioBorder/10 transition-all"
+              className="aspect-square flex items-center justify-center rounded-lg border border-studioBorder bg-newBgColorInner text-btnPrimaryAccent hover:border-designerAccent hover:bg-studioBorder/10 transition-all"
             >
               <svg
                 viewBox="0 0 24 24"

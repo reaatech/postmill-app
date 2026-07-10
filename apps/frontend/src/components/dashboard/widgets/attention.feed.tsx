@@ -16,7 +16,7 @@ const severityBorder: Record<string, string> = {
 
 const severityIconBg: Record<string, string> = {
   critical: 'bg-[var(--negative,#f97066)]/10 text-[var(--negative,#f97066)]',
-  warning: 'bg-amber-500/10 text-amber-500',
+  warning: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
   info: 'bg-newTableBorder text-newTableText',
   default: 'bg-newTableBorder text-newTableText',
 };

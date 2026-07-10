@@ -71,7 +71,7 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
     );
   }
   return (
-    <div className="flex items-center justify-center w-full h-full text-newTextColor/40">
+    <div className="flex items-center justify-center w-full h-full text-newTextColor/60">
       <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <circle cx="9" cy="9" r="2" />
@@ -171,14 +171,14 @@ export const FileGrid: FC<{
               >
                 {file.originalName || file.name}
               </div>
-              <div className="text-[10px] text-newTextColor/50 truncate">
+              <div className="text-[10px] text-newTextColor/65 truncate">
                 {formatDate(file.createdAt)}
                 {file.fileSize ? ` · ${fileSize(file.fileSize)}` : ''}
               </div>
               {tags.length > 0 && (
                 <div className="flex gap-[4px] mt-[3px] flex-wrap">
                   {tags.slice(0, 2).map((tag: string) => (
-                    <span key={tag} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-btnPrimary/15 text-btnPrimary">{tag}</span>
+                    <span key={tag} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-btnPrimary/15 text-btnPrimaryAccent">{tag}</span>
                   ))}
                 </div>
               )}

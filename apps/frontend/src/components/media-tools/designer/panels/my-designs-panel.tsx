@@ -50,7 +50,7 @@ export const MyDesignsPanel: FC<MyDesignsPanelProps> = ({ onOpen, onClose }) => 
   return (
     <div className="p-4">
       {designs.length === 0 ? (
-        <div className="text-[12px] text-newTextColor/40 text-center py-8">
+        <div className="text-[12px] text-newTextColor/60 text-center py-8">
           No designs yet. Start one from a format or template!
         </div>
       ) : (
@@ -78,7 +78,7 @@ export const MyDesignsPanel: FC<MyDesignsPanelProps> = ({ onOpen, onClose }) => 
               )}
               <div className="p-2">
                 <p className="text-[12px] text-textColor truncate">{d.name}</p>
-                <p className="text-[10px] text-newTextColor/40">
+                <p className="text-[10px] text-newTextColor/60">
                   {new Date(d.updatedAt).toLocaleDateString()}
                 </p>
               </div>

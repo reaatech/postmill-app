@@ -147,7 +147,7 @@ export const DelayComponent: FC<{
           {currentDelay > 0 && (
             <button
               onClick={() => handleSelectDelay(0)}
-              className="mt-[8px] h-[32px] w-full rounded-[4px] text-[13px] text-red-400 hover:bg-red-400/10"
+              className="mt-[8px] h-[32px] w-full rounded-[4px] text-[13px] text-dangerText hover:bg-red-400/10"
             >
               Remove delay
             </button>

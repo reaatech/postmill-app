@@ -484,6 +484,7 @@ export const MultiFileComponent: FC<{
               <button
                 type="button"
                 onClick={() => setPickerOpen(true)}
+                aria-label={t('insert_media', 'Insert Media')}
                 className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
               >
                 <div className="flex gap-[8px] items-center">
@@ -555,7 +556,7 @@ export const MultiFileComponent: FC<{
         kinds={['image', 'video']}
         excludeTabs={['Stock Stickers', 'Stock Icons']}
       />
-      <div className="text-[12px] text-red-400">{error}</div>
+      <div className="text-[12px] text-dangerText">{error}</div>
     </>
   );
 };

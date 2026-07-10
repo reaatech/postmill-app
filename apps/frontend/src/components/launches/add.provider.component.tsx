@@ -1,6 +1,7 @@
 'use client';
 
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import React, { FC, useCallback, useMemo } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
@@ -49,6 +50,13 @@ export const AddProviderButton: FC<{
   const add = useAddProvider(update);
   const invite = useAddProvider(update, true);
   const t = useT();
+  const permissions = usePermissions();
+  // Connecting/inviting a channel hits endpoints gated by
+  // @RequirePermission('channels','create'); hide the trigger for members who
+  // lack it (backend still 403s — UI gating only).
+  if (!permissions.hasPermission('channels', 'create')) {
+    return null;
+  }
 
   return (
     <div className="flex group-[.sidebar]:block gap-[8px]">

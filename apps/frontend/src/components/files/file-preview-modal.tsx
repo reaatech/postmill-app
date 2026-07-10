@@ -76,14 +76,14 @@ export const FilePreviewModal: FC<{
       )}
 
       <div className="flex items-center justify-between gap-[10px] flex-wrap">
-        <div className="text-[12px] text-newTextColor/50">
+        <div className="text-[12px] text-newTextColor/65">
           {(file.type || 'file')} · {fileSize(file.fileSize)}
         </div>
         <div className="flex items-center gap-[10px] flex-wrap">
           {onRemoveFromCampaign && (
             <button
               onClick={() => onRemoveFromCampaign(file)}
-              className="px-[16px] py-[10px] rounded-[8px] border border-red-500/50 text-red-400 text-[13px] font-[500] hover:bg-red-500/10 transition-all"
+              className="px-[16px] py-[10px] rounded-[8px] border border-red-500/50 text-dangerText text-[13px] font-[500] hover:bg-red-500/10 transition-all"
             >
               Remove from campaign
             </button>

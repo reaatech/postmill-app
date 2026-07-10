@@ -184,8 +184,21 @@ async function start() {
   }
 
   try {
-    await app.listen(port);
-    new Logger('Bootstrap').log('Backend started successfully on port ' + port);
+    // Optional explicit bind host. Default (unset) preserves the current
+    // behavior — `app.listen(port)` binds Node's default address. Set
+    // BACKEND_LISTEN_HOST=0.0.0.0 to force IPv4 (e.g. in CI, where the default
+    // binds IPv6-only and browsers that prefer 127.0.0.1 get ECONNREFUSED).
+    const listenHost = process.env.BACKEND_LISTEN_HOST;
+    await (listenHost ? app.listen(port, listenHost) : app.listen(port));
+    new Logger('Bootstrap').log(
+      'Backend started successfully on port ' +
+        port +
+        ' (bind host: ' +
+        (listenHost || 'default') +
+        ', address: ' +
+        JSON.stringify(app.getHttpServer().address()) +
+        ')',
+    );
 
     const server = app.getHttpServer();
     const collabGateway = app.get(CollaborationGateway);

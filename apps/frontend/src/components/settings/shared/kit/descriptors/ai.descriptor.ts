@@ -64,12 +64,12 @@ interface ProviderInfo {
 type AiMeta = OrgProviderInfo & { credentialFields: KitCredentialField[] };
 
 const CAPABILITY_COLORS: Record<string, string> = {
-  text: 'bg-blue-500/20 text-blue-400',
-  image: 'bg-purple-500/20 text-purple-400',
-  vision: 'bg-amber-500/20 text-amber-400',
-  embeddings: 'bg-emerald-500/20 text-emerald-400',
-  speech: 'bg-pink-500/20 text-pink-400',
-  tools: 'bg-cyan-500/20 text-cyan-400',
+  text: 'bg-blue-500/20 text-blue-800 dark:text-blue-400',
+  image: 'bg-purple-500/20 text-purple-800 dark:text-purple-400',
+  vision: 'bg-amber-500/20 text-amber-800 dark:text-amber-400',
+  embeddings: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400',
+  speech: 'bg-pink-500/20 text-pink-800 dark:text-pink-400',
+  tools: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400',
 };
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -129,32 +129,32 @@ export const aiDescriptor: ProviderSurfaceDescriptor<AiMeta> = {
       {
         key: 'text',
         label: 'Text',
-        activeClass: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
+        activeClass: 'bg-blue-500/20 text-blue-800 dark:text-blue-400 border-blue-500/40',
       },
       {
         key: 'image',
         label: 'Image',
-        activeClass: 'bg-purple-500/20 text-purple-400 border-purple-500/40',
+        activeClass: 'bg-purple-500/20 text-purple-800 dark:text-purple-400 border-purple-500/40',
       },
       {
         key: 'vision',
         label: 'Vision',
-        activeClass: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
+        activeClass: 'bg-amber-500/20 text-amber-800 dark:text-amber-400 border-amber-500/40',
       },
       {
         key: 'embeddings',
         label: 'Embeddings',
-        activeClass: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40',
+        activeClass: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400 border-emerald-500/40',
       },
       {
         key: 'speech',
         label: 'Speech',
-        activeClass: 'bg-pink-500/20 text-pink-400 border-pink-500/40',
+        activeClass: 'bg-pink-500/20 text-pink-800 dark:text-pink-400 border-pink-500/40',
       },
       {
         key: 'tools',
         label: 'Tools',
-        activeClass: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40',
+        activeClass: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400 border-cyan-500/40',
       },
     ],
   },

@@ -42,7 +42,7 @@ const NoticeContent: React.FC<{ notice: string }> = ({ notice }) => {
   return (
     <SafeContent
       content={html}
-      className="space-y-2 [&_a]:text-designerAccent [&_a]:underline"
+      className="space-y-2 [&_a]:text-btnPrimaryAccent [&_a]:underline"
     />
   );
 };
@@ -165,7 +165,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
       <div className="flex-1 min-h-0 overflow-y-auto p-[20px]">
         <div className="max-w-3xl mx-auto space-y-6">
           {notice && (
-            <div className="rounded-lg border border-amber-600/40 bg-amber-600/10 p-3 text-[13px] text-amber-600">
+            <div className="rounded-lg border border-amber-600/40 bg-amber-600/10 p-3 text-[13px] text-amber-800 dark:text-amber-400">
               <NoticeContent notice={notice} />
             </div>
           )}
@@ -268,7 +268,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                     <button
                       type="button"
                       onClick={() => removeCustomSize(s.id)}
-                      className="text-textColor/50 hover:text-red-400"
+                      className="text-textColor/50 hover:text-dangerText"
                       aria-label="Remove custom size"
                     >
                       ✕
@@ -315,6 +315,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
             <Input
               label="Variants"
               name="variants"
+              aria-label="Variants"
               type="number"
               disableForm
               min={1}
@@ -376,7 +377,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                         )
                       )
                     }
-                    className="text-textColor/50 hover:text-red-400"
+                    className="text-textColor/50 hover:text-dangerText"
                     aria-label="Remove reference"
                   >
                     ✕

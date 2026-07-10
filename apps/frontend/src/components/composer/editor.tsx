@@ -1076,6 +1076,11 @@ export const OnlyEditor = forwardRef<
     content: value || '',
     shouldRerenderOnTransaction: true,
     immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        'aria-label': t('post_content', 'Post content'),
+      },
+    },
     // @ts-ignore
     onPaste: paste,
     onUpdate: (innerProps) => {

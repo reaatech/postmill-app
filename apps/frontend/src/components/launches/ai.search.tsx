@@ -38,7 +38,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
           height="16"
           viewBox="0 0 16 16"
           fill="none"
-          className="absolute left-[12px] top-[50%] -translate-y-[50%] text-newTextColor/40"
+          className="absolute left-[12px] top-[50%] -translate-y-[50%] text-newTextColor/60"
         >
           <circle
             cx="7"
@@ -81,7 +81,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
       )}
 
       {!isLoading && !error && debouncedQuery && (!data || data.length === 0) && (
-        <div className="text-[13px] text-newTextColor/50 py-[32px] text-center">
+        <div className="text-[13px] text-newTextColor/65 py-[32px] text-center">
           {t('no_results_found', 'No results found for your query.')}
         </div>
       )}
@@ -100,12 +100,12 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
                 {item.content || item.text || item.snippet || JSON.stringify(item)}
               </div>
               {item.source && (
-                <div className="text-[11px] text-newTextColor/50">
+                <div className="text-[11px] text-newTextColor/65">
                   {t('source', 'Source')}: {item.source}
                 </div>
               )}
               {item.score !== undefined && (
-                <div className="text-[10px] text-newTextColor/40 mt-[2px]">
+                <div className="text-[10px] text-newTextColor/60 mt-[2px]">
                   {t('relevance', 'Relevance')}:{' '}
                   {typeof item.score === 'number'
                     ? `${(item.score * 100).toFixed(0)}%`
@@ -136,6 +136,7 @@ export const AiSearch: FC = () => {
       <button
         type="button"
         onClick={openModal}
+        aria-label={t('ai_search', 'AI Search')}
         className={clsx(
           'm-0 p-0 border-0 bg-transparent cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
         )}

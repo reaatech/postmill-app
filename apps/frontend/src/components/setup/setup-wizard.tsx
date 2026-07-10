@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR, { useSWRConfig } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Button } from '@gitroom/react/form/button';
 import { SetupStepper } from '@gitroom/frontend/components/setup/setup-stepper';
@@ -15,9 +16,12 @@ import { StepStorage } from '@gitroom/frontend/components/setup/steps/step-stora
 import { StepShortlinks } from '@gitroom/frontend/components/setup/steps/step-shortlinks';
 import { StepVpn } from '@gitroom/frontend/components/setup/steps/step-vpn';
 
-// Only StepLlm consumes `onProviderChange`; the others are no-arg components and
-// remain assignable to this prop type (extra optional props are ignored).
-const STEP_COMPONENTS: React.FC<{ onProviderChange?: () => void }>[] = [
+// Only StepLlm consumes `onProviderChange` / `onActiveChange`; the others are no-arg
+// components and remain assignable to this prop type (extra optional props are ignored).
+const STEP_COMPONENTS: React.FC<{
+  onProviderChange?: () => void;
+  onActiveChange?: (active: boolean) => void;
+}>[] = [
   StepLlm,
   StepAiMedia,
   StepChannels,
@@ -33,6 +37,19 @@ export function SetupWizard() {
   const router = useRouter();
   const { mutate: globalMutate } = useSWRConfig();
 
+  // Setup configures org-level providers (owner/admin only). A member who lands here directly
+  // can't complete the required LLM step (AI-config endpoints 403) — send them to the app
+  // instead of a dead-end wizard. The layout gate already avoids force-redirecting members
+  // here; this covers direct navigation / stale links.
+  const permissions = usePermissions();
+  const canCompleteSetup =
+    permissions.isSuperAdmin || permissions.isOwner || permissions.isAdmin;
+  useEffect(() => {
+    if (permissions.isResolved && !canCompleteSetup) {
+      router.replace('/dashboard');
+    }
+  }, [permissions.isResolved, canCompleteSetup, router]);
+
   // Restore the active step after an OAuth full-page round-trip (connecting a channel or an
   // OAuth short-link provider navigates the tab out to the provider and back; the gate then
   // returns the still-incomplete user to /setup, remounting this wizard). sessionStorage
@@ -47,6 +64,9 @@ export function SetupWizard() {
   const [skippedSteps, setSkippedSteps] = useState<Set<number>>(new Set());
   const [finishing, setFinishing] = useState(false);
   const [finishError, setFinishError] = useState<string | null>(null);
+  // Live, uncached active-provider signal reported by StepLlm's own SWR surface — the
+  // authoritative gate source (the /dashboard/summary read below is Redis-cached 60s).
+  const [llmActive, setLlmActive] = useState(false);
 
   const steps = useMemo(
     () => [
@@ -85,7 +105,9 @@ export function SetupWizard() {
     }
   }, [currentStep]);
 
-  const aiProviderActive = !!summary?.aiProviderActive;
+  // Prefer the live surface signal; fall back to the (cached) summary so a returning user
+  // resuming setup with an already-active provider still clears the gate on first mount.
+  const aiProviderActive = llmActive || !!summary?.aiProviderActive;
   const isLastStep = currentStep === steps.length - 1;
   const canFinish = aiProviderActive;
 
@@ -172,7 +194,10 @@ export function SetupWizard() {
       />
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ActiveStepComponent onProviderChange={handleProviderChange} />
+        <ActiveStepComponent
+          onProviderChange={handleProviderChange}
+          onActiveChange={setLlmActive}
+        />
       </div>
 
       {finishError && (

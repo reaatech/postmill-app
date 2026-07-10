@@ -12,7 +12,7 @@ const STATUS_META: Record<StudioJob['status'], { label: string; className: strin
   pending: { label: 'Queued', className: 'text-amber-600 bg-amber-500/10' },
   processing: { label: 'Rendering', className: 'text-amber-600 bg-amber-500/10' },
   completed: { label: 'Ready', className: 'text-green-500 bg-green-500/10' },
-  failed: { label: 'Failed', className: 'text-red-500 bg-red-500/10' },
+  failed: { label: 'Failed', className: 'text-red-700 dark:text-red-400 bg-red-500/10' },
 };
 
 const OPERATION_LABEL: Record<string, string> = {
@@ -115,7 +115,7 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
 
   if (!isLoading && (!jobs || jobs.length === 0)) {
     return (
-      <div className="text-[12px] text-newTextColor/40 px-[4px] py-[10px]">
+      <div className="text-[12px] text-newTextColor/60 px-[4px] py-[10px]">
         Your renders will appear here.
       </div>
     );
@@ -151,7 +151,7 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
                   {OPERATION_LABEL[job.operation] || job.operation}
                 </div>
                 {job.status === 'failed' && job.error && (
-                  <div className="text-[11px] text-red-500/80 truncate" title={job.error}>{job.error}</div>
+                  <div className="text-[11px] text-red-600 dark:text-red-400 truncate" title={job.error}>{job.error}</div>
                 )}
               </div>
               <span className={`shrink-0 text-[10px] font-[600] px-[7px] py-[3px] rounded-full ${meta.className}`}>

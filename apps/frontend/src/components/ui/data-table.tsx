@@ -39,10 +39,10 @@ export const StatusPill: FC<{
   label: string;
 }> = ({ status, label }) => {
   const colors: Record<string, string> = {
-    green: 'bg-green-500/10 text-green-500',
-    blue: 'bg-blue-500/10 text-blue-500',
-    amber: 'bg-amber-500/10 text-amber-500',
-    red: 'bg-red-500/10 text-red-500',
+    green: 'bg-green-500/10 text-green-700 dark:text-green-400',
+    blue: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+    amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+    red: 'bg-red-500/10 text-red-700 dark:text-red-400',
   };
   return (
     <span className={clsx('inline-flex items-center px-[8px] py-[2px] text-[12px] rounded-full font-medium', colors[status])}>
@@ -232,6 +232,7 @@ export function DataTable<T>({
                 <th className="w-[40px] py-[14px] px-[16px] text-left">
                   <input
                     type="checkbox"
+                    aria-label="Select all rows"
                     checked={allSelected && data.length > 0}
                     onChange={handleSelectAll}
                     className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer"
@@ -292,6 +293,7 @@ export function DataTable<T>({
                     <td className="py-[14px] px-[16px]" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
+                        aria-label="Select row"
                         checked={isSelected}
                         onChange={() => handleSelect(id)}
                         className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer"

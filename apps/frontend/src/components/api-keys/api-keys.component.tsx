@@ -161,7 +161,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
               <code className="text-[14px] break-all select-all">{createdKey.plaintext}</code>
             </div>
             <div className="bg-red-900/20 border border-red-500/30 rounded-[8px] p-[12px] mb-[16px]">
-              <div className="text-[13px] text-red-400 font-[500]">
+              <div className="text-[13px] text-dangerText font-[500]">
                 {t('api_key_warning', 'You will not be able to see this key again. Copy it now or you will have to create a new one.')}
               </div>
             </div>
@@ -280,11 +280,11 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
                   <td className="px-[16px] py-[12px]">{key.expiresAt ? new Date(key.expiresAt).toLocaleDateString() : '-'}</td>
                   <td className="px-[16px] py-[12px]">
                     {key.revokedAt ? (
-                      <span className="text-red-400">{t('revoked', 'Revoked')}</span>
+                      <span className="text-dangerText">{t('revoked', 'Revoked')}</span>
                     ) : key.expiresAt && new Date(key.expiresAt) < new Date() ? (
                       <span className="text-amber-600">{t('expired', 'Expired')}</span>
                     ) : (
-                      <span className="text-green-400">{t('active', 'Active')}</span>
+                      <span className="text-green-700 dark:text-green-400">{t('active', 'Active')}</span>
                     )}
                   </td>
                   <td className="px-[16px] py-[12px] text-right">

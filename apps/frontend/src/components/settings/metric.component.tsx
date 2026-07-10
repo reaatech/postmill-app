@@ -48,7 +48,7 @@ const MetricComponent = () => {
   return (
     <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="mt-[4px]">Date Metrics</div>
-      <Select name="metric" disableForm={true} label="" onChange={changeMetric} value={currentMetric ? 'US' : 'GLOBAL'}>
+      <Select name="metric" aria-label="Date metrics" disableForm={true} label="" onChange={changeMetric} value={currentMetric ? 'US' : 'GLOBAL'}>
         {dateMetrics.map((metric) => (
           <option
             key={metric.value}
@@ -62,6 +62,7 @@ const MetricComponent = () => {
       <div className="mt-[4px]">Current Timezone</div>
       <Select
         name="timezone"
+        aria-label="Current timezone"
         disableForm={true}
         label=""
         onChange={changeTimezone}

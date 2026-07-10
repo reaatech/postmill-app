@@ -113,7 +113,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
     <div className="flex flex-col gap-[15px]">
       <div className="flex flex-col sm:flex-row sm:items-center gap-[12px]">
         <div className="relative flex-1">
-          <svg className="absolute left-[14px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-newTextColor/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute left-[14px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-newTextColor/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z" />
           </svg>
           <input
@@ -128,7 +128,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
               type="button"
               onClick={() => setQuery('')}
               aria-label="Clear search"
-              className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/40 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
+              className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/60 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
             >
               ✕
             </button>
@@ -138,13 +138,14 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
           <select
             value={orientation}
             onChange={(e) => setOrientation(e.target.value)}
+            aria-label="Filter by orientation"
             className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
           >
             <option value="">All orientations</option>
             <option value="horizontal">Horizontal</option>
             <option value="vertical">Vertical</option>
           </select>
-          <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/60 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
         </div>
@@ -157,7 +158,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
           aria-pressed={color === ''}
           className={`h-[30px] px-[12px] rounded-full border text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] ${
             color === ''
-              ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-[#2B5CD3] font-[500]'
+              ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-btnPrimaryAccent font-[500]'
               : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
           }`}
         >
@@ -188,7 +189,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
           <div className="text-[15px] font-[600] text-textColor">
             Something went wrong{error.status ? ` (HTTP ${error.status})` : ''}
           </div>
-          <div className="text-[13px] text-newTextColor/50 max-w-[320px]">
+          <div className="text-[13px] text-newTextColor/65 max-w-[320px]">
             {error.status === 401 || error.status === 403
               ? 'Your session may have expired — try signing in again.'
               : "We couldn't reach the vector library. Give it another go in a moment."}
@@ -223,7 +224,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
           <div className="text-[15px] font-[600] text-textColor">
             {debouncedQuery ? `No vectors for "${debouncedQuery}"` : 'Find the perfect vector'}
           </div>
-          <div className="text-[13px] text-newTextColor/50 max-w-[340px]">
+          <div className="text-[13px] text-newTextColor/65 max-w-[340px]">
             {debouncedQuery
               ? 'Try a different keyword or one of these popular searches.'
               : 'Search millions of free vector illustrations from Pixabay to get started.'}
@@ -234,7 +235,7 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
                 key={s}
                 type="button"
                 onClick={() => setQuery(s)}
-                className="h-[30px] px-[14px] rounded-full border border-newColColor text-[12px] text-newTextColor/70 hover:text-[#2B5CD3] hover:border-[#2B5CD3] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
+                className="h-[30px] px-[14px] rounded-full border border-newColColor text-[12px] text-newTextColor/70 hover:text-btnPrimaryAccent hover:border-[#2B5CD3] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
               >
                 {s}
               </button>
@@ -306,11 +307,11 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect,
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[#2B5CD3] hover:underline"
+                      className="text-btnPrimaryAccent underline"
                     >
                       {vector.author}
                     </a>
-                    <span className="text-newTextColor/40 ml-[4px]">· {stockSourceLabel(vector.source)}</span>
+                    <span className="text-newTextColor/60 ml-[4px]">· {stockSourceLabel(vector.source)}</span>
                   </div>
                 </div>
               </div>

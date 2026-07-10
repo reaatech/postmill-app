@@ -71,19 +71,19 @@ export const Translate: FC<TranslateProps> = ({ onGenerated }) => {
           {source ? (
             <video src={source.previewUrl} className="w-full h-full object-cover" muted preload="metadata" />
           ) : (
-            <span className="text-newTextColor/40 text-[22px]">＋</span>
+            <span className="text-newTextColor/60 text-[22px]">＋</span>
           )}
         </div>
         <div>
           <div className="text-[13px] text-textColor">{source ? 'Change source video' : 'Pick a source video from Files'}</div>
-          <div className="text-[11px] text-newTextColor/40">MP4 with clear speech</div>
+          <div className="text-[11px] text-newTextColor/60">MP4 with clear speech</div>
         </div>
       </button>
 
       <div>
         <div className="flex items-center justify-between mb-[8px]">
           <span className="text-[13px] font-[500] text-textColor">Target languages</span>
-          {selected.length > 0 && <span className="text-[11px] text-newTextColor/50">{selected.length} selected</span>}
+          {selected.length > 0 && <span className="text-[11px] text-newTextColor/65">{selected.length} selected</span>}
         </div>
         <input
           type="text"
@@ -93,9 +93,9 @@ export const Translate: FC<TranslateProps> = ({ onGenerated }) => {
           className="w-full h-[36px] px-[12px] mb-[8px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
         />
         {langsLoading ? (
-          <div className="text-[12px] text-newTextColor/40 py-[10px]">Loading languages…</div>
+          <div className="text-[12px] text-newTextColor/60 py-[10px]">Loading languages…</div>
         ) : languages.length === 0 ? (
-          <div className="text-[12px] text-newTextColor/40 py-[10px]">No languages available</div>
+          <div className="text-[12px] text-newTextColor/60 py-[10px]">No languages available</div>
         ) : (
           <div className="flex flex-wrap gap-[6px] max-h-[220px] overflow-y-auto">
             {languages.map((lang) => (

@@ -72,7 +72,7 @@ export function InpaintMaskEditor() {
 
   const toolbar = (
     <>
-      {maskApplied && <span className="text-xs text-green-400">✓ Mask applied — ready to generate</span>}
+      {maskApplied && <span className="text-xs text-green-700 dark:text-green-400">✓ Mask applied — ready to generate</span>}
       <button onClick={openSourcePicker} className={source ? toolbarBtn : toolbarPrimary}>
         {source ? 'Change image' : 'Select image'}
       </button>

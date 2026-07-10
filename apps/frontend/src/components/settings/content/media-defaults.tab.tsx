@@ -448,6 +448,7 @@ const MediaCategoryRow: React.FC<{
         options={options}
         isLoading={optionsLoading}
         disabled={empty}
+        label={`Default model for ${CATEGORY_LABELS[category]}`}
         value={value}
         onChange={(newValue) => {
           if (!newValue) return;
@@ -456,7 +457,7 @@ const MediaCategoryRow: React.FC<{
       />
 
       {description && (
-        <div className="text-[11px] text-newTextColor/55 leading-[1.4]">
+        <div className="text-[11px] text-newTextColor/70 leading-[1.4]">
           {description}
           {providerInfo?.website && (
             <>
@@ -509,7 +510,7 @@ const MediaCategoryRow: React.FC<{
               </Button>
             </>
           ) : (
-            <div className="px-[12px] py-[9px] rounded-[8px] border border-newTableBorder bg-newBgColorInner text-[12px] text-newTextColor/40 select-none">
+            <div className="px-[12px] py-[9px] rounded-[8px] border border-newTableBorder bg-newBgColorInner text-[12px] text-newTextColor/60 select-none">
               {t('no_settings_for_provider', 'No settings for this provider/model.')}
             </div>
           )}
@@ -517,7 +518,7 @@ const MediaCategoryRow: React.FC<{
       )}
 
       {empty ? (
-        <div className="text-[11px] text-newTextColor/45">
+        <div className="text-[11px] text-newTextColor/60">
           {t(
             'no_media_providers_enabled',
             'No media providers enabled — enable one in Settings → Media.'
@@ -525,7 +526,7 @@ const MediaCategoryRow: React.FC<{
         </div>
       ) : (
         isAuto && (
-          <div className="text-[11px] text-newTextColor/45">
+          <div className="text-[11px] text-newTextColor/60">
             {t(
               'auto_default_media',
               'Auto — picks a provider from your enabled media providers.'

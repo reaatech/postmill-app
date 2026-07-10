@@ -238,6 +238,7 @@ export const AnalyticsFilterBar: FC<AnalyticsFilterBarProps> = ({
   const drawer = (
     <div
       aria-hidden={!open}
+      inert={!open}
       className={clsx(
         'fixed inset-0 z-[300] flex justify-end',
         !open && 'pointer-events-none'

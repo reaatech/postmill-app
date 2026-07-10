@@ -217,7 +217,7 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
 
   return (
     <div className="max-w-[760px] mx-auto flex flex-col gap-[18px]">
-      <p className="text-[13px] text-newTextColor/55">
+      <p className="text-[13px] text-newTextColor/70">
         Transcribe any audio or video from your library with Deepgram, then export captions
         (.srt / .vtt), copy the transcript, or send it to the composer.
       </p>
@@ -329,7 +329,7 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
           <div className="flex flex-col gap-[6px] max-h-[280px] overflow-y-auto">
             {segments.map((s, i) => (
               <div key={i} className="flex gap-[10px] text-[12px]">
-                <span className="shrink-0 text-newTextColor/40 tabular-nums w-[64px]">{timecode(s.start, '.').slice(0, 8)}</span>
+                <span className="shrink-0 text-newTextColor/60 tabular-nums w-[64px]">{timecode(s.start, '.').slice(0, 8)}</span>
                 <span className="text-textColor">{s.text}</span>
               </div>
             ))}

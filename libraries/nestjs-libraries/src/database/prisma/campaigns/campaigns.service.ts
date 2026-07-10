@@ -328,10 +328,12 @@ export class CampaignsService {
       createdBy = profiles.get(campaign.createdById) || null;
     }
 
-    const { shareToken, shareEnabled, ...campaignWithoutShare } = campaign as any;
-
+    // NOTE: shareToken/shareEnabled are intentionally KEPT here — this is the authenticated,
+    // org-scoped dashboard (the owner needs the token to display/copy the public link and to
+    // know sharing is on across reloads). The PUBLIC report strips internals separately via
+    // CampaignReportService.toPublicJson. Stripping them here broke share-state rehydration.
     return {
-      campaign: { ...campaignWithoutShare, createdBy },
+      campaign: { ...campaign, createdBy },
       engagement,
       stateCounts,
       upcoming,

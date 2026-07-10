@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, ReactNode } from 'react';
+import { readableTextColor } from '@gitroom/frontend/components/shared/readable-text-color';
 
 type Entry = { viewBox?: string; color?: string; node?: ReactNode; full?: boolean; src?: string };
 
@@ -227,8 +228,8 @@ const ProviderIcon: FC<{
         </svg>
       ) : (
         <span
-          className="inline-flex items-center justify-center w-full h-full text-white text-[11px] font-semibold"
-          style={{ backgroundColor: bgColor }}
+          className="inline-flex items-center justify-center w-full h-full text-[11px] font-semibold"
+          style={{ backgroundColor: bgColor, color: readableTextColor(bgColor) }}
         >
           {label}
         </span>

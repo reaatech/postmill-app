@@ -133,7 +133,7 @@ export const BrandList = () => {
                   </div>
                 )}
                 {!brand.enabled && (
-                  <div className="bg-red-500/20 text-red-500 text-[10px] rounded-[4px] px-[6px] py-[2px]">
+                  <div className="bg-red-500/20 text-red-700 dark:text-red-400 text-[10px] rounded-[4px] px-[6px] py-[2px]">
                     {t('disabled', 'Disabled')}
                   </div>
                 )}
@@ -172,13 +172,13 @@ export const BrandList = () => {
               )}
               <button
                 onClick={() => router.push(`/settings/ai/brands/${brand.id}/voice`)}
-                className="text-btnPrimary text-[12px] hover:underline"
+                className="text-btnPrimaryAccent text-[12px] hover:underline"
               >
                 {t('edit', 'Edit')}
               </button>
               <button
                 onClick={() => handleDelete(brand)}
-                className="text-red-500 text-[12px] hover:underline"
+                className="text-red-600 dark:text-red-500 text-[12px] hover:underline"
               >
                 {t('delete', 'Delete')}
               </button>

@@ -32,6 +32,16 @@ const jakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
 });
 
+// Default document title for every route (a11y: `document-title` was empty on ~89 routes —
+// the app has no root metadata). `default` fills routes that don't set their own title;
+// routes that DO set one (e.g. "Postmill Posts") keep it verbatim — no template, so titles
+// that already carry the brand don't become "… · Postmill".
+export const metadata = {
+  title: {
+    default: 'Postmill',
+  },
+};
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const cookieStore = await cookies();
   const language = cookieStore.get(cookieName)?.value || fallbackLng;

@@ -78,12 +78,12 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
             // eslint-disable-next-line @next/next/no-img-element -- external provider asset
             <img src={photo.previewUrl} alt="Selected" className="w-full h-full object-cover" />
           ) : (
-            <span className="text-newTextColor/40 text-[22px]">＋</span>
+            <span className="text-newTextColor/60 text-[22px]">＋</span>
           )}
         </div>
         <div>
           <div className="text-[13px] text-textColor">{photo ? 'Change photo' : 'Pick a photo from Files'}</div>
-          <div className="text-[11px] text-newTextColor/40">A clear, front-facing portrait works best</div>
+          <div className="text-[11px] text-newTextColor/60">A clear, front-facing portrait works best</div>
         </div>
       </button>
 
@@ -99,9 +99,9 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
       >
         <div>
           <div className="text-[13px] text-textColor">{voice?.name || 'Pick a voice'}</div>
-          <div className="text-[11px] text-newTextColor/40">Voice</div>
+          <div className="text-[11px] text-newTextColor/60">Voice</div>
         </div>
-        <span className="text-newTextColor/40">🎙️</span>
+        <span className="text-newTextColor/60">🎙️</span>
       </button>
 
       <textarea

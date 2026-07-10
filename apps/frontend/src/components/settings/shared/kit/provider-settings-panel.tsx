@@ -298,7 +298,7 @@ export function ProviderSettingsPanel<Meta = any>({
               meta={descriptor.capabilityMeta}
               leading={
                 primaryEnabled && row?.isPrimary ? (
-                  <span className="text-[10px] rounded-[4px] px-[6px] py-[2px] bg-green-900/20 text-green-400">
+                  <span className="text-[10px] rounded-[4px] px-[6px] py-[2px] bg-green-900/20 text-green-900 dark:text-green-400">
                     {t('primary', 'Primary')}
                   </span>
                 ) : undefined
@@ -311,7 +311,7 @@ export function ProviderSettingsPanel<Meta = any>({
           return (
             <>
               <button
-                className="text-[12px] text-btnPrimary hover:underline"
+                className="text-[12px] text-btnPrimaryAccent hover:underline"
                 onClick={() => setConfiguring(item.identifier)}
               >
                 {row?.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
@@ -321,7 +321,7 @@ export function ProviderSettingsPanel<Meta = any>({
                 row?.enabled &&
                 !row?.isPrimary && (
                   <button
-                    className="text-[12px] text-btnPrimary hover:underline"
+                    className="text-[12px] text-btnPrimaryAccent hover:underline"
                     onClick={() =>
                       setPrimary(item.identifier, row?.version).then(
                         (ok) => ok && onChange?.(),
@@ -355,7 +355,7 @@ export function ProviderSettingsPanel<Meta = any>({
               )}
               {row?.isConfigured && descriptor.features.remove !== false && (
                 <button
-                  className="text-[12px] text-red-500 hover:underline"
+                  className="text-[12px] text-red-600 dark:text-red-500 hover:underline"
                   onClick={() => remove(item.identifier).then((ok) => ok && refresh())}
                 >
                   {t('remove', 'Remove')}

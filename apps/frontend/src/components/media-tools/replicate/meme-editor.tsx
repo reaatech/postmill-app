@@ -45,7 +45,7 @@ function buildFontString(layer: TextLayer) {
   return `${style}${weight}${layer.fontSize}px "${layer.fontFamily}", sans-serif`;
 }
 
-const fieldLabel = 'text-[10px] uppercase tracking-wider text-newTextColor/50';
+const fieldLabel = 'text-[10px] uppercase tracking-wider text-newTextColor/65';
 const fieldInput =
   'w-full px-2 py-1 rounded border border-studioBorder bg-newBgColor text-textColor text-xs focus:outline-none focus:border-designerAccent';
 
@@ -318,7 +318,7 @@ export function MemeEditor() {
       <div>
         <div className={`${fieldLabel} mb-2`}>Layers</div>
         {layers.length === 0 ? (
-          <p className="text-xs text-newTextColor/50">No text yet — add a text layer.</p>
+          <p className="text-xs text-newTextColor/65">No text yet — add a text layer.</p>
         ) : (
           <div className="space-y-1">
             {layers.map((l, i) => (
@@ -337,7 +337,7 @@ export function MemeEditor() {
                     e.stopPropagation();
                     removeLayer(l.id);
                   }}
-                  className="text-red-400 hover:text-red-300 ml-2"
+                  className="text-dangerText hover:text-red-300 ml-2"
                 >
                   ✕
                 </button>
@@ -443,7 +443,7 @@ export function MemeEditor() {
               Italic
             </label>
           </div>
-          <p className="text-[10px] text-newTextColor/50">Tip: drag the text directly on the canvas to position it.</p>
+          <p className="text-[10px] text-newTextColor/65">Tip: drag the text directly on the canvas to position it.</p>
         </div>
       )}
     </div>

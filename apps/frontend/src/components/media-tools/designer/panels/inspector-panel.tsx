@@ -81,7 +81,7 @@ export const InspectorPanel: FC<InspectorProps> = ({ store }) => {
               : primary.type}
           </div>
           {primary.originId ? (
-            <span className="text-[11px] text-designerAccent shrink-0">🔗 Linked — edits update all formats</span>
+            <span className="text-[11px] text-btnPrimaryAccent shrink-0">🔗 Linked — edits update all formats</span>
           ) : (
             <span className="text-[11px] text-gray-500 shrink-0">🔓 This format only</span>
           )}
@@ -107,7 +107,7 @@ export const InspectorPanel: FC<InspectorProps> = ({ store }) => {
 
       {!primary.originId && primary.type !== 'icon' && (
         <button
-          className="w-full text-xs px-2 py-1.5 rounded border border-designerAccent/30 text-designerAccent hover:bg-designerAccent/10"
+          className="w-full text-xs px-2 py-1.5 rounded border border-designerAccent/30 text-btnPrimaryAccent hover:bg-designerAccent/10"
           onClick={() => {
             const newOriginId = `relink-${Date.now()}`;
             relinkElement(primary.id, newOriginId);

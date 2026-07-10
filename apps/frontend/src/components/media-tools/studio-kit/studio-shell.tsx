@@ -122,7 +122,7 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
       <div className="flex flex-col items-center justify-center h-full gap-[14px] text-center px-[20px]">
         <div className="text-[42px]">🎬</div>
         <h2 className="text-[18px] font-[600] text-textColor">{title} isn&apos;t configured</h2>
-        <p className="text-[13px] text-newTextColor/50 max-w-[360px]">
+        <p className="text-[13px] text-newTextColor/65 max-w-[360px]">
           Add your {title} credentials to start generating, then come back here.
         </p>
         <a
@@ -171,7 +171,7 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
             <Custom provider={provider} onGenerated={() => mutateJobs()} />
           ) : (
             <div className="max-w-[640px] mx-auto flex flex-col gap-[18px]">
-              {tab.description && <p className="text-[13px] text-newTextColor/55">{tab.description}</p>}
+              {tab.description && <p className="text-[13px] text-newTextColor/70">{tab.description}</p>}
               <StudioForm
                 fields={tab.fields}
                 values={values}
@@ -198,7 +198,7 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
               type="button"
               onClick={() => mutateJobs()}
               aria-label="Refresh queue"
-              className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-newTextColor/50 hover:text-textColor hover:bg-boxHover transition-all"
+              className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-newTextColor/65 hover:text-textColor hover:bg-boxHover transition-all"
             >
               ⟳
             </button>

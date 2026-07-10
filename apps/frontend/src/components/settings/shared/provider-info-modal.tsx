@@ -50,13 +50,13 @@ export function ProviderInfoModal({
               href={entry.website}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[13px] text-btnPrimary hover:underline"
+              className="text-[13px] text-btnPrimaryAccent hover:underline"
             >
               {t('visit_website', 'Visit website')} ↗
             </a>
           )}
           {href && (
-            <a href={href} className="text-[13px] text-btnPrimary hover:underline">
+            <a href={href} className="text-[13px] text-btnPrimaryAccent hover:underline">
               {t('open', 'Open')} ↗
             </a>
           )}

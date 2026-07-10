@@ -308,7 +308,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
             href="https://pixabay.com"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#2B5CD3] hover:underline"
+            className="text-btnPrimaryAccent hover:underline"
           >
             Pixabay
           </a>
@@ -337,7 +337,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       <div className="flex gap-[20px]">
         <div className="flex-1 min-w-0">{renderPreview()}</div>
         <div className="w-[240px] shrink-0 flex flex-col gap-[12px]">
-          <div className="text-[12px] text-newTextColor/40 uppercase tracking-wider font-[600]">
+          <div className="text-[12px] text-newTextColor/60 uppercase tracking-wider font-[600]">
             {type === 'photo' ? 'Photo' : type === 'video' ? 'Video' : type === 'vector' ? 'Vector' : type === 'sticker' ? 'Sticker' : 'Icon'}
           </div>
           <div className="text-[13px] text-textColor">
@@ -349,13 +349,13 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
               href={item.authorUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#2B5CD3] hover:underline"
+              className="text-btnPrimaryAccent hover:underline"
             >
               {item.author}
             </a>
           </div>
           <div className="flex gap-[8px] items-center">
-            <span className="px-[8px] py-[2px] rounded-[4px] bg-[#2B5CD3]/20 text-[11px] text-[#2B5CD3] font-[500]">
+            <span className="px-[8px] py-[2px] rounded-[4px] bg-[#2B5CD3]/20 text-[11px] text-btnPrimaryAccent font-[500]">
               {sourceBadgeLabel}
             </span>
           </div>

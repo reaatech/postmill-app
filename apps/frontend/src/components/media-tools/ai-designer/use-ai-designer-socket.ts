@@ -97,7 +97,11 @@ export function useAiDesignerSocket(
 
     const socket = io(`${backendUrl}/ai-designer`, {
       withCredentials: true,
-      transports: ['websocket', 'polling'],
+      // Polling-first with silent auto-upgrade to WebSocket (socket.io default order).
+      // WS-first surfaced a failed upgrade ("Invalid frame header") as a connect_error
+      // toast + reconnect loop on /media/ai-designer; polling connects immediately and the
+      // WS upgrade happens in the background (or degrades gracefully behind proxies/LBs).
+      transports: ['polling', 'websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 1000,

@@ -123,7 +123,12 @@ export class OpenAIAdapter implements AIProviderAdapter {
     _opts?: AIModelOptions,
   ): LanguageModelV2 {
     const provider = this._buildProvider(creds);
-    return provider.languageModel(modelId);
+    // Pin to the Chat Completions API. In @ai-sdk/openai v2, `.languageModel()` defaults to the
+    // Responses API, which rejects the `{ type: 'text' }` message parts that AIModelProvider
+    // hand-builds for the low-level doGenerate() call (400: "Invalid value: 'text'. Supported
+    // values are 'input_text', …"). Chat Completions accepts that format, so every generateText/
+    // generateObject/vision call works (the Daily Brief and all utility AI were 400ing otherwise).
+    return provider.chat(modelId);
   }
 
   createLangchainModel(

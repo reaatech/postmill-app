@@ -52,6 +52,7 @@ export const CanvasInspector: FC<CanvasInspectorProps> = ({ store, onSetBackgrou
               type="number"
               value={w}
               onChange={(e) => setW(e.target.value)}
+              aria-label="Width"
               className="w-full h-[34px] rounded-[6px] border border-studioBorder bg-newBgColor px-2 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <span className="text-textColor/30">×</span>
@@ -59,6 +60,7 @@ export const CanvasInspector: FC<CanvasInspectorProps> = ({ store, onSetBackgrou
               type="number"
               value={h}
               onChange={(e) => setH(e.target.value)}
+              aria-label="Height"
               className="w-full h-[34px] rounded-[6px] border border-studioBorder bg-newBgColor px-2 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <button

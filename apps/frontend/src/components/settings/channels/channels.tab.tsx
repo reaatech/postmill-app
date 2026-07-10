@@ -12,6 +12,7 @@ import {
   latestActiveVersion,
 } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CapabilityBadges as KitCapabilityBadges } from '@gitroom/frontend/components/settings/shared/kit/capabilities';
@@ -84,16 +85,16 @@ const CAPABILITY_FILTERS: { key: CapabilityKey; label: string }[] = [
 ];
 
 const CAPABILITY_COLORS: Record<string, string> = {
-  analytics: 'bg-blue-500/20 text-blue-400',
-  comments: 'bg-purple-500/20 text-purple-400',
-  firstComment: 'bg-amber-500/20 text-amber-400',
-  poll: 'bg-emerald-500/20 text-emerald-400',
-  video: 'bg-red-500/20 text-red-400',
-  carousel: 'bg-pink-500/20 text-pink-400',
-  altText: 'bg-cyan-500/20 text-cyan-400',
-  linkPreview: 'bg-indigo-500/20 text-indigo-400',
-  refreshToken: 'bg-teal-500/20 text-teal-400',
-  watchlist: 'bg-orange-500/20 text-orange-400',
+  analytics: 'bg-blue-500/20 text-blue-800 dark:text-blue-400',
+  comments: 'bg-purple-500/20 text-purple-800 dark:text-purple-400',
+  firstComment: 'bg-amber-500/20 text-amber-800 dark:text-amber-400',
+  poll: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400',
+  video: 'bg-red-500/20 text-dangerText',
+  carousel: 'bg-pink-500/20 text-pink-800 dark:text-pink-400',
+  altText: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400',
+  linkPreview: 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-400',
+  refreshToken: 'bg-teal-500/20 text-teal-800 dark:text-teal-400',
+  watchlist: 'bg-orange-500/20 text-orange-800 dark:text-orange-400',
 };
 
 // Capability label + color, built from the existing filter labels and the
@@ -307,12 +308,12 @@ const ProviderPicker: FC<{
                   <span className="flex items-center gap-[6px] flex-wrap">
                     <span className="text-[14px] font-[500] text-textColor">{p.name}</span>
                     {vi && vi.status === 'deprecated' && (
-                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-amber-500/15 text-amber-600">
+                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-amber-500/15 text-amber-800 dark:text-amber-400">
                         {t('deprecated', 'Deprecated')}
                       </span>
                     )}
                     {retired && (
-                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-red-500/15 text-red-400">
+                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-red-500/15 text-dangerText">
                         {t('retired', 'Retired')}
                       </span>
                     )}
@@ -336,6 +337,10 @@ export const ChannelsTab: FC = () => {
   const { data: catalog } = useProviderCatalog('social');
   const modals = useModals();
   const toaster = useToaster();
+  const permissions = usePermissions();
+  // Adding a channel hits POST endpoints gated by @RequirePermission('channels','create');
+  // hide the trigger for members who lack it (the backend still 403s — this is UI gating only).
+  const canAddChannel = permissions.hasPermission('channels', 'create');
 
   const [search, setSearch] = useState('');
 
@@ -480,13 +485,15 @@ export const ChannelsTab: FC = () => {
           onSearch={setSearch}
           placeholder={t('search_channels', 'Search channels...')}
           trailing={
-            <button
-              type="button"
-              onClick={openPicker}
-              className="text-[13px] px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white hover:opacity-90 transition-opacity whitespace-nowrap"
-            >
-              + {t('add_channel', 'Add channel')}
-            </button>
+            canAddChannel ? (
+              <button
+                type="button"
+                onClick={openPicker}
+                className="text-[13px] px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white hover:opacity-90 transition-opacity whitespace-nowrap"
+              >
+                + {t('add_channel', 'Add channel')}
+              </button>
+            ) : undefined
           }
         />
       }

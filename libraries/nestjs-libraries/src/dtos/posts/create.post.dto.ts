@@ -68,6 +68,10 @@ export class PostContent {
 
 export class Post {
   @ApiPropertyOptional({ description: 'Post type override (e.g. "draft").' })
+  // Needs a class-validator decorator or the global forbidNonWhitelisted pipe rejects it
+  // ("property type should not exist") — which also defeats the draft settings-skip below.
+  @IsOptional()
+  @IsString()
   type?: string;
 
   @ApiProperty({ type: () => Integration })

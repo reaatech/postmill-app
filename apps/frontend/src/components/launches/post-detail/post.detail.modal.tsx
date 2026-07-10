@@ -322,7 +322,7 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
               <div className="text-[12px] text-red-500 font-[500] mb-[4px]">
                 {t('error_details', 'Error details')}
               </div>
-              <div className="text-[12px] text-red-400 break-words">
+              <div className="text-[12px] text-dangerText break-words">
                 {mainPost.errors.map((e: any) => e.message || e.error).join('; ')}
               </div>
             </div>
@@ -334,7 +334,7 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
               href={mainPost.releaseURL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[13px] text-btnPrimary underline whitespace-nowrap"
+              className="text-[13px] text-btnPrimaryAccent underline whitespace-nowrap"
             >
               {t('open_on_platform', 'Open on platform')}
             </a>

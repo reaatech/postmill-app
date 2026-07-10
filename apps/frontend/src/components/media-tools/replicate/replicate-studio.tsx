@@ -77,7 +77,7 @@ function SaveFolderPicker() {
 
   return (
     <div className="flex items-center gap-2">
-      <label htmlFor="replicate-save-folder" className="text-xs text-newTextColor/50 mobile:hidden">Save to</label>
+      <label htmlFor="replicate-save-folder" className="text-xs text-newTextColor/65 mobile:hidden">Save to</label>
       <select
         id="replicate-save-folder"
         value={saveFolderId || ''}
@@ -144,7 +144,7 @@ function MenuSpine({
             title="Toggle controls"
             aria-label="Toggle controls panel"
             className={`w-10 h-10 mb-2 flex items-center justify-center rounded-lg text-lg transition-colors ${
-              controlsOpen ? 'bg-designerAccent/20 text-designerAccent' : 'text-newTextColor/70 hover:bg-boxHover'
+              controlsOpen ? 'bg-designerAccent/20 text-btnPrimaryAccent' : 'text-newTextColor/70 hover:bg-boxHover'
             }`}
           >
             ⚙
@@ -175,10 +175,10 @@ function CategoryPanel({
       <div className="hidden mobile:block absolute inset-0 z-10 bg-black/40" onClick={onClose} />
       <div className="absolute left-[52px] inset-y-0 w-[220px] z-20 border-r border-studioBorder bg-newBgColorInner overflow-y-auto shadow-2xl">
         <div className="flex items-center justify-between px-3 h-12 border-b border-studioBorder sticky top-0 bg-newBgColorInner">
-          <span className="text-xs uppercase tracking-wider text-newTextColor/50">
+          <span className="text-xs uppercase tracking-wider text-newTextColor/65">
             {MEDIUM_ICONS[medium]} {MEDIUM_TITLE[medium]}
           </span>
-          <button onClick={onClose} className="text-newTextColor/50 hover:text-textColor" aria-label="Close">
+          <button onClick={onClose} className="text-newTextColor/65 hover:text-textColor" aria-label="Close">
             ✕
           </button>
         </div>
@@ -218,7 +218,7 @@ function GenerateButton({ category }: { category: string }) {
     <div className="space-y-2">
       {needsFolder && <p className="text-[11px] text-amber-600">Pick a save folder before generating.</p>}
       {missing.length > 0 && selectedModel && (
-        <p className="text-[11px] text-newTextColor/50">Required: {missing.join(', ')}</p>
+        <p className="text-[11px] text-newTextColor/65">Required: {missing.join(', ')}</p>
       )}
       <button
         onClick={() => generate()}
@@ -239,10 +239,10 @@ function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string })
     runState === 'running'
       ? 'text-amber-600'
       : runState === 'error'
-        ? 'text-red-400'
+        ? 'text-dangerText'
         : runState === 'success'
-          ? 'text-green-400'
-          : 'text-newTextColor/50';
+          ? 'text-green-700 dark:text-green-400'
+          : 'text-newTextColor/65';
 
   return (
     <div className="flex items-center justify-between h-12 flex-shrink-0 border-b border-studioBorder px-3 bg-newBgColorInner">
@@ -250,13 +250,13 @@ function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string })
         <Logo size={20} className="" />
         <h1 className="text-sm font-semibold text-textColor whitespace-nowrap">Replicate Studio</h1>
         {activeCategoryLabel && (
-          <span className="text-xs text-newTextColor/50 truncate mobile:hidden">› {activeCategoryLabel}</span>
+          <span className="text-xs text-newTextColor/65 truncate mobile:hidden">› {activeCategoryLabel}</span>
         )}
         {stateLabel && <span className={`text-xs ${stateColor} mobile:hidden`}>· {stateLabel}</span>}
       </div>
       <div className="flex items-center gap-3">
         <SaveFolderPicker />
-        <span className="mobile:hidden text-[10px] text-newTextColor/50 border border-studioBorder rounded px-1.5 py-0.5">
+        <span className="mobile:hidden text-[10px] text-newTextColor/65 border border-studioBorder rounded px-1.5 py-0.5">
           ⌘K
         </span>
         <FullscreenButton />
@@ -345,7 +345,7 @@ export function ReplicateStudio() {
 
         {/* Display area */}
         {!selectedCategory ? (
-          <div className="flex-1 flex items-center justify-center text-newTextColor/50 px-6 text-center">
+          <div className="flex-1 flex items-center justify-center text-newTextColor/65 px-6 text-center">
             <div>
               <p className="text-lg">Pick a tool to get started</p>
               <p className="text-sm mt-1">Tap a medium on the left — image, video, or audio.</p>
@@ -370,8 +370,8 @@ export function ReplicateStudio() {
             {controlsOpen && (
               <div className={controlsClasses}>
                 <div className="flex items-center justify-between px-4 h-10 border-b border-studioBorder mobile:flex hidden">
-                  <span className="text-xs uppercase tracking-wider text-newTextColor/50">Controls</span>
-                  <button onClick={() => setControlsOpen(false)} className="text-newTextColor/50 hover:text-textColor" aria-label="Close controls">
+                  <span className="text-xs uppercase tracking-wider text-newTextColor/65">Controls</span>
+                  <button onClick={() => setControlsOpen(false)} className="text-newTextColor/65 hover:text-textColor" aria-label="Close controls">
                     ✕
                   </button>
                 </div>

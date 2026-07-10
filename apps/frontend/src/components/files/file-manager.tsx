@@ -251,7 +251,7 @@ export const FileManager: FC<{
                 className="w-full h-[44px] pl-[40px] pr-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
               />
               <svg
-                className="absolute left-[12px] top-[50%] -translate-y-[50%] text-newTextColor/40"
+                className="absolute left-[12px] top-[50%] -translate-y-[50%] text-newTextColor/60"
                 width="16" height="16" viewBox="0 0 16 16" fill="none"
               >
                 <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
@@ -261,6 +261,7 @@ export const FileManager: FC<{
 
             <select
               value={filterType}
+              aria-label="Filter by file type"
               onChange={e => setFilterTypeAndReset(e.target.value)}
               className="h-[44px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3] shrink-0"
             >
@@ -276,16 +277,20 @@ export const FileManager: FC<{
             <div className="flex items-center gap-[8px] mobile:order-2">
               <button
                 onClick={() => setViewMode('grid')}
+                aria-label="Grid view"
+                aria-pressed={viewMode === 'grid'}
                 className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'grid'
-                  ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
+                  ? 'border-[#2B5CD3] text-btnPrimaryAccent bg-[#2B5CD3]/10'
                   : 'border-newColColor text-textColor hover:bg-boxHover')}
               >
                 <GridIcon />
               </button>
               <button
                 onClick={() => setViewMode('list')}
+                aria-label="List view"
+                aria-pressed={viewMode === 'list'}
                 className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'list'
-                  ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
+                  ? 'border-[#2B5CD3] text-btnPrimaryAccent bg-[#2B5CD3]/10'
                   : 'border-newColColor text-textColor hover:bg-boxHover')}
               >
                 <ListViewIcon />

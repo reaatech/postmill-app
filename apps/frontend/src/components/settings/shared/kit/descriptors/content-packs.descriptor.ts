@@ -39,12 +39,12 @@ const CAPABILITY_LABELS: Record<string, string> = {
 };
 
 const CAPABILITY_COLORS: Record<string, string> = {
-  photos: 'bg-blue-500/20 text-blue-400',
-  videos: 'bg-purple-500/20 text-purple-400',
-  vectors: 'bg-emerald-500/20 text-emerald-400',
-  icons: 'bg-amber-500/20 text-amber-400',
-  audio: 'bg-pink-500/20 text-pink-400',
-  stickers: 'bg-cyan-500/20 text-cyan-400',
+  photos: 'bg-blue-500/20 text-blue-800 dark:text-blue-400',
+  videos: 'bg-purple-500/20 text-purple-800 dark:text-purple-400',
+  vectors: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400',
+  icons: 'bg-amber-500/20 text-amber-800 dark:text-amber-400',
+  audio: 'bg-pink-500/20 text-pink-800 dark:text-pink-400',
+  stickers: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400',
 };
 
 const capabilityMeta: Record<string, CapabilityMeta> = Object.fromEntries(

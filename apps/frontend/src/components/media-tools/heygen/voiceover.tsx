@@ -62,9 +62,9 @@ export const Voiceover: FC<VoiceoverProps> = ({ voices, onGenerated }) => {
       >
         <div>
           <div className="text-[13px] text-textColor">{voice?.name || 'Pick a voice'}</div>
-          <div className="text-[11px] text-newTextColor/40">Voice</div>
+          <div className="text-[11px] text-newTextColor/60">Voice</div>
         </div>
-        <span className="text-newTextColor/40">🎙️</span>
+        <span className="text-newTextColor/60">🎙️</span>
       </button>
 
       <textarea

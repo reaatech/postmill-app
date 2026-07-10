@@ -27,12 +27,12 @@ const CAPABILITY_LABELS: Record<string, string> = {
 };
 
 const CAPABILITY_COLORS: Record<string, string> = {
-  wireguard: 'bg-cyan-500/20 text-cyan-400',
-  openvpn: 'bg-blue-500/20 text-blue-400',
-  ikev2: 'bg-indigo-500/20 text-indigo-400',
-  socks5: 'bg-amber-500/20 text-amber-400',
-  multiHop: 'bg-purple-500/20 text-purple-400',
-  killSwitch: 'bg-emerald-500/20 text-emerald-400',
+  wireguard: 'bg-cyan-500/20 text-cyan-800 dark:text-cyan-400',
+  openvpn: 'bg-blue-500/20 text-blue-800 dark:text-blue-400',
+  ikev2: 'bg-indigo-500/20 text-indigo-800 dark:text-indigo-400',
+  socks5: 'bg-amber-500/20 text-amber-800 dark:text-amber-400',
+  multiHop: 'bg-purple-500/20 text-purple-800 dark:text-purple-400',
+  killSwitch: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-400',
 };
 
 const capabilityMeta: Record<string, CapabilityMeta> = Object.fromEntries(

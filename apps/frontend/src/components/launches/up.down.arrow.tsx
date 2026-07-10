@@ -31,6 +31,7 @@ export const UpDownArrow: FC<{
     <div className="flex flex-col gap-[8px] pt-[8px]">
       <button
         onClick={changePosition('up')}
+        aria-label="Move up"
         className={clsx(
           'outline-none w-[20px] h-[20px] flex justify-center items-center',
           isUp
@@ -42,6 +43,7 @@ export const UpDownArrow: FC<{
       </button>
       <button
         onClick={changePosition('down')}
+        aria-label="Move down"
         className={clsx(
           'outline-none rounded-bl-[20px] w-[20px] h-[20px] flex justify-center items-center',
           isDown

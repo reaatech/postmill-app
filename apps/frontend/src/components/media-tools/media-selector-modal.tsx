@@ -403,7 +403,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
                     <span className="text-sm text-textColor">
                       Drop files here or click to upload
                     </span>
-                    <span className="text-xs text-newTextColor/50">
+                    <span className="text-xs text-newTextColor/65">
                       {myFilesFolderId
                         ? 'Uploading to the selected folder'
                         : 'Uploading to All Files'}
@@ -424,7 +424,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
           <div className="border-t border-studioBorder px-5 py-3 flex items-center gap-3">
             <div className="flex-1 flex items-center gap-2 overflow-x-auto">
               {selection.length === 0 && (
-                <span className="text-sm text-newTextColor/50">
+                <span className="text-sm text-newTextColor/65">
                   {t('click_items_to_select', 'Click items to select them')}
                 </span>
               )}

@@ -117,7 +117,7 @@ export function HeyGenStudio() {
               type="button"
               onClick={() => mutateJobs()}
               aria-label="Refresh queue"
-              className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-newTextColor/50 hover:text-textColor hover:bg-boxHover transition-all"
+              className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-newTextColor/65 hover:text-textColor hover:bg-boxHover transition-all"
             >
               ⟳
             </button>

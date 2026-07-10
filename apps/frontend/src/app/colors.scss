@@ -17,9 +17,15 @@
     --new-btn-simple: #313030;
     --new-btn-text: #ffffff;
     --new-btn-primary: #2b5cd3;
+    /* Accessible accent text for subtle btnPrimary/15 chips (a11y: text-btnPrimary fails
+       AA ~3.3:1 on the tinted-over-dark bg). Lighter blue → ~5.9:1 on dark chip surfaces. */
+    --new-btn-primary-accent: #6d95ec;
+    /* Theme-aware danger/error text (a11y: text-dangerText is only ~2.5:1 on the light bg).
+       Dark: light red (readable on dark surfaces + dark-red chips). */
+    --new-danger-text: #f87171;
     --new-ai-btn: #1d9bf0;
     --new-promo: #aa0fa4;
-    --new-badge: #ff3ea2;
+    --new-badge: #d6006e;
     --new-priority-high: #f97066;
     --new-priority-medium: #ffac30;
     --new-priority-low: #1d9bf0;
@@ -31,6 +37,9 @@
     --new-table-header: #1e1d1d;
     --new-table-text: #9c9c9c;
     --new-table-text-focused: #1d9bf0;
+    /* Semantic up/down metric colors — vibrant on dark surfaces (pass AA on dark). */
+    --positive: #32d583;
+    --negative: #f97066;
     --heading-accent: #4f9fe8;
     --heading-h1: #b3bdd0;
     --new-small-strips: #191818;
@@ -66,16 +75,22 @@
     --studio-border: #aebdd4;
     --new-bgLineColor: #d6deea;
     --new-textItemFocused: #1f47a8;
-    --new-textItemBlur: #777b7f;
+    --new-textItemBlur: #63676c;
     --new-boxFocused: #e3ecfb;
     --new-textColor: 14 14 14;
     --new-blockSeparator: #f2f2f4;
     --new-btn-simple: #eceef1;
     --new-btn-text: #0e0e0e;
     --new-btn-primary: #2b5cd3;
+    /* Accessible accent text for subtle btnPrimary/15 chips in light mode: darker blue →
+       ~5.7:1 on the light tinted chip bg (plain btnPrimary is ~4.2:1 there). */
+    --new-btn-primary-accent: #1e47b8;
+    /* Light: deep red — passes on the page bg, white cards, AND the light-pink bg-red-900/20
+       danger chips (a lighter red would fail on those). */
+    --new-danger-text: #a01212;
     --new-ai-btn: #1d9bf0;
     --new-promo: #aa0fa4;
-    --new-badge: #ff3ea2;
+    --new-badge: #d6006e;
     --new-priority-high: #f97066;
     --new-priority-medium: #ffac30;
     --new-priority-low: #1d9bf0;
@@ -85,8 +100,12 @@
     --new-box-hover: #f4f6f8;
     --new-table-border: #e7e9eb;
     --new-table-header: #f5f7f9;
-    --new-table-text: #777b7f;
-    --new-table-text-focused: #1d9bf0;
+    --new-table-text: #595d63;
+    --new-table-text-focused: #0e6ba8;
+    /* Semantic up/down metric colors — darkened for AA as text on light surfaces
+       (green-700 / red-700). White-on-solid and tint/border uses only gain contrast. */
+    --positive: #15803d;
+    --negative: #b91c1c;
     --heading-accent: #2f53a8;
     --heading-h1: var(--new-btn-primary);
     --new-small-strips: #191818;

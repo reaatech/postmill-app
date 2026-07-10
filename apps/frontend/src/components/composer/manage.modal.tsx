@@ -540,6 +540,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           id: post.id,
         },
         group,
+        // Per-post `type` mirrors the submit mode. Required for drafts: create.post.dto skips
+        // per-provider settings validation only when the POST's own `type === 'draft'`
+        // (@ValidateIf on Post.settings) — without it, a draft with X/provider settings is
+        // rejected by forbidNonWhitelisted and silently fails to save (data loss).
+        ...(type === 'draft' ? { type: 'draft' } : {}),
         settings: colorize(post.settings),
         value: post.values.map((value: any) => ({
           ...(value.id ? { id: value.id } : {}),
@@ -839,7 +844,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                           strokeWidth="1.8"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          className="text-[#2B5CD3]"
+                          className="text-btnPrimaryAccent"
                         >
                           <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3Z" />
                           <path d="M19 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" />
@@ -1163,7 +1168,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     strokeWidth="1.8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="text-[#2B5CD3]"
+                    className="text-btnPrimaryAccent"
                   >
                     <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3Z" />
                     <path d="M19 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" />
