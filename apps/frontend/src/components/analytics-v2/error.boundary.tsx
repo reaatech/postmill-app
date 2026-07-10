@@ -28,11 +28,14 @@ export class ErrorBoundary extends Component<Props, State> {
       const error = this.state.error;
       const messageKey = (error as { messageKey?: string } | undefined)
         ?.messageKey;
+      // With a messageKey (Pattern C fetch errors) translate it; otherwise show
+      // the error's own message verbatim. Never route the dynamic message through
+      // a static resource key — a key present in the locale files shadows the
+      // defaultValue (it swallowed error.message and rendered the generic text twice).
       const errorMessage = messageKey
         ? i18next.t(messageKey, { defaultValue: error?.message ?? '' })
-        : i18next.t('error_boundary_message', {
-            defaultValue: error?.message ?? 'Something went wrong',
-          });
+        : error?.message ||
+          i18next.t('something_went_wrong', { defaultValue: 'Something went wrong' });
       return (
         this.props.fallback || (
           <div className="flex flex-col items-center justify-center py-[48px] text-center">
