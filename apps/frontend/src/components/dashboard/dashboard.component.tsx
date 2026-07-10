@@ -22,28 +22,65 @@ import { RecommendationsStrip } from './widgets/recommendations.strip';
 import { AttentionFeed } from './widgets/attention.feed';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
 import { DailyBrief } from './widgets/daily.brief';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export { greetingForUser };
-
-const DASHBOARD_SECTIONS: DashboardSectionMeta[] = [
-  { id: 'setup', label: 'Setup checklist' },
-  { id: 'attention', label: 'Needs attention' },
-  { id: 'kpi', label: 'At a glance', permission: ['analytics', 'read'] },
-  { id: 'trend', label: 'Engagement trend', permission: ['analytics', 'read'] },
-  { id: 'schedule', label: 'Next 7 days', permission: ['posts', 'read'] },
-  { id: 'campaigns', label: 'Active campaigns', permission: ['posts', 'read'] },
-  { id: 'inbox', label: 'Inbox', permission: ['comments', 'read'] },
-  { id: 'media', label: 'Media queue', permission: ['media', 'read'] },
-  { id: 'usage', label: 'Usage & budget', permission: ['billing', 'read'] },
-  { id: 'recommendations', label: 'Recommendations', permission: ['posts', 'read'] },
-  { id: 'brief', label: 'Daily brief', permission: ['analytics', 'read'] },
-];
 
 export const DashboardComponent = () => {
   const [briefOpen, setBriefOpen] = useState(false);
   const aiActive = useAiActive();
+  const t = useT();
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: integrations } = useIntegrationList();
+
+  const DASHBOARD_SECTIONS: DashboardSectionMeta[] = useMemo(
+    () => [
+      { id: 'setup', label: t('setup_checklist_label', 'Setup checklist') },
+      { id: 'attention', label: t('needs_attention', 'Needs attention') },
+      {
+        id: 'kpi',
+        label: t('kpi_at_a_glance', 'At a glance'),
+        permission: ['analytics', 'read'],
+      },
+      {
+        id: 'trend',
+        label: t('trend_label', 'Engagement trend'),
+        permission: ['analytics', 'read'],
+      },
+      {
+        id: 'schedule',
+        label: t('next_7_days', 'Next 7 days'),
+        permission: ['posts', 'read'],
+      },
+      {
+        id: 'campaigns',
+        label: t('active_campaigns', 'Active campaigns'),
+        permission: ['posts', 'read'],
+      },
+      { id: 'inbox', label: t('inbox', 'Inbox'), permission: ['comments', 'read'] },
+      {
+        id: 'media',
+        label: t('media_queue', 'Media queue'),
+        permission: ['media', 'read'],
+      },
+      {
+        id: 'usage',
+        label: t('usage_budget', 'Usage & budget'),
+        permission: ['billing', 'read'],
+      },
+      {
+        id: 'recommendations',
+        label: t('recommendations_label', 'Recommendations'),
+        permission: ['posts', 'read'],
+      },
+      {
+        id: 'brief',
+        label: t('daily_brief_section_label', 'Daily brief'),
+        permission: ['analytics', 'read'],
+      },
+    ],
+    [t]
+  );
 
   const activeIntegrationIds = useMemo(
     () => (integrations ?? []).map((i: { id: string }) => i.id),
@@ -87,7 +124,7 @@ export const DashboardComponent = () => {
         </div>
 
         <div className="lg:col-span-12 order-1 lg:order-2">
-          <SectionCard id="attention" title="Needs attention">
+          <SectionCard id="attention" title={t('needs_attention', 'Needs attention')}>
             <AttentionFeed />
           </SectionCard>
         </div>
@@ -95,7 +132,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-12 order-2 lg:order-5">
           <SectionCard
             id="schedule"
-            title="Next 7 days"
+            title={t('next_7_days', 'Next 7 days')}
             viewAllHref="/posts"
             permission={['posts', 'read']}
           >
@@ -110,7 +147,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-4 order-3 lg:order-3">
           <SectionCard
             id="kpi"
-            title="At a glance"
+            title={t('kpi_at_a_glance', 'At a glance')}
             viewAllHref="/analytics"
             permission={['analytics', 'read']}
           >
@@ -125,7 +162,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-8 order-4 lg:order-4">
           <SectionCard
             id="trend"
-            title="7-day engagement"
+            title={t('trend_title', '7-day engagement')}
             viewAllHref="/analytics"
             permission={['analytics', 'read']}
           >
@@ -137,8 +174,11 @@ export const DashboardComponent = () => {
               </div>
             ) : (
               <EmptyState
-                title="No trend data yet"
-                description="Publish posts and connect channels to see engagement over time."
+                title={t('no_trend_data_title', 'No trend data yet')}
+                description={t(
+                  'no_trend_data_description',
+                  'Publish posts and connect channels to see engagement over time.'
+                )}
               />
             )}
           </SectionCard>
@@ -147,7 +187,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-6 order-6 lg:order-6">
           <SectionCard
             id="campaigns"
-            title="Active campaigns"
+            title={t('active_campaigns', 'Active campaigns')}
             viewAllHref="/campaigns"
             permission={['posts', 'read']}
           >
@@ -158,7 +198,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-6 order-5 lg:order-6">
           <SectionCard
             id="inbox"
-            title="Inbox"
+            title={t('inbox', 'Inbox')}
             viewAllHref="/replies"
             permission={['comments', 'read']}
           >
@@ -169,7 +209,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-6 order-7 lg:order-7">
           <SectionCard
             id="media"
-            title="Media queue"
+            title={t('media_queue', 'Media queue')}
             viewAllHref="/media"
             permission={['media', 'read']}
           >
@@ -180,7 +220,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-6 order-8 lg:order-7">
           <SectionCard
             id="usage"
-            title="Usage & budget"
+            title={t('usage_budget', 'Usage & budget')}
             viewAllHref="/billing"
             permission={['billing', 'read']}
           >
@@ -191,7 +231,7 @@ export const DashboardComponent = () => {
         <div className="lg:col-span-12 order-9 lg:order-8">
           <SectionCard
             id="recommendations"
-            title="Recommendations"
+            title={t('recommendations_label', 'Recommendations')}
             viewAllHref="/analytics?tab=insights"
             permission={['posts', 'read']}
           >

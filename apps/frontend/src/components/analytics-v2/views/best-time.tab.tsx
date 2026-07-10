@@ -117,7 +117,16 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
                           lowConfidence ? 'opacity-40' : ''
                         }`}
                         style={ratio > 0 ? { backgroundColor: heatmapColor(ratio) } : undefined}
-                        title={`${DAY_LABELS[de.day]} ${HOUR_LABELS[de.hour]}: ${de.avgEngagement} avg engagement (${de.postCount} posts)`}
+                        title={t(
+                          'heatmap_cell_tooltip',
+                          '{{day}} {{hour}}: {{avg}} avg engagement ({{count}} posts)',
+                          {
+                            day: DAY_LABELS[de.day],
+                            hour: HOUR_LABELS[de.hour],
+                            avg: de.avgEngagement,
+                            count: de.postCount,
+                          }
+                        )}
                       />
                     );
                   })}
@@ -149,7 +158,9 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
                   <span className="font-medium">{DAY_LABELS[slot.day]}</span>{' '}
                   <span>{HOUR_LABELS[slot.hour]}</span>
                   <span className="text-newTableText ml-[4px]">
-                    ({slot.avgEngagement} avg)
+                    {t('slot_avg_engagement', '({{avg}} avg)', {
+                      avg: slot.avgEngagement,
+                    })}
                   </span>
                   {slot.postCount != null && (
                     <span className="text-newTableText ml-[4px]">

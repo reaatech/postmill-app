@@ -4,12 +4,14 @@ import { FC } from 'react';
 import { SeriesPoint } from './utils';
 import { LineChart } from './charts/line.chart';
 import { CHART_PALETTE } from './kit/palette';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface PostDetailChartProps {
   series: Record<string, SeriesPoint[]>;
 }
 
 export const PostDetailChart: FC<PostDetailChartProps> = ({ series }) => {
+  const t = useT();
   const entries = Object.entries(series).filter(
     ([, points]) => points.length > 0
   );
@@ -19,7 +21,7 @@ export const PostDetailChart: FC<PostDetailChartProps> = ({ series }) => {
   return (
     <div>
       <h4 className="text-[13px] font-medium text-newTableText mb-[12px]">
-        Metric Trends
+        {t('metric_trends', 'Metric Trends')}
       </h4>
       <div className="space-y-[16px]">
         {entries.map(([metric, points], i) => (

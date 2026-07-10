@@ -393,7 +393,9 @@ export const TeamsComponent = () => {
 
             {selected.size > 0 && (
               <div className="flex items-center gap-[8px] mt-[12px] pt-[12px] border-t border-newTableBorder">
-                <span className="text-[13px] text-newTableText">{selected.size} selected</span>
+                <span className="text-[13px] text-newTableText">
+                  {t('n_selected_count', '{{count}} selected', { count: selected.size })}
+                </span>
                 <Button secondary className="!h-[32px] !text-[12px]" onClick={bulkRemove}>
                   {t('remove_selected', 'Remove Selected')}
                 </Button>

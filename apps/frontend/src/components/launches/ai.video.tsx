@@ -241,7 +241,7 @@ export const AiVideo: FC<{
             </svg>
           </div>
           <div className="text-[10px] font-[600] iconBreak:hidden block">
-            {t('ai', 'AI')} Video
+            {t('ai_video_label', 'AI Video')}
           </div>
         </div>
       </div>

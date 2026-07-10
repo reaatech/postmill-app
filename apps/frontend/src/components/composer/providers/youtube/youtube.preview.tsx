@@ -8,6 +8,7 @@ import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validatio
 import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export const YoutubePreview: FC<{
   maximumCharacters?: number;
@@ -15,6 +16,7 @@ export const YoutubePreview: FC<{
   const { value: topValue, integration } = useIntegration();
   const current = useLaunchStore((state) => state.current);
   const mediaDir = useMediaDirectory();
+  const t = useT();
 
   const renderContent = topValue.map((p) => {
     const newContent = stripHtmlValidation(
@@ -40,7 +42,10 @@ export const YoutubePreview: FC<{
         .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
           return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
         }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
+      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="${t(
+        'this_text_will_be_cropped',
+        'This text will be cropped'
+      )}">` +
       newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
         return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
       }) +
@@ -70,17 +75,19 @@ export const YoutubePreview: FC<{
             {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
             <img
               src={integration?.picture || '/no-picture.jpg'}
-              alt="social"
+              alt={t('alt_social', 'social')}
               className="rounded-full z-[2] w-[40px] h-[40px]"
             />
           </div>
           <div className="flex flex-col">
             <div className="text-[14px] font-[500]">{integration?.name}</div>
-            <div className="text-[10px] font-[400]">16.7M subscribers</div>
+            <div className="text-[10px] font-[400]">
+              {t('youtube_preview_subscribers_count', '16.7M subscribers')}
+            </div>
           </div>
           <div>
             <div className="h-[32px] text-[12px] text-newBgColor font-[500] px-[14px] flex justify-center items-center bg-youtubeButton rounded-[16px]">
-              Subscribe
+              {t('subscribe', 'Subscribe')}
             </div>
           </div>
         </div>

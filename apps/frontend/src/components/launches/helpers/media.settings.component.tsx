@@ -6,6 +6,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 const postUrlEmitter = new EventEmitter();
 
 export const MediaSettingsLayout = () => {
@@ -102,6 +103,7 @@ export const CreateThumbnail: FC<{
 }> = (props) => {
   const { onSelect, media } = props;
   const { backendUrl } = useVariables();
+  const t = useT();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [currentTime, setCurrentTime] = useState(0);
@@ -195,7 +197,10 @@ export const CreateThumbnail: FC<{
       } catch (fallbackError) {
         console.error('Fallback capture also failed:', fallbackError);
         alert(
-          'Unable to capture frame. This might be due to CORS restrictions on the video source.'
+          t(
+            'unable_to_capture_frame',
+            'Unable to capture frame. This might be due to CORS restrictions on the video source.'
+          )
         );
         setIsCapturing(false);
       }
@@ -257,7 +262,9 @@ export const CreateThumbnail: FC<{
               disabled={isCapturing}
               className="bg-btnPrimary text-white px-6 py-2 rounded-lg hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isCapturing ? 'Capturing...' : 'Select This Frame'}
+              {isCapturing
+                ? t('capturing', 'Capturing...')
+                : t('select_this_frame', 'Select This Frame')}
             </button>
           </div>
         </>
@@ -312,6 +319,7 @@ export const MediaComponentInner: FC<{
   const { onClose, onSelect, media } = props;
   const setActivateExitButton = useLaunchStore((e) => e.setActivateExitButton);
   const newFetch = useFetch();
+  const t = useT();
   const [newThumbnail, setNewThumbnail] = useState<string | null>(null);
   const [isEditingThumbnail, setIsEditingThumbnail] = useState(false);
   const [altText, setAltText] = useState<string>(media?.alt || '');
@@ -367,7 +375,7 @@ export const MediaComponentInner: FC<{
 
   const generateAltText = useCallback(async () => {
     if (!media?.path) {
-      setAltTextError('No media selected');
+      setAltTextError(t('no_media_selected', 'No media selected'));
       return;
     }
 
@@ -386,30 +394,40 @@ export const MediaComponentInner: FC<{
       const data = await response.json();
 
       if (!response.ok) {
-        setAltTextError(data?.message || data?.error || 'Failed to generate alt text');
+        setAltTextError(
+          data?.message ||
+            data?.error ||
+            t('failed_to_generate_alt_text', 'Failed to generate alt text')
+        );
         return;
       }
 
       setAltText(data.altText || data.text || data.url || '');
     } catch (err: any) {
-      setAltTextError(err?.message || 'Failed to generate alt text');
+      setAltTextError(
+        err?.message ||
+          t('failed_to_generate_alt_text', 'Failed to generate alt text')
+      );
     } finally {
       setAltTextLoading(false);
     }
-  }, [media?.path, newFetch]);
+  }, [media?.path, newFetch, t]);
 
   return (
     <div className="mt-[10px] flex flex-col gap-[20px]">
       <div className="flex flex-col space-y-2">
         <label htmlFor="media-alt-text" className="text-sm text-textColor font-medium">
-          Alt Text (for accessibility)
+          {t('alt_text_for_accessibility', 'Alt Text (for accessibility)')}
         </label>
         <input
           id="media-alt-text"
           type="text"
           value={altText}
           onChange={(e) => setAltText(e.target.value)}
-          placeholder="Describe the image/video content..."
+          placeholder={t(
+            'describe_the_image_video_content',
+            'Describe the image/video content...'
+          )}
           className="w-full px-3 py-2 bg-newBgColorInner border border-newTableBorder rounded-lg text-textColor placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-btnPrimary focus:border-transparent"
         />
         <div className="flex items-center gap-[8px]">
@@ -441,7 +459,9 @@ export const MediaComponentInner: FC<{
                 />
               </svg>
             ) : null}
-            {altTextLoading ? 'Generating...' : 'Generate Alt Text'}
+            {altTextLoading
+              ? t('generating', 'Generating...')
+              : t('generate_alt_text', 'Generate Alt Text')}
           </button>
           {altTextError && (
             <span className="text-[12px] text-dangerText">{altTextError}</span>
@@ -458,12 +478,12 @@ export const MediaComponentInner: FC<{
                 {(newThumbnail || thumbnail) && (
                   <div className="flex flex-col space-y-2">
                     <span className="text-sm text-textColor">
-                      Current Thumbnail:
+                      {t('current_thumbnail_colon', 'Current Thumbnail:')}
                     </span>
                     {/* eslint-disable-next-line @next/next/no-img-element -- external media thumbnail */}
                     <img
                       src={newThumbnail || thumbnail}
-                      alt="Current thumbnail"
+                      alt={t('current_thumbnail', 'Current thumbnail')}
                       className="max-w-full max-h-[500px] object-contain rounded-lg border border-newTableBorder"
                     />
                   </div>
@@ -477,8 +497,8 @@ export const MediaComponentInner: FC<{
                     className="bg-third text-textColor px-6 py-2 rounded-lg hover:bg-opacity-80 transition-all flex-1 border border-newTableBorder"
                   >
                     {media.thumbnail || newThumbnail
-                      ? 'Edit Thumbnail'
-                      : 'Create Thumbnail'}
+                      ? t('edit_thumbnail', 'Edit Thumbnail')
+                      : t('create_thumbnail', 'Create Thumbnail')}
                   </button>
                   {(thumbnail || newThumbnail) && (
                     <button
@@ -489,7 +509,7 @@ export const MediaComponentInner: FC<{
                       }}
                       className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-opacity-80 transition-all flex-1 border border-red-700"
                     >
-                      Clear Thumbnail
+                      {t('clear_thumbnail', 'Clear Thumbnail')}
                     </button>
                   )}
                 </div>
@@ -517,7 +537,7 @@ export const MediaComponentInner: FC<{
                         strokeLinejoin="round"
                       />
                     </svg>
-                    <span>Back</span>
+                    <span>{t('back', 'Back')}</span>
                   </button>
                 </div>
 
@@ -552,13 +572,13 @@ export const MediaComponentInner: FC<{
             onClick={onClose}
             className="flex-1 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-opacity-80 transition-all"
           >
-            Cancel
+            {t('cancel', 'Cancel')}
           </button>
           <button
             onClick={save}
             className="flex-1 bg-btnPrimary text-white px-6 py-2 rounded-lg hover:bg-opacity-80 transition-all"
           >
-            Save Changes
+            {t('save_changes', 'Save Changes')}
           </button>
         </div>
       )}

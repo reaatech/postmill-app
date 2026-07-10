@@ -85,7 +85,7 @@ export const vpnDescriptor: ProviderSurfaceDescriptor<VpnProviderInfo> = {
     instanceName: true,
     extraFields: [
       { type: 'instance-name', key: 'name' },
-      { type: 'region-checklist', key: 'regions', label: 'Regions' },
+      { type: 'region-checklist', key: 'regions' },
     ],
     credentialFieldsFromMeta: (m) => m.credentialFields,
     buildBody: (state: ProviderFormState, meta: VpnProviderInfo) => ({

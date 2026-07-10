@@ -109,9 +109,9 @@ export const NoteCard: FC<NoteCardProps> = ({
   const kebabItems = [
     ...(note.isOwn
       ? [
-          { label: 'Edit', onClick: () => setEditing(true) },
+          { label: t('edit', 'Edit'), onClick: () => setEditing(true) },
           {
-            label: 'Delete',
+            label: t('delete', 'Delete'),
             danger: true,
             onClick: () =>
               call(`/campaigns/${campaignId}/notes/${note.id}`, 'DELETE'),
@@ -119,14 +119,14 @@ export const NoteCard: FC<NoteCardProps> = ({
         ]
       : []),
     {
-      label: note.pinned ? 'Unpin' : 'Pin',
+      label: note.pinned ? t('unpin', 'Unpin') : t('pin', 'Pin'),
       onClick: () =>
         call(`/campaigns/${campaignId}/notes/${note.id}/pin`, 'POST', {
           pinned: !note.pinned,
         }),
     },
     {
-      label: resolved ? 'Unresolve' : 'Resolve',
+      label: resolved ? t('unresolve', 'Unresolve') : t('resolve', 'Resolve'),
       onClick: () =>
         call(`/campaigns/${campaignId}/notes/${note.id}/resolve`, 'POST', {
           resolved: !resolved,
@@ -147,23 +147,23 @@ export const NoteCard: FC<NoteCardProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-[8px] flex-wrap">
             <span className="text-[13px] font-semibold text-textColor">
-              {note.author?.name || 'Unknown'}
+              {note.author?.name || t('unknown', 'Unknown')}
             </span>
             <span className="text-[11px] text-newTableText">
               {dayjs(note.createdAt).fromNow()}
             </span>
             {note.editedAt && (
-              <span className="text-[11px] text-newTableText">(edited)</span>
+              <span className="text-[11px] text-newTableText">({t('edited', 'edited')})</span>
             )}
             {note.pinned && (
-              <span className="text-[11px] text-btnPrimary">📌 Pinned</span>
+              <span className="text-[11px] text-btnPrimary">📌 {t('pinned', 'Pinned')}</span>
             )}
             {resolved && (
-              <span className="text-[11px] text-newTableText">✓ Resolved</span>
+              <span className="text-[11px] text-newTableText">✓ {t('resolved_label', 'Resolved')}</span>
             )}
           </div>
         </div>
-        <KebabMenu ariaLabel="Note actions" align="right" items={kebabItems} />
+        <KebabMenu ariaLabel={t('note_actions', 'Note actions')} align="right" items={kebabItems} />
       </div>
 
       {editing ? (
@@ -171,7 +171,7 @@ export const NoteCard: FC<NoteCardProps> = ({
           initialContent={note.content}
           onSubmit={submitEdit}
           submitting={busy}
-          submitLabel="Save"
+          submitLabel={t('save', 'Save')}
           focusOnMount
           onCancel={() => setEditing(false)}
           loadList={loadList}
@@ -229,17 +229,17 @@ export const NoteCard: FC<NoteCardProps> = ({
             onClick={() => setReplying((v) => !v)}
             className="h-[24px] px-[8px] text-[12px] text-newTableText hover:text-textColor ms-[4px]"
           >
-            Reply
+            {t('reply', 'Reply')}
           </button>
         )}
       </div>
 
       {replying && (
         <DiscussionEditor
-          placeholder="Write a reply…"
+          placeholder={t('write_a_reply_placeholder', 'Write a reply…')}
           onSubmit={submitReply}
           submitting={busy}
-          submitLabel="Reply"
+          submitLabel={t('reply', 'Reply')}
           focusOnMount
           onCancel={() => setReplying(false)}
           loadList={loadList}

@@ -194,7 +194,7 @@ export function ProviderConfigForm<Meta = any>({
       {fields.map((field) => (
         <div key={field.key} className="flex flex-col gap-[4px]">
           <label className="text-[13px] text-newTableText">
-            {field.label}
+            {t('provider_field_' + field.key, field.label)}
             {field.required && <span className="text-red-500 ml-[2px]">*</span>}
           </label>
           {field.type === 'select' && field.options ? (
@@ -206,14 +206,18 @@ export function ProviderConfigForm<Meta = any>({
               <option value="">{t('select_option', 'Select...')}</option>
               {field.options.map((opt) => (
                 <option key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t('provider_field_option_' + field.key + '_' + opt.value, opt.label)}
                 </option>
               ))}
             </select>
           ) : field.type === 'textarea' ? (
             <textarea
               className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] font-mono min-h-[120px] resize-y"
-              placeholder={field.placeholder || ''}
+              placeholder={
+                field.placeholder
+                  ? t('provider_field_placeholder_' + field.key, field.placeholder)
+                  : ''
+              }
               value={state.credentials[field.key] || ''}
               onChange={(e) => setCred(field.key, e.target.value)}
             />
@@ -226,7 +230,11 @@ export function ProviderConfigForm<Meta = any>({
                     ? 'password'
                     : 'text'
                 }
-                placeholder={field.placeholder || ''}
+                placeholder={
+                  field.placeholder
+                    ? t('provider_field_placeholder_' + field.key, field.placeholder)
+                    : ''
+                }
                 value={state.credentials[field.key] || ''}
                 onChange={(e) => setCred(field.key, e.target.value)}
               />
@@ -243,7 +251,11 @@ export function ProviderConfigForm<Meta = any>({
               )}
             </div>
           )}
-          {field.help && <div className="text-[11px] text-newTableText">{field.help}</div>}
+          {field.help && (
+            <div className="text-[11px] text-newTableText">
+              {t('provider_field_help_' + field.key, field.help)}
+            </div>
+          )}
         </div>
       ))}
 

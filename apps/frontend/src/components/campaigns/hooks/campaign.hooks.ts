@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { expandPostsList } from '@gitroom/helpers/utils/posts.list.minify';
 import dayjs from 'dayjs';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Campaign, CampaignEntitySlug, CampaignRef } from '@gitroom/frontend/components/campaigns/campaign-types';
 
 export interface OrgEntityOption {
@@ -18,32 +19,35 @@ export interface OrgEntityOption {
 
 export const useCampaigns = () => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch('/campaigns');
-    if (!r.ok) throw new Error('Failed to load campaigns');
+    if (!r.ok) throw new Error(t('failed_to_load_campaigns', 'Failed to load campaigns'));
     return r.json();
-  }, [fetch]);
+  }, [fetch, t]);
   return useSWR<Campaign[]>('/campaigns', loader, { revalidateOnFocus: false });
 };
 
 export const useCampaign = (id: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${id}`);
-    if (!r.ok) throw new Error('Failed to load campaign');
+    if (!r.ok) throw new Error(t('failed_to_load_campaign', 'Failed to load campaign'));
     return r.json();
-  }, [fetch, id]);
+  }, [fetch, id, t]);
   return useSWR<Campaign>(id ? `campaign-${id}` : null, loader, { revalidateOnFocus: false });
 };
 
 // Reverse lookup: which campaigns is this entity tagged on (for the selector).
 export const useCampaignsForEntity = (entityType: string, entityId?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/for/${entityType}/${entityId}`);
-    if (!r.ok) throw new Error('Failed to load campaign tags');
+    if (!r.ok) throw new Error(t('failed_to_load_campaign_tags', 'Failed to load campaign tags'));
     return r.json();
-  }, [fetch, entityType, entityId]);
+  }, [fetch, entityType, entityId, t]);
   return useSWR<CampaignRef[]>(
     entityId ? `campaigns-for-${entityType}-${entityId}` : null,
     loader,
@@ -122,15 +126,16 @@ export const useCampaignAnalytics = (
   to?: string
 ) => {
   const fetch = useFetch();
+  const t = useT();
   const params = new URLSearchParams();
   if (from) params.set('from', from);
   if (to) params.set('to', to);
   const suffix = params.toString() ? `?${params.toString()}` : '';
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${campaignId}/analytics${suffix}`);
-    if (!r.ok) throw new Error('Failed to load campaign analytics');
+    if (!r.ok) throw new Error(t('failed_to_load_campaign_analytics', 'Failed to load campaign analytics'));
     return r.json();
-  }, [fetch, campaignId, suffix]);
+  }, [fetch, campaignId, suffix, t]);
   return useSWR<CampaignAnalytics>(
     campaignId ? `campaign-analytics-${campaignId}${suffix}` : null,
     loader,
@@ -140,15 +145,16 @@ export const useCampaignAnalytics = (
 
 export const useCampaignDashboard = (id?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${id}/dashboard`);
     if (!r.ok) {
-      const err = new Error('Failed to load dashboard') as Error & { status?: number };
+      const err = new Error(t('failed_to_load_dashboard', 'Failed to load dashboard')) as Error & { status?: number };
       err.status = r.status;
       throw err;
     }
     return r.json();
-  }, [fetch, id]);
+  }, [fetch, id, t]);
   return useSWR<any>(id ? `campaign-dashboard-${id}` : null, loader, { revalidateOnFocus: false });
 };
 
@@ -156,11 +162,12 @@ export const useCampaignDashboard = (id?: string) => {
 // the /files-style Files tab (thumbnails + preview). Own hook, own key.
 export const useCampaignFiles = (id?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${id}/files`);
-    if (!r.ok) throw new Error('Failed to load campaign files');
+    if (!r.ok) throw new Error(t('failed_to_load_campaign_files', 'Failed to load campaign files'));
     return r.json();
-  }, [fetch, id]);
+  }, [fetch, id, t]);
   return useSWR<any[]>(id ? `campaign-files-${id}` : null, loader, {
     revalidateOnFocus: false,
   });
@@ -189,11 +196,12 @@ export interface DiscussionNote {
 
 export const useCampaignNotes = (campaignId?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${campaignId}/notes`);
-    if (!r.ok) throw new Error('Failed to load discussion');
+    if (!r.ok) throw new Error(t('failed_to_load_discussion', 'Failed to load discussion'));
     return r.json();
-  }, [fetch, campaignId]);
+  }, [fetch, campaignId, t]);
   return useSWR<DiscussionNote[]>(
     campaignId ? `campaign-notes-${campaignId}` : null,
     loader,
@@ -210,12 +218,13 @@ export interface TeamMemberRow {
 }
 export const useTeamMembers = () => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch('/settings/team');
-    if (!r.ok) throw new Error('Failed to load team');
+    if (!r.ok) throw new Error(t('failed_to_load_team', 'Failed to load team'));
     const json = await r.json();
     return (json?.users ?? []) as TeamMemberRow[];
-  }, [fetch]);
+  }, [fetch, t]);
   return useSWR<TeamMemberRow[]>('settings-team-members', loader, {
     revalidateOnFocus: false,
   });
@@ -236,6 +245,7 @@ export const useCampaignComments = (
   cursor?: string
 ) => {
   const fetch = useFetch();
+  const t = useT();
   const params = new URLSearchParams();
   if (campaignId) params.set('campaignId', campaignId);
   if (filters.status) params.set('status', filters.status);
@@ -247,9 +257,10 @@ export const useCampaignComments = (
 
   const loader = useCallback(async () => {
     const r = await fetch(url);
-    if (!r.ok) throw new Error(r.status === 402 ? 'UPGRADE_REQUIRED' : 'Failed to load comments');
+    // 'UPGRADE_REQUIRED' is a sentinel checked by callers, not displayed — do not translate.
+    if (!r.ok) throw new Error(r.status === 402 ? 'UPGRADE_REQUIRED' : t('failed_to_load_comments', 'Failed to load comments'));
     return r.json();
-  }, [fetch, url]);
+  }, [fetch, url, t]);
 
   return useSWR<{ comments: any[]; nextCursor?: string }>(
     campaignId ? url : null,
@@ -260,11 +271,12 @@ export const useCampaignComments = (
 
 export const useCampaignDrafts = (id?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${id}/drafts`);
-    if (!r.ok) throw new Error('Failed to load drafts');
+    if (!r.ok) throw new Error(t('failed_to_load_drafts', 'Failed to load drafts'));
     return r.json();
-  }, [fetch, id]);
+  }, [fetch, id, t]);
   return useSWR<Record<string, any[]>>(id ? `campaign-drafts-${id}` : null, loader, {
     revalidateOnFocus: false,
   });
@@ -272,12 +284,13 @@ export const useCampaignDrafts = (id?: string) => {
 
 export const useCampaignReport = (id?: string, format: 'json' | 'csv' | 'pdf' = 'json') => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${id}/report?format=${format}`);
-    if (!r.ok) throw new Error('Failed to load report');
+    if (!r.ok) throw new Error(t('failed_to_load_report', 'Failed to load report'));
     if (format === 'json') return r.json();
     return r.blob();
-  }, [fetch, id, format]);
+  }, [fetch, id, format, t]);
   return useSWR<any>(id && format === 'json' ? `campaign-report-${id}` : null, loader, {
     revalidateOnFocus: false,
   });
@@ -285,12 +298,13 @@ export const useCampaignReport = (id?: string, format: 'json' | 'csv' | 'pdf' = 
 
 export const useCampaignChangelog = (id?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${id}/dashboard`);
-    if (!r.ok) throw new Error('Failed to load changelog');
+    if (!r.ok) throw new Error(t('failed_to_load_changelog', 'Failed to load changelog'));
     const data = await r.json();
     return data.recentChangelog || [];
-  }, [fetch, id]);
+  }, [fetch, id, t]);
   return useSWR<any[]>(id ? `campaign-dashboard-${id}` : null, loader, {
     revalidateOnFocus: false,
   });
@@ -298,11 +312,12 @@ export const useCampaignChangelog = (id?: string) => {
 
 export const usePublicCampaignReport = (token?: string) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     const r = await fetch(`/public/campaign-report/${token}`);
-    if (!r.ok) throw new Error('Failed to load shared report');
+    if (!r.ok) throw new Error(t('failed_to_load_shared_report', 'Failed to load shared report'));
     return r.json();
-  }, [fetch, token]);
+  }, [fetch, token, t]);
   return useSWR<any>(token ? `public-campaign-report-${token}` : null, loader, {
     revalidateOnFocus: false,
   });
@@ -312,13 +327,14 @@ export const usePublicCampaignReport = (token?: string) => {
 // Each entity type is normalized to { id, name, icon?, subtitle? }.
 export const useOrgEntities = (type?: CampaignEntitySlug) => {
   const fetch = useFetch();
+  const t = useT();
   const loader = useCallback(async () => {
     if (!type) return [];
 
     const normalize = (raw: any[]): OrgEntityOption[] => {
       return raw.map((item) => ({
         id: item.id,
-        name: item.name || item.originalName || item.displayName || 'Untitled',
+        name: item.name || item.originalName || item.displayName || t('untitled', 'Untitled'),
         icon: item.picture || item.path || item.icon || item.identifier || undefined,
         subtitle: item.type || item.identifier || item.provider || item.subtitle || undefined,
       }));
@@ -326,14 +342,14 @@ export const useOrgEntities = (type?: CampaignEntitySlug) => {
 
     if (type === 'post') {
       const r = await fetch('/posts/list?state=all&limit=1000');
-      if (!r.ok) throw new Error('Failed to load posts');
+      if (!r.ok) throw new Error(t('failed_to_load_posts', 'Failed to load posts'));
       const data = expandPostsList(await r.json());
       return (data.posts || []).map((post: any) => ({
         id: post.id,
         name:
           post.title ||
           post.content?.replace(/<[^>]+>/g, ' ').trim().slice(0, 60) ||
-          'Untitled post',
+          t('untitled_post', 'Untitled post'),
         icon: post.integration?.picture,
         subtitle: post.publishDate
           ? dayjs(post.publishDate).format('MMM D, YYYY HH:mm')
@@ -343,62 +359,62 @@ export const useOrgEntities = (type?: CampaignEntitySlug) => {
 
     if (type === 'channel') {
       const r = await fetch('/integrations/list');
-      if (!r.ok) throw new Error('Failed to load channels');
+      if (!r.ok) throw new Error(t('failed_to_load_channels', 'Failed to load channels'));
       const data = await r.json();
       return normalize(data.integrations || []);
     }
 
     if (type === 'brand') {
       const r = await fetch('/brands');
-      if (!r.ok) throw new Error('Failed to load brands');
+      if (!r.ok) throw new Error(t('failed_to_load_brands', 'Failed to load brands'));
       const data = await r.json();
       return normalize(Array.isArray(data) ? data : data.brands || []);
     }
 
     if (type === 'file') {
       const r = await fetch('/files?page=0&limit=1000');
-      if (!r.ok) throw new Error('Failed to load files');
+      if (!r.ok) throw new Error(t('failed_to_load_files', 'Failed to load files'));
       const data = await r.json();
       return normalize(data.results || []);
     }
 
     if (type === 'signature') {
       const r = await fetch('/signatures');
-      if (!r.ok) throw new Error('Failed to load signatures');
+      if (!r.ok) throw new Error(t('failed_to_load_signatures', 'Failed to load signatures'));
       const data = await r.json();
       return normalize(Array.isArray(data) ? data : data.signatures || []);
     }
 
     if (type === 'set') {
       const r = await fetch('/sets');
-      if (!r.ok) throw new Error('Failed to load sets');
+      if (!r.ok) throw new Error(t('failed_to_load_sets', 'Failed to load sets'));
       const data = await r.json();
       return normalize(Array.isArray(data) ? data : data.sets || []);
     }
 
     if (type === 'vpn') {
       const r = await fetch('/settings/vpn/config');
-      if (!r.ok) throw new Error('Failed to load VPN configs');
+      if (!r.ok) throw new Error(t('failed_to_load_vpn_configs', 'Failed to load VPN configs'));
       const data = await r.json();
       return normalize(data.providers || []);
     }
 
     if (type === 'llm') {
       const r = await fetch('/settings/ai/config');
-      if (!r.ok) throw new Error('Failed to load AI configs');
+      if (!r.ok) throw new Error(t('failed_to_load_ai_configs', 'Failed to load AI configs'));
       const data = await r.json();
       return normalize(data.providers || []);
     }
 
     if (type === 'storage') {
       const r = await fetch('/settings/storage');
-      if (!r.ok) throw new Error('Failed to load storage configs');
+      if (!r.ok) throw new Error(t('failed_to_load_storage_configs', 'Failed to load storage configs'));
       const data = await r.json();
       return normalize(Array.isArray(data) ? data : data.providers || []);
     }
 
     return [];
-  }, [fetch, type]);
+  }, [fetch, type, t]);
   return useSWR<OrgEntityOption[]>(type ? `org-entities-${type}` : null, loader, {
     revalidateOnFocus: false,
   });

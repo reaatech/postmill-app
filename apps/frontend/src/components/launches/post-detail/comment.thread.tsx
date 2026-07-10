@@ -94,6 +94,11 @@ const CommentItem: FC<{
   const [assignInput, setAssignInput] = useState('');
 
   const currentStatus = comment.status || 'needs_reply';
+  const statusLabels: Record<string, string> = {
+    needs_reply: t('status_needs_reply', 'Needs reply'),
+    handled: t('status_handled', 'Handled'),
+    ignored: t('status_ignored', 'Ignored'),
+  };
 
   const cycleStatus = useCallback(async () => {
     const next = statusCycle[currentStatus];
@@ -161,7 +166,7 @@ const CommentItem: FC<{
             type="button"
             onClick={cycleStatus}
             className={`inline-block w-[8px] h-[8px] rounded-full ${statusColors[currentStatus]} cursor-pointer hover:opacity-80 transition-opacity`}
-            title={currentStatus}
+            title={statusLabels[currentStatus] || currentStatus}
           />
           {sentimentLabel && (
             <span className={`text-[10px] px-[6px] py-[1px] rounded-full border ${sentimentColors[sentimentLabel] || sentimentColors.neutral}`}>

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const typeLabels: Record<string, string> = {
   LOCAL: 'Local Storage',
@@ -42,6 +43,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
   onTest,
   onMigrate,
 }) => {
+  const t = useT();
   const quota = provider.quotaBytes ? BigInt(provider.quotaBytes) : null;
   const usage = usageBytes ? BigInt(usageBytes) : null;
   const usagePercent =
@@ -62,7 +64,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
             {provider.name}
           </h4>
           <p className="text-[12px] text-newTableText">
-            {typeLabels[provider.type] || provider.type}
+            {t('storage_type_' + provider.type, typeLabels[provider.type] || provider.type)}
             {provider.bucket ? ` · ${provider.bucket}` : ''}
             {provider.region ? ` · ${provider.region}` : ''}
           </p>
@@ -70,7 +72,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
         <div className="flex items-center gap-[6px]">
           {provider.type === 'LOCAL' ? (
             <div className="px-[8px] py-[2px] rounded-full text-[11px] font-medium bg-[#1a3a1a] text-textColor">
-              Always on
+              {t('always_on', 'Always on')}
             </div>
           ) : (
             <div
@@ -80,7 +82,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                   : 'bg-[#3a1a1a] text-[#f87171]'
               }`}
             >
-              {provider.mounted ? 'Mounted' : 'Unmounted'}
+              {provider.mounted ? t('mounted', 'Mounted') : t('unmounted', 'Unmounted')}
             </div>
           )}
         </div>
@@ -89,7 +91,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
       {usagePercent !== null && (
         <div className="flex flex-col gap-[4px]">
           <div className="flex justify-between text-[11px] text-newTableText">
-            <span>Usage</span>
+            <span>{t('usage', 'Usage')}</span>
             <span>{usagePercent}%</span>
           </div>
           <div className="h-[4px] bg-newTableHeader rounded-full overflow-hidden">
@@ -109,14 +111,14 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
                 onClick={() => onUnmount(provider.id)}
                 className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f87171] hover:bg-[#3a2a2a] transition-colors"
               >
-                Unmount
+                {t('unmount', 'Unmount')}
               </button>
             ) : (
               <button
                 onClick={() => onMount(provider.id)}
                 className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-textColor hover:bg-[#1a3a1a] transition-colors"
               >
-                Mount
+                {t('mount', 'Mount')}
               </button>
             )}
           </>
@@ -125,20 +127,20 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
           onClick={() => onEdit(provider.id)}
           className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors"
         >
-          Edit
+          {t('edit', 'Edit')}
         </button>
         <button
           onClick={() => onTest(provider.id)}
           className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-blue-700 dark:text-blue-400 hover:bg-[#1a2a3a] transition-colors"
         >
-          Test
+          {t('test', 'Test')}
         </button>
         {provider.type !== 'LOCAL' && hasOtherProviders && (
           <button
             onClick={() => onMigrate?.(provider.id)}
             className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f59e0b] hover:bg-[#3a2a1a] transition-colors"
           >
-            Migrate
+            {t('migrate', 'Migrate')}
           </button>
         )}
         {provider.type !== 'LOCAL' && (
@@ -146,7 +148,7 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
             onClick={() => onDelete(provider.id)}
             className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f87171] hover:bg-[#3a1a1a] transition-colors ml-auto"
           >
-            Delete
+            {t('delete', 'Delete')}
           </button>
         )}
       </div>

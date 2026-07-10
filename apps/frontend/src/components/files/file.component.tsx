@@ -122,7 +122,7 @@ export const Pagination: FC<{
         <button
           type="button"
           className="cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 ps-2.5 text-gray-400 hover:text-white border-[#1F1F1F] hover:bg-boxHover"
-          aria-label="Go to previous page"
+          aria-label={t('go_to_previous_page', 'Go to previous page')}
           onClick={() => setPage(current - 1)}
           disabled={current === 0}
         >
@@ -162,7 +162,7 @@ export const Pagination: FC<{
         <button
           type="button"
           className="text-textColor hover:text-white group cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 pe-2.5 text-gray-400 border-[#1F1F1F] hover:bg-boxHover"
-          aria-label="Go to next page"
+          aria-label={t('go_to_next_page', 'Go to next page')}
           onClick={() => setPage(current + 1)}
           disabled={current + 1 === totalPages}
         >
@@ -449,7 +449,7 @@ export const MultiFileComponent: FC<{
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element -- Media URLs may point to arbitrary external storage endpoints configured per org; next/image remotePatterns would need dynamic per-org configuration.
                         <img
-                          alt="Media"
+                          alt={t('media', 'Media')}
                           className="w-full h-full object-cover rounded-[4px]"
                           src={mediaDirectory.set(media?.path)}
                         />
@@ -697,13 +697,13 @@ export const FileComponent: FC<{
           ) : (
             <button
               type="button"
-              aria-label="Open media preview"
+              aria-label={t('open_media_preview', 'Open media preview')}
               className="w-full h-full cursor-pointer"
               onClick={() => window.open(mediaDirectory.set(value.path))}
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- Media URLs may point to arbitrary external storage endpoints configured per org; next/image remotePatterns would need dynamic per-org configuration. */}
               <img
-                alt="Media preview"
+                alt={t('media_preview', 'Media preview')}
                 className="w-full h-full object-cover"
                 src={value.path}
               />

@@ -9,6 +9,7 @@ import { ChannelAvatar } from '../kit/channel-avatar';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
 import { TabSkeleton } from '../kit/states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface PostsTabProps {
   posts?: Post[];
@@ -35,6 +36,7 @@ export const PostsTab: FC<PostsTabProps> = ({
   onPageChange,
   onSortChange,
 }) => {
+  const t = useT();
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [showMetrics, setShowMetrics] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
@@ -74,14 +76,14 @@ export const PostsTab: FC<PostsTabProps> = ({
     const base: Column<Post>[] = [
       {
         key: 'content',
-        header: 'Content',
+        header: t('content', 'Content'),
         render: (post: Post) => (
           <span className="max-w-[240px] truncate block">{post.content}</span>
         ),
       },
       {
         key: 'channel',
-        header: 'Channel',
+        header: t('label_channel', 'Channel'),
         render: (post: Post) => (
           <div className="flex items-center gap-[6px]">
             <ChannelAvatar
@@ -97,7 +99,7 @@ export const PostsTab: FC<PostsTabProps> = ({
       },
       {
         key: 'publishedAt',
-        header: 'Date',
+        header: t('date', 'Date'),
         sortable: true,
         render: (post: Post) => (
           <span className="text-[12px] text-newTableText tabular-nums whitespace-nowrap">
@@ -108,9 +110,10 @@ export const PostsTab: FC<PostsTabProps> = ({
     ];
 
     selectedColumns.forEach((key) => {
+      const found = CANONICAL_METRICS.find((m) => m.key === key);
       base.push({
         key,
-        header: CANONICAL_METRICS.find((m) => m.key === key)?.label || key,
+        header: found ? t(found.labelKey, found.label) : key,
         align: 'right',
         sortable: true,
         render: (post: Post) =>
@@ -119,7 +122,7 @@ export const PostsTab: FC<PostsTabProps> = ({
     });
 
     return base;
-  }, [selectedColumns]);
+  }, [selectedColumns, t]);
 
   // Initial load: show the shared skeleton (matching the other tabs) before any
   // rows exist. Subsequent paginated loads keep the DataTable's own loading row.
@@ -141,7 +144,7 @@ export const PostsTab: FC<PostsTabProps> = ({
               <rect x="1" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
               <rect x="7" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
             </svg>
-            Columns ({selectedColumns.length})
+            {t('columns_count', 'Columns ({{count}})', { count: selectedColumns.length })}
           </button>
           {showMetrics && (
             <>
@@ -166,7 +169,7 @@ export const PostsTab: FC<PostsTabProps> = ({
                         }}
                         className="accent-btnPrimary"
                       />
-                      {m.label}
+                      {t(m.labelKey, m.label)}
                     </label>
                   );
                 })}
@@ -190,13 +193,13 @@ export const PostsTab: FC<PostsTabProps> = ({
         limit={limit}
         onPageChange={onPageChange}
         onRowClick={(post: Post) => setSelectedPostId(post.postId)}
-        emptyState={{ title: 'No posts found in this period' }}
+        emptyState={{ title: t('no_posts_found_period', 'No posts found in this period') }}
       />
 
       <Drawer
         open={!!selectedPostId}
         onClose={() => setSelectedPostId(null)}
-        ariaLabel={postDetail?.content || 'Post Detail'}
+        ariaLabel={postDetail?.content || t('post_detail', 'Post Detail')}
       >
         <PostDetailBody
           postDetail={postDetail}

@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const TrashThumb: React.FC<{ src: string; alt: string }> = ({ src, alt }) => {
   const ref = useRef<HTMLImageElement>(null);
@@ -27,6 +28,7 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
   const fetch = useFetch();
   const toast = useToaster();
   const mediaDirectory = useMediaDirectory();
+  const t = useT();
   const [trashedMedia, setTrashedMedia] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -38,10 +40,10 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
         const data = await res.json();
         setTrashedMedia(data || []);
       } else {
-        toast.show('Failed to load trash', 'warning');
+        toast.show(t('failed_to_load_trash', 'Failed to load trash'), 'warning');
       }
     } catch {
-      toast.show('Failed to load trash', 'warning');
+      toast.show(t('failed_to_load_trash', 'Failed to load trash'), 'warning');
     } finally {
       setLoading(false);
     }
@@ -56,20 +58,20 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
       const res = await fetch(`/files/${id}/restore`, { method: 'POST' });
       if (res.ok) {
         setTrashedMedia((prev) => prev.filter((m) => m.id !== id));
-        toast.show('Media restored successfully', 'success');
+        toast.show(t('media_restored_successfully', 'Media restored successfully'), 'success');
       } else {
-        toast.show('Failed to restore media', 'warning');
+        toast.show(t('failed_to_restore_media', 'Failed to restore media'), 'warning');
       }
     } catch {
-      toast.show('Failed to restore media', 'warning');
+      toast.show(t('failed_to_restore_media', 'Failed to restore media'), 'warning');
     }
   };
 
   const handlePermanentDelete = async (id: string) => {
     const confirmed = await deleteDialog(
-      'Permanently delete this media? This action cannot be undone.',
-      'Permanently Delete',
-      'Delete'
+      t('permanently_delete_this_media_confirm', 'Permanently delete this media? This action cannot be undone.'),
+      t('permanently_delete', 'Permanently Delete'),
+      t('delete', 'Delete')
     );
     if (!confirmed) return;
 
@@ -77,12 +79,12 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
       const res = await fetch(`/files/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setTrashedMedia((prev) => prev.filter((m) => m.id !== id));
-        toast.show('Media permanently deleted', 'success');
+        toast.show(t('media_permanently_deleted', 'Media permanently deleted'), 'success');
       } else {
-        toast.show('Failed to delete media', 'warning');
+        toast.show(t('failed_to_delete_media', 'Failed to delete media'), 'warning');
       }
     } catch {
-      toast.show('Failed to delete media', 'warning');
+      toast.show(t('failed_to_delete_media', 'Failed to delete media'), 'warning');
     }
   };
 
@@ -93,7 +95,7 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
   return (
     <div className="flex flex-col gap-[20px]">
       <div className="flex items-center justify-between">
-        <h3 className="text-[18px] text-textColor font-semibold">Trash</h3>
+        <h3 className="text-[18px] text-textColor font-semibold">{t('trash', 'Trash')}</h3>
         {onClose && (
           <button
             onClick={onClose}
@@ -105,10 +107,10 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
       </div>
 
       {loading ? (
-        <div className="text-[14px] text-newTableText">Loading trash...</div>
+        <div className="text-[14px] text-newTableText">{t('loading_trash', 'Loading trash...')}</div>
       ) : trashedMedia.length === 0 ? (
         <div className="text-[14px] text-newTableText text-center py-[40px]">
-          Your trash is empty.
+          {t('your_trash_is_empty', 'Your trash is empty.')}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
@@ -130,20 +132,20 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
                   {media.name}
                 </div>
                 <div className="text-[11px] text-newTableText mb-[8px]">
-                  Deleted: {formatDate(media.deletedAt)}
+                  {t('deleted_date', 'Deleted: {{date}}', { date: formatDate(media.deletedAt) })}
                 </div>
                 <div className="flex gap-[8px]">
                   <button
                     onClick={() => handleRestore(media.id)}
                     className="flex-1 px-[8px] py-[6px] rounded-[8px] bg-btnPrimary text-white text-[12px] font-medium hover:bg-btnPrimary/80 transition-colors"
                   >
-                    Restore
+                    {t('restore', 'Restore')}
                   </button>
                   <button
                     onClick={() => handlePermanentDelete(media.id)}
                     className="flex-1 px-[8px] py-[6px] rounded-[8px] bg-red-600 text-white text-[12px] font-medium hover:bg-red-700 transition-colors"
                   >
-                    Delete
+                    {t('delete', 'Delete')}
                   </button>
                 </div>
               </div>

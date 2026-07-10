@@ -4,6 +4,7 @@ import { Select } from '@gitroom/react/form/select';
 import React, { useState } from 'react';
 import { isUSCitizen } from '@gitroom/frontend/components/launches/helpers/isuscitizen.utils';
 import rawTimezonesList from 'timezones-list';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const timezonesList =
   (rawTimezonesList as any).default || (rawTimezonesList as any);
@@ -29,6 +30,7 @@ import timezone from 'dayjs/plugin/timezone';
 dayjs.extend(timezone);
 
 const MetricComponent = () => {
+  const t = useT();
   const [currentMetric, setCurrentMetric] = useState(isUSCitizen());
   const [timezone, setTimezone] = useState(
     localStorage.getItem('timezone') || dayjs.tz.guess()
@@ -47,22 +49,22 @@ const MetricComponent = () => {
   };
   return (
     <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
-      <div className="mt-[4px]">Date Metrics</div>
-      <Select name="metric" aria-label="Date metrics" disableForm={true} label="" onChange={changeMetric} value={currentMetric ? 'US' : 'GLOBAL'}>
+      <div className="mt-[4px]">{t('date_metrics', 'Date Metrics')}</div>
+      <Select name="metric" aria-label={t('date_metrics_aria', 'Date metrics')} disableForm={true} label="" onChange={changeMetric} value={currentMetric ? 'US' : 'GLOBAL'}>
         {dateMetrics.map((metric) => (
           <option
             key={metric.value}
             value={metric.value}
           >
-            {metric.label}
+            {t('date_metric_' + metric.value, metric.label)}
           </option>
         ))}
       </Select>
 
-      <div className="mt-[4px]">Current Timezone</div>
+      <div className="mt-[4px]">{t('current_timezone', 'Current Timezone')}</div>
       <Select
         name="timezone"
-        aria-label="Current timezone"
+        aria-label={t('current_timezone_aria', 'Current timezone')}
         disableForm={true}
         label=""
         onChange={changeTimezone}

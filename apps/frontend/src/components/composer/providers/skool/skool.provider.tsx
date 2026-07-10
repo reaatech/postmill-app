@@ -10,8 +10,10 @@ import { SkoolLabelSelect } from '@gitroom/frontend/components/composer/provider
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { Input } from '@gitroom/react/form/input';
 import { FirstCommentField } from '@gitroom/frontend/components/composer/providers/shared/first-comment.field';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 const SkoolComponent: FC = () => {
   const form = useSettings();
+  const t = useT();
   const [selectedGroup, setSelectedGroup] = useState<string | undefined>(
     form.getValues().group
   );
@@ -22,7 +24,7 @@ const SkoolComponent: FC = () => {
   };
   return (
     <div>
-      <Input label="Title" {...form.register('title')} />
+      <Input label={t('label_title', 'Title')} {...form.register('title')} />
       <SkoolGroupSelect {...groupRegister} onChange={onGroupChange} />
       <SkoolLabelSelect {...form.register('label')} groupId={selectedGroup} />
       <FirstCommentField />

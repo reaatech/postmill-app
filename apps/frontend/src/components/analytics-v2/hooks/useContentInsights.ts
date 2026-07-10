@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 // One ranked "what works" finding (7.4). `bucket` is the machine key used to
 // deep-link the posts tab; `label` is the human copy; `ratio` is the bucket's
@@ -29,7 +30,7 @@ export const useContentInsights = () => {
   const load = useCallback(
     async (path: string) => {
       const res = await fetch(path);
-      if (!res.ok) throw new Error('Failed to load content insights');
+      if (!res.ok) throw createFetchError('content_insights_fetch_failed', 'Failed to load content insights');
       return res.json() as Promise<ContentInsightsResponse>;
     },
     [fetch]

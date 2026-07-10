@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useSchedule } from '../hooks/useSchedule';
 import { EmptyState, TabSkeleton } from '@gitroom/frontend/components/analytics-v2/kit/states';
 import { ChannelAvatar } from '@gitroom/frontend/components/analytics-v2/kit/channel-avatar';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface UpcomingPost {
   id: string;
@@ -21,18 +22,20 @@ interface ScheduleTimelineProps {
 
 const ComposerFillButton: FC<{ date: string }> = ({ date }) => {
   const router = useRouter();
+  const t = useT();
   return (
     <button
       type="button"
       onClick={() => router.push(`/posts/post?date=${date}T10:00:00`)}
       className="mt-[8px] inline-flex items-center justify-center min-h-[40px] px-[12px] py-[8px] text-[12px] font-medium rounded-[6px] bg-btnPrimary text-white hover:bg-btnPrimary/90 transition-colors"
     >
-      Fill
+      {t('fill_button', 'Fill')}
     </button>
   );
 };
 
 export const ScheduleTimeline: FC<ScheduleTimelineProps> = ({ upcomingPosts = [] }) => {
+  const t = useT();
   const { data: schedule, isLoading } = useSchedule(7);
 
   const postsByDay = useMemo(() => {
@@ -51,7 +54,12 @@ export const ScheduleTimeline: FC<ScheduleTimelineProps> = ({ upcomingPosts = []
   }
 
   if (!schedule?.days.length) {
-    return <EmptyState title="No schedule data" description="Create a post to fill your calendar." />;
+    return (
+      <EmptyState
+        title={t('no_schedule_data_title', 'No schedule data')}
+        description={t('no_schedule_data_description', 'Create a post to fill your calendar.')}
+      />
+    );
   }
 
   return (
@@ -76,7 +84,7 @@ export const ScheduleTimeline: FC<ScheduleTimelineProps> = ({ upcomingPosts = []
               {day.count}
             </div>
             <div className="text-[11px] text-newTableText">
-              {day.count === 1 ? 'post' : 'posts'}
+              {day.count === 1 ? t('post_lower', 'post') : t('posts_lower', 'posts')}
             </div>
 
             <div className="flex flex-col gap-[6px] min-h-[44px]">
@@ -91,7 +99,7 @@ export const ScheduleTimeline: FC<ScheduleTimelineProps> = ({ upcomingPosts = []
                     name={post.channelName ?? undefined}
                     size={16}
                   />
-                  <span className="truncate">{post.content || 'Untitled'}</span>
+                  <span className="truncate">{post.content || t('untitled', 'Untitled')}</span>
                 </div>
               ))}
             </div>

@@ -6,7 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { StatTile } from '@gitroom/frontend/components/analytics-v2/kit/stat-tile';
 import { CHART_PALETTE } from '@gitroom/frontend/components/analytics-v2/kit/palette';
 import { KPI } from '@gitroom/frontend/components/analytics-v2/utils';
-import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
+import { metricLabelT } from '@gitroom/frontend/components/campaigns/metric-labels';
 import {
   useCampaignAnalytics,
   resolveCampaignAnalyticsRange,
@@ -175,7 +175,7 @@ export const DashboardKpis: FC<DashboardKpisProps> = ({ dashboard }) => {
             {goals.map((g, idx) => (
               <div key={`${g.metric}-${g.target}-${idx}`} className="flex flex-col gap-[4px]">
                 <div className="flex justify-between text-[12px] text-newTableText">
-                  <span>{metricLabel(g.metric)}</span>
+                  <span>{metricLabelT(g.metric, t)}</span>
                   <span>
                     {Math.round(g.current).toLocaleString()} / {Math.round(g.target).toLocaleString()}
                   </span>

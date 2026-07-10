@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface ProviderSummary {
   id: string;
@@ -31,6 +32,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
   onClose,
   onComplete,
 }) => {
+  const translate = useT();
   const fetch = useFetch();
   const [targetId, setTargetId] = useState(targets[0]?.id || '');
   const [running, setRunning] = useState(false);
@@ -95,7 +97,9 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
         );
         if (!res.ok) {
           const err = await res.json();
-          throw new Error(err.message || err.error || 'Migration failed');
+          throw new Error(
+            err.message || err.error || translate('migration_failed', 'Migration failed')
+          );
         }
         const data = await res.json();
         totalMigrated += data.migrated || 0;
@@ -132,27 +136,28 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
       <div className="bg-newBgColorInner border border-newTableBorder rounded-[16px] p-[24px] w-full max-w-[500px]">
         <h3 className="text-[18px] font-medium text-textColor mb-[20px]">
-          Migrate Files
+          {translate('migrate_files', 'Migrate Files')}
         </h3>
 
         {!result ? (
           <>
             <p className="text-[14px] text-newTableText mb-[20px]">
-              Migrate all files from{' '}
-              <span className="text-textColor font-medium">{source.name}</span> to
-              another storage provider. Files will be copied, verified, and then
-              removed from the source.
+              {translate(
+                'migrate_files_description',
+                'Migrate all files from {{name}} to another storage provider. Files will be copied, verified, and then removed from the source.',
+                { name: source.name }
+              )}
             </p>
 
             <div className="mb-[16px] p-[12px] rounded-[8px] bg-btnSimple">
               <div className="flex justify-between text-[13px]">
-                <span className="text-newTableText">Files to migrate</span>
+                <span className="text-newTableText">{translate('files_to_migrate', 'Files to migrate')}</span>
                 <span className="text-textColor font-medium">
                   {preview ? preview.count : '…'}
                 </span>
               </div>
               <div className="flex justify-between text-[13px] mt-[4px]">
-                <span className="text-newTableText">Total size</span>
+                <span className="text-newTableText">{translate('total_size', 'Total size')}</span>
                 <span className="text-textColor font-medium">
                   {preview ? formatBytes(preview.totalBytes) : '…'}
                 </span>
@@ -161,7 +166,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
 
             <div className="mb-[20px]">
               <label htmlFor="migration-target-provider" className="text-[12px] text-newTableText mb-[6px] block">
-                Target Provider
+                {translate('target_provider', 'Target Provider')}
               </label>
               <select
                 id="migration-target-provider"
@@ -189,8 +194,11 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                 <div className="flex justify-between text-[12px] text-newTableText mb-[4px]">
                   <span>
                     {progress && progress.total > 0
-                      ? `Migrating\u2026 ${processed} / ${progress.total}`
-                      : 'Migrating\u2026'}
+                      ? translate('migrating_progress', 'Migrating\u2026 {{processed}} / {{total}}', {
+                          processed,
+                          total: progress.total,
+                        })
+                      : translate('migrating_ellipsis', 'Migrating\u2026')}
                   </span>
                   <span>{percent}%</span>
                 </div>
@@ -211,14 +219,14 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                 }}
                 className="px-[16px] py-[8px] rounded-[8px] bg-btnSimple text-newTableText text-[13px] hover:bg-boxHover transition-colors"
               >
-                Cancel
+                {translate('cancel', 'Cancel')}
               </button>
               <button
                 onClick={handleMigrate}
                 disabled={running || !targetId || preview?.count === 0}
                 className="px-[16px] py-[8px] rounded-[8px] bg-[#f59e0b] text-textColor text-[13px] font-medium hover:bg-[#d97706] transition-colors disabled:opacity-50"
               >
-                {running ? 'Migrating...' : 'Start Migration'}
+                {running ? translate('migrating', 'Migrating...') : translate('start_migration', 'Start Migration')}
               </button>
             </div>
           </>
@@ -227,16 +235,16 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
             <div className="flex flex-col gap-[12px] mb-[20px]">
               <div className="flex items-center gap-[12px] p-[16px] rounded-[12px] bg-btnSimple">
                 <div className="flex-1">
-                  <p className="text-[14px] text-textColor font-medium">Migration Complete</p>
+                  <p className="text-[14px] text-textColor font-medium">{translate('migration_complete', 'Migration Complete')}</p>
                   <div className="flex gap-[16px] mt-[8px]">
                     <div>
-                      <span className="text-[11px] text-newTableText">Migrated</span>
+                      <span className="text-[11px] text-newTableText">{translate('migrated', 'Migrated')}</span>
                       <p className="text-[16px] text-textColor font-medium">
                         {result.migrated}
                       </p>
                     </div>
                     <div>
-                      <span className="text-[11px] text-newTableText">Failed</span>
+                      <span className="text-[11px] text-newTableText">{translate('failed', 'Failed')}</span>
                       <p className="text-[16px] text-[#f87171] font-medium">
                         {result.failed}
                       </p>
@@ -248,7 +256,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
               {result.errors.length > 0 && (
                 <div className="p-[12px] rounded-[8px] bg-[#3a1a1a] max-h-[200px] overflow-y-auto">
                   <p className="text-[12px] text-[#f87171] font-medium mb-[6px]">
-                    Errors ({result.errors.length})
+                    {translate('errors_count', 'Errors ({{count}})', { count: result.errors.length })}
                   </p>
                   {result.errors.map((err, i) => (
                     <p key={i} className="text-[11px] text-[#f87171]/80 mb-[4px] break-all">
@@ -267,7 +275,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                 }}
                 className="px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium hover:bg-btnPrimary/80 transition-colors"
               >
-                Done
+                {translate('done', 'Done')}
               </button>
             </div>
           </>

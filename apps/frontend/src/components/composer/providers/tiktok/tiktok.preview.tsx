@@ -9,6 +9,7 @@ import { FC, ReactNode } from 'react';
 import { SliderComponent } from '@gitroom/frontend/components/ui/slider.component';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const TikTokItem: FC<{ icon: ReactNode; num: string }> = ({ icon, num }) => {
   return (
@@ -26,6 +27,7 @@ export const TiktokPreview: FC<{
   const { value: topValue, integration } = useIntegration();
   const current = useLaunchStore((state) => state.current);
   const mediaDir = useMediaDirectory();
+  const t = useT();
 
   const renderContent = topValue.map((p) => {
     const newContent = stripHtmlValidation(
@@ -51,7 +53,10 @@ export const TiktokPreview: FC<{
         .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
           return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
         }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
+      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="${t(
+        'this_text_will_be_cropped',
+        'This text will be cropped'
+      )}">` +
       newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
         return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
       }) +
@@ -88,7 +93,7 @@ export const TiktokPreview: FC<{
           {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
-            alt="social"
+            alt={t('alt_social', 'social')}
             className="rounded-full z-[2] w-[29px] h-[29px]"
           />
           <div className="absolute left-[50%] -translate-x-[50%] bottom-0 translate-y-[50%] z-[1]">
@@ -179,7 +184,7 @@ export const TiktokPreview: FC<{
           {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
-            alt="social"
+            alt={t('alt_social', 'social')}
             className="rounded-full relative z-[2] w-[29px] h-[29px]"
           />
         </div>

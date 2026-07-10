@@ -6,6 +6,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import useSWR from 'swr';
 import clsx from 'clsx';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 type FolderItem = {
   id: string;
@@ -30,6 +31,7 @@ export const FolderTree: FC<{
 }> = ({ folders, selectedFolderId, onSelectFolder, onRefresh, onFileMoved, drawerMode }) => {
   const fetch = useFetch();
   const toaster = useToaster();
+  const t = useT();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [newFolderParent, setNewFolderParent] = useState<string | null>(null);
   const [newFolderName, setNewFolderName] = useState('');
@@ -57,8 +59,8 @@ export const FolderTree: FC<{
     setNewFolderName('');
     setNewFolderParent(null);
     onRefresh();
-    toaster.show('Folder created', 'success');
-  }, [newFolderName, fetch, onRefresh, toaster]);
+    toaster.show(t('folder_created', 'Folder created'), 'success');
+  }, [newFolderName, fetch, onRefresh, toaster, t]);
 
   const handleRename = useCallback(async (id: string) => {
     if (!renamingName.trim()) return;
@@ -75,14 +77,14 @@ export const FolderTree: FC<{
     const res = await fetch(`/files/folders/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const text = await res.text();
-      toaster.show(text || 'Cannot delete non-empty folder', 'warning');
+      toaster.show(text || t('cannot_delete_non_empty_folder', 'Cannot delete non-empty folder'), 'warning');
     } else {
-      toaster.show('Folder deleted', 'success');
+      toaster.show(t('folder_deleted', 'Folder deleted'), 'success');
       if (selectedFolderId === id) onSelectFolder(null);
     }
     onRefresh();
     setContextMenu(null);
-  }, [fetch, onRefresh, toaster, selectedFolderId, onSelectFolder]);
+  }, [fetch, onRefresh, toaster, selectedFolderId, onSelectFolder, t]);
 
   const handleDrop = useCallback(async (e: React.DragEvent, targetFolderId: string | null) => {
     e.preventDefault();
@@ -98,14 +100,14 @@ export const FolderTree: FC<{
     });
 
     if (!res.ok) {
-      toaster.show('Failed to move file', 'warning');
+      toaster.show(t('failed_to_move_file', 'Failed to move file'), 'warning');
       return;
     }
 
-    toaster.show('File moved successfully', 'success');
+    toaster.show(t('file_moved_successfully', 'File moved successfully'), 'success');
     onRefresh();
     onFileMoved?.();
-  }, [fetch, onRefresh, onFileMoved, toaster]);
+  }, [fetch, onRefresh, onFileMoved, toaster, t]);
 
   const handleDragOver = useCallback((e: React.DragEvent, folderId: string | null) => {
     e.preventDefault();
@@ -234,10 +236,10 @@ export const FolderTree: FC<{
     >
       {!drawerMode && (
         <div className="flex items-center justify-between px-[12px] py-[12px] border-b border-newBorder">
-          <div className="text-[13px] font-[600] text-textColor">Folders</div>
+          <div className="text-[13px] font-[600] text-textColor">{t('folders', 'Folders')}</div>
           <button
             onClick={() => { setNewFolderParent(null); setNewFolderName(''); }}
-            aria-label="New folder"
+            aria-label={t('new_folder', 'New folder')}
             className="p-[4px] rounded-[4px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover transition-all"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
@@ -274,7 +276,7 @@ export const FolderTree: FC<{
             <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" />
             <path d="M1 6H15" stroke="currentColor" strokeWidth="1.3" />
           </svg>
-          <span className="flex-1 truncate">All Files</span>
+          <span className="flex-1 truncate">{t('all_files', 'All Files')}</span>
         </div>
 
         {folders.map((folder) => renderFolder(folder))}
@@ -289,7 +291,7 @@ export const FolderTree: FC<{
                 if (e.key === 'Enter') handleCreateFolder(newFolderParent);
                 if (e.key === 'Escape') { setNewFolderParent(null); setNewFolderName(''); }
               }}
-              placeholder="Folder name..."
+              placeholder={t('folder_name_placeholder', 'Folder name...')}
               className="flex-1 bg-transparent border-b border-[#2B5CD3] text-textColor text-[13px] outline-none placeholder:text-newTextColor/30"
             />
           </div>
@@ -310,7 +312,7 @@ export const FolderTree: FC<{
             }}
             className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
           >
-            Rename
+            {t('rename', 'Rename')}
           </button>
           <button
             onClick={() => {
@@ -320,14 +322,14 @@ export const FolderTree: FC<{
             }}
             className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
           >
-            New Subfolder
+            {t('new_subfolder', 'New Subfolder')}
           </button>
           <div className="border-t border-newBorder my-[4px]" />
           <button
             onClick={() => handleDelete(contextMenu.folderId)}
             className="w-full text-left px-[12px] py-[8px] text-[13px] text-dangerText hover:bg-boxHover transition-all"
           >
-            Delete
+            {t('delete', 'Delete')}
           </button>
         </div>
       )}

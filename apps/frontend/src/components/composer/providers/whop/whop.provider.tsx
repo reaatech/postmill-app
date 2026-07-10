@@ -11,9 +11,11 @@ import { WhopCompanySelect } from '@gitroom/frontend/components/composer/provide
 import { WhopExperienceSelect } from '@gitroom/frontend/components/composer/providers/whop/whop.experience.select';
 import { FC, useState } from 'react';
 import { FirstCommentField } from '@gitroom/frontend/components/composer/providers/shared/first-comment.field';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const WhopSettings: FC = () => {
   const form = useSettings();
+  const t = useT();
   const [selectedCompany, setSelectedCompany] = useState<string | undefined>(
     form.getValues().company
   );
@@ -32,7 +34,7 @@ const WhopSettings: FC = () => {
         {...form.register('experience')}
         companyId={selectedCompany}
       />
-      <Input label="Title (optional)" {...form.register('title')} />
+      <Input label={t('title_optional', 'Title (optional)')} {...form.register('title')} />
       <FirstCommentField />
     </div>
   );

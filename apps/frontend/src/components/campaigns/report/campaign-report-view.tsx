@@ -9,7 +9,7 @@ import dayjs from 'dayjs';
 import clsx from 'clsx';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
-import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
+import { metricLabelT } from '@gitroom/frontend/components/campaigns/metric-labels';
 import { readableTextColor } from '@gitroom/frontend/components/shared/readable-text-color';
 
 const stripHtml = (html?: string | null): string =>
@@ -328,7 +328,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
           <div className="flex flex-wrap items-baseline justify-between gap-[8px]">
             <h2 className="text-[16px] font-[600] text-textColor">{t('performance', 'Performance')}</h2>
             <span className="text-[12px] text-newTableText">
-              {t('post_metrics_trend', 'Post metrics')} · {metricLabel(trend.metric)}
+              {t('post_metrics_trend', 'Post metrics')} · {metricLabelT(trend.metric, t)}
             </span>
           </div>
           <div className="w-full aspect-[16/9] sm:aspect-[21/9] max-h-[320px]">
@@ -396,7 +396,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
             {report.goals.map((goal, idx) => (
               <div key={`${goal.metric}-${goal.target}-${idx}`} className="flex flex-col gap-[6px]">
                 <div className="flex items-center justify-between text-[13px]">
-                  <span className="text-textColor capitalize">{metricLabel(goal.metric)}</span>
+                  <span className="text-textColor capitalize">{metricLabelT(goal.metric, t)}</span>
                   <span className="text-newTableText">
                     {formatNumber(goal.current)} / {formatNumber(goal.target)} ({goal.pct}%)
                   </span>

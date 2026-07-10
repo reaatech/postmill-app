@@ -53,8 +53,10 @@ export const AlertRulesModal: FC = () => {
     if (!id) return t('alert_any_channel', 'Any channel');
     return integrations.find((i) => i.id === id)?.name || id;
   };
-  const metricLabel = (metric: string) =>
-    CANONICAL_METRICS.find((m) => m.key === metric)?.label || metric;
+  const metricLabel = (metric: string) => {
+    const found = CANONICAL_METRICS.find((m) => m.key === metric);
+    return found ? t(found.labelKey, found.label) : metric;
+  };
 
   const startEdit = (rule: AlertRule) => {
     setEditingId(rule.id);
@@ -215,7 +217,7 @@ export const AlertRulesModal: FC = () => {
             >
               {CANONICAL_METRICS.map((m) => (
                 <option key={m.key} value={m.key}>
-                  {m.label}
+                  {t(m.labelKey, m.label)}
                 </option>
               ))}
             </select>

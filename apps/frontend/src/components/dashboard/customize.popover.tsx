@@ -4,6 +4,7 @@ import { FC, ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useDashboardPrefs } from './hooks/useDashboardPrefs';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { Button } from '@gitroom/react/form/button';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export interface DashboardSectionMeta {
   id: string;
@@ -89,6 +90,7 @@ export const CustomizePopover: FC<CustomizePopoverProps> = ({ sections }) => {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const { hidden, toggle } = useDashboardPrefs();
   const permissions = usePermissions();
+  const t = useT();
 
   const visibleSections = sections.filter((section) => {
     if (!section.permission) return true;
@@ -136,7 +138,7 @@ export const CustomizePopover: FC<CustomizePopoverProps> = ({ sections }) => {
           onClick={() => setOpen((o) => !o)}
           aria-haspopup="true"
           aria-expanded={open}
-          aria-label="Customize dashboard"
+          aria-label={t('customize_dashboard', 'Customize dashboard')}
           className="px-[10px]"
         >
           <GearIcon className="w-[18px] h-[18px]" />
@@ -150,13 +152,13 @@ export const CustomizePopover: FC<CustomizePopoverProps> = ({ sections }) => {
         >
           <div className="flex items-center justify-between pb-[8px] mb-[4px] border-b border-newTableBorder">
             <span className="text-[13px] font-medium text-newTableText">
-              Customize
+              {t('customize', 'Customize')}
             </span>
           </div>
 
           {visibleSections.length === 0 ? (
             <p className="text-[12px] text-newTableText py-[8px]">
-              No sections available.
+              {t('no_sections_available', 'No sections available.')}
             </p>
           ) : (
             <div className="flex flex-col">

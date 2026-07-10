@@ -4,6 +4,7 @@ import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import clsx from 'clsx';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { FileItem } from './file-manager';
 
 // Thumbnail with a graceful fallback: prefer a still thumbnail (doubles as a
@@ -11,6 +12,7 @@ import type { FileItem } from './file-manager';
 // a placeholder icon when the source is missing/unrenderable (broken image).
 const Thumb: FC<{ file: FileItem }> = ({ file }) => {
   const mediaDirectory = useMediaDirectory();
+  const t = useT();
   const [broken, setBroken] = useState(false);
   const isVideo = hasExtension(file.path, 'mp4');
   const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
@@ -66,7 +68,7 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
         muted
         preload="metadata"
       >
-        <track kind="captions" src="" label="No captions" default />
+        <track kind="captions" src="" label={t('no_captions', 'No captions')} default />
       </video>
     );
   }

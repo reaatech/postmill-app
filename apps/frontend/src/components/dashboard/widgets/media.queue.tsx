@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useMediaJobs, MediaJob } from '../hooks/useMediaJobs';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { EmptyState, TabSkeleton } from '@gitroom/frontend/components/analytics-v2/kit/states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 // Providers that have a dedicated /media/<slug> studio route.
 const MEDIA_STUDIO_ROUTES = new Set([
@@ -78,6 +79,23 @@ const statusPill = (status: string) => {
   }
 };
 
+type TranslateFn = (key: string, fallback: string, vars?: Record<string, unknown>) => string;
+
+const statusLabel = (t: TranslateFn, status: string) => {
+  switch (status) {
+    case 'completed':
+      return t('completed_label', 'completed');
+    case 'failed':
+      return t('failed_label', 'failed');
+    case 'processing':
+      return t('processing_label', 'processing');
+    case 'pending':
+      return t('pending_label', 'pending');
+    default:
+      return status;
+  }
+};
+
 const isImageOrVideo = (url: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
@@ -86,6 +104,7 @@ const isImageOrVideo = (url: string | null) => {
 
 const MediaJobRow: FC<{ job: MediaJob }> = ({ job }) => {
   const router = useRouter();
+  const t = useT();
   const route = getMediaRoute(job.provider);
   return (
     <button
@@ -99,7 +118,7 @@ const MediaJobRow: FC<{ job: MediaJob }> = ({ job }) => {
           <span className="text-[12px] font-medium text-textColor capitalize">
             {job.operation}
           </span>
-          <span className={statusPill(job.status)}>{job.status}</span>
+          <span className={statusPill(job.status)}>{statusLabel(t, job.status)}</span>
         </div>
         <p className="text-[11px] text-newTableText">
           {dayjs(job.createdAt).fromNow()}
@@ -123,14 +142,18 @@ const MediaJobRow: FC<{ job: MediaJob }> = ({ job }) => {
 };
 
 export const MediaQueueWidget: FC = () => {
+  const t = useT();
   const { data, isLoading } = useMediaJobs();
 
   if (isLoading) return <TabSkeleton variant="list" />;
   if (!data?.jobs.length) {
     return (
       <EmptyState
-        title="No media jobs"
-        description="Render jobs from media studios will show here."
+        title={t('no_media_jobs_title', 'No media jobs')}
+        description={t(
+          'no_media_jobs_description',
+          'Render jobs from media studios will show here.'
+        )}
       />
     );
   }
@@ -139,14 +162,17 @@ export const MediaQueueWidget: FC = () => {
     <div className="flex flex-col gap-[8px]">
       <div className="flex items-center gap-[12px] mb-[4px]">
         <div className="text-[12px] text-newTableText">
-          <span className="font-medium text-textColor">{data.counts.pending}</span> pending
+          <span className="font-medium text-textColor">{data.counts.pending}</span>{' '}
+          {t('pending_label', 'pending')}
         </div>
         <div className="text-[12px] text-newTableText">
-          <span className="font-medium text-textColor">{data.counts.processing}</span> processing
+          <span className="font-medium text-textColor">{data.counts.processing}</span>{' '}
+          {t('processing_label', 'processing')}
         </div>
         {data.counts.failed7d > 0 && (
           <div className="text-[12px] text-[var(--negative,#f97066)]">
-            <span className="font-medium">{data.counts.failed7d}</span> failed
+            <span className="font-medium">{data.counts.failed7d}</span>{' '}
+            {t('failed_label', 'failed')}
           </div>
         )}
       </div>

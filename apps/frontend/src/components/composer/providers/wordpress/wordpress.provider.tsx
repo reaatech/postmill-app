@@ -10,16 +10,18 @@ import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.v
 import { WordpressPostType } from '@gitroom/frontend/components/composer/providers/wordpress/wordpress.post.type';
 import { FileComponent } from '@gitroom/frontend/components/files/file.component';
 import { WordpressDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/wordpress.dto';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const WordpressSettings: FC = () => {
   const form = useSettings();
+  const t = useT();
   return (
     <>
-      <Input label="Title" {...form.register('title')} />
+      <Input label={t('label_title', 'Title')} {...form.register('title')} />
       <WordpressPostType {...form.register('type')} />
       <FileComponent
-        label="Cover picture"
-        description="Add a cover picture"
+        label={t('label_cover_picture', 'Cover picture')}
+        description={t('add_a_cover_picture', 'Add a cover picture')}
         {...form.register('main_image')}
       />
     </>

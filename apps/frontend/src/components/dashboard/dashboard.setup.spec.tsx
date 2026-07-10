@@ -2,6 +2,10 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT: () => (_key: string, fallback: string) => fallback,
+}));
+
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),

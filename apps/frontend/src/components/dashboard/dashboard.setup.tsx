@@ -6,15 +6,7 @@ import clsx from 'clsx';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import { useDashboardSummary } from './hooks/useDashboardSummary';
 import { SectionCard } from './kit/section-card';
-
-const SETUP_STEPS = [
-  { key: 'ai', label: 'Connect an AI (LLM) Provider', hint: 'OpenAI, Anthropic, DeepSeek', href: '/settings/ai/llm-providers' },
-  { key: 'media', label: 'Connect an AI Media Provider', hint: 'OpenAI, Replicate, Luma', href: '/settings/content/ai-media' },
-  { key: 'storage', label: 'Connect a Storage Provider', hint: 'AWS S3, Cloudflare R2, Backblaze B2', href: '/settings/storage/providers' },
-  { key: 'channel', label: 'Connect a Social Channel', hint: 'Instagram, TikTok, YouTube', href: '/settings/channels' },
-  { key: 'post', label: 'Create your First Post', hint: 'Craft, review, publish', href: '/posts' },
-  { key: 'team', label: 'Invite a Team Member', hint: 'Colleague, Contractor, Client', href: '/settings/team' },
-];
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const DISMISS_KEY = 'onboarding_dismissed';
 const DISMISS_EVENT = 'onboarding-dismiss-change';
@@ -51,12 +43,55 @@ export const DashboardSetup: FC = () => {
   const router = useRouter();
   const { data: integrations } = useIntegrationList();
   const { data: summary } = useDashboardSummary();
+  const t = useT();
   const dismissedRaw = useSyncExternalStore(
     subscribeDismissed,
     readDismissedRaw,
     () => null
   );
   const dismissed = parseDismissed(dismissedRaw);
+
+  const SETUP_STEPS = useMemo(
+    () => [
+      {
+        key: 'ai',
+        label: t('setup_step_ai_label', 'Connect an AI (LLM) Provider'),
+        hint: 'OpenAI, Anthropic, DeepSeek',
+        href: '/settings/ai/llm-providers',
+      },
+      {
+        key: 'media',
+        label: t('setup_step_media_label', 'Connect an AI Media Provider'),
+        hint: 'OpenAI, Replicate, Luma',
+        href: '/settings/content/ai-media',
+      },
+      {
+        key: 'storage',
+        label: t('setup_step_storage_label', 'Connect a Storage Provider'),
+        hint: 'AWS S3, Cloudflare R2, Backblaze B2',
+        href: '/settings/storage/providers',
+      },
+      {
+        key: 'channel',
+        label: t('setup_step_channel_label', 'Connect a Social Channel'),
+        hint: 'Instagram, TikTok, YouTube',
+        href: '/settings/channels',
+      },
+      {
+        key: 'post',
+        label: t('setup_step_post_label', 'Create your First Post'),
+        hint: t('setup_step_post_hint', 'Craft, review, publish'),
+        href: '/posts',
+      },
+      {
+        key: 'team',
+        label: t('setup_step_team_label', 'Invite a Team Member'),
+        hint: t('setup_step_team_hint', 'Colleague, Contractor, Client'),
+        href: '/settings/team',
+      },
+    ],
+    [t]
+  );
 
   const steps: Record<string, boolean> = useMemo(() => ({
     ai: summary?.aiProviderActive === true,
@@ -77,15 +112,17 @@ export const DashboardSetup: FC = () => {
   if (dismissed || allComplete) return null;
 
   return (
-    <SectionCard id="setup" title="Welcome to Postmill">
+    <SectionCard id="setup" title={t('welcome_to_postmill', 'Welcome to Postmill')}>
       <div className="flex items-center justify-between mb-[16px]">
-        <p className="text-[12px] text-newTableText">Let&apos;s get you set up</p>
-        <button onClick={handleDismiss} className="text-[12px] text-newTableText hover:text-textColor cursor-pointer" type="button">Dismiss</button>
+        <p className="text-[12px] text-newTableText">
+          {t('lets_get_you_set_up', "Let's get you set up")}
+        </p>
+        <button onClick={handleDismiss} className="text-[12px] text-newTableText hover:text-textColor cursor-pointer" type="button">{t('dismiss', 'Dismiss')}</button>
       </div>
 
       <div className="mb-[16px]">
         <div className="flex justify-between text-[11px] text-newTableText mb-[4px]">
-          <span>Setup progress</span>
+          <span>{t('setup_progress', 'Setup progress')}</span>
           <span>{completedCount}/{SETUP_STEPS.length}</span>
         </div>
         <div className="h-[6px] bg-newTableHeader rounded-full overflow-hidden">

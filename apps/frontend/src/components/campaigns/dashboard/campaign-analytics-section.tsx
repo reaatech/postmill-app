@@ -6,7 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
 import { TabSkeleton, EmptyState, ErrorState } from '@gitroom/frontend/components/analytics-v2/kit/states';
-import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
+import { metricLabelT } from '@gitroom/frontend/components/campaigns/metric-labels';
 import {
   useCampaignAnalytics,
   resolveCampaignAnalyticsRange,
@@ -107,7 +107,7 @@ export const CampaignAnalyticsSection: FC<CampaignAnalyticsSectionProps> = ({
         <div className="flex flex-col gap-[16px]">
           <div>
             <div className="text-[12px] font-medium text-newTableText mb-[8px]">
-              {metricLabel(primary.metric)}
+              {metricLabelT(primary.metric, t)}
             </div>
             <div className="w-full aspect-[16/9] sm:aspect-[21/9] max-h-[320px]">
               <LineChart series={primary.series} height={300} />

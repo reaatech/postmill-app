@@ -6,6 +6,7 @@ import dayjs from 'dayjs';
 import { useDashboardCampaigns, CampaignSummary } from '../hooks/useDashboardCampaigns';
 import { Button } from '@gitroom/react/form/button';
 import { EmptyState, TabSkeleton } from '@gitroom/frontend/components/analytics-v2/kit/states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const BAR_COLORS: Record<string, string> = {
   queue: 'bg-[var(--chart-5,#ffac30)]',
@@ -58,17 +59,21 @@ const GoalBar: FC<{ target: number; current: number; metric: string }> = ({
 
 export const CampaignsWidget: FC = () => {
   const router = useRouter();
+  const t = useT();
   const { data: campaigns, isLoading } = useDashboardCampaigns(4);
 
   if (isLoading) return <TabSkeleton variant="list" />;
   if (!campaigns?.length) {
     return (
       <EmptyState
-        title="No active campaigns"
-        description="Create a campaign to group posts, channels, and goals."
+        title={t('no_active_campaigns_title', 'No active campaigns')}
+        description={t(
+          'no_active_campaigns_description',
+          'Create a campaign to group posts, channels, and goals.'
+        )}
         action={
           <Button onClick={() => router.push('/campaigns?new=1')}>
-            Create campaign
+            {t('create_campaign', 'Create campaign')}
           </Button>
         }
       />
@@ -94,7 +99,9 @@ export const CampaignsWidget: FC = () => {
               </span>
               {daysLeft !== null && (
                 <span className="text-[11px] text-newTableText shrink-0">
-                  {daysLeft === 0 ? 'Ends today' : `${daysLeft}d left`}
+                  {daysLeft === 0
+                    ? t('ends_today', 'Ends today')
+                    : t('days_left_short', '{{days}}d left', { days: daysLeft })}
                 </span>
               )}
             </div>

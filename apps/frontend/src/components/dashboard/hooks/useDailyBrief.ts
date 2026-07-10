@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export interface DailyBriefResponse {
   brief: string;
@@ -15,6 +16,7 @@ export interface DailyBriefEmpty {
 
 export const useDailyBrief = () => {
   const fetch = useFetch();
+  const t = useT();
   const load = useCallback(
     async (url: string): Promise<DailyBriefResponse | DailyBriefEmpty> => {
       const res = await fetch(url);
@@ -39,14 +41,19 @@ export const useDailyBrief = () => {
     const res = await fetch('/dashboard/brief', { method: 'POST' });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      const err = new Error(body.message || `Brief generation failed (${res.status})`) as any;
+      const err = new Error(
+        body.message ||
+          t('brief_generation_failed_with_status', 'Brief generation failed ({{status}})', {
+            status: res.status,
+          })
+      ) as any;
       err.status = res.status;
       throw err;
     }
     const result: DailyBriefResponse = await res.json();
     await mutate(result, false);
     return result;
-  }, [fetch, mutate]);
+  }, [fetch, mutate, t]);
 
   return {
     data,

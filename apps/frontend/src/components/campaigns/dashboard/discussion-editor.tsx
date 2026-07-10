@@ -7,6 +7,7 @@ import Mention from '@tiptap/extension-mention';
 import { Node, mergeAttributes } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { suggestion } from '@gitroom/frontend/components/composer/mention.component';
 
@@ -84,14 +85,18 @@ export const DiscussionEditor: FC<DiscussionEditorProps> = ({
   initialContent,
   onSubmit,
   submitting,
-  placeholder = 'Write a note…',
-  submitLabel = 'Send',
+  // Note: `placeholder` is accepted but not currently wired into the editor
+  // (pre-existing — left as-is, no visible effect either before or after this pass).
+  placeholder,
+  submitLabel,
   focusOnMount,
   onCancel,
   loadList,
 }) => {
+  const t = useT();
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const resolvedSubmitLabel = submitLabel ?? t('send', 'Send');
 
   const editor = useEditor({
     extensions: [
@@ -143,14 +148,14 @@ export const DiscussionEditor: FC<DiscussionEditorProps> = ({
   const setLink = useCallback(() => {
     if (!editor) return;
     const prev = editor.getAttributes('link')?.href || '';
-    const url = window.prompt('Link URL', prev);
+    const url = window.prompt(t('link_url', 'Link URL'), prev);
     if (url === null) return;
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
       return;
     }
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-  }, [editor]);
+  }, [editor, t]);
 
   const submit = useCallback(async () => {
     if (!editor || submitting) return;
@@ -166,39 +171,39 @@ export const DiscussionEditor: FC<DiscussionEditorProps> = ({
     <div className="border border-newTableBorder rounded-[10px] bg-newBgColorInner overflow-visible">
       {/* Toolbar */}
       <div className="flex items-center gap-[2px] flex-wrap px-[8px] py-[6px] border-b border-newTableBorder relative">
-        <ToolbarButton title="Bold" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
+        <ToolbarButton title={t('bold', 'Bold')} active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()}>
           <span className="font-bold">B</span>
         </ToolbarButton>
-        <ToolbarButton title="Italic" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
+        <ToolbarButton title={t('italic', 'Italic')} active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()}>
           <span className="italic">I</span>
         </ToolbarButton>
-        <ToolbarButton title="Underline" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
+        <ToolbarButton title={t('underline', 'Underline')} active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()}>
           <span className="underline">U</span>
         </ToolbarButton>
-        <ToolbarButton title="Strikethrough" active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
+        <ToolbarButton title={t('strikethrough', 'Strikethrough')} active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()}>
           <span className="line-through">S</span>
         </ToolbarButton>
         <span className="w-px h-[18px] bg-newTableBorder mx-[4px]" />
-        <ToolbarButton title="Heading" active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
-          H2
+        <ToolbarButton title={t('heading', 'Heading')} active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+          {t('heading_h2_short', 'H2')}
         </ToolbarButton>
-        <ToolbarButton title="Subheading" active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
-          H3
+        <ToolbarButton title={t('subheading', 'Subheading')} active={editor.isActive('heading', { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
+          {t('heading_h3_short', 'H3')}
         </ToolbarButton>
-        <ToolbarButton title="Bullet list" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+        <ToolbarButton title={t('bullet_list', 'Bullet list')} active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()}>
           •
         </ToolbarButton>
-        <ToolbarButton title="Numbered list" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+        <ToolbarButton title={t('numbered_list', 'Numbered list')} active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
           1.
         </ToolbarButton>
-        <ToolbarButton title="Link" active={editor.isActive('link')} onClick={setLink}>
+        <ToolbarButton title={t('link', 'Link')} active={editor.isActive('link')} onClick={setLink}>
           🔗
         </ToolbarButton>
         <span className="w-px h-[18px] bg-newTableBorder mx-[4px]" />
-        <ToolbarButton title="Emoji" onClick={() => setEmojiOpen((v) => !v)}>
+        <ToolbarButton title={t('emoji', 'Emoji')} onClick={() => setEmojiOpen((v) => !v)}>
           😊
         </ToolbarButton>
-        <ToolbarButton title="Insert media" onClick={() => setPickerOpen(true)}>
+        <ToolbarButton title={t('insert_media_tooltip', 'Insert media')} onClick={() => setPickerOpen(true)}>
           🖼️
         </ToolbarButton>
         {emojiOpen && (
@@ -226,7 +231,7 @@ export const DiscussionEditor: FC<DiscussionEditorProps> = ({
             onClick={onCancel}
             className="h-[32px] px-[12px] rounded-[8px] text-[13px] text-newTableText hover:text-textColor"
           >
-            Cancel
+            {t('cancel', 'Cancel')}
           </button>
         )}
         <button
@@ -235,7 +240,7 @@ export const DiscussionEditor: FC<DiscussionEditorProps> = ({
           disabled={submitting}
           className="h-[32px] px-[16px] rounded-[8px] text-[13px] font-[500] bg-btnPrimary text-white disabled:opacity-50"
         >
-          {submitting ? '…' : submitLabel}
+          {submitting ? '…' : resolvedSubmitLabel}
         </button>
       </div>
 

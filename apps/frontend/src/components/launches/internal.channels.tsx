@@ -166,7 +166,7 @@ const Plug: FC<{
       </div>
       <div className="w-full max-w-[600px] overflow-y-auto pb-[10px] text-[12px] flex flex-col gap-[10px]">
         {!allowedIntegrations.length ? (
-          'No available accounts'
+          t('no_available_accounts', 'No available accounts')
         ) : (
           <div
             className={clsx(
@@ -176,7 +176,7 @@ const Plug: FC<{
           >
             <div>{plug.description}</div>
             <Select
-              label="Delay"
+              label={t('label_delay', 'Delay')}
               hideErrors={true}
               {...register(`plug--${plug.identifier}--delay`)}
             >

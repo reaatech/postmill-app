@@ -162,7 +162,7 @@ export const LinkedinCompany: FC<{
           <Input
             name="url"
             disableForm={true}
-            label="URL"
+            label={t('url', 'URL')}
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             placeholder="https://www.linkedin.com/company/gitroom"

@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 // One anomaly row from GET /analytics/v2/anomalies (4.8). Shape mirrors the
 // backend `listAnomalies` response (AnalyticsAnomaly + included integration).
@@ -44,7 +45,7 @@ export const useAnomalies = (includeDismissed = false) => {
   const load = useCallback(
     async (path: string) => {
       const res = await fetch(path);
-      if (!res.ok) throw new Error('Failed to fetch anomalies');
+      if (!res.ok) throw createFetchError('anomalies_fetch_failed', 'Failed to fetch anomalies');
       return res.json() as Promise<AnomalyRow[]>;
     },
     [fetch]

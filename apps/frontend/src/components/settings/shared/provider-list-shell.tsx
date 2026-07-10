@@ -2,6 +2,7 @@
 
 import React, { ReactNode } from 'react';
 import Link from 'next/link';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export interface ProviderConfigItem {
   id: string;
@@ -98,6 +99,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
   addProviderButton,
   toolbar,
 }) => {
+  const t = useT();
   return (
     <div className="flex flex-col gap-[16px]">
       {(title || description || addProviderButton) && (
@@ -120,7 +122,10 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
         {providers.length === 0 ? (
           <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] text-center">
             <span className="text-[13px] text-newTableText">
-              No providers configured. Use the button above to add one.
+              {t(
+                'no_providers_configured',
+                'No providers configured. Use the button above to add one.',
+              )}
             </span>
           </div>
         ) : (
@@ -146,7 +151,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                           type="button"
                           onClick={() => onProviderNameClick(provider)}
                           className="text-[14px] font-semibold truncate hover:text-btnPrimaryAccent hover:underline transition-colors text-left"
-                          title="What is this?"
+                          title={t('what_is_this', 'What is this?')}
                         >
                           {provider.name}
                         </button>
@@ -168,7 +173,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                   {provider.featured && (
                     <span
                       className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-500/15 text-amber-800 dark:text-amber-400 inline-flex items-center gap-[4px]"
-                      title="Featured provider"
+                      title={t('featured_provider', 'Featured provider')}
                     >
                       <svg
                         viewBox="0 0 20 20"
@@ -179,15 +184,18 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                       >
                         <path d="M10 1.5l2.6 5.27 5.82.846-4.21 4.104.994 5.795L10 14.86l-5.204 2.735.994-5.795L1.58 7.616l5.82-.846L10 1.5z" />
                       </svg>
-                      Featured
+                      {t('featured', 'Featured')}
                     </span>
                   )}
                   {provider.verified === false && (
                     <span
                       className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-900/20 text-amber-800 dark:text-amber-400"
-                      title="Built without a live key — request shape unverified."
+                      title={t(
+                        'beta_unverified_hint',
+                        'Built without a live key — request shape unverified.',
+                      )}
                     >
-                      Beta
+                      {t('beta', 'Beta')}
                     </span>
                   )}
                   {(provider.status || []).map((s) => (
@@ -202,12 +210,12 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                   ))}
                   {provider.isActive && (
                     <span className="text-[11px] bg-green-900/20 text-green-900 dark:text-green-400 rounded-[4px] px-[8px] py-[2px]">
-                      Active
+                      {t('active', 'Active')}
                     </span>
                   )}
                   {provider.mounted && (
                     <span className="text-[11px] bg-[#1a3a1a] text-textColor rounded-[4px] px-[8px] py-[2px]">
-                      Mounted
+                      {t('mounted', 'Mounted')}
                     </span>
                   )}
                   {provider.version && (
@@ -216,11 +224,16 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                         VERSION_STYLES[provider.versionStatus || 'active'] ||
                         'bg-newTableHeader text-newTableText'
                       }`}
-                      title={`Pinned to version ${provider.version}`}
+                      title={t('pinned_to_version', 'Pinned to version {{version}}', {
+                        version: provider.version,
+                      })}
                     >
                       {provider.version}
                       {provider.versionStatus && provider.versionStatus !== 'active'
-                        ? ` — ${VERSION_LABEL[provider.versionStatus]}`
+                        ? ` — ${t(
+                            'version_status_' + provider.versionStatus,
+                            VERSION_LABEL[provider.versionStatus],
+                          )}`
                         : ''}
                     </span>
                   )}
@@ -229,11 +242,20 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                 {provider.versionStatus === 'deprecated' && (
                   <div className="mt-[6px] flex items-center gap-[8px] flex-wrap rounded-[8px] border border-amber-500/40 bg-amber-500/10 px-[10px] py-[6px]">
                     <span className="text-[12px] text-amber-600">
-                      Version {provider.version} is deprecated
                       {provider.sunsetAt
-                        ? ` and will be retired on ${new Date(provider.sunsetAt).toLocaleDateString()}`
-                        : ''}
-                      . Upgrade to the latest active version to keep it working.
+                        ? t(
+                            'provider_deprecated_with_sunset',
+                            'Version {{version}} is deprecated and will be retired on {{date}}. Upgrade to the latest active version to keep it working.',
+                            {
+                              version: provider.version,
+                              date: new Date(provider.sunsetAt).toLocaleDateString(),
+                            },
+                          )
+                        : t(
+                            'provider_deprecated',
+                            'Version {{version}} is deprecated. Upgrade to the latest active version to keep it working.',
+                            { version: provider.version },
+                          )}
                     </span>
                     <button
                       type="button"
@@ -242,22 +264,25 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                         (onUpgrade ?? onConfigure)(provider.identifier)
                       }
                     >
-                      Upgrade
+                      {t('upgrade', 'Upgrade')}
                     </button>
                   </div>
                 )}
                 {provider.versionStatus === 'retired' && (
                   <div className="mt-[6px] flex items-center gap-[8px] flex-wrap rounded-[8px] border border-red-500/40 bg-red-500/10 px-[10px] py-[6px]">
                     <span className="text-[12px] text-dangerText">
-                      Version {provider.version} is retired and no longer functional.
-                      Reconfigure this provider to resume service.
+                      {t(
+                        'provider_retired',
+                        'Version {{version}} is retired and no longer functional. Reconfigure this provider to resume service.',
+                        { version: provider.version },
+                      )}
                     </span>
                     <button
                       type="button"
                       className="text-[12px] font-medium rounded-[6px] px-[10px] py-[3px] bg-red-500/20 text-dangerText hover:bg-red-500/30 transition-colors whitespace-nowrap"
                       onClick={() => onConfigure(provider.identifier)}
                     >
-                      Reconfigure
+                      {t('reconfigure', 'Reconfigure')}
                     </button>
                   </div>
                 )}
@@ -288,7 +313,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                       className="text-[12px] text-red-600 dark:text-red-500 hover:underline"
                       onClick={() => onRemove(provider.identifier)}
                     >
-                      Remove
+                      {t('remove', 'Remove')}
                     </button>
                   )
                 ) : renderActions ? (
@@ -299,20 +324,20 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                       className="text-[12px] text-btnPrimaryAccent hover:underline"
                       onClick={() => onConfigure(provider.identifier)}
                     >
-                      {provider.isConfigured ? 'Edit' : 'Configure'}
+                      {provider.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
                     </button>
                     {provider.isConfigured && onSetActive && !provider.isActive && (
                       <button
                         className="text-[12px] text-btnPrimaryAccent hover:underline"
                         onClick={() => onSetActive(provider.identifier)}
                       >
-                        Set Active
+                        {t('set_active', 'Set Active')}
                       </button>
                     )}
                     {onToggle && provider.isConfigured && (
                       <label className="flex items-center gap-[4px] cursor-pointer">
                         <span className="text-[11px] text-newTableText">
-                          {provider.enabled ? 'On' : 'Off'}
+                          {provider.enabled ? t('on', 'On') : t('off', 'Off')}
                         </span>
                         <input
                           type="checkbox"
@@ -327,7 +352,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                         className="text-[12px] text-red-600 dark:text-red-500 hover:underline"
                         onClick={() => onRemove(provider.identifier)}
                       >
-                        Remove
+                        {t('remove', 'Remove')}
                       </button>
                     )}
                   </>

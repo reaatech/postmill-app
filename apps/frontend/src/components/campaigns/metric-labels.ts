@@ -14,3 +14,17 @@ const LABELS: Record<string, string> = {
 };
 
 export const metricLabel = (metric: string): string => LABELS[metric] || metric;
+
+// Translated variant for the two campaign-only overrides above (module-scope
+// literals can't call hooks — callers pass their own `t`). Metrics sourced
+// from CANONICAL_METRICS fall back to the plain English label (translated at
+// the analytics-v2 layer, out of scope here). Reuses the existing `posts` /
+// `replies` keys (same English text used for the campaign dashboard tabs).
+export const metricLabelT = (
+  metric: string,
+  t: (key: string, defaultValue: string) => string
+): string => {
+  if (metric === 'posts') return t('posts', 'Posts');
+  if (metric === 'comments') return t('replies', 'Replies');
+  return metricLabel(metric);
+};

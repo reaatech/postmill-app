@@ -6,6 +6,7 @@ import { useAttention, AttentionItemDto } from '../hooks/useAttention';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { EmptyState, TabSkeleton } from '@gitroom/frontend/components/analytics-v2/kit/states';
 import { Button } from '@gitroom/react/form/button';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const severityBorder: Record<string, string> = {
   critical: 'border-l-[var(--negative,#f97066)]',
@@ -70,6 +71,7 @@ const AttentionRow: FC<{
   const [expanded, setExpanded] = useState(false);
   const [working, setWorking] = useState(false);
   const toaster = useToaster();
+  const t = useT();
 
   const payloadPosts = item.action?.payload?.posts as
     | Array<{ id: string; channelName?: string; content?: string; error?: string }>
@@ -80,9 +82,9 @@ const AttentionRow: FC<{
     setWorking(true);
     try {
       await onRetry(postId);
-      toaster.show('Post queued for retry', 'success');
+      toaster.show(t('post_queued_for_retry', 'Post queued for retry'), 'success');
     } catch (err: any) {
-      toaster.show(err?.message || 'Retry failed', 'warning');
+      toaster.show(err?.message || t('retry_failed', 'Retry failed'), 'warning');
     } finally {
       setWorking(false);
     }
@@ -94,7 +96,7 @@ const AttentionRow: FC<{
     try {
       await onDismiss(item.id);
     } catch (err: any) {
-      toaster.show(err?.message || 'Dismiss failed', 'warning');
+      toaster.show(err?.message || t('dismiss_failed', 'Dismiss failed'), 'warning');
     } finally {
       setWorking(false);
     }
@@ -154,7 +156,16 @@ const AttentionRow: FC<{
                 className="inline-flex items-center gap-[6px] min-h-[40px] py-[8px] text-[12px] text-newTableText hover:text-textColor transition-colors"
               >
                 <ChevronIcon open={expanded} />
-                {expanded ? 'Hide failed posts' : `Show ${payloadPosts.length} failed post${payloadPosts.length === 1 ? '' : 's'}`}
+                {expanded
+                  ? t('hide_failed_posts', 'Hide failed posts')
+                  : t(
+                      'show_failed_posts_count',
+                      'Show {{count}} failed post{{plural}}',
+                      {
+                        count: payloadPosts.length,
+                        plural: payloadPosts.length === 1 ? '' : 's',
+                      }
+                    )}
               </button>
 
               {expanded && (
@@ -166,7 +177,7 @@ const AttentionRow: FC<{
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-[12px] text-textColor truncate">
-                          {post.channelName || 'Channel'}
+                          {post.channelName || t('channel_label', 'Channel')}
                         </p>
                         {post.error && (
                           <p className="text-[11px] text-newTableText truncate">
@@ -180,7 +191,7 @@ const AttentionRow: FC<{
                           disabled={working}
                           className="px-[10px] py-[4px] text-[11px] shrink-0"
                         >
-                          Retry
+                          {t('retry', 'Retry')}
                         </Button>
                       )}
                     </div>
@@ -197,7 +208,7 @@ const AttentionRow: FC<{
               type="button"
               onClick={handleDismiss}
               disabled={working}
-              aria-label="Dismiss anomaly"
+              aria-label={t('dismiss_anomaly_aria', 'Dismiss anomaly')}
               className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-[6px] text-newTableText hover:text-textColor hover:bg-newTableBorder transition-colors"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -212,7 +223,7 @@ const AttentionRow: FC<{
               onClick={() => router.push(kindLink(item))}
               className="inline-flex items-center justify-center min-h-[40px] px-[12px] py-[8px] text-[12px] font-medium rounded-[6px] bg-btnPrimary text-white hover:bg-btnPrimary/90 transition-colors"
             >
-              {item.action?.label || 'View'}
+              {item.action?.label || t('view', 'View')}
             </button>
           )}
         </div>
@@ -221,19 +232,24 @@ const AttentionRow: FC<{
   );
 };
 
-const AllClear: FC = () => (
-  <div className="flex items-center gap-[10px] p-[12px] rounded-[10px] border border-newTableBorder border-l-[3px] border-l-[var(--positive,#32d583)] bg-newTableHeader">
-    <div className="shrink-0 w-[28px] h-[28px] rounded-full bg-[var(--positive,#32d583)]/10 text-[var(--positive,#32d583)] flex items-center justify-center">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
+const AllClear: FC = () => {
+  const t = useT();
+  return (
+    <div className="flex items-center gap-[10px] p-[12px] rounded-[10px] border border-newTableBorder border-l-[3px] border-l-[var(--positive,#32d583)] bg-newTableHeader">
+      <div className="shrink-0 w-[28px] h-[28px] rounded-full bg-[var(--positive,#32d583)]/10 text-[var(--positive,#32d583)] flex items-center justify-center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </div>
+      <div>
+        <h3 className="text-[13px] font-medium text-textColor">{t('all_clear', 'All clear')}</h3>
+        <p className="text-[12px] text-newTableText">
+          {t('nothing_needs_attention', 'Nothing needs your attention right now.')}
+        </p>
+      </div>
     </div>
-    <div>
-      <h3 className="text-[13px] font-medium text-textColor">All clear</h3>
-      <p className="text-[12px] text-newTableText">Nothing needs your attention right now.</p>
-    </div>
-  </div>
-);
+  );
+};
 
 export const AttentionFeed: FC = () => {
   const { data, isLoading, retryPost, dismissAnomaly } = useAttention();

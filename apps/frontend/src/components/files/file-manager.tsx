@@ -16,6 +16,7 @@ import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { TrashComponent } from '@gitroom/frontend/components/files/trash.component';
 import clsx from 'clsx';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 type ViewMode = 'grid' | 'list';
 
@@ -65,6 +66,7 @@ export const FileManager: FC<{
   refreshKey,
 }) => {
   const fetch = useFetch();
+  const t = useT();
   const modals = useModals();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
@@ -179,7 +181,7 @@ export const FileManager: FC<{
         <div
           role="button"
           tabIndex={folderDrawerOpen ? 0 : -1}
-          aria-label="Close folder drawer"
+          aria-label={t('close_folder_drawer', 'Close folder drawer')}
           className={clsx(
             'absolute inset-0 bg-black/50 transition-opacity duration-200',
             folderDrawerOpen ? 'opacity-100' : 'opacity-0'
@@ -200,10 +202,10 @@ export const FileManager: FC<{
           )}
         >
           <div className="h-[56px] shrink-0 flex items-center justify-between px-[16px] bg-studioBg border-b border-studioBorder">
-            <div className="text-[16px] font-[600]">Folders</div>
+            <div className="text-[16px] font-[600]">{t('folders', 'Folders')}</div>
             <button
               type="button"
-              aria-label="Close"
+              aria-label={t('close', 'Close')}
               onClick={() => setFolderDrawerOpen(false)}
               className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-newTableText hover:bg-[#2B5CD3]/15 hover:text-textColor transition-all"
             >
@@ -230,8 +232,8 @@ export const FileManager: FC<{
 
       <div className="flex-1 flex flex-col min-w-0">
         <PageHeader
-          title="Media Library"
-          description="Manage your images, videos, and files"
+          title={t('media_library', 'Media Library')}
+          description={t('manage_your_images_videos_and_files', 'Manage your images, videos, and files')}
           action={
             <FileUploader
               folderId={selectedFolderId}
@@ -247,7 +249,7 @@ export const FileManager: FC<{
                 type="text"
                 value={search}
                 onChange={e => setSearchAndReset(e.target.value)}
-                placeholder="Search files by name, tags..."
+                placeholder={t('search_files_by_name_tags', 'Search files by name, tags...')}
                 className="w-full h-[44px] pl-[40px] pr-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
               />
               <svg
@@ -261,15 +263,15 @@ export const FileManager: FC<{
 
             <select
               value={filterType}
-              aria-label="Filter by file type"
+              aria-label={t('filter_by_file_type', 'Filter by file type')}
               onChange={e => setFilterTypeAndReset(e.target.value)}
               className="h-[44px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3] shrink-0"
             >
-              <option value="">All types</option>
-              <option value="image">Images</option>
-              <option value="video">Videos</option>
-              <option value="audio">Audio</option>
-              <option value="document">Documents</option>
+              <option value="">{t('all_types', 'All types')}</option>
+              <option value="image">{t('images', 'Images')}</option>
+              <option value="video">{t('videos', 'Videos')}</option>
+              <option value="audio">{t('audio', 'Audio')}</option>
+              <option value="document">{t('documents', 'Documents')}</option>
             </select>
           </div>
 
@@ -277,7 +279,7 @@ export const FileManager: FC<{
             <div className="flex items-center gap-[8px] mobile:order-2">
               <button
                 onClick={() => setViewMode('grid')}
-                aria-label="Grid view"
+                aria-label={t('grid_view', 'Grid view')}
                 aria-pressed={viewMode === 'grid'}
                 className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'grid'
                   ? 'border-[#2B5CD3] text-btnPrimaryAccent bg-[#2B5CD3]/10'
@@ -287,7 +289,7 @@ export const FileManager: FC<{
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                aria-label="List view"
+                aria-label={t('list_view', 'List view')}
                 aria-pressed={viewMode === 'list'}
                 className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'list'
                   ? 'border-[#2B5CD3] text-btnPrimaryAccent bg-[#2B5CD3]/10'
@@ -306,14 +308,14 @@ export const FileManager: FC<{
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
-                <span>Folder</span>
+                <span>{t('folder', 'Folder')}</span>
               </button>
 
               <button
                 onClick={() => setShowTrash(!showTrash)}
                 className="px-[12px] h-[44px] rounded-[8px] border border-newColColor text-[13px] text-textColor hover:bg-boxHover transition-colors"
               >
-                🗑️ Trash
+                🗑️ {t('trash', 'Trash')}
               </button>
             </div>
           </div>
@@ -337,7 +339,9 @@ export const FileManager: FC<{
                 <path d="M8 44L22 32L34 44L44 34L56 44" stroke="currentColor" strokeWidth="2" strokeOpacity="0.3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <div className="text-[16px] font-[500]">
-                {debouncedSearch ? 'No media matches your search' : 'This folder is empty'}
+                {debouncedSearch
+                  ? t('no_media_matches_your_search', 'No media matches your search')
+                  : t('this_folder_is_empty', 'This folder is empty')}
               </div>
             </div>
           ) : viewMode === 'grid' ? (
@@ -433,7 +437,7 @@ export const FileManager: FC<{
           <div
             role="button"
             tabIndex={0}
-            aria-label="Close details drawer"
+            aria-label={t('close_details_drawer', 'Close details drawer')}
             className="absolute inset-0 bg-black/50"
             onClick={() => setDetailsFile(null)}
             onKeyDown={(e) => {
@@ -459,7 +463,7 @@ export const FileManager: FC<{
         <div
           role="button"
           tabIndex={0}
-          aria-label="Close trash"
+          aria-label={t('close_trash', 'Close trash')}
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-[20px]"
           onClick={(e) => {
             if (e.target === e.currentTarget) {

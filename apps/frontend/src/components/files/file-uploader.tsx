@@ -7,6 +7,7 @@ import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader
 import { Dashboard } from '@uppy/react';
 import { PlusIcon } from '@gitroom/frontend/components/ui/icons';
 import { UPLOAD_ALLOWED_MIME_TYPES } from '@gitroom/helpers/upload-limits.client';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export const FileUploader: FC<{
   folderId: string | null;
@@ -15,6 +16,7 @@ export const FileUploader: FC<{
 }> = ({ folderId, onUploadComplete, variant = 'default' }) => {
   const uploaderRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
+  const t = useT();
 
   const uppy = useUppyUploader({
     folderId,
@@ -58,7 +60,7 @@ export const FileUploader: FC<{
           ) : (
             <PlusIcon size={14} />
           )}
-          <span className={loading ? 'invisible' : ''}>Upload</span>
+          <span className={loading ? 'invisible' : ''}>{t('upload', 'Upload')}</span>
         </button>
         <input
           ref={uploaderRef}

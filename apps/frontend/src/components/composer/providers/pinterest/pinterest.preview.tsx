@@ -7,12 +7,14 @@ import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 export const PinterestPreview: FC<{
   maximumCharacters?: number;
 }> = (props) => {
   const { value: topValue, integration } = useIntegration();
   const mediaDir = useMediaDirectory();
+  const t = useT();
 
   const renderContent = topValue.map((p) => {
     const newContent = stripHtmlValidation(
@@ -38,7 +40,10 @@ export const PinterestPreview: FC<{
         .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
           return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
         }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
+      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="${t(
+        'this_text_will_be_cropped',
+        'This text will be cropped'
+      )}">` +
       newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
         return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
       }) +
@@ -138,7 +143,7 @@ export const PinterestPreview: FC<{
           </div>
         </div>
         <div className="h-full flex rounded-[12px] text-[16px] font-[600] w-[100px] bg-[#E70024] text-white justify-center items-center">
-          Save
+          {t('save', 'Save')}
         </div>
       </div>
       <div

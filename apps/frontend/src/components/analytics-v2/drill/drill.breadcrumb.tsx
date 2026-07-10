@@ -2,6 +2,7 @@
 
 import { FC } from 'react';
 import { DrillState } from '../utils';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface BreadcrumbItem {
   id: string;
@@ -24,6 +25,7 @@ export const DrillBreadcrumb: FC<DrillBreadcrumbProps> = ({
   channelName,
   postContent,
 }) => {
+  const t = useT();
   const items: BreadcrumbItem[] = [];
 
   if (drill.tab && drill.tab !== 'overview') {
@@ -33,7 +35,7 @@ export const DrillBreadcrumb: FC<DrillBreadcrumbProps> = ({
       onClick: () => onNavigate({ tab: drill.tab }),
     });
   } else {
-    items.push({ id: 'overview', label: 'Overview', onClick: onReset });
+    items.push({ id: 'overview', label: t('overview', 'Overview'), onClick: onReset });
   }
 
   if (drill.metric) {
@@ -97,7 +99,7 @@ export const DrillBreadcrumb: FC<DrillBreadcrumbProps> = ({
         onClick={onReset}
         className="ml-[8px] text-[11px] px-[8px] py-[3px] bg-newTableHeader border border-newTableBorder rounded-[4px] hover:text-btnText transition-colors"
       >
-        Reset
+        {t('reset', 'Reset')}
       </button>
     </div>
   );

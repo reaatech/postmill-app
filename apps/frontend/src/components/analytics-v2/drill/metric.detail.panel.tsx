@@ -65,7 +65,7 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
 
           {data.byChannel.length > 0 && (
             <div>
-              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">By Channel</h4>
+              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">{t('by_channel', 'By Channel')}</h4>
               <div className="space-y-[6px]">
                 {data.byChannel.map((ch) => (
                   <div key={ch.integrationId} className="flex items-center gap-[10px] px-[12px] py-[8px] bg-newTableHeader rounded-[8px]">
@@ -82,7 +82,7 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
 
           {data.topPosts.length > 0 && (
             <div>
-              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">Top Posts</h4>
+              <h4 className="text-[13px] font-medium text-newTableText mb-[8px]">{t('top_posts', 'Top Posts')}</h4>
               <div className="space-y-[6px]">
                 {data.topPosts.slice(0, 5).map((post) => (
                   <div key={post.postId} className="px-[12px] py-[8px] bg-newTableHeader rounded-[8px]">
@@ -99,7 +99,7 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
           {data.movers.up.length > 0 && data.movers.down.length > 0 && (
             <div className="grid grid-cols-2 gap-[12px]">
               <div>
-                <h4 className="text-[13px] font-medium text-[var(--positive,#32d583)] mb-[6px]">Biggest Movers ↑</h4>
+                <h4 className="text-[13px] font-medium text-[var(--positive,#32d583)] mb-[6px]">{t('biggest_movers_up', 'Biggest Movers ↑')}</h4>
                 {data.movers.up.slice(0, 3).map((m) => (
                   <div key={m.integrationId} className="text-[12px] py-[4px] flex justify-between">
                     <span className="truncate">{m.name}</span>
@@ -108,7 +108,7 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
                 ))}
               </div>
               <div>
-                <h4 className="text-[13px] font-medium text-[var(--negative,#f97066)] mb-[6px]">Biggest Movers ↓</h4>
+                <h4 className="text-[13px] font-medium text-[var(--negative,#f97066)] mb-[6px]">{t('biggest_movers_down', 'Biggest Movers ↓')}</h4>
                 {data.movers.down.slice(0, 3).map((m) => (
                   <div key={m.integrationId} className="text-[12px] py-[4px] flex justify-between">
                     <span className="truncate">{m.name}</span>

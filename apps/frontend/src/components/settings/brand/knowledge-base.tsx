@@ -483,9 +483,9 @@ export const KnowledgeBase = () => {
                   onChange={(e) => setDistance(e.target.value)}
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
-                  <option value="Cosine">Cosine</option>
-                  <option value="Euclid">Euclidean</option>
-                  <option value="Dot">Dot Product</option>
+                  <option value="Cosine">{t('distance_cosine', 'Cosine')}</option>
+                  <option value="Euclid">{t('distance_euclidean', 'Euclidean')}</option>
+                  <option value="Dot">{t('distance_dot_product', 'Dot Product')}</option>
                 </select>
               </div>
             </>
@@ -560,10 +560,10 @@ export const KnowledgeBase = () => {
                   onChange={(e) => setChunkStrategy(e.target.value)}
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
-                  <option value="fixed-size">Fixed Size</option>
-                  <option value="semantic">Semantic</option>
-                  <option value="recursive">Recursive</option>
-                  <option value="sliding-window">Sliding Window</option>
+                  <option value="fixed-size">{t('chunk_strategy_fixed_size', 'Fixed Size')}</option>
+                  <option value="semantic">{t('chunk_strategy_semantic', 'Semantic')}</option>
+                  <option value="recursive">{t('chunk_strategy_recursive', 'Recursive')}</option>
+                  <option value="sliding-window">{t('chunk_strategy_sliding_window', 'Sliding Window')}</option>
                 </select>
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -599,9 +599,9 @@ export const KnowledgeBase = () => {
                   onChange={(e) => setFusionStrategy(e.target.value)}
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
-                  <option value="rrf">Reciprocal Rank Fusion (RRF)</option>
-                  <option value="weighted-sum">Weighted Sum</option>
-                  <option value="normalized">Normalized Score</option>
+                  <option value="rrf">{t('fusion_strategy_rrf', 'Reciprocal Rank Fusion (RRF)')}</option>
+                  <option value="weighted-sum">{t('fusion_strategy_weighted_sum', 'Weighted Sum')}</option>
+                  <option value="normalized">{t('fusion_strategy_normalized', 'Normalized Score')}</option>
                 </select>
               </div>
               {fusionStrategy === 'rrf' && (

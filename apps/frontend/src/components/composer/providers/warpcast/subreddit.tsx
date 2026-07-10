@@ -6,6 +6,7 @@ import { Input } from '@gitroom/react/form/input';
 import { useDebouncedCallback } from 'use-debounce';
 import { useWatch } from 'react-hook-form';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export const Subreddit: FC<{
   onChange: (event: {
     target: {
@@ -24,6 +25,7 @@ export const Subreddit: FC<{
   name: string;
 }> = (props) => {
   const { onChange, name } = props;
+  const t = useT();
   const state = useSettings();
   const split = name.split('.');
   const [loading, setLoading] = useState(false);
@@ -106,16 +108,16 @@ export const Subreddit: FC<{
             disableForm={true}
             value={value.subreddit}
             readOnly={true}
-            label="Channel"
+            label={t('label_channel', 'Channel')}
             name="subreddit"
           />
         </>
       ) : (
         <div className="relative">
           <Input
-            placeholder="Channel"
+            placeholder={t('label_channel', 'Channel')}
             name="search"
-            label="Search Channel"
+            label={t('label_search_channel', 'Search Channel')}
             readOnly={loading}
             value={searchValue}
             error={errors?.message}

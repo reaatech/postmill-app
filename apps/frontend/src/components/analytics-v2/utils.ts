@@ -121,45 +121,65 @@ export interface ChannelMetricResponse {
   byDay: { date: string; value: number }[];
 }
 
-export const CANONICAL_METRICS: { key: string; label: string }[] = [
-  { key: 'impressions', label: 'Impressions' },
-  { key: 'unique_impressions', label: 'Unique Impressions' },
-  { key: 'reach', label: 'Reach' },
-  { key: 'engagement', label: 'Engagement' },
-  { key: 'likes', label: 'Likes' },
-  { key: 'comments', label: 'Comments' },
-  { key: 'shares', label: 'Shares' },
-  { key: 'saves', label: 'Saves' },
-  { key: 'replies', label: 'Replies' },
-  { key: 'retweets', label: 'Retweets' },
-  { key: 'quotes', label: 'Quotes' },
-  { key: 'bookmarks', label: 'Bookmarks' },
-  { key: 'views', label: 'Views' },
-  { key: 'clicks', label: 'Clicks' },
-  { key: 'followers', label: 'Followers' },
-  { key: 'page_views', label: 'Page Views' },
-  { key: 'video_views', label: 'Video Views' },
-  { key: 'minutes_watched', label: 'Estimated Minutes Watched' },
-  { key: 'avg_view_duration', label: 'Average View Duration' },
-  { key: 'avg_view_percentage', label: 'Average View Percentage' },
-  { key: 'subscribers_gained', label: 'Subscribers Gained' },
-  { key: 'subscribers_lost', label: 'Subscribers Lost' },
-  { key: 'pin_clicks', label: 'Pin Clicks' },
-  { key: 'pin_click_rate', label: 'Pin Click Rate' },
-  { key: 'website_clicks', label: 'Website Clicks' },
-  { key: 'phone_calls', label: 'Phone Calls' },
-  { key: 'direction_requests', label: 'Direction Requests' },
-  { key: 'desktop_map_views', label: 'Desktop Map Views' },
-  { key: 'mobile_map_views', label: 'Mobile Map Views' },
-  { key: 'organic_followers', label: 'Organic Followers' },
-  { key: 'paid_followers', label: 'Paid Followers' },
-  { key: 'reposts', label: 'Reposts' },
-  { key: 'post_impressions', label: 'Post Impressions' },
-  { key: 'total_likes', label: 'Total Likes' },
-  { key: 'reactions', label: 'Reactions' },
-  { key: 'outbound_clicks', label: 'Outbound Clicks' },
-  { key: 'favorites', label: 'Favorites' },
+// `label` stays the English display copy (also the i18next default value);
+// `labelKey` is the translation key resolved at each render site via
+// `t(labelKey, label)`. This module-level array cannot use hooks, so it is
+// NOT translated here — see posts.tab.tsx / alert-rules.modal.tsx /
+// alerts.section.tsx for the render-site translation.
+export const CANONICAL_METRICS: { key: string; labelKey: string; label: string }[] = [
+  { key: 'impressions', labelKey: 'metric_impressions', label: 'Impressions' },
+  { key: 'unique_impressions', labelKey: 'metric_unique_impressions', label: 'Unique Impressions' },
+  { key: 'reach', labelKey: 'metric_reach', label: 'Reach' },
+  { key: 'engagement', labelKey: 'metric_engagement', label: 'Engagement' },
+  { key: 'likes', labelKey: 'metric_likes', label: 'Likes' },
+  { key: 'comments', labelKey: 'comments', label: 'Comments' },
+  { key: 'shares', labelKey: 'metric_shares', label: 'Shares' },
+  { key: 'saves', labelKey: 'metric_saves', label: 'Saves' },
+  { key: 'replies', labelKey: 'replies', label: 'Replies' },
+  { key: 'retweets', labelKey: 'metric_retweets', label: 'Retweets' },
+  { key: 'quotes', labelKey: 'metric_quotes', label: 'Quotes' },
+  { key: 'bookmarks', labelKey: 'metric_bookmarks', label: 'Bookmarks' },
+  { key: 'views', labelKey: 'metric_views', label: 'Views' },
+  { key: 'clicks', labelKey: 'clicks', label: 'Clicks' },
+  { key: 'followers', labelKey: 'metric_followers', label: 'Followers' },
+  { key: 'page_views', labelKey: 'metric_page_views', label: 'Page Views' },
+  { key: 'video_views', labelKey: 'metric_video_views', label: 'Video Views' },
+  { key: 'minutes_watched', labelKey: 'metric_minutes_watched', label: 'Estimated Minutes Watched' },
+  { key: 'avg_view_duration', labelKey: 'metric_avg_view_duration', label: 'Average View Duration' },
+  { key: 'avg_view_percentage', labelKey: 'metric_avg_view_percentage', label: 'Average View Percentage' },
+  { key: 'subscribers_gained', labelKey: 'metric_subscribers_gained', label: 'Subscribers Gained' },
+  { key: 'subscribers_lost', labelKey: 'metric_subscribers_lost', label: 'Subscribers Lost' },
+  { key: 'pin_clicks', labelKey: 'metric_pin_clicks', label: 'Pin Clicks' },
+  { key: 'pin_click_rate', labelKey: 'metric_pin_click_rate', label: 'Pin Click Rate' },
+  { key: 'website_clicks', labelKey: 'metric_website_clicks', label: 'Website Clicks' },
+  { key: 'phone_calls', labelKey: 'metric_phone_calls', label: 'Phone Calls' },
+  { key: 'direction_requests', labelKey: 'metric_direction_requests', label: 'Direction Requests' },
+  { key: 'desktop_map_views', labelKey: 'metric_desktop_map_views', label: 'Desktop Map Views' },
+  { key: 'mobile_map_views', labelKey: 'metric_mobile_map_views', label: 'Mobile Map Views' },
+  { key: 'organic_followers', labelKey: 'metric_organic_followers', label: 'Organic Followers' },
+  { key: 'paid_followers', labelKey: 'metric_paid_followers', label: 'Paid Followers' },
+  { key: 'reposts', labelKey: 'metric_reposts', label: 'Reposts' },
+  { key: 'post_impressions', labelKey: 'metric_post_impressions', label: 'Post Impressions' },
+  { key: 'total_likes', labelKey: 'metric_total_likes', label: 'Total Likes' },
+  { key: 'reactions', labelKey: 'metric_reactions', label: 'Reactions' },
+  { key: 'outbound_clicks', labelKey: 'metric_outbound_clicks', label: 'Outbound Clicks' },
+  { key: 'favorites', labelKey: 'metric_favorites', label: 'Favorites' },
 ];
+
+// Pattern C helper (fetcher errors, S8): attaches a stable translation key to
+// a thrown Error so the render site can show a localized message while
+// `error.message` keeps the exact English fallback (byte-identical when no
+// translation applies). Only used by hooks whose `.message` is actually
+// rendered to the user — see analytics-v2/hooks/*.ts.
+export interface FetchError extends Error {
+  messageKey?: string;
+}
+
+export function createFetchError(messageKey: string, fallback: string): FetchError {
+  const err = new Error(fallback) as FetchError;
+  err.messageKey = messageKey;
+  return err;
+}
 
 export function formatCompactNumber(value: number): string {
   if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1) + 'B';

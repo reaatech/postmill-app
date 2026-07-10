@@ -136,14 +136,14 @@ export const UrlModal: FC<{
   }, [gotoUrl]);
   return (
     <div className="rounded-[4px] border border-newTableBorder bg-newBgColorInner px-[16px] pb-[16px] relative">
-      <TopTitle title={`Instance URL`} />
+      <TopTitle title={t('top_title_instance_url', 'Instance URL')} />
       <FormProvider {...methods}>
         <form
           className="gap-[8px] flex flex-col"
           onSubmit={methods.handleSubmit(submit)}
         >
           <div className="pt-[10px]">
-            <Input label="URL" name="url" />
+            <Input label={t('url', 'URL')} name="url" />
           </div>
           <div>
             <Button type="submit">{t('connect', 'Connect')}</Button>
@@ -329,11 +329,16 @@ const ChromeExtensionWarning: FC<{
           )}
         </li>
         <li>
-          We will store your cookies securely to facilitate the connection.
+          {t(
+            'chrome_extension_warning_cookies',
+            'We will store your cookies securely to facilitate the connection.'
+          )}
         </li>
         <li>
-          Postmill does not take responsibility for any issues arising or account
-          termination due to the use of this method.
+          {t(
+            'chrome_extension_warning_liability',
+            'Postmill does not take responsibility for any issues arising or account termination due to the use of this method.'
+          )}
         </li>
       </ul>
       <div className="flex gap-[10px] mt-[8px]">

@@ -10,6 +10,7 @@ import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.v
 import { Select } from '@gitroom/react/form/select';
 import { useWatch } from 'react-hook-form';
 import { FirstCommentField } from '@gitroom/frontend/components/composer/providers/shared/first-comment.field';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const messageTypes = [
   {
@@ -45,8 +46,22 @@ const announcementColors = [
   },
 ];
 
+const messageTypeLabelKeys: Record<string, string> = {
+  message: 'chat_message',
+  announcement: 'announcement',
+};
+
+const announcementColorLabelKeys: Record<string, string> = {
+  primary: 'primary_default',
+  blue: 'blue',
+  green: 'green',
+  orange: 'orange',
+  purple: 'purple',
+};
+
 const TwitchSettings: FC = () => {
   const { register, control } = useSettings();
+  const translate = useT();
   const messageType = useWatch({
     control,
     name: 'messageType',
@@ -55,27 +70,27 @@ const TwitchSettings: FC = () => {
   return (
     <div className="flex flex-col">
       <Select
-        label="Message Type"
+        label={translate('message_type', 'Message Type')}
         {...register('messageType', {
           value: 'message',
         })}
       >
         {messageTypes.map((t) => (
           <option key={t.value} value={t.value}>
-            {t.label}
+            {translate(messageTypeLabelKeys[t.value], t.label)}
           </option>
         ))}
       </Select>
       {messageType === 'announcement' && (
         <Select
-          label="Announcement Color"
+          label={translate('announcement_color', 'Announcement Color')}
           {...register('announcementColor', {
             value: 'primary',
           })}
         >
           {announcementColors.map((c) => (
             <option key={c.value} value={c.value}>
-              {c.label}
+              {translate(announcementColorLabelKeys[c.value], c.label)}
             </option>
           ))}
         </Select>

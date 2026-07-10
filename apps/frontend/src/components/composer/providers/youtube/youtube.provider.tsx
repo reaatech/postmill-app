@@ -12,6 +12,7 @@ import { MediumTags } from '@gitroom/frontend/components/composer/providers/medi
 import { FileComponent } from '@gitroom/frontend/components/files/file.component';
 import { Select } from '@gitroom/react/form/select';
 import { YoutubePreview } from '@gitroom/frontend/components/composer/providers/youtube/youtube.preview';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 const type = [
   {
     label: 'Public',
@@ -37,43 +38,55 @@ const madeForKids = [
     value: 'yes',
   },
 ];
+const typeLabelKeys: Record<string, string> = {
+  public: 'public',
+  private: 'private',
+  unlisted: 'unlisted',
+};
+
+const madeForKidsLabelKeys: Record<string, string> = {
+  no: 'no',
+  yes: 'yes',
+};
+
 const YoutubeSettings: FC = () => {
   const { register, control } = useSettings();
+  const translate = useT();
   return (
     <div className="flex flex-col">
-      <Input label="Title" {...register('title')} maxLength={100} />
+      <Input label={translate('label_title', 'Title')} {...register('title')} maxLength={100} />
       <Select
-        label="Type"
+        label={translate('type', 'Type')}
         {...register('type', {
           value: 'public',
         })}
       >
         {type.map((t) => (
           <option key={t.value} value={t.value}>
-            {t.label}
+            {translate(typeLabelKeys[t.value], t.label)}
           </option>
         ))}
       </Select>
       <Select
-        label="Made for kids"
+        label={translate('made_for_kids', 'Made for kids')}
         {...register('selfDeclaredMadeForKids', {
           value: 'no',
         })}
       >
         {madeForKids.map((t) => (
           <option key={t.value} value={t.value}>
-            {t.label}
+            {translate(madeForKidsLabelKeys[t.value], t.label)}
           </option>
         ))}
       </Select>
-      <MediumTags label="Tags" {...register('tags')} />
+      <MediumTags label={translate('tags', 'Tags')} {...register('tags')} />
       <div className="mt-[20px]">
         <FileComponent
           type="image"
           width={1280}
           height={720}
-          label="Thumbnail"
-          description="Thumbnail picture (optional)"
+          label={translate('label_thumbnail', 'Thumbnail')}
+          description={translate('thumbnail_picture_optional', 'Thumbnail picture (optional)')}
           {...register('thumbnail')}
         />
       </div>

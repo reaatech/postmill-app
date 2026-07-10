@@ -13,26 +13,45 @@ interface CommentComposerProps {
   parentCommentText?: string;
 }
 
-const humanizeAiError = (status: number, body: any): string => {
+const humanizeAiError = (
+  t: ReturnType<typeof useT>,
+  status: number,
+  body: any
+): string => {
   if (status === 429) {
     const message = body?.message || body?.error;
     return message === 'BudgetExceeded' || body?.error === 'BudgetExceeded'
-      ? 'AI budget exceeded — contact your admin to increase limits.'
-      : `Rate limited: ${message || 'please try again later.'}`;
+      ? t(
+          'ai_budget_exceeded',
+          'AI budget exceeded — contact your admin to increase limits.'
+        )
+      : t('ai_rate_limited', 'Rate limited: {{message}}', {
+          message:
+            message ||
+            t('please_try_again_later', 'please try again later.'),
+        });
   }
   if (status === 403) {
     const policy = body?.policy;
     return policy
-      ? `AI blocked by guardrail policy: ${policy}`
-      : 'AI request blocked by content guardrail.';
+      ? t('ai_blocked_by_guardrail_policy', 'AI blocked by guardrail policy: {{policy}}', {
+          policy,
+        })
+      : t(
+          'ai_blocked_by_content_guardrail',
+          'AI request blocked by content guardrail.'
+        );
   }
   if (status === 422 || body?.error === 'CapabilityNotAvailable') {
-    return 'AI comment drafting is not available on this provider.';
+    return t(
+      'ai_comment_drafting_unavailable',
+      'AI comment drafting is not available on this provider.'
+    );
   }
   if (status === 402) {
-    return 'AI spend cap reached. Contact your admin.';
+    return t('ai_spend_cap_reached', 'AI spend cap reached. Contact your admin.');
   }
-  return 'AI draft failed. Please try again.';
+  return t('ai_draft_failed', 'AI draft failed. Please try again.');
 };
 
 export const CommentComposer: FC<CommentComposerProps> = ({
@@ -98,7 +117,7 @@ export const CommentComposer: FC<CommentComposerProps> = ({
       setMessage(data.suggestion || '');
     } catch (err: any) {
       if (err.status) {
-        setError(humanizeAiError(err.status, err.body));
+        setError(humanizeAiError(t, err.status, err.body));
       } else {
         setError(t('ai_draft_failed', 'AI draft failed. Please try again.'));
       }
@@ -158,7 +177,7 @@ export const CommentComposer: FC<CommentComposerProps> = ({
                 setMessage(data.suggestion || '');
               } catch (err: any) {
                 if (err.status) {
-                  setError(humanizeAiError(err.status, err.body));
+                  setError(humanizeAiError(t, err.status, err.body));
                 } else {
                   setError(t('summarize_failed', 'Summarize failed. Please try again.'));
                 }

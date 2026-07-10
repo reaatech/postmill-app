@@ -8,6 +8,7 @@ import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import { FC } from 'react';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const Icons = () => {
   return (
@@ -253,6 +254,7 @@ export const LinkedinPreview: FC<{
   const { value: topValue, integration } = useIntegration();
   const current = useLaunchStore((state) => state.current);
   const mediaDir = useMediaDirectory();
+  const t = useT();
 
   const renderContent = topValue.map((p) => {
     const newContent = stripHtmlValidation(
@@ -278,7 +280,10 @@ export const LinkedinPreview: FC<{
         .replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
           return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
         }) +
-      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="This text will be cropped">` +
+      `<mark class="bg-red-500" data-tooltip-id="tooltip" data-tooltip-content="${t(
+        'this_text_will_be_cropped',
+        'This text will be cropped'
+      )}">` +
       newContent.slice(end).replace(/\[\[\[([.\s\S]*?)]]]/, (match, match1) => {
         return `<span class="font-bold font-[arial]" style="color: #2b5cd3">${match1}</span>`;
       }) +
@@ -293,14 +298,14 @@ export const LinkedinPreview: FC<{
           {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
           <img
             src={integration?.picture || '/no-picture.jpg'}
-            alt="social"
+            alt={t('alt_social', 'social')}
             className="rounded-full relative z-[2] w-[48px] h-[48px]"
           />
         </div>
         <div className="flex flex-col leading-[16px]">
           <div className="text-[14px] font-[500]">{integration?.name}</div>
           <div className="text-[12px] font-[400] text-[#A3A3A3]">
-            2,871 followers
+            {t('follower_count_2871', '2,871 followers')}
           </div>
           <div className="text-[12px] font-[400] text-[#A3A3A3] flex gap-[4px] items-center">
             <span>30m •</span>
@@ -345,11 +350,11 @@ export const LinkedinPreview: FC<{
           <div className="">88</div>
         </div>
         <div className="gap-[9px] items-center flex">
-          <div>4 Comments</div>
+          <div>{t('comment_count_4', '4 Comments')}</div>
           <div>
             <div className="w-[3px] h-[3px] bg-[#565C65] rounded-full" />
           </div>
-          <div>8 Reposts</div>
+          <div>{t('repost_count_8', '8 Reposts')}</div>
         </div>
       </div>
       <div className="pt-[8px] flex text-[14px] font-[700] px-[32px] justify-between border-t border-borderLinkedin text-textLinkedin">
@@ -366,7 +371,7 @@ export const LinkedinPreview: FC<{
               fill="currentColor"
             />
           </svg>
-          <div>Like</div>
+          <div>{t('like', 'Like')}</div>
         </div>
         <div className="flex gap-[4px] items-center">
           <svg
@@ -382,7 +387,7 @@ export const LinkedinPreview: FC<{
               strokeWidth="2"
             />
           </svg>
-          <div>Comments</div>
+          <div>{t('comments', 'Comments')}</div>
         </div>
         <div className="flex gap-[4px] items-center">
           <svg
@@ -408,7 +413,7 @@ export const LinkedinPreview: FC<{
               </clipPath>
             </defs>
           </svg>
-          <div>Repost</div>
+          <div>{t('repost', 'Repost')}</div>
         </div>
         <div className="flex gap-[4px] items-center">
           <svg
@@ -423,7 +428,7 @@ export const LinkedinPreview: FC<{
               fill="currentColor"
             />
           </svg>
-          <div>Send</div>
+          <div>{t('send', 'Send')}</div>
         </div>
       </div>
       {renderContent.length > 1 && (
@@ -435,7 +440,7 @@ export const LinkedinPreview: FC<{
                   {/* eslint-disable-next-line @next/next/no-img-element -- external channel avatar */}
                   <img
                     src={integration?.picture || '/no-picture.jpg'}
-                    alt="social"
+                    alt={t('alt_social', 'social')}
                     className="rounded-full relative z-[2] h-[34px] w-[34px]"
                   />
                 </div>
@@ -448,10 +453,12 @@ export const LinkedinPreview: FC<{
                       <div>
                         <LinkedinIconSmall />
                       </div>
-                      <div className="text-[12px] font-[400]">• 1st</div>
+                      <div className="text-[12px] font-[400]">
+                        {t('bullet_first_degree', '• 1st')}
+                      </div>
                     </div>
                     <div className="text-[12px] font-[400] text-textLinkedin">
-                      Founder
+                      {t('founder', 'Founder')}
                     </div>
                   </div>
                   <SafeContent
@@ -459,7 +466,7 @@ export const LinkedinPreview: FC<{
                     content={value.text}
                   />
                   <div className="flex gap-[6px] font-[400] text-[12px] text-textLinkedin items-center">
-                    <div className="font-[700]">Like</div>
+                    <div className="font-[700]">{t('like', 'Like')}</div>
                     <div>•</div>
                     <div>
                       <svg
@@ -499,9 +506,9 @@ export const LinkedinPreview: FC<{
                     </div>
                     <div>19</div>
                     <div>|</div>
-                    <div className="font-[700]">Reply</div>
+                    <div className="font-[700]">{t('reply', 'Reply')}</div>
                     <div>•</div>
-                    <div>1 reply</div>
+                    <div>{t('reply_count_1', '1 reply')}</div>
                   </div>
                 </div>
               </div>
