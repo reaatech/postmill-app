@@ -161,7 +161,7 @@ export const MobileView = () => {
         >
           {loading ? (
             <div className="flex-1 flex items-center justify-center text-textColor">
-              {t('loading', 'Loading...')}
+              {t('loading', 'Loading')}
             </div>
           ) : posts.length === 0 ? (
             <div className="flex-1 flex items-center justify-center text-textColor text-[16px]">

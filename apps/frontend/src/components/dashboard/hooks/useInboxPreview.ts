@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../dashboard.utils';
 
 export interface InboxComment {
   id: string;
@@ -32,7 +33,7 @@ export const useInboxPreview = (limit = 4) => {
     async (url: string): Promise<InboxPreviewResponse> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load inbox');
+        throw createFetchError('inbox_fetch_failed', 'Failed to load inbox');
       }
       return res.json();
     },

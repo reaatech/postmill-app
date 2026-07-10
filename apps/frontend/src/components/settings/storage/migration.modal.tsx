@@ -194,11 +194,11 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                 <div className="flex justify-between text-[12px] text-newTableText mb-[4px]">
                   <span>
                     {progress && progress.total > 0
-                      ? translate('migrating_progress', 'Migrating\u2026 {{processed}} / {{total}}', {
+                      ? translate('migrating_progress', 'Migrating… {{processed}} / {{total}}', {
                           processed,
                           total: progress.total,
                         })
-                      : translate('migrating_ellipsis', 'Migrating\u2026')}
+                      : translate('migrating_ellipsis', 'Migrating…')}
                   </span>
                   <span>{percent}%</span>
                 </div>

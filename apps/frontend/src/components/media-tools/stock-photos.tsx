@@ -31,15 +31,21 @@ const COLOR_KEY: Record<string, string> = {
   white: 'color_white',
   gray: 'color_gray',
   red: 'color_red',
-  orange: 'orange',
+  orange: 'color_orange',
   yellow: 'color_yellow',
-  green: 'green',
-  blue: 'blue',
-  purple: 'purple',
+  green: 'color_green',
+  blue: 'color_blue',
+  purple: 'color_purple',
   brown: 'color_brown',
 };
 
-const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'People', 'Abstract'];
+const SUGGESTED_SEARCHES: { key: string; label: string }[] = [
+  { key: 'suggested_search_nature', label: 'Nature' },
+  { key: 'suggested_search_city', label: 'City' },
+  { key: 'suggested_search_technology', label: 'Technology' },
+  { key: 'suggested_search_people', label: 'People' },
+  { key: 'suggested_search_abstract', label: 'Abstract' },
+];
 
 interface StockPhotosProps {
   mode?: 'browse' | 'select';
@@ -261,12 +267,12 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
           <div className="flex items-center flex-wrap justify-center gap-[8px] mt-[4px]">
             {SUGGESTED_SEARCHES.map((s) => (
               <button
-                key={s}
+                key={s.key}
                 type="button"
-                onClick={() => setQuery(s)}
+                onClick={() => setQuery(s.label)}
                 className="h-[30px] px-[14px] rounded-full border border-newColColor text-[12px] text-newTextColor/70 hover:text-btnPrimary hover:border-btnPrimary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-btnPrimary"
               >
-                {s}
+                {t(s.key, s.label)}
               </button>
             ))}
           </div>

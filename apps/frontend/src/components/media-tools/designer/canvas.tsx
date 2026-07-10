@@ -811,7 +811,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" opacity="0.3" />
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
             </svg>
-            {t('uploading_ellipsis', 'Uploading...')}
+            {t('uploading_ellipsis', 'Uploading…')}
           </div>
         </div>
       )}

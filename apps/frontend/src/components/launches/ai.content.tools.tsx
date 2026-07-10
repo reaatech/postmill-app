@@ -129,7 +129,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({
-          message: 'Request failed',
+          message: t('request_failed', 'Request failed'),
         }));
         setError(err);
         return;
@@ -137,7 +137,9 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
 
       setResults(await res.json());
     } catch {
-      setError('Network error — please try again');
+      setError(
+        t('network_error_please_try_again', 'Network error — please try again')
+      );
     } finally {
       setLoading(false);
     }

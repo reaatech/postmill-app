@@ -5,6 +5,7 @@ import {
   CapabilityMeta,
   KitCredentialField,
 } from '../provider-surface.types';
+import { createFetchError } from '../../fetch-error';
 import {
   ContentPackConfigResponse,
   ContentPackProviderInfo,
@@ -70,7 +71,7 @@ export const contentPacksDescriptor: ProviderSurfaceDescriptor<ContentPackProvid
 
     load: async (fetch) => {
       const res = await fetch('/settings/content-packs/config');
-      if (!res.ok) throw new Error('Failed to load content pack settings');
+      if (!res.ok) throw createFetchError('failed_to_load_content_pack_settings', 'Failed to load content pack settings');
       const data: ContentPackConfigResponse = await res.json();
       const rows: ProviderRow<ContentPackProviderInfo>[] = (
         data.providers || []

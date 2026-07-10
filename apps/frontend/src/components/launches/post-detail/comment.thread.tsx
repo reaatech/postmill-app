@@ -60,7 +60,7 @@ const useSocialComments = (postId: string) => {
       if (res.status === 400 || res.status === 404 || res.status === 501 || res.status === 405) {
         return { comments: [], nextCursor: undefined, unreadCount: 0, notSupported: true };
       }
-      throw new Error('Failed to load comments');
+      throw new Error('failed_to_load_comments');
     }
     return res.json();
   }, [postId, fetch]);
@@ -362,7 +362,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
         body: JSON.stringify({ like: liked }),
       });
       if (!res.ok) {
-        throw new Error('like failed');
+        throw new Error('like_failed');
       }
       let serverCount: number | undefined;
       try {

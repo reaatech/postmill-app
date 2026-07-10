@@ -4,6 +4,7 @@ import React, { useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
@@ -59,7 +60,7 @@ const useStorageProviders = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage');
-    if (!res.ok) throw new Error('Failed to load storage providers');
+    if (!res.ok) throw createFetchError('failed_to_load_storage_providers', 'Failed to load storage providers');
     return res.json();
   }, [fetch]);
   return useSWR<StorageProviderRow[]>('storage-providers', load, { revalidateOnFocus: false });
@@ -69,7 +70,7 @@ const useStorageUsage = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage/usage');
-    if (!res.ok) throw new Error('Failed to load storage usage');
+    if (!res.ok) throw createFetchError('failed_to_load_storage_usage', 'Failed to load storage usage');
     return res.json();
   }, [fetch]);
   return useSWR<StorageUsageResponse>('storage-usage', load, { revalidateOnFocus: false });
@@ -79,7 +80,7 @@ const useQuotaStatus = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage/quota-status');
-    if (!res.ok) throw new Error('Failed to load quota status');
+    if (!res.ok) throw createFetchError('failed_to_load_quota_status', 'Failed to load quota status');
     return res.json();
   }, [fetch]);
   return useSWR<QuotaStatusResponse>('storage-quota-status', load, { revalidateOnFocus: false });
@@ -89,7 +90,7 @@ const useUsageBreakdown = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
     const res = await fetch('/settings/storage/usage-breakdown');
-    if (!res.ok) throw new Error('Failed to load usage breakdown');
+    if (!res.ok) throw createFetchError('failed_to_load_usage_breakdown', 'Failed to load usage breakdown');
     return res.json();
   }, [fetch]);
   return useSWR<UsageBreakdownResponse>('storage-usage-breakdown', load, { revalidateOnFocus: false });
@@ -497,7 +498,7 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
               </div>
             </div>
           ) : (
-            <div className="text-[13px] text-newTableText animate-pulse">{t('loading', 'Loading...')}</div>
+            <div className="text-[13px] text-newTableText animate-pulse">{t('loading', 'Loading')}</div>
           )}
         </div>
       )}

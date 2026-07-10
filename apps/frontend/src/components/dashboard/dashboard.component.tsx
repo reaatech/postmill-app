@@ -101,8 +101,8 @@ export const DashboardComponent = () => {
   const series = useMemo(() => {
     if (!overviewData?.series || !mainKPI) return [];
     const points = overviewData.series[mainKPI.metric] || [];
-    return points.map((p) => ({ ...p, date: dayjs(p.date).format('M/DD') }));
-  }, [overviewData, mainKPI]);
+    return points.map((p) => ({ ...p, date: dayjs(p.date).format(t('chart_date_format', 'M/DD')) }));
+  }, [overviewData, mainKPI, t]);
 
   const hasOverview = !!overviewData && series.length > 0;
 

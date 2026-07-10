@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '../dashboard.utils';
 
 export interface DailyBriefResponse {
   brief: string;
@@ -21,7 +22,7 @@ export const useDailyBrief = () => {
     async (url: string): Promise<DailyBriefResponse | DailyBriefEmpty> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load brief');
+        throw createFetchError('brief_fetch_failed', 'Failed to load brief');
       }
       return res.json();
     },

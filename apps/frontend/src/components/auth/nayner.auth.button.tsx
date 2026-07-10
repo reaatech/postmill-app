@@ -9,11 +9,13 @@ import React, {
   ReactNode,
 } from 'react';
 import { useNeynarContext } from '@neynar/react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export const NeynarAuthButton: FC<{
   children: ReactNode;
   onLogin: (code: string) => void;
 }> = (props) => {
   const { children, onLogin } = props;
+  const t = useT();
   const { client_id } = useNeynarContext();
   const [showModal, setShowModal] = useState(false);
   const authWindowRef = useRef<Window | null>(null);
@@ -61,7 +63,10 @@ export const NeynarAuthButton: FC<{
     );
     if (!authWindowRef.current) {
       console.error(
-        'Failed to open the authentication window. Please check your pop-up blocker settings.'
+        t(
+          'popup_blocker_warning',
+          'Failed to open the authentication window. Please check your pop-up blocker settings.'
+        )
       );
       return;
     }

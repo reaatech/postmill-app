@@ -135,7 +135,7 @@ describe('AttentionFeed', () => {
     mockHook.mockReturnValue({ data: { items }, isLoading: false, retryPost: mockRetry, dismissAnomaly: mockDismiss });
 
     render(<AttentionFeed />);
-    fireEvent.click(await screen.findByText('Show 2 failed posts'));
+    fireEvent.click(await screen.findByText(/Show 2 failed post/));
 
     expect(screen.getByText('X / @acct')).toBeTruthy();
     expect(screen.getByText('LinkedIn')).toBeTruthy();

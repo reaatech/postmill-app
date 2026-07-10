@@ -166,20 +166,13 @@ export const CANONICAL_METRICS: { key: string; labelKey: string; label: string }
   { key: 'favorites', labelKey: 'metric_favorites', label: 'Favorites' },
 ];
 
-// Pattern C helper (fetcher errors, S8): attaches a stable translation key to
-// a thrown Error so the render site can show a localized message while
-// `error.message` keeps the exact English fallback (byte-identical when no
-// translation applies). Only used by hooks whose `.message` is actually
-// rendered to the user — see analytics-v2/hooks/*.ts.
-export interface FetchError extends Error {
-  messageKey?: string;
-}
-
-export function createFetchError(messageKey: string, fallback: string): FetchError {
-  const err = new Error(fallback) as FetchError;
-  err.messageKey = messageKey;
-  return err;
-}
+// Pattern C helper (fetcher errors, S8) — single source of truth in the shared
+// module; re-exported here so analytics-v2/hooks/*.ts can keep importing it from
+// '../utils'.
+export {
+  createFetchError,
+  type FetchError,
+} from '@gitroom/frontend/components/settings/shared/fetch-error';
 
 export function formatCompactNumber(value: number): string {
   if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1) + 'B';

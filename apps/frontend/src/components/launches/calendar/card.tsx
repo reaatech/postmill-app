@@ -164,7 +164,9 @@ export const CalendarItem: FC<{
         <div
           className="absolute -top-[6px] -end-[6px] z-20 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
           data-tooltip-id="tooltip"
-          data-tooltip-content={`${post.unreadComments} ${t('unread_comments', 'unread replies')}`}
+          data-tooltip-content={t('unread_comments', '{{count}} unread reply', {
+            count: post.unreadComments,
+          })}
         >
           {post.unreadComments > 99 ? '99+' : post.unreadComments}
         </div>

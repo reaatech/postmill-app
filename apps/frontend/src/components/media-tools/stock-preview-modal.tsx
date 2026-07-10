@@ -297,7 +297,12 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       return (
         <div className="text-[12px] text-newTextColor/60">
           {icon.prefix} · {t('license_label', 'License:')} {icon.license}
-          {requiresAttribution && ` · ${t('attribution_required', 'Attribution required')}`}
+          {requiresAttribution && (
+            <>
+              {' · '}
+              {t('attribution_required', 'Attribution required')}
+            </>
+          )}
         </div>
       );
     }

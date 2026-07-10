@@ -249,13 +249,13 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
           <Select
             name="channelSelector"
             label=""
-            aria-label={t('select_channel', 'Select channel...')}
+            aria-label={t('select_channel', 'Select Channel')}
             disableForm={true}
             hideErrors={true}
             value={selectedChannel}
             onChange={(e) => setSelectedChannel(e.target.value)}
           >
-            <option value="">{t('select_channel', 'Select channel...')}</option>
+            <option value="">{t('select_channel', 'Select Channel')}</option>
             {channels.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}

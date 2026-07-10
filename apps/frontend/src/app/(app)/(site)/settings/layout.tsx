@@ -97,8 +97,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
           <button
             type="button"
             onClick={toggle}
-            aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
-            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            aria-label={collapsed ? t('expand_menu', 'Expand menu') : t('collapse_menu', 'Collapse menu')}
+            title={collapsed ? t('expand_menu', 'Expand menu') : t('collapse_menu', 'Collapse menu')}
             className="w-[24px] h-[24px] flex items-center justify-center rounded-[6px] text-newTableText hover:text-textColor hover:bg-boxHover transition-colors"
           >
             <svg
@@ -123,6 +123,13 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
             items.forEach((item) => {
               if (item.section && item.section !== currentSection) {
                 currentSection = item.section;
+                const sectionKey =
+                  item.section === 'Workspace'
+                    ? 'settings_section_workspace'
+                    : item.section === 'Automation'
+                      ? 'settings_section_automation'
+                      : 'settings_section_developer';
+                const sectionDefault = item.section;
                 elements.push(
                   <div
                     key={`section-${item.section}`}
@@ -131,7 +138,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
                       collapsed && 'hidden'
                     )}
                   >
-                    {item.section}
+                    {t(sectionKey, sectionDefault)}
                   </div>
                 );
               }
@@ -176,7 +183,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       </div>
 
       <div className="bg-newBgColorInner flex-1 flex-col flex min-w-0 mobile:p-0 p-[20px] gap-[12px] h-[calc(100vh-104px)] mobile:h-auto min-h-0 overflow-y-auto mobile:overflow-visible">
-        <SubmenuStrip ariaLabel="Settings sections" items={stripItems} />
+        <SubmenuStrip ariaLabel={t('settings_sections_aria', 'Settings sections')} items={stripItems} />
         <div className="flex flex-col gap-[12px] mobile:p-[16px]">
           <div className="w-full mx-auto gap-[24px] flex flex-col relative rounded-[4px]">
             {activeItem && (

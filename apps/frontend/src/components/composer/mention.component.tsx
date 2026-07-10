@@ -112,7 +112,7 @@ const MentionList = forwardRef<any, any>(function MentionList(props, ref) {
         </div>
       ) : props?.loading ? (
         <div className="flex items-center justify-center p-2 text-gray-500">
-          {t('loading_ellipsis', 'Loading...')}
+          {t('loading_ellipsis', 'Loading…')}
         </div>
       ) : props?.items ? (
         props.items.length === 0 ? (
@@ -140,7 +140,7 @@ const MentionList = forwardRef<any, any>(function MentionList(props, ref) {
         )
       ) : (
         <div className="p-2 text-gray-500 text-center">
-          {t('loading_ellipsis', 'Loading...')}
+          {t('loading_ellipsis', 'Loading…')}
         </div>
       )}
     </div>

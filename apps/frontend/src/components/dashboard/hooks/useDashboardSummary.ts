@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useCallback } from 'react';
+import { createFetchError } from '../dashboard.utils';
 
 export interface DashboardSummary {
   totalPosts: number;
@@ -29,7 +30,7 @@ export const useDashboardSummary = () => {
   const load = useCallback(async (url: string): Promise<DashboardSummary> => {
     const res = await fetch(url);
     if (!res.ok) {
-      throw new Error('Failed to load summary');
+      throw createFetchError('summary_fetch_failed', 'Failed to load summary');
     }
     return res.json();
   }, [fetch]);

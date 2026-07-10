@@ -3,6 +3,7 @@
 import React, { FC } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
+import { createFetchError } from './fetch-error';
 import type { StudioField } from '@gitroom/frontend/components/media-tools/studio-kit/types';
 
 export interface DefaultCatalogOption {
@@ -45,7 +46,7 @@ export const useDefaultCatalog = (domain: 'ai' | 'media', category: string) => {
 
   const load = React.useCallback(async () => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to load catalog');
+    if (!res.ok) throw createFetchError('failed_to_load_default_catalog', 'Failed to load catalog');
     return (await res.json()) as DefaultCatalogResponse;
   }, [fetch, path]);
 

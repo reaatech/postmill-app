@@ -305,7 +305,7 @@ export const CalendarWeekProvider: FC<{
       // Without this, error JSON flows through `expandPosts` and renders as an
       // empty calendar — a user seeing "no posts" during an API blip may
       // recreate/reschedule. Throw so SWR surfaces `error` for a retry banner.
-      throw new Error('Failed to load posts');
+      throw new Error('could_not_load_posts');
     }
     const data = await res.json();
     return expandPosts(data);

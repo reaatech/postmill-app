@@ -3,7 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
-import { ChannelMetricResponse } from '../utils';
+import { ChannelMetricResponse, createFetchError } from '../utils';
 
 interface ChannelMetricParams {
   integrationId: string;
@@ -27,7 +27,7 @@ export const useChannelMetric = (params: ChannelMetricParams) => {
 
   const load = useCallback(async (path: string) => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to fetch channel metric');
+    if (!res.ok) throw createFetchError('channel_metric_fetch_failed', 'Failed to fetch channel metric');
     return res.json() as Promise<ChannelMetricResponse>;
   }, [fetch]);
 

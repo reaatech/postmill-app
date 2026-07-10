@@ -112,7 +112,10 @@ const GmbSettings: FC = () => {
         callToActionType !== 'CALL' && (
           <Input
             label={translate('label_call_to_action_url', 'Call to Action URL')}
-            placeholder="https://example.com"
+            placeholder={translate(
+              'cta_url_placeholder',
+              'https://example.com'
+            )}
             {...register('callToActionUrl')}
           />
         )}
@@ -161,7 +164,10 @@ const GmbSettings: FC = () => {
           </div>
           <Input
             label={translate('coupon_code_optional', 'Coupon Code (optional)')}
-            placeholder="SAVE20"
+            placeholder={translate(
+              'coupon_code_placeholder',
+              'SAVE20'
+            )}
             {...register('offerCouponCode')}
           />
           <Input
@@ -169,7 +175,10 @@ const GmbSettings: FC = () => {
               'redeem_online_url_optional',
               'Redeem Online URL (optional)'
             )}
-            placeholder="https://example.com/redeem"
+            placeholder={translate(
+              'redeem_url_placeholder',
+              'https://example.com/redeem'
+            )}
             {...register('offerRedeemUrl')}
           />
           <Input

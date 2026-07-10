@@ -8,6 +8,7 @@ import clsx from 'clsx';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
@@ -43,7 +44,7 @@ const useSignatures = () => {
     'signatures',
     async () => {
       const res = await fetch('/signatures');
-      if (!res.ok) throw new Error('Failed to load signatures');
+      if (!res.ok) throw createFetchError('failed_to_load_signatures', 'Failed to load signatures');
       return res.json();
     },
     { revalidateOnFocus: false, revalidateOnReconnect: false }
@@ -472,7 +473,7 @@ export const SignaturesComponent: FC<{
       {!isLoading && !error && (!data || data.length === 0) && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] flex flex-col items-center py-[40px] gap-[16px]">
           <div className="text-textColor/50 text-[14px]">
-            {t('no_signatures', 'No signatures created yet')}
+            {t('no_signatures', 'No signatures yet')}
           </div>
           <p className="text-[12px] text-newTableText max-w-[400px] text-center">
             {t(

@@ -8,6 +8,7 @@ import {
   menuLabel,
   menuLabelKey,
   MENU_ORDER,
+  submenuLabelKey,
   type DesignerAction,
   type DesignerMenu,
 } from './actions';
@@ -82,6 +83,7 @@ const ItemButton: FC<{ action: DesignerAction; onRun: () => void; indent?: boole
 };
 
 const Dropdown: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items, onClose }) => {
+  const t = useT();
   const entries = buildEntries(items);
   // Flip to right-aligned if a left-aligned dropdown would spill off the right
   // edge (the designer root is overflow-hidden, so spillover gets clipped).
@@ -111,7 +113,7 @@ const Dropdown: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items,
             ) : (
               <div>
                 <div className="px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-textColor/35">
-                  {entry.name}
+                  {t(submenuLabelKey(entry.name), entry.name)}
                 </div>
                 {entry.items.map((it) => (
                   <ItemButton key={it.id} action={it} onRun={onClose} indent />
@@ -226,6 +228,7 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
 
 // Inline variant (no absolute positioning) for the mobile ☰ overflow sheet.
 const DropdownInline: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items, onClose }) => {
+  const t = useT();
   const entries = buildEntries(items);
   return (
     <div>
@@ -239,7 +242,7 @@ const DropdownInline: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ 
             ) : (
               <div>
                 <div className="px-3 pt-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-textColor/35">
-                  {entry.name}
+                  {t(submenuLabelKey(entry.name), entry.name)}
                 </div>
                 {entry.items.map((it) => (
                   <ItemButton key={it.id} action={it} onRun={onClose} indent />

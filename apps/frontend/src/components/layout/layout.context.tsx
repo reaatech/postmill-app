@@ -103,11 +103,12 @@ function LayoutContextInner(params: { children: ReactNode }) {
       }
 
       if (response.status === 402) {
+        const paymentMessage = (await response.json()).message;
         if (
           await deleteDialog(
-            (
-              await response.json()
-            ).message,
+            t('payment_required_message', '{{message}}', {
+              message: paymentMessage,
+            }),
             t('move_to_billing', 'Move to billing'),
             t('payment_required', 'Payment Required')
           )

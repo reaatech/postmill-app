@@ -86,18 +86,16 @@ export const Features: FC<{
     const channelsOr = currentPricing.channel;
     const list = [];
     list.push(
-      `${channelsOr} ${
-        channelsOr === 1
-          ? t('billing_channel', 'channel')
-          : t('billing_channels', 'channels')
-      }`
+      t('billing_n_channels', '{{count}} channel', { count: channelsOr })
     );
     list.push(
-      `${
-        currentPricing.posts_per_month > 10000
-          ? t('billing_unlimited', 'Unlimited')
-          : currentPricing.posts_per_month
-      } ${t('billing_posts_per_month', 'posts per month')}`
+      currentPricing.posts_per_month > 10000
+        ? t('billing_unlimited_feature', 'Unlimited {{feature}}', {
+            feature: t('billing_posts_per_month', 'posts per month'),
+          })
+        : t('billing_n_posts_per_month', '{{count}} posts per month', {
+            count: currentPricing.posts_per_month,
+          })
     );
     if (currentPricing.team_members) {
       list.push(t('billing_unlimited_team_members', 'Unlimited team members'));
@@ -110,18 +108,16 @@ export const Features: FC<{
     list.push(t('billing_advanced_picture_editor', 'Advanced Picture Editor'));
     if (currentPricing?.image_generator) {
       list.push(
-        `${currentPricing?.image_generation_count} ${t(
-          'billing_ai_images_per_month',
-          'AI Images per month'
-        )}`
+        t('billing_n_ai_images_per_month', '{{count}} AI Images per month', {
+          count: currentPricing?.image_generation_count,
+        })
       );
     }
     if (currentPricing?.generate_videos) {
       list.push(
-        `${currentPricing?.generate_videos} ${t(
-          'billing_ai_videos_per_month',
-          'AI Videos per month'
-        )}`
+        t('billing_n_ai_videos_per_month', '{{count}} AI Videos per month', {
+          count: currentPricing?.generate_videos,
+        })
       );
     }
     return list;
@@ -223,7 +219,7 @@ const Info: FC<{
       <div>
         <Button disabled={feedback.length < 20} onClick={cancel}>
           {feedback.length < 20
-            ? t('please_add_at_least', 'Please add at least 20 chars')
+            ? t('please_add_at_least', 'Please add at least 20 characters')
             : t('cancel_subscription', 'Cancel Subscription')}
         </Button>
       </div>
@@ -343,11 +339,11 @@ export const MainBillingComponent: FC<{
           if (
             subscription?.cancelAt ||
             (await deleteDialog(
-              `${t(
-                'billing_are_you_sure_you_want_to_cancel_your_subscription',
-                'Are you sure you want to cancel your subscription?'
-              )}
-              ${messages.join(', ')}`,
+              t(
+                'billing_cancel_subscription_confirmation',
+                'Are you sure you want to cancel your subscription?\n{{messages}}',
+                { messages: messages.join(', ') }
+              ),
               t('billing_yes_cancel', 'Yes, cancel'),
               t('cancel_subscription', 'Cancel Subscription')
             ))
@@ -571,7 +567,7 @@ export const MainBillingComponent: FC<{
                             date: dayjs
                               .utc(subscription?.cancelAt)
                               .local()
-                              .format('D MMM, YYYY'),
+                              .format(t('billing_date_format', 'D MMM, YYYY')),
                           })
                         : t('cancel_subscription_1', 'Cancel subscription')
                       : // @ts-ignore
@@ -623,7 +619,7 @@ export const MainBillingComponent: FC<{
             'your_subscription_will_be_canceled_at',
             'Your subscription will be canceled at'
           )}{' '}
-          {newDayjs(subscription.cancelAt).local().format('D MMM, YYYY')}
+          {newDayjs(subscription.cancelAt).local().format(t('billing_date_format', 'D MMM, YYYY'))}
           <br />
           {t(
             'you_will_never_be_charged_again',

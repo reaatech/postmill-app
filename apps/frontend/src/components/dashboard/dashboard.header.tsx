@@ -32,7 +32,7 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({
   const hour = dayjs().tz(getTimezone()).hour();
   const greeting = greetingForUser(firstName, hour, t);
 
-  const dateLabel = dayjs().tz(getTimezone()).format('dddd, MMMM D');
+  const dateLabel = dayjs().tz(getTimezone()).format(t('dashboard_date_format', 'dddd, MMMM D'));
 
   return (
     <div className="flex flex-col gap-[8px] mb-[20px]">

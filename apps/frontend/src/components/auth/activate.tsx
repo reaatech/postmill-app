@@ -138,7 +138,9 @@ export function Activate() {
                 disabled={cooldown > 0}
               >
                 {cooldown > 0
-                  ? `${t('resend_available_in', 'You can resend in')} ${cooldown}s`
+                  ? t('resend_available_in_seconds', 'You can resend in {{seconds}}s', {
+                      seconds: cooldown,
+                    })
                   : t('resend_activation_email', 'Resend Activation Email')}
               </Button>
             </form>

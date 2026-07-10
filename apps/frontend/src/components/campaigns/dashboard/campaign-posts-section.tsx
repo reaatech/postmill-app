@@ -33,10 +33,10 @@ interface CampaignPost {
   };
 }
 
-const STATE_PILL: Record<string, { status: 'green' | 'blue' | 'amber' | 'red'; label: string }> = {
-  PUBLISHED: { status: 'green', label: 'Published' },
-  QUEUE: { status: 'blue', label: 'Scheduled' },
-  DRAFT: { status: 'amber', label: 'Draft' },
+const STATE_PILL: Record<string, { status: 'green' | 'blue' | 'amber' | 'red'; labelKey: string; label: string }> = {
+  PUBLISHED: { status: 'green', labelKey: 'post_state_published', label: 'Published' },
+  QUEUE: { status: 'blue', labelKey: 'post_state_queue', label: 'Scheduled' },
+  DRAFT: { status: 'amber', labelKey: 'post_state_draft', label: 'Draft' },
 };
 
 const ListIcon = (
@@ -65,7 +65,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
     '/integrations/list',
     async () => {
       const r = await fetch('/integrations/list');
-      if (!r.ok) throw new Error('Failed to load channels');
+      if (!r.ok) throw new Error(t('failed_to_load_channels', 'Failed to load channels'));
       return (await r.json()).integrations;
     },
     { revalidateOnFocus: false }
@@ -179,7 +179,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
         width: '140px',
         render: (post: CampaignPost) => (
           <span className="text-[13px] text-textColor">
-            {post.publishDate ? dayjs(post.publishDate).format('MMM D, YYYY HH:mm') : '—'}
+            {post.publishDate ? dayjs(post.publishDate).format(t('campaign_post_date_format', 'MMM D, YYYY HH:mm')) : '—'}
           </span>
         ),
       },
@@ -210,11 +210,11 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
       },
       {
         key: 'state',
-        header: t('status', 'Status'),
+        header: t('status', 'Status:'),
         width: '110px',
         render: (post: CampaignPost) => {
-          const pill = STATE_PILL[post.state || ''] || { status: 'blue' as const, label: post.state || '—' };
-          return <StatusPill status={pill.status} label={pill.label} />;
+          const pill = STATE_PILL[post.state || ''] || { status: 'blue' as const, labelKey: `post_state_${post.state?.toLowerCase()}`, label: post.state || '—' };
+          return <StatusPill status={pill.status} label={t(pill.labelKey, pill.label)} />;
         },
       },
       {
@@ -223,9 +223,9 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
         width: '180px',
         render: (post: CampaignPost) => (
           <div className="flex items-center gap-[12px] text-[12px] text-newTableText">
-            <span>{Math.round(post.lastViews || 0).toLocaleString()} {t('views', 'views')}</span>
-            <span>{Math.round(post.lastLikes || 0).toLocaleString()} {t('likes', 'likes')}</span>
-            <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('replies', 'replies')}</span>
+            <span>{Math.round(post.lastViews || 0).toLocaleString()} {t('views', 'Views')}</span>
+            <span>{Math.round(post.lastLikes || 0).toLocaleString()} {t('likes', 'Likes')}</span>
+            <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('replies', 'Replies')}</span>
           </div>
         ),
       },
@@ -291,7 +291,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
           <select
             value={status}
             onChange={(e) => update(setStatus)(e.target.value as typeof status)}
-            aria-label={t('status', 'Status')}
+            aria-label={t('status', 'Status:')}
             className="px-[12px] py-[8px] bg-newBgColorInner border border-newTableBorder rounded-[8px] text-[14px] outline-none"
           >
             <option value="all">{t('all_statuses', 'All statuses')}</option>
@@ -354,6 +354,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
           {paged.map((post) => {
             const pill = STATE_PILL[post.state || ''] || {
               status: 'blue' as const,
+              labelKey: `post_state_${post.state?.toLowerCase()}`,
               label: post.state || '—',
             };
             return (
@@ -372,7 +373,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
                       {post.integration?.name || '—'}
                     </span>
                   </div>
-                  <StatusPill status={pill.status} label={pill.label} />
+                  <StatusPill status={pill.status} label={t(pill.labelKey, pill.label)} />
                 </div>
                 <div className="text-[13px] text-textColor line-clamp-2">
                   {post.title || post.content?.replace(/<[^>]+>/g, ' ') || '—'}
@@ -380,13 +381,13 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
                 <div className="flex items-center justify-between gap-[8px] flex-wrap text-[12px] text-newTableText">
                   <span>
                     {post.publishDate
-                      ? dayjs(post.publishDate).format('MMM D, YYYY HH:mm')
+                      ? dayjs(post.publishDate).format(t('campaign_post_date_format', 'MMM D, YYYY HH:mm'))
                       : '—'}
                   </span>
                   <div className="flex items-center gap-[10px]">
-                    <span>{Math.round(post.lastViews || 0).toLocaleString()} {t('views', 'views')}</span>
-                    <span>{Math.round(post.lastLikes || 0).toLocaleString()} {t('likes', 'likes')}</span>
-                    <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('replies', 'replies')}</span>
+                    <span>{Math.round(post.lastViews || 0).toLocaleString()} {t('views', 'Views')}</span>
+                    <span>{Math.round(post.lastLikes || 0).toLocaleString()} {t('likes', 'Likes')}</span>
+                    <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('replies', 'Replies')}</span>
                   </div>
                 </div>
               </div>

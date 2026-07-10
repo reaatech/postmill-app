@@ -116,6 +116,17 @@ const MENU_LABEL_KEYS: Record<DesignerMenu, string> = {
 /** i18n key for a top-level menu label — used at render sites (menu-bar, command-palette). */
 export const menuLabelKey = (m: DesignerMenu) => MENU_LABEL_KEYS[m];
 
+const SUBMENU_LABEL_KEYS: Record<string, string> = {
+  New: 'designer_submenu_new',
+  Align: 'designer_submenu_align',
+  Arrange: 'designer_submenu_arrange',
+  Upscale: 'designer_submenu_upscale',
+};
+
+/** i18n key for a submenu heading (e.g. New / Align / Arrange / Upscale). */
+export const submenuLabelKey = (name: string) =>
+  SUBMENU_LABEL_KEYS[name] ?? `designer_submenu_${slugLabel(name)}`;
+
 // Labels that already have a reusable i18n key elsewhere in the app — avoid coining a
 // duplicate key for the exact same English word.
 const REUSED_ACTION_LABEL_KEYS: Record<string, string> = {

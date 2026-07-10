@@ -66,7 +66,7 @@ const SaveSetModal: FC<{
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-[16px]">
       <div>
         <Input
-          label="Template Name"
+          label={t('label_template_name', 'Template Name')}
           translationKey="label_template_name"
           name="setName"
           value={name}
@@ -308,13 +308,13 @@ export const Sets: FC = () => {
                         )}
                       </div>
                     ) : (
-                      <span className="text-[11px] text-newTableText">{t('no_channels', 'No channels')}</span>
+                      <span className="text-[11px] text-newTableText">{t('no_channels', 'No channels yet')}</span>
                     )}
                     <span className="text-[11px] text-newTableText">
-                      · {postCount} {postCount === 1 ? t('post', 'post') : t('posts_lower', 'posts')}
+                      · {postCount} {postCount === 1 ? t('post', 'Post') : t('posts_lower', 'posts')}
                     </span>
                     <span className="text-[11px] text-newTableText">
-                      · {dayjs(s.createdAt).format('MMM D, YYYY')}
+                      · {dayjs(s.createdAt).format(t('set_date_format', 'MMM D, YYYY'))}
                     </span>
                   </div>
                 </div>

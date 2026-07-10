@@ -75,7 +75,7 @@ const JoinOver: FC<{ onShowYouTube: () => void }> = ({ onShowYouTube }) => {
               src="/icons/platforms/youtube.svg"
               width={22.5}
               height={16}
-              alt="YouTube"
+              alt={t('youtube', 'YouTube')}
             />
           </div>
           <div>
@@ -390,10 +390,15 @@ export const BillingFeatures: FC<{ tier: string }> = ({ tier }) => {
   const renderFeature = (feature: FeatureItem) => {
     const translatedText = t(feature.key, feature.defaultValue);
     if (feature.prefix === 'unlimited') {
-      return `${t('billing_unlimited', 'Unlimited')} ${translatedText}`;
+      return t('billing_unlimited_feature', 'Unlimited {{feature}}', {
+        feature: translatedText,
+      });
     }
     if (feature.prefix !== undefined) {
-      return `${feature.prefix} ${translatedText}`;
+      return t('billing_feature_with_prefix', '{{prefix}} {{feature}}', {
+        prefix: feature.prefix,
+        feature: translatedText,
+      });
     }
     return translatedText;
   };

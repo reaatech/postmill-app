@@ -41,7 +41,7 @@ export const CampaignTemplatesSection: FC<{
     '/integrations/list',
     async () => {
       const r = await fetch('/integrations/list');
-      if (!r.ok) throw new Error('Failed to load channels');
+      if (!r.ok) throw new Error(t('failed_to_load_channels', 'Failed to load channels'));
       return (await r.json()).integrations;
     },
     { revalidateOnFocus: false }
@@ -159,6 +159,7 @@ export const CampaignTemplatesSection: FC<{
           {templates.map((item) => (
             <PanelItem
               key={item.id}
+              t={t}
               item={item}
               onRemove={remove}
               busy={removingId === item.id}

@@ -178,7 +178,12 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
               <span>
                 {(attribution as any)?.set || (attribution as any)?.prefix || 'Iconify'} · {t('license_label', 'License:')}{' '}
                 {(attribution as any)?.license || t('unknown', 'Unknown')}
-                {/cc-by/i.test(String((attribution as any)?.license || '')) && ` · ${t('attribution_required', 'Attribution required')}`}
+                {/cc-by/i.test(String((attribution as any)?.license || '')) && (
+                  <>
+                    {' · '}
+                    {t('attribution_required', 'Attribution required')}
+                  </>
+                )}
               </span>
             )}
           </div>

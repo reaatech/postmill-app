@@ -26,7 +26,7 @@ const useAuthProviders = () => {
   const fetch = useFetch();
   return useSWR<{ providers: AuthProvider[] }>('auth-providers', async () => {
     const res = await fetch('/auth/providers');
-    if (!res.ok) throw new Error('Failed to fetch auth providers');
+    if (!res.ok) throw new Error('failed_to_fetch_auth_providers');
     return res.json();
   });
 };
@@ -107,7 +107,11 @@ export function Login() {
     }
 
     if (providersError) {
-      return null;
+      return (
+        <div className="text-red-500 text-sm">
+          {t('failed_to_fetch_auth_providers', 'Failed to fetch auth providers')}
+        </div>
+      );
     }
 
     if (isGeneral && genericOauth) {
@@ -144,7 +148,7 @@ export function Login() {
               <div
                 className={`absolute z-[1] justify-center items-center w-full start-0 -top-[4px] flex`}
               >
-                <div className="px-[16px]">{t('or', 'or')}</div>
+                <div className="px-[16px]">{t('or', 'OR')}</div>
               </div>
             </div>
             <div className="flex flex-col gap-[12px]">

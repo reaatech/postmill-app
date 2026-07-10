@@ -235,7 +235,7 @@ const AiVideoDialog: FC<AiVideoDialogProps> = ({ fetch, toaster, selectedImageSr
         disabled={loading || !prompt.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
+        {loading ? t('generating', 'Generating...') : t('generate', 'Generate')}
       </button>
     </div>
   );
@@ -289,7 +289,7 @@ const MusicDialog: FC<MusicDialogProps> = ({ fetch, toaster, onResult }) => {
         disabled={loading || !prompt.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
+        {loading ? t('generating', 'Generating...') : t('generate', 'Generate')}
       </button>
     </div>
   );
@@ -365,7 +365,7 @@ const AvatarDialog: FC<AvatarDialogProps> = ({ fetch, toaster, selectedImageSrc,
         disabled={loading || !script.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
+        {loading ? t('generating', 'Generating...') : t('generate', 'Generate')}
       </button>
       <MediaSelectorModal
         open={pickerOpen}
@@ -450,7 +450,7 @@ const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult })
         disabled={loading || !prompt.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
+        {loading ? t('generating', 'Generating...') : t('generate', 'Generate')}
       </button>
       <MediaSelectorModal
         open={pickerOpen}
@@ -1719,10 +1719,9 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
 
       {/* Duration indicator */}
       <div className="flex items-center justify-end px-3 py-1 text-[10px] text-textColor/40">
-        {translate('n_tracks_count', '{{count}} track{{plural}}', { count: vo.tracks.length, plural: vo.tracks.length !== 1 ? 's' : '' })}{' \u00B7 '}
-        {translate('n_clips_count', '{{count}} clip{{plural}}', {
+        {translate('n_tracks_count', '{{count}} track', { count: vo.tracks.length })}{' \u00B7 '}
+        {translate('n_clips_count', '{{count}} clip', {
           count: vo.tracks.reduce((sum, t) => sum + t.clips.length, 0),
-          plural: vo.tracks.reduce((sum, t) => sum + t.clips.length, 0) !== 1 ? 's' : '',
         })}{' \u00B7 '}
         {formatTime(vo.durationMs)}
       </div>

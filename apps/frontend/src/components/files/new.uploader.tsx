@@ -212,6 +212,12 @@ export function useUppyUploader(props: {
               continue;
             }
 
+            const maxBytes = file.type?.startsWith('image/')
+              ? limits.image.maxBytes
+              : file.type?.startsWith('video/')
+                ? limits.video.maxBytes
+                : limits.audio.maxBytes;
+            const maxMB = Math.round(maxBytes / MB);
             const error = new Error(
               tRef.current(
                 'file_upload_limit_exceeded',
@@ -222,10 +228,10 @@ export function useUppyUploader(props: {
             uppy.log(error.message, 'error');
             uppy.info(error.message, 'error', 5000);
             toastRef.current.show(
-              limitCheck.reason.replace(
-                /Maximum size allowed is (\d+) bytes./,
-                (_: string, bytes: string) =>
-                  `Maximum size allowed is ${Math.round(Number(bytes) / MB)}MB.`,
+              tRef.current(
+                'upload_max_size_toast',
+                'Maximum size allowed is {{size}}MB.',
+                { size: maxMB }
               ),
               'warning'
             );

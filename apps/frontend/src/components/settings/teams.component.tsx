@@ -56,9 +56,9 @@ const CreateUserForm = ({ onDone }: { onDone: () => void }) => {
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(submit)} className="flex flex-col gap-[10px] p-[16px] pt-0">
-        <Input label="Email" name="email" placeholder={t('enter_email', 'Enter email')} />
-        <Input label="Password" name="password" type="password" placeholder={t('enter_password', 'Enter password')} />
-        <Select label="Role" name="roleId">
+        <Input label={t('email', 'Email')} name="email" placeholder={t('enter_email', 'Enter email')} />
+        <Input label={t('password', 'Password')} name="password" type="password" placeholder={t('enter_password', 'Enter password')} />
+        <Select label={t('role', 'Role')} name="roleId">
           <option value="">{t('select_role', 'Select Role')}</option>
           {(rolesList || []).map((r: RoleItem) => (
             <option key={r.id} value={r.id}>{r.name}</option>
@@ -99,8 +99,8 @@ const InviteMemberForm = ({ onDone }: { onDone: () => void }) => {
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(submit)} className="flex flex-col gap-[10px] p-[16px] pt-0">
-        <Input label="Email" name="email" placeholder={t('enter_email', 'Enter email')} />
-        <Select label="Role" name="roleId">
+        <Input label={t('email', 'Email')} name="email" placeholder={t('enter_email', 'Enter email')} />
+        <Select label={t('role', 'Role')} name="roleId">
           <option value="">{t('select_role', 'Select Role')}</option>
           {(rolesList || []).map((r: RoleItem) => (
             <option key={r.id} value={r.id}>{r.name}</option>
@@ -110,7 +110,7 @@ const InviteMemberForm = ({ onDone }: { onDone: () => void }) => {
           <input type="checkbox" aria-label={t('send_invitation_via_email', 'Send invitation via email?')} {...form.register('sendEmail')} className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer" />
           <span className="text-[13px]">{t('send_invitation_via_email', 'Send invitation via email?')}</span>
         </div>
-        <Button type="submit" className="mt-[18px]">{t('send_invitation_link', 'Send Invitation')}</Button>
+        <Button type="submit" className="mt-[18px]">{t('send_invitation_link', 'Send Invitation Link')}</Button>
       </form>
     </FormProvider>
   );
@@ -343,7 +343,9 @@ export const TeamsComponent = () => {
                   render: (m: any) =>
                     canManageMember(m) ? (
                       <select
-                        aria-label={`${t('role', 'Role')} — ${m.user.profile?.name || m.user.email}`}
+                        aria-label={t('role_for_user', 'Role — {{user}}', {
+                          user: m.user.profile?.name || m.user.email,
+                        })}
                         value={m.roleId || ''}
                         onChange={changeRole(m)}
                         className="bg-newBgColor border border-newTableBorder rounded-[8px] px-[8px] py-[4px] text-[13px] outline-none"
@@ -359,7 +361,7 @@ export const TeamsComponent = () => {
                 },
                 {
                   key: 'status',
-                  header: t('status', 'Status'),
+                  header: t('status', 'Status:'),
                   render: (m: any) => (
                     <StatusPill
                       status={getStatus(m) === 'active' ? 'green' : 'amber'}

@@ -6,7 +6,6 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 // dayjs locale imports and setup
 import 'dayjs/locale/en';
-import 'dayjs/locale/he';
 import 'dayjs/locale/ru';
 import 'dayjs/locale/zh';
 import 'dayjs/locale/fr';

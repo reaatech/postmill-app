@@ -498,7 +498,7 @@ export const Designer: FC<DesignerProps> = ({
       s.markSaved();
       toaster.show(translate('design_saved', 'Design saved'), 'success');
     } catch {
-      toaster.show(translate('save_failed', 'Save failed'), 'warning');
+      toaster.show(translate('save_failed', 'Failed to save'), 'warning');
     } finally {
       s.setSaving(false);
     }

@@ -171,7 +171,7 @@ describe('AlertRulesModal', () => {
     render(<AlertRulesModal />);
     fireEvent.click(screen.getByText('Delete'));
     await waitFor(() =>
-      expect(mockToasterShow).toHaveBeenCalledWith('Failed to delete rule', 'warning')
+      expect(mockToasterShow).toHaveBeenCalledWith('Failed to delete alert rule', 'warning')
     );
   });
 

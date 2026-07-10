@@ -3,7 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
-import { ChannelDetailResponse } from '../utils';
+import { ChannelDetailResponse, createFetchError } from '../utils';
 
 interface ChannelDetailParams {
   integrationId: string;
@@ -26,7 +26,7 @@ export const useChannelDetail = (params: ChannelDetailParams) => {
 
   const load = useCallback(async (path: string) => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to fetch channel detail');
+    if (!res.ok) throw createFetchError('channel_detail_fetch_failed', 'Failed to fetch channel detail');
     return res.json() as Promise<ChannelDetailResponse>;
   }, [fetch]);
 

@@ -70,7 +70,7 @@ export const BrandList = () => {
   if (isLoading) {
     return (
       <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+        <div className="animate-pulse">{t('loading', 'Loading')}</div>
       </div>
     );
   }

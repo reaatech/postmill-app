@@ -19,6 +19,7 @@ import { Button } from '@gitroom/react/form/button';
 import { useHotkeys } from 'react-hotkeys-hook';
 import clsx from 'clsx';
 import { EventEmitter } from 'events';
+import i18next from '@gitroom/react/translation/i18next';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface OpenModalInterface {
@@ -466,10 +467,13 @@ export const DecisionModal: FC<{
 export const decisionModalEmitter = new EventEmitter();
 
 export const areYouSure = ({
-  title = 'Are you sure?',
-  description = 'Are you sure you want to close this modal?' as any,
-  approveLabel = 'Yes',
-  cancelLabel = 'No',
+  title = i18next.t('are_you_sure', 'Are you sure?'),
+  description = i18next.t(
+    'are_you_sure_you_want_to_close_this_modal',
+    'Are you sure you want to close this modal?'
+  ) as any,
+  approveLabel = i18next.t('yes', 'Yes'),
+  cancelLabel = i18next.t('no', 'No'),
 } = {}): Promise<boolean> => {
   return new Promise<boolean>((newRes) => {
     decisionModalEmitter.emit('open', {

@@ -200,9 +200,8 @@ const PlanMessage: React.FC<{
                 </div>
                 {plan.slots.length > 0 && (
                   <div className="mt-1 text-[12px] text-textColor/60">
-                    {t('n_slots_count', '{{count}} slot{{plural}}', {
+                    {t('n_slots_count', '{{count}} slot', {
                       count: plan.slots.length,
-                      plural: plan.slots.length === 1 ? '' : 's',
                     })}
                   </div>
                 )}

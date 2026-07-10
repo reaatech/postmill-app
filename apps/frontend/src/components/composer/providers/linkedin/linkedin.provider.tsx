@@ -31,7 +31,7 @@ const LinkedInSettings = () => {
         <div className="mt-[10px]">
           <Input
             label={t('carousel_name', 'Carousel slide name')}
-            placeholder="slides"
+            placeholder={t('linkedin_slides_placeholder', 'slides')}
             {...register('carousel_name')}
           />
         </div>

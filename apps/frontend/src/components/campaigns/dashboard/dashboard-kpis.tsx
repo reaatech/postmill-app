@@ -127,7 +127,7 @@ export const DashboardKpis: FC<DashboardKpisProps> = ({ dashboard }) => {
     }
     return latest || analytics?.window?.to || '';
   }, [analytics]);
-  const asOfLabel = asOf ? dayjs(asOf).format('MMM D') : '';
+  const asOfLabel = asOf ? dayjs(asOf).format(t('campaign_kpis_asof_format', 'MMM D')) : '';
 
   const states = [
     { key: 'DRAFT', label: t('draft', 'Draft'), color: 'bg-newTableText/20 text-newTableText' },

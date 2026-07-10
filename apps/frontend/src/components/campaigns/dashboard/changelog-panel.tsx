@@ -94,7 +94,7 @@ export const ChangelogPanel: FC<ChangelogPanelProps> = ({ logs }) => {
         id: log.id,
         text,
         date: dayjs(log.createdAt).fromNow(),
-        fullDate: dayjs(log.createdAt).format('MMM D, YYYY h:mm A'),
+        fullDate: dayjs(log.createdAt).format(t('changelog_date_format', 'MMM D, YYYY h:mm A')),
       };
     });
   }, [logs, t]);

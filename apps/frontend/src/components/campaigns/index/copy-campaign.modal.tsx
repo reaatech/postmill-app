@@ -43,7 +43,7 @@ export const CopyCampaignModal: FC<{ campaignId: string; name: string; onDone: (
     setLoading(false);
 
     if (!res.ok) {
-      toast.show(t('copy_failed', 'Failed to copy campaign'), 'warning');
+      toast.show(t('copy_failed', 'Copy failed'), 'warning');
       return;
     }
 

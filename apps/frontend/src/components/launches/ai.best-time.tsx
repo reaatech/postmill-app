@@ -33,7 +33,10 @@ const AiBestTimeModal: FC<{ close: () => void }> = (props) => {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({
-          message: 'Best time analysis is temporarily unavailable',
+          message: t(
+            'best_time_analysis_unavailable',
+            'Best time analysis is temporarily unavailable'
+          ),
         }));
         setError(err);
         return;
@@ -42,11 +45,16 @@ const AiBestTimeModal: FC<{ close: () => void }> = (props) => {
       const data = await res.json();
       setResult(data);
     } catch {
-      setError('Best time analysis is temporarily unavailable');
+      setError(
+        t(
+          'best_time_analysis_unavailable',
+          'Best time analysis is temporarily unavailable'
+        )
+      );
     } finally {
       setLoading(false);
     }
-  }, [fetch]);
+  }, [fetch, t]);
 
   return (
     <div className="flex flex-col gap-[16px]">

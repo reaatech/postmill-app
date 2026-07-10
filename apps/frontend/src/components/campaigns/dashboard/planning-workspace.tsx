@@ -351,11 +351,11 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
               </div>
             </div>
             <div className="text-[13px] text-textColor line-clamp-2 min-h-[36px]">
-              {stripHtml(post.content) || t('no_content', 'No content')}
+              {stripHtml(post.content) || t('no_content', 'no content')}
             </div>
             <div className="text-[12px] text-newTableText">
               {post.publishDate
-                ? dayjs(post.publishDate).format('MMM D, YYYY h:mm A')
+                ? dayjs(post.publishDate).format(t('campaign_draft_date_format', 'MMM D, YYYY h:mm A'))
                 : t('unscheduled', 'Unscheduled')}
             </div>
           </div>
@@ -382,7 +382,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
             header: t('content', 'Content'),
             render: (post) => (
               <span className="text-[13px] text-textColor line-clamp-2">
-                {stripHtml(post.content) || t('no_content', 'No content')}
+                {stripHtml(post.content) || t('no_content', 'no content')}
               </span>
             ),
           },
@@ -405,7 +405,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
             render: (post) =>
               post.publishDate ? (
                 <span className="text-[13px] text-newTableText">
-                  {dayjs(post.publishDate).format('MMM D, YYYY h:mm A')}
+                  {dayjs(post.publishDate).format(t('campaign_draft_date_format', 'MMM D, YYYY h:mm A'))}
                 </span>
               ) : (
                 '—'
@@ -488,7 +488,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
 
       {!error && !data && (
         <div className="text-[13px] text-newTableText">
-          {t('loading', 'Loading…')}
+          {t('loading', 'Loading')}
         </div>
       )}
 

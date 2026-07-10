@@ -8,13 +8,15 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
 import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import i18next from '@gitroom/react/translation/i18next';
 import type { FileItem } from './file-manager';
 
-const fileSize = (bytes: number) => {
+const fileSize = (bytes: number, t: ReturnType<typeof useT>) => {
   if (!bytes) return '-';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes < 1024) return t('file_size_bytes', '{{size}} B', { size: bytes });
+  if (bytes < 1024 * 1024)
+    return t('file_size_kb', '{{size}} KB', { size: (bytes / 1024).toFixed(1) });
+  return t('file_size_mb', '{{size}} MB', { size: (bytes / (1024 * 1024)).toFixed(1) });
 };
 
 export const FilePreviewModal: FC<{
@@ -79,7 +81,7 @@ export const FilePreviewModal: FC<{
 
       <div className="flex items-center justify-between gap-[10px] flex-wrap">
         <div className="text-[12px] text-newTextColor/65">
-          {(file.type || t('file_type_file', 'file'))} · {fileSize(file.fileSize)}
+          {(file.type || t('file_type_file', 'file'))} · {fileSize(file.fileSize, t)}
         </div>
         <div className="flex items-center gap-[10px] flex-wrap">
           {onRemoveFromCampaign && (

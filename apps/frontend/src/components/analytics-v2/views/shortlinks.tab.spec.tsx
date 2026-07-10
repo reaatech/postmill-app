@@ -82,7 +82,7 @@ describe('Analytics ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab from="2026-01-01" to="2026-01-31" />, { wrapper });
 
-      expect(screen.getByText('Failed to load short links')).toBeDefined();
+      expect(screen.getByText('Failed to load')).toBeDefined();
     });
   });
 

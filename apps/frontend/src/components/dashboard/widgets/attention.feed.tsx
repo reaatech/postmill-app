@@ -84,7 +84,10 @@ const AttentionRow: FC<{
       await onRetry(postId);
       toaster.show(t('post_queued_for_retry', 'Post queued for retry'), 'success');
     } catch (err: any) {
-      toaster.show(err?.message || t('retry_failed', 'Retry failed'), 'warning');
+      toaster.show(
+        err?.messageKey ? t(err.messageKey, err.message) : err?.message || t('retry_failed', 'Retry failed'),
+        'warning'
+      );
     } finally {
       setWorking(false);
     }
@@ -96,7 +99,10 @@ const AttentionRow: FC<{
     try {
       await onDismiss(item.id);
     } catch (err: any) {
-      toaster.show(err?.message || t('dismiss_failed', 'Dismiss failed'), 'warning');
+      toaster.show(
+        err?.messageKey ? t(err.messageKey, err.message) : err?.message || t('dismiss_failed', 'Dismiss failed'),
+        'warning'
+      );
     } finally {
       setWorking(false);
     }
@@ -160,10 +166,9 @@ const AttentionRow: FC<{
                   ? t('hide_failed_posts', 'Hide failed posts')
                   : t(
                       'show_failed_posts_count',
-                      'Show {{count}} failed post{{plural}}',
+                      'Show {{count}} failed post',
                       {
                         count: payloadPosts.length,
-                        plural: payloadPosts.length === 1 ? '' : 's',
                       }
                     )}
               </button>

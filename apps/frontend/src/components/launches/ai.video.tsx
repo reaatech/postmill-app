@@ -44,24 +44,35 @@ const AiVideoModal: FC<{
       while (polls < MAX_POLLS) {
         const res = await fetch(`/media/jobs/${jobId}`);
         if (!res.ok) {
-          throw new Error('Failed to check video status');
+          throw new Error(
+            t('failed_to_check_video_status', 'Failed to check video status')
+          );
         }
         const job = await res.json();
         if (job.status === 'completed') {
           if (!job.artifactUrl) {
-            throw new Error('Video completed but no artifact was returned');
+            throw new Error(
+              t(
+                'video_completed_no_artifact',
+                'Video completed but no artifact was returned'
+              )
+            );
           }
           return { id: job.id, path: job.artifactUrl };
         }
         if (job.status === 'failed') {
-          throw new Error(job.error || 'Video generation failed');
+          throw new Error(
+            job.error || t('video_generation_failed', 'Video generation failed')
+          );
         }
         polls++;
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
       }
-      throw new Error('Video generation timed out');
+      throw new Error(
+        t('video_generation_timed_out', 'Video generation timed out')
+      );
     },
-    [fetch]
+    [fetch, t]
   );
 
   const generate = useCallback(async () => {
@@ -126,7 +137,7 @@ const AiVideoModal: FC<{
           onChange={(e) => setPrompt(e.target.value)}
           placeholder={t(
             'describe_the_video_you_want_to_generate',
-            'Describe the video you want to generate'
+            'Describe the video you want to generate...'
           )}
           className="bg-input min-h-[150px] p-[16px] outline-none border-newTableBorder border rounded-[4px] text-inputText placeholder-inputText"
         />

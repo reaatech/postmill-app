@@ -23,7 +23,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
     async (url) => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Search unavailable');
+        throw new Error(t('search_unavailable', 'Search unavailable'));
       }
       return res.json();
     },
@@ -82,7 +82,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
 
       {!isLoading && !error && debouncedQuery && (!data || data.length === 0) && (
         <div className="text-[13px] text-newTextColor/65 py-[32px] text-center">
-          {t('no_results_found', 'No results found for your query.')}
+          {t('no_results_found', 'No results found')}
         </div>
       )}
 

@@ -202,7 +202,7 @@ export function ProviderSettingsPanel<Meta = any>({
     return (
       <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
         <span className="text-[14px] text-red-500">
-          {t('failed_to_load', 'Failed to load settings')}
+          {t('failed_to_load', 'Failed to load')}
         </span>
         <button
           className="text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"
@@ -259,14 +259,17 @@ export function ProviderSettingsPanel<Meta = any>({
             ? ''
             : descriptor.titleKey
               ? t(descriptor.titleKey, descriptor.title)
-              : descriptor.title
+              : t(`provider_title_${descriptor.key}`, descriptor.title)
         }
         description={
           hideHeader
             ? undefined
             : descriptor.descriptionKey
               ? t(descriptor.descriptionKey, descriptor.description ?? '')
-              : descriptor.description
+              : t(
+                  `provider_description_${descriptor.key}`,
+                  descriptor.description ?? '',
+                )
         }
         toolbar={
           descriptor.filter.search ? (

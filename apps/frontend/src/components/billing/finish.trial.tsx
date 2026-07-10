@@ -47,7 +47,7 @@ export const FinishTrial: FC<{ close: () => void }> = (props) => {
         <div className="flex gap-[10px] flex-col w-[500px] h-auto bg-newBgColorInner border-newTableBorder border-2 rounded-xl pb-[20px] px-[20px] relative">
           <div className="flex">
             <div className="flex-1">
-              <TopTitle title={'Finishing Trial'} />
+              <TopTitle title={t('billing_finishing_trial', 'Finishing Trial')} />
             </div>
             <button
               onClick={props.close}

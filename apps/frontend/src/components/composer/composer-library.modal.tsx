@@ -115,7 +115,7 @@ export const ComposerLibraryModal: FC<ComposerLibraryModalProps> = ({
 
   const loadDrafts = useCallback(async () => {
     const res = await fetch('/posts/list?page=0&limit=100&state=draft');
-    if (!res.ok) throw new Error('Failed to load drafts');
+    if (!res.ok) throw new Error('failed_to_load_drafts');
     // The list endpoint minifies keys (group→g, content→c, …); expand first.
     const json = expandPostsList(await res.json());
     const posts = (json.posts || []) as DraftItem[];
@@ -131,13 +131,13 @@ export const ComposerLibraryModal: FC<ComposerLibraryModalProps> = ({
 
   const loadTemplates = useCallback(async () => {
     const res = await fetch('/sets');
-    if (!res.ok) throw new Error('Failed to load templates');
+    if (!res.ok) throw new Error('failed_to_load_templates');
     return (await res.json()) as TemplateItem[];
   }, [fetch]);
 
   const loadSignatures = useCallback(async () => {
     const res = await fetch('/signatures');
-    if (!res.ok) throw new Error('Failed to load signatures');
+    if (!res.ok) throw new Error('failed_to_load_signatures');
     return (await res.json()) as SignatureItem[];
   }, [fetch]);
 
@@ -372,7 +372,7 @@ export const ComposerLibraryModal: FC<ComposerLibraryModalProps> = ({
             <span className="text-[14px] text-newTableText">
               {tab === 'drafts' && t('no_drafts', 'No drafts yet')}
               {tab === 'templates' &&
-                t('no_templates', 'No post templates yet')}
+                t('no_templates', 'No post templates created yet')}
               {tab === 'signatures' && t('no_signatures', 'No signatures yet')}
             </span>
             <span className="text-[12px] text-newTableText max-w-[320px]">
@@ -473,18 +473,18 @@ export const ComposerLibraryModal: FC<ComposerLibraryModalProps> = ({
                           </div>
                         ) : (
                           <span className="text-[12px] text-newTableText">
-                            {t('no_channels', 'No channels')}
+                            {t('no_channels', 'No channels yet')}
                           </span>
                         )}
                         <span className="text-[12px] text-newTableText">
-                          · {postCount} {postCount === 1 ? t('post', 'post') : t('posts_lower', 'posts')}
+                          · {postCount} {postCount === 1 ? t('post', 'Post') : t('posts_lower', 'posts')}
                         </span>
                         {mediaCount > 0 && (
                           <span className="text-[12px] text-newTableText">
                             · {mediaCount}{' '}
                             {mediaCount === 1
-                              ? t('image', 'image')
-                              : t('images', 'images')}
+                              ? t('image', 'Image')
+                              : t('images', 'Images')}
                           </span>
                         )}
                       </div>

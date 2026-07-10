@@ -534,7 +534,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 onClick={handleAddFormats}
                 className="w-full py-1.5 rounded text-[12px] bg-designerAccent text-white hover:bg-designerAccent/80 font-medium"
               >
-                {t('designer_add_n_formats', 'Add {{count}} format{{plural}}', { count: pendingFormats.size, plural: pendingFormats.size > 1 ? 's' : '' })}
+                {t('designer_add_n_formats', 'Add {{count}} format', { count: pendingFormats.size })}
               </button>
             </div>
           )}

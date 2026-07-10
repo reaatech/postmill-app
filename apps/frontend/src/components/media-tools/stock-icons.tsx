@@ -8,7 +8,13 @@ import { StockIconItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
-const SUGGESTED_SEARCHES = ['Home', 'User', 'Heart', 'Arrow', 'Social'];
+const SUGGESTED_SEARCHES: { key: string; label: string }[] = [
+  { key: 'suggested_search_home', label: 'Home' },
+  { key: 'suggested_search_user', label: 'User' },
+  { key: 'suggested_search_heart', label: 'Heart' },
+  { key: 'suggested_search_arrow', label: 'Arrow' },
+  { key: 'suggested_search_social', label: 'Social' },
+];
 
 interface StockIconsProps {
   mode?: 'browse' | 'select';
@@ -168,12 +174,12 @@ export const StockIcons: FC<StockIconsProps> = ({ mode = 'browse', onSelect, onS
           <div className="flex items-center flex-wrap justify-center gap-[8px] mt-[4px]">
             {SUGGESTED_SEARCHES.map((s) => (
               <button
-                key={s}
+                key={s.key}
                 type="button"
-                onClick={() => setQuery(s)}
+                onClick={() => setQuery(s.label)}
                 className="h-[30px] px-[14px] rounded-full border border-newColColor text-[12px] text-newTextColor/70 hover:text-btnPrimaryAccent hover:border-[#2B5CD3] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
               >
-                {s}
+                {t(s.key, s.label)}
               </button>
             ))}
           </div>

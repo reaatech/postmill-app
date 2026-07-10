@@ -67,8 +67,8 @@ export const ScheduleTimeline: FC<ScheduleTimelineProps> = ({ upcomingPosts = []
       {schedule.days.map((day) => {
         const isGap = schedule.gaps.includes(day.date);
         const dayPosts = postsByDay.get(day.date) ?? [];
-        const label = dayjs(day.date).format('ddd');
-        const dateNum = dayjs(day.date).format('D');
+        const label = dayjs(day.date).format(t('schedule_day_abbrev_format', 'ddd'));
+        const dateNum = dayjs(day.date).format(t('schedule_day_number_format', 'D'));
         return (
           <div
             key={day.date}

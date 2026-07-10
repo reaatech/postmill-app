@@ -44,7 +44,7 @@ export const PinterestBoard: FC<{
   return (
     <Select
       name={name}
-      label="Select board"
+      label={t('select_board', 'Select board')}
       onChange={onChangeInner}
       value={currentMedia}
     >

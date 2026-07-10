@@ -78,7 +78,10 @@ export const DailyBrief: FC<DailyBriefProps> = ({ open }) => {
           'warning'
         );
       } else {
-        toaster.show(err?.message || t('could_not_generate_brief', 'Could not generate brief'), 'warning');
+        toaster.show(
+          err?.messageKey ? t(err.messageKey, err.message) : err?.message || t('could_not_generate_brief', 'Could not generate brief'),
+          'warning'
+        );
       }
     } finally {
       setGenerating(false);
@@ -148,8 +151,10 @@ export const DailyBrief: FC<DailyBriefProps> = ({ open }) => {
                       await generate();
                     } catch (err: any) {
                       toaster.show(
-                        err?.message ||
-                          t('could_not_regenerate_brief', 'Could not regenerate brief'),
+                        err?.messageKey
+                          ? t(err.messageKey, err.message)
+                          : err?.message ||
+                              t('could_not_regenerate_brief', 'Could not regenerate brief'),
                         'warning'
                       );
                     } finally {

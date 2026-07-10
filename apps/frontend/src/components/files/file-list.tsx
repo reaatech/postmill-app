@@ -5,20 +5,30 @@ import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import i18next from '@gitroom/react/translation/i18next';
 import type { FileItem } from './file-manager';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
 
 const formatDate = (dateStr: string) => {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(i18next.resolvedLanguage || 'en', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
 };
 
-const fileSize = (bytes: number) => {
+const fileSize = (bytes: number, t: ReturnType<typeof useT>) => {
   if (!bytes) return '-';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes < 1024) return t('file_size_bytes', '{{size}} B', { size: bytes });
+  if (bytes < 1024 * 1024)
+    return t('file_size_kb', '{{size}} KB', { size: (bytes / 1024).toFixed(1) });
+  return t('file_size_mb', '{{size}} MB', { size: (bytes / (1024 * 1024)).toFixed(1) });
 };
 
 export const FileList: FC<{
@@ -125,7 +135,7 @@ export const FileList: FC<{
       return <span className="text-[12px] text-textColor/60">{ext}</span>;
     }},
     { key: 'size', header: t('size', 'Size'), sortable: true, render: (file: FileItem) => (
-      <span className="text-[12px] text-textColor/60">{fileSize(file.fileSize)}</span>
+      <span className="text-[12px] text-textColor/60">{fileSize(file.fileSize, t)}</span>
     )},
     { key: 'folder', header: t('folder', 'Folder'), render: (file: FileItem) => (
       <span className="text-[12px] text-textColor/60">{file.folder?.name || '-'}</span>

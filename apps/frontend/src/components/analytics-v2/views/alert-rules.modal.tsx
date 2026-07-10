@@ -99,7 +99,7 @@ export const AlertRulesModal: FC = () => {
       if (editingId === id) resetForm();
       toaster.show(t('alert_rule_deleted', 'Alert rule deleted'), 'success');
     } catch {
-      toaster.show(t('alert_rule_delete_failed', 'Failed to delete rule'), 'warning');
+      toaster.show(t('alert_rule_delete_failed', 'Failed to delete alert rule'), 'warning');
     }
   };
 

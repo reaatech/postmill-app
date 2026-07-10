@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
+import { createFetchError } from './fetch-error';
 
 export interface CatalogCredentialField {
   key: string;
@@ -74,7 +75,7 @@ export function useProviderCatalog(domain?: string) {
   const load = useCallback(async () => {
     const url = domain ? `/providers/catalog?domain=${encodeURIComponent(domain)}` : '/providers/catalog';
     const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to load provider catalog');
+    if (!res.ok) throw createFetchError('failed_to_load_provider_catalog', 'Failed to load provider catalog');
     return res.json();
   }, [fetch, domain]);
 

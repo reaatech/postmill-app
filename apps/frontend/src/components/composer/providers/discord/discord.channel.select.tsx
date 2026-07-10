@@ -40,7 +40,7 @@ export const DiscordChannelSelect: FC<{
   return (
     <Select
       name={name}
-      label="Select Channel"
+      label={t('select_channel', 'Select Channel')}
       onChange={onChangeInner}
       value={currentMedia}
     >

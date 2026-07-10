@@ -5,6 +5,7 @@ import useSWR, { mutate as globalMutate } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { AttentionItemDto, AttentionResponseDto } from '@gitroom/nestjs-libraries/dtos/dashboard/attention.dto';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '../dashboard.utils';
 
 export type { AttentionItemDto, AttentionResponseDto };
 
@@ -15,7 +16,7 @@ export const useAttention = () => {
     async (url: string): Promise<AttentionResponseDto> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load attention');
+        throw createFetchError('attention_fetch_failed', 'Failed to load attention');
       }
       return res.json();
     },

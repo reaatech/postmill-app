@@ -7,6 +7,7 @@ import { Button } from '@gitroom/react/form/button';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import dayjs from 'dayjs';
 
 const useApprovedApps = () => {
   const fetch = useFetch();
@@ -32,7 +33,7 @@ export const ApprovedAppsComponent: FC = () => {
         await deleteDialog(
           t(
             'are_you_sure_revoke_access',
-            `Are you sure you want to revoke access for ${app.oauthApp?.name}?`,
+            'Are you sure you want to revoke access for {{name}}?',
             { name: app.oauthApp?.name }
           )
         )
@@ -96,7 +97,7 @@ export const ApprovedAppsComponent: FC = () => {
                     )}
                     <div className="text-newTableText text-[12px]">
                       {t('authorized_on', 'Authorized on')}{' '}
-                      {new Date(app.createdAt).toLocaleDateString()}
+                      {dayjs(app.createdAt).format(t('approved_app_date_format', 'MMM D, YYYY'))}
                     </div>
                   </div>
                 </div>

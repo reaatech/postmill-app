@@ -3,7 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
-import { PostsResponse } from '../utils';
+import { PostsResponse, createFetchError } from '../utils';
 
 interface PostsParams {
   from: string;
@@ -38,7 +38,7 @@ export const usePosts = (params?: PostsParams) => {
 
   const load = useCallback(async (path: string) => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to fetch posts');
+    if (!res.ok) throw createFetchError('posts_fetch_failed', 'Failed to fetch posts');
     return res.json() as Promise<PostsResponse>;
   }, [fetch]);
 

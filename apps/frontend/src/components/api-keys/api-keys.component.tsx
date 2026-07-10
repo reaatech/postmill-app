@@ -7,6 +7,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal';
 import copy from 'copy-to-clipboard';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import dayjs from 'dayjs';
 
 interface ApiKey {
   id: string;
@@ -271,7 +272,7 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
                 <th className="text-left px-[16px] py-[10px] font-[600] text-newTableText">{t('created', 'Created')}</th>
                 <th className="text-left px-[16px] py-[10px] font-[600] text-newTableText">{t('last_used', 'Last Used')}</th>
                 <th className="text-left px-[16px] py-[10px] font-[600] text-newTableText">{t('expiry', 'Expiry')}</th>
-                <th className="text-left px-[16px] py-[10px] font-[600] text-newTableText">{t('status', 'Status')}</th>
+                <th className="text-left px-[16px] py-[10px] font-[600] text-newTableText">{t('status', 'Status:')}</th>
                 <th className="text-right px-[16px] py-[10px] font-[600] text-newTableText">{t('actions', 'Actions')}</th>
               </tr>
             </thead>
@@ -280,9 +281,9 @@ export const ApiKeysSection: FC<{ onKeyCreated?: (key: CreatedKey) => void }> = 
                 <tr key={key.id} className="border-b border-newBorder last:border-b-0">
                   <td className="px-[16px] py-[12px]">{key.name}</td>
                   <td className="px-[16px] py-[12px] font-mono">{key.prefix}&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</td>
-                  <td className="px-[16px] py-[12px]">{new Date(key.createdAt).toLocaleDateString()}</td>
-                  <td className="px-[16px] py-[12px]">{key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString() : '-'}</td>
-                  <td className="px-[16px] py-[12px]">{key.expiresAt ? new Date(key.expiresAt).toLocaleDateString() : '-'}</td>
+                  <td className="px-[16px] py-[12px]">{dayjs(key.createdAt).format(t('api_key_date_format', 'MMM D, YYYY'))}</td>
+                  <td className="px-[16px] py-[12px]">{key.lastUsedAt ? dayjs(key.lastUsedAt).format(t('api_key_date_format', 'MMM D, YYYY')) : '-'}</td>
+                  <td className="px-[16px] py-[12px]">{key.expiresAt ? dayjs(key.expiresAt).format(t('api_key_date_format', 'MMM D, YYYY')) : '-'}</td>
                   <td className="px-[16px] py-[12px]">
                     {key.revokedAt ? (
                       <span className="text-dangerText">{t('revoked', 'Revoked')}</span>

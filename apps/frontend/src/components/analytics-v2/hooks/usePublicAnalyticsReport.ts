@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 // Public org analytics report (7.6). Read-only, token-scoped, whitelisted:
 // no ids beyond a channel's provider identifier, no org metadata.
@@ -35,7 +36,7 @@ export const usePublicAnalyticsReport = (token?: string) => {
 
   const load = useCallback(async () => {
     const res = await fetch(`/public/analytics-report/${token}`);
-    if (!res.ok) throw new Error('Failed to load shared report');
+    if (!res.ok) throw createFetchError('shared_report_fetch_failed', 'Failed to load shared report');
     return res.json() as Promise<PublicAnalyticsReport>;
   }, [fetch, token]);
 

@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 export interface WatchlistSeriesPoint {
   date: string;
@@ -38,7 +39,7 @@ export const useWatchlistSeries = (
   const load = useCallback(
     async (path: string) => {
       const res = await fetch(path);
-      if (!res.ok) throw new Error('Failed to load watchlist series');
+      if (!res.ok) throw createFetchError('watchlist_series_fetch_failed', 'Failed to load watchlist series');
       return res.json() as Promise<WatchlistSeriesResponse>;
     },
     [fetch]

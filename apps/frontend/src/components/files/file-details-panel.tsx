@@ -9,20 +9,30 @@ import clsx from 'clsx';
 import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
 import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import i18next from '@gitroom/react/translation/i18next';
 import type { FileItem } from './file-manager';
 
 const formatDate = (dateStr: string) => {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(i18next.resolvedLanguage || 'en', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return dateStr;
+  }
 };
 
-const fileSize = (bytes: number) => {
+const fileSize = (bytes: number, t: ReturnType<typeof useT>) => {
   if (!bytes) return '-';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes < 1024) return t('file_size_bytes', '{{size}} B', { size: bytes });
+  if (bytes < 1024 * 1024)
+    return t('file_size_kb', '{{size}} KB', { size: (bytes / 1024).toFixed(1) });
+  return t('file_size_mb', '{{size}} MB', { size: (bytes / (1024 * 1024)).toFixed(1) });
 };
 
 export const FileDetailsPanel: FC<{
@@ -240,7 +250,7 @@ export const FileDetailsPanel: FC<{
           <div className="border-t border-newBorder pt-[14px] space-y-[8px]">
             <div className="flex justify-between text-[12px]">
               <span className="text-textColor/50">{t('file_size', 'File size')}</span>
-              <span className="text-textColor">{fileSize(file.fileSize)}</span>
+              <span className="text-textColor">{fileSize(file.fileSize, t)}</span>
             </div>
             <div className="flex justify-between text-[12px]">
               <span className="text-textColor/50">{t('type', 'Type')}</span>

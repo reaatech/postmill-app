@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../dashboard.utils';
 
 export interface AiBudget {
   monthlyCap: number | null;
@@ -30,7 +31,7 @@ export const useAiUsage = () => {
     async (url: string): Promise<AiUsageResponse> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load AI usage');
+        throw createFetchError('ai_usage_fetch_failed', 'Failed to load AI usage');
       }
       return res.json();
     },

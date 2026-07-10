@@ -118,7 +118,9 @@ const TikTokSettings: FC<{
           <div>{tiktokRestrictionNotice}</div>
         </div>
       )}
-      {isTitle && <Input label="Title" {...register('title')} maxLength={89} />}
+      {isTitle && (
+        <Input label={t('title', 'Title')} {...register('title')} maxLength={89} />
+      )}
       <Select
         label={t('label_who_can_see_this_video', 'Who can see this video?')}
         disabled={isUploadMode}

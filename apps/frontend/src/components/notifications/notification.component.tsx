@@ -41,7 +41,7 @@ const NotificationRow: FC<{
   const t = useT();
   const createdAt = dayjs(notification.createdAt);
   const isWithin24h = dayjs().diff(createdAt, 'hour') < 24;
-  const fullDate = createdAt.format('MMM D, YYYY h:mm A');
+  const fullDate = createdAt.format(t('notification_full_date_format', 'MMM D, YYYY h:mm A'));
   const isUnread = !notification.readAt;
 
   return (

@@ -110,7 +110,7 @@ export const CampaignDashboardPage: FC = () => {
     );
   }
   if (isLoading || !data) {
-    return <div className="p-[24px] text-center text-newTableText">{t('loading', 'Loading…')}</div>;
+    return <div className="p-[24px] text-center text-newTableText">{t('loading', 'Loading')}</div>;
   }
 
   const tabs: { key: TabKey; label: string }[] = [

@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { createFetchError } from '@gitroom/frontend/components/settings/shared/fetch-error';
 
 const limit = 25;
 
@@ -24,7 +25,7 @@ const useAuditLog = (page: number) => {
     const res = await fetch(
       `/settings/storage/audit-log?limit=${limit}&offset=${page * limit}`
     );
-    if (!res.ok) throw new Error('Failed to load audit logs');
+    if (!res.ok) throw createFetchError('failed_to_load_audit_logs', 'Failed to load audit logs');
     return res.json();
   }, [fetch, page]);
   return useSWR<{ logs: AuditLogRow[]; total: number }>(

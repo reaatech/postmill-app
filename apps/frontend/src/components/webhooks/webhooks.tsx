@@ -27,13 +27,14 @@ const EVENT_OPTIONS = [
   { value: 'analytics.snapshot_complete', labelKey: 'event_analytics_snapshot', label: 'Analytics Snapshot' },
 ];
 
-const webhookDetails = object().shape({
-  name: string().required('Name is required'),
-  url: string().url('Must be a valid URL').required('URL is required'),
-  secret: string().optional(),
-  events: array().of(string().required()).min(1, 'Select at least one event'),
-  integrations: array(),
-});
+const webhookDetails = (t: (key: string, fallback: string) => string) =>
+  object().shape({
+    name: string().required(t('webhook_name_required', 'Name is required')),
+    url: string().url(t('webhook_url_invalid', 'Must be a valid URL')).required(t('webhook_url_required', 'URL is required')),
+    secret: string().optional(),
+    events: array().of(string().required()).min(1, t('webhook_events_required', 'Select at least one event')),
+    integrations: array(),
+  });
 
 const getWebhookOptions = (t: (key: string, fallback: string) => string) => [
   { label: t('all_integrations', 'All integrations'), value: 'all' },
@@ -55,7 +56,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
   const [testing, setTesting] = useState(false);
 
   const form = useForm({
-    resolver: yupResolver(webhookDetails),
+    resolver: yupResolver(webhookDetails(t)),
     values: {
       name: data?.name || '',
       url: data?.url || '',
@@ -124,9 +125,9 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(callBack)} className="relative flex gap-[20px] flex-col flex-1 rounded-[4px] pt-0">
         <div>
-          <Input label="Name" translationKey="label_name" {...form.register('name')} />
-          <Input label="URL" translationKey="label_url" {...form.register('url')} />
-          <Input label="Secret (HMAC key)" translationKey="label_secret" {...form.register('secret')} />
+          <Input label={t('label_name', 'Name')} translationKey="label_name" {...form.register('name')} />
+          <Input label={t('label_url', 'URL')} translationKey="label_url" {...form.register('url')} />
+          <Input label={t('label_secret_hmac', 'Secret (HMAC key)')} translationKey="label_secret_hmac" {...form.register('secret')} />
 
           <div className="flex flex-col gap-[6px] mb-[16px]">
             <div className="text-[14px]">{t('events', 'Events')}</div>
@@ -148,7 +149,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
           <Select
             value={allIntegrations.value}
             name="integrations"
-            label="Integrations"
+            label={t('label_integrations', 'Integrations')}
             translationKey="label_integrations"
             disableForm
             onChange={changeIntegration}
@@ -214,7 +215,7 @@ export const Webhooks: FC = () => {
 
   const addWebhook = useCallback((webhookData?: any) => () => {
     modal.openModal({
-      title: webhookData ? t('edit_webhook', 'Edit Webhook') : t('add_webhook', 'Add Webhook'),
+      title: webhookData ? t('edit_webhook', 'Edit Webhook') : t('add_webhook', 'Add webhook'),
       withCloseButton: true,
       children: <AddOrEditWebhook data={webhookData} reload={mutate} />,
     });
@@ -254,7 +255,7 @@ export const Webhooks: FC = () => {
             className="w-full px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
           />
         </div>
-        <Button onClick={addWebhook()}>{t('add_webhook', 'Add Webhook')}</Button>
+        <Button onClick={addWebhook()}>{t('add_webhook', 'Add webhook')}</Button>
       </div>
 
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] overflow-x-auto">
@@ -294,7 +295,7 @@ export const Webhooks: FC = () => {
             <div className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-newTableText uppercase font-medium pb-[12px] border-b border-newTableBorder items-center">
               <div>{t('url', 'URL')}</div>
               <div>{t('events', 'Events')}</div>
-              <div>{t('status', 'Status')}</div>
+              <div>{t('status', 'Status:')}</div>
               <div>{t('created', 'Created')}</div>
               <div className="text-end">{t('actions', 'Actions')}</div>
             </div>
@@ -306,7 +307,7 @@ export const Webhooks: FC = () => {
                   <div className="flex flex-wrap gap-[4px]">
                     {(w.events || ['post.published']).slice(0, 3).map((ev: string) => (
                       <span key={ev} className="text-[11px] bg-btnPrimary/20 text-btnPrimary px-[6px] py-[2px] rounded-full">
-                        {ev.replace('.', ' ')}
+                        {t(`webhook_event_${ev.replace('.', '_')}`, ev.replace('.', ' '))}
                       </span>
                     ))}
                     {(w.events || []).length > 3 && (
@@ -318,7 +319,7 @@ export const Webhooks: FC = () => {
                       {w.active !== false ? t('active', 'Active') : t('disabled', 'Disabled')}
                     </span>
                   </div>
-                  <div className="text-newTableText text-[12px]">{dayjs(w.createdAt).format('MMM D, YYYY')}</div>
+                  <div className="text-newTableText text-[12px]">{dayjs(w.createdAt).format(t('webhook_date_format', 'MMM D, YYYY'))}</div>
                   <div className="flex justify-end gap-[8px]">
                     <button onClick={() => testPing(w)} className="text-[12px] text-textColor hover:underline">{t('test', 'Test')}</button>
                     <button onClick={addWebhook(w)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>

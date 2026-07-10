@@ -25,7 +25,10 @@ export const MoltbookProvider: FC<Web3ProviderInterface> = (props) => {
 
   const register = async () => {
     if (!agentName.trim()) {
-      toaster.show('Please enter an agent name', 'warning');
+      toaster.show(
+        t('please_enter_an_agent_name', 'Please enter an agent name'),
+        'warning'
+      );
       return;
     }
 
@@ -37,7 +40,9 @@ export const MoltbookProvider: FC<Web3ProviderInterface> = (props) => {
         method: 'POST',
         body: JSON.stringify({
           name: agentName.trim(),
-          description: agentDescription.trim() || 'Postmill social media scheduler',
+          description:
+            agentDescription.trim() ||
+            t('default_agent_description', 'Postmill social media scheduler'),
         }),
       });
 
@@ -55,7 +60,7 @@ export const MoltbookProvider: FC<Web3ProviderInterface> = (props) => {
 
       pollForClaim(data.apiKey);
     } catch (err) {
-      setError('Failed to register agent');
+      setError(t('failed_to_register_agent', 'Failed to register agent'));
       setStep('error');
     }
   };
@@ -82,8 +87,11 @@ export const MoltbookProvider: FC<Web3ProviderInterface> = (props) => {
 
   const copyClaimUrl = useCallback(() => {
     copy(claimUrl);
-    toaster.show('Claim URL copied to clipboard', 'success');
-  }, [claimUrl, toaster]);
+    toaster.show(
+      t('claim_url_copied', 'Claim URL copied to clipboard'),
+      'success'
+    );
+  }, [claimUrl, toaster, t]);
 
   useEffect(() => {
     return () => {
@@ -165,7 +173,7 @@ export const MoltbookProvider: FC<Web3ProviderInterface> = (props) => {
         <div className="w-full text-center">
           <div className="text-red-500 mb-[16px]">{error}</div>
           <Button onClick={() => setStep('init')}>
-            {t('try_again', 'Try Again')}
+            {t('try_again', 'Try again')}
           </Button>
         </div>
       )}

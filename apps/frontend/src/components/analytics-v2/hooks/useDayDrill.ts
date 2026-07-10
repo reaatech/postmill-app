@@ -3,7 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
-import { DayDetailResponse } from '../utils';
+import { DayDetailResponse, createFetchError } from '../utils';
 
 interface DayDrillParams {
   date: string;
@@ -30,7 +30,7 @@ export const useDayDrill = (params: DayDrillParams) => {
 
   const load = useCallback(async (path: string) => {
     const res = await fetch(path);
-    if (!res.ok) throw new Error('Failed to fetch day drill');
+    if (!res.ok) throw createFetchError('day_drill_fetch_failed', 'Failed to fetch day drill');
     return res.json() as Promise<DayDetailResponse>;
   }, [fetch]);
 

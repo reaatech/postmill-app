@@ -27,10 +27,11 @@ export const useAddProvider = (
 ) => {
   const modal = useModals();
   const fetch = useFetch();
+  const t = useT();
   return useCallback(async () => {
     const data = await (await fetch('/integrations')).json();
     modal.openModal({
-      title: 'Add Channel',
+      title: t('add_channel', 'Add Channel'),
       withCloseButton: true,
       children: (
         <AddProviderComponent
@@ -172,6 +173,7 @@ export const CustomVariables: FC<{
   const fetch = useFetch();
   const modals = useModals();
   const toaster = useToaster();
+  const t = useT();
   const schema = useMemo(() => {
     return object({
       ...variables.reduce((aIcc, item) => {
@@ -226,13 +228,14 @@ export const CustomVariables: FC<{
           )}${onboarding ? '&onboarding=true' : ''}`
         );
       } catch {
-        toaster.show('Failed to connect to provider', 'warning');
+        toaster.show(
+          t('failed_to_connect_to_provider', 'Failed to connect to provider'),
+          'warning'
+        );
       }
     },
     [variables, onboarding, config, campaign, gotoUrl, identifier, fetch, modals, toaster]
   );
-
-  const t = useT();
 
   return (
     <div className="rounded-[4px] relative">
@@ -526,7 +529,10 @@ export const AddProviderComponent: FC<{
             (item) => item.identifier === identifier
           );
           if (!found) {
-            toaster.show('Web3 provider not found', 'warning');
+            toaster.show(
+              t('web3_provider_not_found', 'Web3 provider not found'),
+              'warning'
+            );
             return;
           }
           const { component: Web3Providers } = found;
@@ -536,11 +542,16 @@ export const AddProviderComponent: FC<{
             const data = await response.json();
             url = data.url;
           } catch {
-            toaster.show('Failed to connect to provider', 'warning');
+            toaster.show(
+              t('failed_to_connect_to_provider', 'Failed to connect to provider'),
+              'warning'
+            );
             return;
           }
           modal.openModal({
-            title: `Add ${capitalize(identifier)}`,
+            title: t('add_provider_modal_title', 'Add {{provider}}', {
+              provider: capitalize(identifier),
+            }),
             withCloseButton: true,
             ...(isMobile ? { removeLayout: true, fullScreen: true } : {}),
             classNames: {
@@ -611,7 +622,10 @@ export const AddProviderComponent: FC<{
 
           if (invite) {
             toaster.show(
-              'Invite link copied to clipboard, link will be available for 1 hour',
+              t(
+                'invite_link_copied',
+                'Invite link copied to clipboard, link will be available for 1 hour'
+              ),
               'success'
             );
             modal.closeAll();
@@ -726,7 +740,10 @@ export const AddProviderComponent: FC<{
               const data = await response.json();
               url = data.url;
             } catch {
-              toaster.show('Failed to connect to provider', 'warning');
+              toaster.show(
+                t('failed_to_connect_to_provider', 'Failed to connect to provider'),
+                'warning'
+              );
               return;
             }
             modal.closeAll();
@@ -746,7 +763,7 @@ export const AddProviderComponent: FC<{
         }
         if (isExternal) {
           modal.openModal({
-            title: 'URL',
+            title: t('url', 'URL'),
             withCloseButton: true,
             ...(isMobile ? { removeLayout: true, fullScreen: true } : {}),
             classNames: {
@@ -791,7 +808,7 @@ export const AddProviderComponent: FC<{
       (e: React.MouseEvent) => {
         e.stopPropagation();
         modal.openModal({
-          title: `Setup: ${name}`,
+          title: t('setup_instructions_title', 'Setup: {{name}}', { name }),
           withCloseButton: true,
           children: (
             <div className="p-[16px] max-h-[60vh] overflow-y-auto">
@@ -899,7 +916,7 @@ export const AddProviderComponent: FC<{
                       )}
                       title={
                         item.setupInstructions
-                          ? 'View setup instructions'
+                          ? t('view_setup_instructions', 'View setup instructions')
                           : item.toolTip
                       }
                     >

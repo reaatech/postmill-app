@@ -61,7 +61,7 @@ export const ShortlinksTab = ({ from, to }: ShortlinksTabProps) => {
   );
 
   if (error) {
-    return <ErrorState title={t('failed_to_load', 'Failed to load short links')} />;
+    return <ErrorState title={t('failed_to_load', 'Failed to load')} />;
   }
 
   if (isLoading) {

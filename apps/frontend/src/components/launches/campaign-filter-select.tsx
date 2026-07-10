@@ -61,7 +61,7 @@ export const CampaignFilterSelect: FC<{
             : `${selectedCount} ${
                 selectedCount === 1
                   ? t('campaign', 'campaign')
-                  : t('campaigns', 'campaigns')
+                  : t('campaigns', 'Campaigns')
               }`}
         </span>
         <div className="flex-1" />

@@ -208,7 +208,7 @@ export function MemeEditor() {
       if (saveFolderId) formData.append('folderId', saveFolderId);
       try {
         const res = await fetch('/files/upload-simple', { method: 'POST', body: formData });
-        if (!res.ok) throw new Error(await res.text().catch(() => t('save_failed', 'Save failed')));
+        if (!res.ok) throw new Error(await res.text().catch(() => t('save_failed', 'Failed to save')));
         const data = await res.json();
         setSavedPath(data.path || data.name);
         toaster.show(t('saved_to_files', 'Saved to Files'), 'success');

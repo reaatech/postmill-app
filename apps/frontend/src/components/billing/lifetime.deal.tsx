@@ -63,18 +63,16 @@ export const LifetimeDeal = () => {
     const channelsOr = currentPricing.channel;
     const list = [];
     list.push(
-      `${user.totalChannels} ${
-        user.totalChannels === 1
-          ? t('billing_channel', 'channel')
-          : t('billing_channels', 'channels')
-      }`
+      t('billing_n_channels', '{{count}} channel', { count: user.totalChannels })
     );
     list.push(
-      `${
-        currentPricing.posts_per_month > 10000
-          ? t('billing_unlimited', 'Unlimited')
-          : currentPricing.posts_per_month
-      } ${t('billing_posts_per_month', 'posts per month')}`
+      currentPricing.posts_per_month > 10000
+        ? t('billing_unlimited_feature', 'Unlimited {{feature}}', {
+            feature: t('billing_posts_per_month', 'posts per month'),
+          })
+        : t('billing_n_posts_per_month', '{{count}} posts per month', {
+            count: currentPricing.posts_per_month,
+          })
     );
     if (currentPricing.team_members) {
       list.push(t('billing_unlimited_team_members', 'Unlimited team members'));
@@ -92,18 +90,16 @@ export const LifetimeDeal = () => {
     const channelsOr = currentPricing.channel;
     const list = [];
     list.push(
-      `${channelsOr} ${
-        channelsOr === 1
-          ? t('billing_channel', 'channel')
-          : t('billing_channels', 'channels')
-      }`
+      t('billing_n_channels', '{{count}} channel', { count: channelsOr })
     );
     list.push(
-      `${
-        currentPricing.posts_per_month > 10000
-          ? t('billing_unlimited', 'Unlimited')
-          : currentPricing.posts_per_month
-      } ${t('billing_posts_per_month', 'posts per month')}`
+      currentPricing.posts_per_month > 10000
+        ? t('billing_unlimited_feature', 'Unlimited {{feature}}', {
+            feature: t('billing_posts_per_month', 'posts per month'),
+          })
+        : t('billing_n_posts_per_month', '{{count}} posts per month', {
+            count: currentPricing.posts_per_month,
+          })
     );
     if (currentPricing.team_members) {
       list.push(t('billing_unlimited_team_members', 'Unlimited team members'));
@@ -166,10 +162,9 @@ export const LifetimeDeal = () => {
         <div className="flex flex-col gap-[10px] justify-center text-[16px] text-newTableText">
           {(user?.tier?.current === 'PRO'
             ? [
-                `${(user?.totalChannels || 0) + 5} ${t(
-                  'billing_channels',
-                  'channels'
-                )}`,
+                t('billing_n_channels', '{{count}} channel', {
+                  count: (user?.totalChannels || 0) + 5,
+                }),
               ]
             : nextFeature
           ).map((feature) => (
@@ -195,7 +190,7 @@ export const LifetimeDeal = () => {
           <div className="mt-[20px] flex items-center gap-[10px]">
             <div className="flex-1">
               <Input
-                label="Code"
+                label={t('label_code', 'Code')}
                 translationKey="label_code"
                 placeholder={t('billing_enter_your_code', 'Enter your code')}
                 disableForm={true}

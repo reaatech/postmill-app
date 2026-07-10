@@ -2,6 +2,7 @@
 
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
+import { createFetchError } from '../utils';
 
 interface ExportParams {
   from: string;
@@ -38,7 +39,7 @@ export const useExport = () => {
     async (params: ExportParams) => {
       const url = serializeParams(params);
       const res = await fetch(url);
-      if (!res.ok) throw new Error('Failed to export analytics data');
+      if (!res.ok) throw createFetchError('analytics_export_failed', 'Failed to export analytics data');
       const blob = await res.blob();
       const ext = params.format === 'csv' ? 'csv' : 'json';
       const filename = `analytics-export.${ext}`;

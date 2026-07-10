@@ -39,7 +39,7 @@ export const SeparatePost: FC<{
           }),
         });
         if (!res.ok) {
-          throw new Error('Failed to separate posts');
+          throw new Error('separate_posts_failed');
         }
         const { posts } = await res.json();
         props.merge(posts);

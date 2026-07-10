@@ -129,7 +129,7 @@ describe('MediaProvidersTab (F2)', () => {
     render(<MediaProvidersTab />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to load settings')).toBeTruthy();
+      expect(screen.getByText('Failed to load')).toBeTruthy();
     });
     expect(screen.getByText('Try again')).toBeTruthy();
   });

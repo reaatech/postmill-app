@@ -230,10 +230,12 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                     >
                       {provider.version}
                       {provider.versionStatus && provider.versionStatus !== 'active'
-                        ? ` — ${t(
-                            'version_status_' + provider.versionStatus,
-                            VERSION_LABEL[provider.versionStatus],
-                          )}`
+                        ? t('version_status_separator', '— {{status}}', {
+                            status: t(
+                              'version_status_' + provider.versionStatus,
+                              VERSION_LABEL[provider.versionStatus],
+                            ),
+                          })
                         : ''}
                     </span>
                   )}

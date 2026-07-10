@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../dashboard.utils';
 
 export interface MediaJob {
   id: string;
@@ -32,7 +33,7 @@ export const useMediaJobs = () => {
     async (url: string): Promise<MediaJobsResponse> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load media jobs');
+        throw createFetchError('media_jobs_fetch_failed', 'Failed to load media jobs');
       }
       return res.json();
     },

@@ -352,7 +352,7 @@ export const useOrgEntities = (type?: CampaignEntitySlug) => {
           t('untitled_post', 'Untitled post'),
         icon: post.integration?.picture,
         subtitle: post.publishDate
-          ? dayjs(post.publishDate).format('MMM D, YYYY HH:mm')
+          ? dayjs(post.publishDate).format(t('campaign_post_date_format', 'MMM D, YYYY HH:mm'))
           : post.state,
       }));
     }

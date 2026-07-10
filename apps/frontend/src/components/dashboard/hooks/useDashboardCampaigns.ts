@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../dashboard.utils';
 
 export interface CampaignSummary {
   id: string;
@@ -28,7 +29,7 @@ export const useDashboardCampaigns = (limit = 6) => {
     async (url: string): Promise<CampaignSummary[]> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load campaigns');
+        throw createFetchError('campaigns_fetch_failed', 'Failed to load campaigns');
       }
       return res.json();
     },

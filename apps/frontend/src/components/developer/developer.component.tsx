@@ -126,7 +126,9 @@ export const DeveloperComponent: FC = () => {
         setPicturePath(imported.path);
       } catch (err) {
         toaster.show(
-          `${t('import_failed', 'Import failed')}: ${(err as Error).message}`,
+          t('import_failed_with_message', 'Import failed: {{message}}', {
+            message: (err as Error).message,
+          }),
           'warning'
         );
       } finally {
@@ -377,7 +379,7 @@ export const DeveloperComponent: FC = () => {
                 >
                   {importing
                     ? t('importing', 'Importing…')
-                    : t('choose_image', 'Choose Image')}
+                    : t('choose_image', 'Choose image')}
                 </button>
               </div>
             </div>
@@ -505,7 +507,7 @@ export const DeveloperComponent: FC = () => {
                 >
                   {importing
                     ? t('importing', 'Importing…')
-                    : t('choose_image', 'Choose Image')}
+                    : t('choose_image', 'Choose image')}
                 </button>
               </div>
             </div>
@@ -617,7 +619,7 @@ export const DeveloperComponent: FC = () => {
             </div>
           </div>
           <div className="flex gap-[8px]">
-            <CopyButton text={app.clientId} label={t('copy_id', 'Copy ID')} />
+            <CopyButton text={app.clientId} label={t('copy_id', 'Copy Channel ID')} />
             {plaintextSecret && (
               <CopyButton
                 text={plaintextSecret}

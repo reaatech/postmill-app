@@ -23,8 +23,8 @@ describe('useBestTime', () => {
     expect(mockUseSWR.mock.calls[0][0]).toContain('integrations=i1%2Ci2');
     expect(result.current.DAY_LABELS).toHaveLength(7);
     expect(result.current.HOUR_LABELS).toHaveLength(24);
-    expect(result.current.HOUR_LABELS[0]).toBe('12a');
-    expect(result.current.HOUR_LABELS[12]).toBe('12p');
+    expect(result.current.HOUR_LABELS[0]).toEqual({ key: 'hour_label_12a', fallback: '12a' });
+    expect(result.current.HOUR_LABELS[12]).toEqual({ key: 'hour_label_12p', fallback: '12p' });
   });
 
   it('always sends the browser IANA timezone (6.4)', () => {

@@ -72,7 +72,7 @@ export const useAnomalies = (includeDismissed = false) => {
         const res = await fetch(`/analytics/v2/anomalies/${id}/dismiss`, {
           method: 'POST',
         });
-        if (!res.ok) throw new Error('Failed to dismiss anomaly');
+        if (!res.ok) throw createFetchError('anomaly_dismiss_failed', 'Failed to dismiss anomaly');
       } finally {
         // Re-sync with the server whether the POST succeeded or failed.
         mutate();

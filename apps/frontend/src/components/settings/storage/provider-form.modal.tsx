@@ -177,7 +177,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
         const err = await res.json();
         setTestResult({
           ok: false,
-          error: err.message || err.error || translate('save_failed', 'Save failed'),
+          error: err.message || err.error || translate('save_failed', 'Failed to save'),
         });
         return;
       }

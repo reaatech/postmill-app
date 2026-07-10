@@ -25,17 +25,35 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      return this.props.fallback || (
-        <div className="flex flex-col items-center justify-center py-[48px] text-center">
-          <p className="text-newTableText text-[14px]">{i18next.t('something_went_wrong', 'Something went wrong')}</p>
-          <p className="text-[12px] text-newTableText opacity-60 mt-[8px]">{this.state.error?.message}</p>
-          <button
-            onClick={() => this.setState({ hasError: false, error: undefined })}
-            className="mt-[16px] px-[12px] py-[6px] text-[12px] bg-btnPrimary text-white rounded-[6px]"
-          >
-            {i18next.t('try_again', 'Try again')}
-          </button>
-        </div>
+      const error = this.state.error;
+      const messageKey = (error as { messageKey?: string } | undefined)
+        ?.messageKey;
+      const errorMessage = messageKey
+        ? i18next.t(messageKey, { defaultValue: error?.message ?? '' })
+        : i18next.t('error_boundary_message', {
+            defaultValue: error?.message ?? 'Something went wrong',
+          });
+      return (
+        this.props.fallback || (
+          <div className="flex flex-col items-center justify-center py-[48px] text-center">
+            <p className="text-newTableText text-[14px]">
+              {i18next.t('something_went_wrong', {
+                defaultValue: 'Something went wrong',
+              })}
+            </p>
+            <p className="text-[12px] text-newTableText opacity-60 mt-[8px]">
+              {errorMessage}
+            </p>
+            <button
+              onClick={() =>
+                this.setState({ hasError: false, error: undefined })
+              }
+              className="mt-[16px] px-[12px] py-[6px] text-[12px] bg-btnPrimary text-white rounded-[6px]"
+            >
+              {i18next.t('try_again', { defaultValue: 'Try again' })}
+            </button>
+          </div>
+        )
       );
     }
     return this.props.children;

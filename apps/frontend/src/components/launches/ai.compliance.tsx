@@ -36,7 +36,10 @@ export const AICompliance: FC<{ content?: string; platform?: string }> = ({
         method: 'POST',
         body: JSON.stringify({ content: content.trim(), platform }),
       });
-      if (!res.ok) throw new Error('Compliance check failed');
+      if (!res.ok) {
+        setError(t('compliance_check_failed', 'Compliance check failed'));
+        return;
+      }
       const data = await res.json();
       setResult(data as ComplianceResult);
     } catch (err) {

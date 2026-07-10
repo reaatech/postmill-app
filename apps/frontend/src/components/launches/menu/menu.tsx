@@ -291,7 +291,7 @@ export const Menu: FC<{
       classNames: {
         modal: 'md',
       },
-      title: t('move_add_to_group', 'Move / Add to group'),
+      title: t('move_add_to_group', 'Move / add to group'),
       withCloseButton: false,
       closeOnEscape: true,
       closeOnClickOutside: true,
@@ -385,7 +385,7 @@ export const Menu: FC<{
                 </svg>
               </div>
               <div className="text-[14px]">
-                {t('create_new_post', 'Create a new post')}
+                {t('create_new_post', 'Create Post')}
               </div>
             </button>
           )}

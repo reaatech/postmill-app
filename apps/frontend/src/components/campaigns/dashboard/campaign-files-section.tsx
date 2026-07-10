@@ -11,6 +11,7 @@ import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useModals, areYouSure } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
+import dayjs from 'dayjs';
 import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
@@ -22,23 +23,20 @@ import type { FileItem } from '@gitroom/frontend/components/files/file-manager';
 import { useCampaignFiles } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
 import { UploadFilesModal } from '@gitroom/frontend/components/campaigns/dashboard/upload-files-modal';
 
-const formatDate = (d: string) => {
+const formatDate = (d: string, format: string) => {
   try {
-    return new Date(d).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return dayjs(d).format(format);
   } catch {
     return '';
   }
 };
 
-const fileSize = (bytes: number) => {
+const fileSize = (bytes: number, t: (key: string, fallback: string, vars?: Record<string, any>) => string) => {
   if (!bytes) return '';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  if (bytes < 1024) return t('file_size_bytes', '{{size}} B', { size: bytes });
+  if (bytes < 1024 * 1024)
+    return t('file_size_kb', '{{size}} KB', { size: (bytes / 1024).toFixed(0) });
+  return t('file_size_mb', '{{size}} MB', { size: (bytes / (1024 * 1024)).toFixed(1) });
 };
 
 const FileTile: FC<{
@@ -46,7 +44,8 @@ const FileTile: FC<{
   onOpen: () => void;
   onRemove: () => void;
   removing: boolean;
-}> = ({ file, onOpen, onRemove, removing }) => {
+  t: (key: string, fallback: string) => string;
+}> = ({ file, onOpen, onRemove, removing, t }) => {
   const mediaDirectory = useMediaDirectory();
   const [broken, setBroken] = useState(false);
   const isVideo = hasExtension(file.path, 'mp4', 'mov', 'webm');
@@ -116,8 +115,8 @@ const FileTile: FC<{
             {file.originalName || file.name}
           </div>
           <div className="text-[10px] text-newTableText truncate">
-            {formatDate(file.createdAt)}
-            {file.fileSize ? ` · ${fileSize(file.fileSize)}` : ''}
+            {formatDate(file.createdAt, t('campaign_file_date_format', 'MMM D, YYYY'))}
+            {file.fileSize ? ` · ${fileSize(file.fileSize, t)}` : ''}
           </div>
         </div>
       </button>
@@ -125,7 +124,7 @@ const FileTile: FC<{
         type="button"
         disabled={removing}
         onClick={onRemove}
-        aria-label="Remove from campaign"
+        aria-label={t('remove_from_campaign', 'Remove from campaign')}
         className="absolute top-[6px] end-[6px] w-[22px] h-[22px] rounded-full bg-black/60 text-white text-[13px] flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all disabled:opacity-40"
       >
         ×
@@ -152,7 +151,7 @@ export const CampaignFilesSection: FC<{
     '/integrations/list',
     async () => {
       const r = await fetch('/integrations/list');
-      if (!r.ok) throw new Error('Failed to load channels');
+      if (!r.ok) throw new Error(t('failed_to_load_channels', 'Failed to load channels'));
       return (await r.json()).integrations;
     },
     { revalidateOnFocus: false }
@@ -188,7 +187,7 @@ export const CampaignFilesSection: FC<{
   const confirmRemoveFromCampaign = useCallback(
     async (file: FileItem) => {
       const ok = await areYouSure({
-        title: t('remove_from_campaign', 'Remove from campaign?'),
+        title: t('remove_from_campaign', 'Remove from campaign'),
         description: t(
           'remove_file_from_campaign_desc',
           'This removes the file from this campaign. It stays in your media library.'
@@ -295,7 +294,7 @@ export const CampaignFilesSection: FC<{
 
       {isLoading ? (
         <div className="text-[13px] text-newTableText text-center py-[24px]">
-          {t('loading', 'Loading…')}
+          {t('loading', 'Loading')}
         </div>
       ) : count === 0 ? (
         <div className="text-[13px] text-newTableText text-center py-[24px]">
@@ -315,6 +314,7 @@ export const CampaignFilesSection: FC<{
               onOpen={() => openPreview(file)}
               onRemove={() => remove(file.id)}
               removing={removingId === file.id}
+              t={t}
             />
           ))}
         </div>

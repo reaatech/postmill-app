@@ -397,7 +397,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     content: JSON.stringify({ posts }),
                   }),
                 });
-                if (!res.ok) throw new Error('Failed to save template');
+                if (!res.ok) throw new Error('template_save_failed');
                 modal.closeAll();
                 toaster.show(
                   t('template_saved', 'Template saved successfully'),
@@ -634,10 +634,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
             if (item.tooLong) {
               toaster.show(
-                `${item.name} (${item.identifier}) ${t(
-                  'post_is_too_long',
-                  'post is too long, please fix it'
-                )}`,
+                t(
+                  'post_name_identifier_too_long',
+                  '{{name}} ({{identifier}}) post is too long, please fix it',
+                  { name: item.name, identifier: item.identifier }
+                ),
                 'warning'
               );
               focus(item.id, 'preview');
@@ -1047,7 +1048,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     onClick={schedule('draft')}
                     className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 h-[40px] rounded-[6px] bg-btnSimple hover:bg-boxHover flex justify-center items-center text-[14px] font-[600]"
                   >
-                    {t('save_as_draft', 'Save as Draft')}
+                    {t('save_as_draft', 'Save as draft')}
                   </button>
                   <button
                     type="button"
@@ -1098,7 +1099,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                       : dummy
                       ? t('create_output', 'Create output')
                       : !existingData?.integration
-                      ? t('add_to_calendar', 'Add to calendar')
+                      ? t('add_to_calendar', 'Add to Calendar')
                       : existingData?.posts?.[0]?.state === 'DRAFT'
                       ? t('schedule', 'Schedule')
                       : t('update', 'Update')}
@@ -1119,7 +1120,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     className="rounded-[8px] z-[300] disabled:cursor-not-allowed disabled:opacity-80 hidden group-hover:flex absolute bottom-[100%] -left-[12px] p-[12px] w-[206px] bg-newBgColorInner"
                   >
                     <div className="text-white rounded-[8px] bg-[#2b5cd3] h-[44px] w-full flex justify-center items-center post-now">
-                      {t('post_now', 'Post Now')}
+                      {t('post_now', 'Post now')}
                     </div>
                   </button>
                 )}

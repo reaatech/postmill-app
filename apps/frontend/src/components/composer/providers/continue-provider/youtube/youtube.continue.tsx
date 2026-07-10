@@ -1,6 +1,9 @@
 'use client';
 
 import { withContinueProvider } from '../with-continue-provider';
+// renderItem is a non-hook config callback, so translate via the client i18next
+// instance directly (same pattern as analytics-v2/error.boundary).
+import i18next from '@gitroom/react/translation/i18next';
 
 interface YoutubeItem {
   id: string;
@@ -79,7 +82,8 @@ export const YoutubeContinue = withContinueProvider<
       )}
       {item.subscriberCount && (
         <div className="text-xs text-gray-400">
-          {parseInt(item.subscriberCount).toLocaleString()} subscribers
+          {parseInt(item.subscriberCount).toLocaleString()}{' '}
+          {i18next.t('subscribers', { defaultValue: 'subscribers' })}
         </div>
       )}
     </>

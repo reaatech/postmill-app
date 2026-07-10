@@ -3,8 +3,12 @@ import { renderHook, waitFor } from '@testing-library/react';
 import dayjs from 'dayjs';
 
 const mockFetch = vi.fn();
+const mockT = (key: string, fallback: string) => fallback;
 vi.mock('@gitroom/helpers/utils/custom.fetch', () => ({
   useFetch: () => mockFetch,
+}));
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT: () => mockT,
 }));
 
 import {

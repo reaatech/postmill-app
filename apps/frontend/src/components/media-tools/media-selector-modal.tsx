@@ -262,9 +262,8 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
         }
       }
       toaster.show(
-        t('uploaded_n_files', 'Uploaded {{count}} file{{suffix}}', {
+        t('uploaded_n_files', 'Uploaded {{count}} file', {
           count: fileList.length,
-          suffix: fileList.length === 1 ? '' : 's',
         }),
         'success'
       );

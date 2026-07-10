@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../dashboard.utils';
 
 export interface UsageResponse {
   billingEnabled: boolean;
@@ -25,7 +26,7 @@ export const useUsage = () => {
     async (url: string): Promise<UsageResponse> => {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error('Failed to load usage');
+        throw createFetchError('usage_fetch_failed', 'Failed to load usage');
       }
       return res.json();
     },

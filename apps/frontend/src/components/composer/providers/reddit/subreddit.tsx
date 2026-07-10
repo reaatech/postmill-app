@@ -190,7 +190,7 @@ export const Subreddit: FC<{
             disableForm={true}
             value={value.subreddit}
             readOnly={true}
-            label="Subreddit"
+            label={t('subreddit', 'Subreddit')}
             name="subreddit"
           />
           <div className="mb-[12px]">
@@ -204,7 +204,7 @@ export const Subreddit: FC<{
             error={errors?.title?.message}
             value={value.title}
             disableForm={true}
-            label="Title"
+            label={t('title', 'Title')}
             name="title"
             onChange={setTitle}
           />
@@ -213,7 +213,7 @@ export const Subreddit: FC<{
             onChange={setFlair}
             value={value?.flair?.id}
             disableForm={true}
-            label="Flair"
+            label={t('flair', 'Flair')}
             name="flair"
           >
             <option value="">{t('select_flair', '--Select Flair--')}</option>
@@ -229,7 +229,7 @@ export const Subreddit: FC<{
               postSelector={postSelector}
               error={errors?.url?.message}
               value={value.url}
-              label="URL"
+              label={t('url', 'URL')}
               name="url"
               disableForm={true}
               onChange={setURL}
@@ -239,9 +239,9 @@ export const Subreddit: FC<{
       ) : (
         <div className="relative">
           <Input
-            placeholder="/r/selfhosted"
+            placeholder={t('subreddit_placeholder', '/r/selfhosted')}
             name="search"
-            label="Search Subreddit"
+            label={t('search_subreddit', 'Search Subreddit')}
             readOnly={loading}
             value={searchValue}
             error={errors?.message}

@@ -4,6 +4,7 @@ import {
   ProviderFormState,
   CapabilityMeta,
 } from '../provider-surface.types';
+import { createFetchError } from '../../fetch-error';
 import {
   VpnConfigResponse,
   VpnProviderInfo,
@@ -55,7 +56,7 @@ export const vpnDescriptor: ProviderSurfaceDescriptor<VpnProviderInfo> = {
 
   load: async (fetch) => {
     const res = await fetch('/settings/vpn/config');
-    if (!res.ok) throw new Error('Failed to load VPN config');
+    if (!res.ok) throw createFetchError('failed_to_load_vpn_config', 'Failed to load VPN config');
     const data: VpnConfigResponse = await res.json();
     const rows: ProviderRow<VpnProviderInfo>[] = (data.providers || []).map(
       (p) => ({

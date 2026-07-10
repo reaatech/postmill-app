@@ -89,7 +89,9 @@ export const RepeatComponent: FC<{
         </div>
         <div className="cursor-pointer">
           {repeat
-            ? `${t('repeat_post_every_label', 'Repeat Post Every')} ${everyLabel}`
+            ? t('repeat_post_every_label_value', 'Repeat Post Every {{interval}}', {
+                interval: everyLabel || '',
+              })
             : t('repeat_post_every', 'Repeat Post Every...')}
         </div>
         <div className="cursor-pointer">

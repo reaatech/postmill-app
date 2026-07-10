@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import useSWR from 'swr';
+import { createFetchError } from '../utils';
 
 export type AlertComparator = 'gte' | 'lte' | 'change_pct';
 export type AlertDirection = 'up' | 'down';
@@ -35,7 +36,7 @@ export const useAlertRules = () => {
   const load = useCallback(
     async (path: string) => {
       const res = await fetch(path);
-      if (!res.ok) throw new Error('Failed to load alert rules');
+      if (!res.ok) throw createFetchError('alert_rules_fetch_failed', 'Failed to load alert rules');
       return res.json() as Promise<AlertRule[]>;
     },
     [fetch]
@@ -55,7 +56,7 @@ export const useAlertRules = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       });
-      if (!res.ok) throw new Error('Failed to create alert rule');
+      if (!res.ok) throw createFetchError('alert_rule_create_failed', 'Failed to create alert rule');
       await mutate();
     },
     [fetch, mutate]
@@ -68,7 +69,7 @@ export const useAlertRules = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       });
-      if (!res.ok) throw new Error('Failed to update alert rule');
+      if (!res.ok) throw createFetchError('alert_rule_update_failed', 'Failed to update alert rule');
       await mutate();
     },
     [fetch, mutate]
@@ -77,7 +78,7 @@ export const useAlertRules = () => {
   const remove = useCallback(
     async (id: string) => {
       const res = await fetch(`${key}/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete alert rule');
+      if (!res.ok) throw createFetchError('alert_rule_delete_failed', 'Failed to delete alert rule');
       await mutate();
     },
     [fetch, mutate]

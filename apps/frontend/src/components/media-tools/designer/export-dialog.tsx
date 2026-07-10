@@ -941,9 +941,8 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
     if (created > 0) {
       toaster.show(
-        t('designer_n_drafts_created', '{{count}} draft{{plural}} created', {
+        t('designer_n_drafts_created', '{{count}} draft created', {
           count: created,
-          plural: created > 1 ? 's' : '',
         }),
         'success'
       );
@@ -1134,9 +1133,8 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
       setSavedFiles(results);
       toaster.show(
-        t('designer_exported_n_files', 'Exported {{count}} file{{plural}}', {
+        t('designer_exported_n_files', 'Exported {{count}} file', {
           count: results.length,
-          plural: results.length > 1 ? 's' : '',
         }),
         'success'
       );
@@ -1384,7 +1382,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               onClick={goToExport}
               className="px-4 h-[38px] rounded-[6px] bg-designerAccent text-white text-[13px] font-medium hover:bg-designerAccent/80 transition-all"
             >
-              {t('designer_next_export_n_files', 'Next: Export {{count}} file{{plural}}', { count: outputCount, plural: outputCount > 1 ? 's' : '' })}
+              {t('designer_next_export_n_files', 'Next: Export {{count}} file', { count: outputCount })}
             </button>
           </div>
         </>
@@ -1394,7 +1392,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
       {step === 'export' && (
         <>
           <div className="text-[13px] font-medium text-textColor">
-            {t('designer_export_n_files', 'Export {{count}} file{{plural}}', { count: outputCount, plural: outputCount > 1 ? 's' : '' })}
+            {t('designer_export_n_files', 'Export {{count}} file', { count: outputCount })}
             {outputCount === 1
               ? ` (${(outputFormats[selectedOutputs[0].id] || 'png').toUpperCase()}${outputFormats[selectedOutputs[0].id] !== 'pdf' ? `, ${scale}x` : ''})`
               : ''}
@@ -1467,7 +1465,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             >
               {exporting
                 ? t('designer_exporting_ellipsis', 'Exporting...')
-                : t('designer_export_n_files', 'Export {{count}} file{{plural}}', { count: outputCount, plural: outputCount > 1 ? 's' : '' })}
+                : t('designer_export_n_files', 'Export {{count}} file', { count: outputCount })}
             </button>
           </div>
         </>
@@ -1492,8 +1490,8 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             </div>
             <div className="text-[13px] text-newTextColor/60 text-center">
               {selectedFolderId
-                ? t('designer_n_files_exported_to_folder', '{{count}} file{{plural}} exported to the selected folder', { count: savedFiles.length, plural: savedFiles.length > 1 ? 's' : '' })
-                : t('designer_n_files_exported', '{{count}} file{{plural}} exported', { count: savedFiles.length, plural: savedFiles.length > 1 ? 's' : '' })}
+                ? t('designer_n_files_exported_to_folder', '{{count}} file exported to the selected folder', { count: savedFiles.length })
+                : t('designer_n_files_exported', '{{count}} file exported', { count: savedFiles.length })}
             </div>
 
             {previews.length > 0 && (
@@ -1540,7 +1538,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           </div>
           <div className="text-[12px] text-newTextColor/60">
             {t('designer_turn_into_drafts_prefix', 'Turn these into draft posts — this will create')}{' '}
-            <strong>{confirmedDraftCount}</strong> {t('designer_draft_plural_suffix', 'draft{{plural}}', { plural: confirmedDraftCount !== 1 ? 's' : '' })}
+            <strong>{confirmedDraftCount}</strong> {t('designer_draft_plural_suffix', 'draft', { count: confirmedDraftCount })}
           </div>
 
           <div className="max-h-[300px] overflow-y-auto flex flex-col gap-2">
@@ -1652,7 +1650,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             >
               {draftCreating
                 ? t('designer_creating_ellipsis', 'Creating...')
-                : t('designer_create_n_drafts', 'Create {{count}} draft{{plural}}', { count: confirmedDraftCount, plural: confirmedDraftCount !== 1 ? 's' : '' })}
+                : t('designer_create_n_drafts', 'Create {{count}} draft', { count: confirmedDraftCount })}
             </button>
           </div>
         </>

@@ -136,7 +136,7 @@ export const ChannelFilterSelect: FC<{
               {selectedList.length}{' '}
               {selectedList.length === 1
                 ? t('channel', 'channel')
-                : t('channels', 'channels')}
+                : t('channels', 'Channels')}
             </span>
           )}
           <div className="flex-1" />

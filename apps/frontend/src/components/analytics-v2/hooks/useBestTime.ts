@@ -3,6 +3,7 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useCallback } from 'react';
+import { createFetchError } from '../utils';
 
 export type BestTimeConfidence = 'high' | 'medium' | 'low' | 'none';
 
@@ -30,10 +31,26 @@ export interface BestTimeResponse {
   bestSlots: BestTimeSlot[];
 }
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const HOUR_LABELS = Array.from({ length: 24 }, (_, i) =>
-  i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i - 12}p`
-);
+interface BestTimeLabel {
+  key: string;
+  fallback: string;
+}
+
+const DAY_LABELS: BestTimeLabel[] = [
+  { key: 'day_short_sun', fallback: 'Sun' },
+  { key: 'day_short_mon', fallback: 'Mon' },
+  { key: 'day_short_tue', fallback: 'Tue' },
+  { key: 'day_short_wed', fallback: 'Wed' },
+  { key: 'day_short_thu', fallback: 'Thu' },
+  { key: 'day_short_fri', fallback: 'Fri' },
+  { key: 'day_short_sat', fallback: 'Sat' },
+];
+
+const HOUR_LABELS: BestTimeLabel[] = Array.from({ length: 24 }, (_, i) => {
+  const fallback =
+    i === 0 ? '12a' : i < 12 ? `${i}a` : i === 12 ? '12p' : `${i - 12}p`;
+  return { key: `hour_label_${fallback}`, fallback };
+});
 
 // The browser IANA timezone — post dates are stored UTC, so bucketing must
 // happen in the viewer's zone or "today's" heatmap is silently UTC-shifted (6.4).
@@ -65,7 +82,7 @@ export const useBestTime = (integrations?: string[], integration?: string) => {
 
   const load = useCallback(async () => {
     const res = await fetch(`/analytics/v2/best-time?${paramsKey}`);
-    if (!res.ok) throw new Error('Failed to load best time data');
+    if (!res.ok) throw createFetchError('best_time_fetch_failed', 'Failed to load best time data');
     return res.json();
   }, [fetch, paramsKey]);
 

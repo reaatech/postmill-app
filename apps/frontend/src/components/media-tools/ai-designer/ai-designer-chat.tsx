@@ -305,7 +305,7 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
           )}
           {onReset && (
             <Button type="button" secondary onClick={onReset}>
-              {t('new_design', 'New design')}
+              {t('new_design', 'New Design')}
             </Button>
           )}
           <FullscreenButton />
