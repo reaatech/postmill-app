@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} 클립",
   "designer_add_n_formats_one": "{{count}} 형식 추가",
   "designer_add_n_formats_other": "{{count}} 형식 추가",
-  "subscribers": "구독자"
+  "subscribers": "구독자",
+  "failed_to_load_settings": "설정을 불러오지 못했습니다",
+  "failed_to_load_short_links": "단축 링크를 불러오지 못했습니다",
+  "failed_to_load_preferences": "환경설정을 불러오지 못했습니다",
+  "failed_to_copy_campaign": "캠페인을 복사하지 못했습니다"
 }

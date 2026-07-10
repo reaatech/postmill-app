@@ -4437,5 +4437,9 @@
   "n_clips_count_other": "{{count}} clips",
   "designer_add_n_formats_one": "Add {{count}} format",
   "designer_add_n_formats_other": "Add {{count}} formats",
-  "subscribers": "subscribers"
+  "subscribers": "subscribers",
+  "failed_to_load_settings": "Failed to load settings",
+  "failed_to_load_short_links": "Failed to load short links",
+  "failed_to_load_preferences": "Failed to load preferences",
+  "failed_to_copy_campaign": "Failed to copy campaign"
 }

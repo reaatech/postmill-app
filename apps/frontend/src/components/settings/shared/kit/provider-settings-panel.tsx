@@ -202,7 +202,7 @@ export function ProviderSettingsPanel<Meta = any>({
     return (
       <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
         <span className="text-[14px] text-red-500">
-          {t('failed_to_load', 'Failed to load')}
+          {t('failed_to_load_settings', 'Failed to load settings')}
         </span>
         <button
           className="text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"

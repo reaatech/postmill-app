@@ -218,7 +218,7 @@ export const NotificationPreferencesPanel: React.FC = () => {
         <div className="text-[20px]">{t('notifications', 'Notifications')}</div>
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
           <span className="text-[14px] text-red-500">
-            {t('failed_to_load', 'Failed to load')}
+            {t('failed_to_load_preferences', 'Failed to load preferences')}
           </span>
           <button
             className="text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"

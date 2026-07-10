@@ -244,7 +244,7 @@ describe('ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      expect(await screen.findByText('Failed to load')).toBeDefined();
+      expect(await screen.findByText('Failed to load settings')).toBeDefined();
       expect(screen.getByText('Try again')).toBeDefined();
     });
   });

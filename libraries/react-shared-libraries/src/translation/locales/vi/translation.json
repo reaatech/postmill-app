@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} đoạn clip",
   "designer_add_n_formats_one": "Thêm {{count}} định dạng",
   "designer_add_n_formats_other": "Thêm {{count}} định dạng",
-  "subscribers": "người đăng ký"
+  "subscribers": "người đăng ký",
+  "failed_to_load_settings": "Không tải được cài đặt",
+  "failed_to_load_short_links": "Không tải được liên kết rút gọn",
+  "failed_to_load_preferences": "Không tải được tùy chọn",
+  "failed_to_copy_campaign": "Không sao chép được chiến dịch"
 }

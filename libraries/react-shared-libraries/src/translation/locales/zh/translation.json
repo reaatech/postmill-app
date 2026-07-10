@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} 个片段",
   "designer_add_n_formats_one": "添加 {{count}} 种格式",
   "designer_add_n_formats_other": "添加 {{count}} 种格式",
-  "subscribers": "订阅者"
+  "subscribers": "订阅者",
+  "failed_to_load_settings": "加载设置失败",
+  "failed_to_load_short_links": "加载短链接失败",
+  "failed_to_load_preferences": "加载偏好设置失败",
+  "failed_to_copy_campaign": "复制活动失败"
 }

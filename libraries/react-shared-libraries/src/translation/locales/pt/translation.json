@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} clipes",
   "designer_add_n_formats_one": "Adicionar {{count}} formato",
   "designer_add_n_formats_other": "Adicionar {{count}} formatos",
-  "subscribers": "inscritos"
+  "subscribers": "inscritos",
+  "failed_to_load_settings": "Falha ao carregar as configurações",
+  "failed_to_load_short_links": "Falha ao carregar os links curtos",
+  "failed_to_load_preferences": "Falha ao carregar as preferências",
+  "failed_to_copy_campaign": "Falha ao copiar a campanha"
 }

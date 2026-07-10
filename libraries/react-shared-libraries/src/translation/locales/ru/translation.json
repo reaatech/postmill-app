@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} клипов",
   "designer_add_n_formats_one": "Добавить {{count}} формат",
   "designer_add_n_formats_other": "Добавить {{count}} форматов",
-  "subscribers": "подписчики"
+  "subscribers": "подписчики",
+  "failed_to_load_settings": "Не удалось загрузить настройки",
+  "failed_to_load_short_links": "Не удалось загрузить короткие ссылки",
+  "failed_to_load_preferences": "Не удалось загрузить параметры",
+  "failed_to_copy_campaign": "Не удалось скопировать кампанию"
 }

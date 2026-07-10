@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} klip",
   "designer_add_n_formats_one": "{{count}} format ekle",
   "designer_add_n_formats_other": "{{count}} format ekle",
-  "subscribers": "abone"
+  "subscribers": "abone",
+  "failed_to_load_settings": "Ayarlar yüklenemedi",
+  "failed_to_load_short_links": "Kısa bağlantılar yüklenemedi",
+  "failed_to_load_preferences": "Tercihler yüklenemedi",
+  "failed_to_copy_campaign": "Kampanya kopyalanamadı"
 }

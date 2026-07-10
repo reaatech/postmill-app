@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} クリップ",
   "designer_add_n_formats_one": "{{count}} 形式を追加",
   "designer_add_n_formats_other": "{{count}} 形式を追加",
-  "subscribers": "登録者"
+  "subscribers": "登録者",
+  "failed_to_load_settings": "設定の読み込みに失敗しました",
+  "failed_to_load_short_links": "短縮リンクの読み込みに失敗しました",
+  "failed_to_load_preferences": "環境設定の読み込みに失敗しました",
+  "failed_to_copy_campaign": "キャンペーンのコピーに失敗しました"
 }

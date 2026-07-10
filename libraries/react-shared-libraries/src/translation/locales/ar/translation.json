@@ -4438,5 +4438,9 @@
   "n_clips_count_other": "{{count}} مقاطع",
   "designer_add_n_formats_one": "إضافة {{count}} تنسيق",
   "designer_add_n_formats_other": "إضافة {{count}} تنسيقات",
-  "subscribers": "مشترك"
+  "subscribers": "مشترك",
+  "failed_to_load_settings": "فشل تحميل الإعدادات",
+  "failed_to_load_short_links": "فشل تحميل الروابط المختصرة",
+  "failed_to_load_preferences": "فشل تحميل التفضيلات",
+  "failed_to_copy_campaign": "فشل نسخ الحملة"
 }
