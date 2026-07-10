@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 vi.mock('file-type', () => ({
   fromBuffer: vi.fn(),
@@ -102,14 +104,15 @@ describe('CustomFileValidationPipe', () => {
   it('cleans up temp file on validation error', async () => {
     vi.mocked(fromFile).mockRejectedValue(new Error('Corrupt file'));
 
+    const tempPath = join(tmpdir(), 'uploads', 'badfile.jpg');
     const value = {
-      path: '/tmp/uploads/badfile.jpg',
+      path: tempPath,
       fieldname: 'file',
       originalname: 'badfile.jpg',
     };
 
     await expect(pipe.transform(value)).rejects.toThrow('Corrupt file');
-    expect(mockUnlink).toHaveBeenCalledWith('/tmp/uploads/badfile.jpg');
+    expect(mockUnlink).toHaveBeenCalledWith(tempPath);
   });
 
   it('does not unlink when value has no path on error', async () => {

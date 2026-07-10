@@ -23,6 +23,7 @@ import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/email
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { getRetentionDays } from '@gitroom/nestjs-libraries/analytics/analytics-aggregation';
+import { stripHtmlTags } from '@gitroom/helpers/utils/strip.tags';
 
 dayjs.extend(isoWeek);
 
@@ -516,7 +517,7 @@ export class AnalyticsActivity {
           if (top) {
             const content = (top as any).post?.content as string | undefined;
             const title = content
-              ? content.replace(/<[^>]*>/g, '').slice(0, 80).trim()
+              ? stripHtmlTags(content).slice(0, 80).trim()
               : '';
             topPost = { postId: top.postId, title, metric: headline, value: top.value };
           }

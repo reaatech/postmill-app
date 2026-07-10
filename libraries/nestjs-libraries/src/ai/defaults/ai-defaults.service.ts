@@ -141,34 +141,37 @@ export class AiDefaultsService {
   }
 
   async setModelDefault(orgId: string, category: string, body: SetDefaultModelDto) {
-    if (!AI_MODEL_CATEGORIES.includes(category as any)) {
+    const safeCategory = AI_MODEL_CATEGORIES.find((c) => c === category);
+    if (!safeCategory) {
       throw new BadRequestException(`Invalid model category: ${category}`);
     }
-    const cleaned = this._sanitizeSettings('ai', category, body);
-    await this._defaultsRepository.upsert(orgId, 'ai', category, cleaned);
+    const cleaned = this._sanitizeSettings('ai', safeCategory, body);
+    await this._defaultsRepository.upsert(orgId, 'ai', safeCategory, cleaned);
     this.bustDefaultsCatalogCache(orgId);
-    return { category, success: true };
+    return { category: safeCategory, success: true };
   }
 
   async clearModelDefault(orgId: string, category: string) {
-    if (!AI_MODEL_CATEGORIES.includes(category as any)) {
+    const safeCategory = AI_MODEL_CATEGORIES.find((c) => c === category);
+    if (!safeCategory) {
       throw new BadRequestException(`Invalid model category: ${category}`);
     }
-    await this._defaultsRepository.remove(orgId, 'ai', category);
-    return { category, success: true };
+    await this._defaultsRepository.remove(orgId, 'ai', safeCategory);
+    return { category: safeCategory, success: true };
   }
 
   async getModelDefaultsCatalog(orgId: string, category: string) {
-    if (!AI_MODEL_CATEGORIES.includes(category as any)) {
+    const safeCategory = AI_MODEL_CATEGORIES.find((c) => c === category);
+    if (!safeCategory) {
       throw new BadRequestException(`Invalid model category: ${category}`);
     }
-    const cacheKey = `settings:ai:defaults:catalog:${orgId}:${category}`;
+    const cacheKey = `settings:ai:defaults:catalog:${orgId}:${safeCategory}`;
     const cached = await ioRedis.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
 
-    const candidates = await this._resolution.candidates('ai', category, orgId);
+    const candidates = await this._resolution.candidates('ai', safeCategory, orgId);
     const options: { providerId: string; version: string; model?: string; label: string }[] = [];
     for (const c of candidates) {
       const providerLabel = this._providerLabel(c);
@@ -179,7 +182,7 @@ export class AiDefaultsService {
           label: providerLabel,
         });
       } else {
-        const models = await this._listModelsForCandidate(c, category, orgId);
+        const models = await this._listModelsForCandidate(c, safeCategory, orgId);
         if (models.length === 0) {
           // Configured model-list provider whose catalog couldn't be enumerated
           // (transient API failure / empty list). Still offer a provider-level option
@@ -202,7 +205,7 @@ export class AiDefaultsService {
         }
       }
     }
-    const result = { category, options };
+    const result = { category: safeCategory, options };
     await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', 60);
     return result;
   }

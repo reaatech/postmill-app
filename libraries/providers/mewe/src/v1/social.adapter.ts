@@ -27,7 +27,12 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
   dto = MeweDto;
 
   private _resolveBaseUrl(instanceUrl?: string): string {
-    const base = (instanceUrl || 'https://mewe.com').trim().replace(/\/+$/, '');
+    let base = (instanceUrl || 'https://mewe.com').trim();
+    let end = base.length;
+    while (end > 0 && base.charCodeAt(end - 1) === 47 /* '/' */) {
+      end--;
+    }
+    base = base.slice(0, end);
     let parsed: URL;
     try {
       parsed = new URL(base);

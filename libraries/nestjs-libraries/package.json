@@ -159,6 +159,7 @@
   "devDependencies": {
     "@nestjs/testing": "^11.1.24",
     "@types/fluent-ffmpeg": "^2.1.24",
+    "@types/jsdom": "^21.1.7",
     "@vitest/coverage-v8": "^4.1.0"
   },
   "engines": {

@@ -200,10 +200,10 @@ export class AutopostService {
       const loadDom = new JSDOM(await (await safeFetch(url)).text());
       loadDom.window.document
         .querySelectorAll('script')
-        .forEach((s) => s.remove());
+        .forEach((s: Element) => s.remove());
       loadDom.window.document
         .querySelectorAll('style')
-        .forEach((s) => s.remove());
+        .forEach((s: Element) => s.remove());
       // remove all html, script and styles
       return striptags(loadDom.window.document.body.innerHTML);
     } catch (err) {

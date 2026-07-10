@@ -24,7 +24,6 @@ function makeController() {
     {
       getProviderConfigSummary: vi.fn(),
     } as unknown as AiDefaultsService,
-    { seedUnset: vi.fn() } as any,
   ) as any;
 }
 

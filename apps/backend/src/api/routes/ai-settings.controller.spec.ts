@@ -112,7 +112,10 @@ describe('AiSettingsController', () => {
   let guardrails: GuardrailService;
   let budget: BudgetService;
   let rag: RagService;
-  let orgMediaProviderSettings: { upsert: ReturnType<typeof vi.fn> };
+  let orgMediaProviderSettings: {
+    upsert: ReturnType<typeof vi.fn>;
+    getEnabledIdentifiers: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();

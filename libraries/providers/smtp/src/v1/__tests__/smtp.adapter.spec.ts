@@ -134,6 +134,43 @@ describe('SmtpAdapter', () => {
       const result = await adapter.send(sendParams);
       expect(result.providerMessageId).toBe('<custom@test.com>');
     });
+
+    it('handles whitespace in closing script tag', async () => {
+      await adapter.send({
+        ...sendParams,
+        html: '<p>Hello</p><script>alert(1)</script >',
+      });
+
+      const call = mockSendMail.mock.calls[mockSendMail.mock.calls.length - 1][0];
+      expect(call.text).not.toContain('<');
+      expect(call.text).not.toContain('>');
+      expect(call.text).not.toContain('alert(1)');
+      expect(call.text).toContain('Hello');
+    });
+
+    it('strips style blocks with attributes', async () => {
+      await adapter.send({
+        ...sendParams,
+        html: '<style type="text/css">body { color: red; }</style><p>Visible</p>',
+      });
+
+      const call = mockSendMail.mock.calls[mockSendMail.mock.calls.length - 1][0];
+      expect(call.text).not.toContain('style');
+      expect(call.text).not.toContain('color: red');
+      expect(call.text).toContain('Visible');
+    });
+
+    it('does not decode double-encoded entities into tags', async () => {
+      await adapter.send({
+        ...sendParams,
+        html: '<p>&amp;lt;script&amp;gt;alert(1)&amp;lt;/script&amp;gt;</p>',
+      });
+
+      const call = mockSendMail.mock.calls[mockSendMail.mock.calls.length - 1][0];
+      expect(call.text).not.toContain('<');
+      expect(call.text).not.toContain('>');
+      expect(call.text).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    });
   });
 
   describe('optional methods', () => {

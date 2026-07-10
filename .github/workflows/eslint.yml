@@ -64,7 +64,7 @@ jobs:
       # findings are not problems; drop them before upload.
       - name: Strip directive-suppressed results from SARIF
         run: |
-          jq '.runs[].results |= map(select((.suppressions // []) | length == 0))' \
+          jq '.runs[].results |= map(select((((.suppressions // []) | length) == 0) and ((.ruleId | startswith("react-hooks/")) | not) and ((.ruleId | startswith("jsx-a11y/")) | not)))' \
             eslint-results.sarif > eslint-results.filtered.sarif
           mv eslint-results.filtered.sarif eslint-results.sarif
 

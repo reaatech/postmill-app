@@ -74,7 +74,12 @@ describe('MediaProviderController', () => {
 
   describe('GET /providers', () => {
     it('delegates to the service for provider metadata', async () => {
-      const meta = [{ identifier: 'openai', name: 'OpenAI', capabilities: { image: true }, credentialFields: null }];
+      const meta: Array<{
+        identifier: string;
+        name: string;
+        capabilities: Record<string, boolean>;
+        credentialFields: unknown;
+      }> = [{ identifier: 'openai', name: 'OpenAI', capabilities: { image: true }, credentialFields: null }];
       mockListProviderMetadata.mockReturnValue(meta);
 
       const result = await controller.listProviders();

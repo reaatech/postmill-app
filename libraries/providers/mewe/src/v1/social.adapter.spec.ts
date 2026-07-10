@@ -230,3 +230,54 @@ describe('MeweProvider authenticate / post / upload SSRF guard (B-02)', () => {
     );
   });
 });
+
+describe('MeweProvider._resolveBaseUrl (A5.1–A5.2)', () => {
+  const resolve = (instanceUrl?: string) =>
+    (new MeweProvider() as any)._resolveBaseUrl(instanceUrl) as string;
+
+  it('returns the default URL when no instanceUrl is provided', () => {
+    expect(resolve()).toBe('https://mewe.com');
+  });
+
+  it('returns a valid URL unchanged', () => {
+    expect(resolve('https://mewe.com')).toBe('https://mewe.com');
+  });
+
+  it('removes a single trailing slash', () => {
+    expect(resolve('https://mewe.com/')).toBe('https://mewe.com');
+  });
+
+  it('removes many trailing slashes', () => {
+    expect(resolve('https://mewe.com////')).toBe('https://mewe.com');
+  });
+
+  it('preserves an internal slash and query path', () => {
+    expect(resolve('https://mewe.com/group/abc/')).toBe(
+      'https://mewe.com/group/abc'
+    );
+  });
+
+  it('trims whitespace before removing trailing slashes', () => {
+    expect(resolve('  https://mewe.com//  ')).toBe('https://mewe.com');
+  });
+
+  it('still rejects an HTTP URL', () => {
+    expect(() => resolve('http://mewe.com/')).toThrow(
+      'Invalid MeWe instance URL:'
+    );
+  });
+
+  it('still rejects a missing hostname', () => {
+    expect(() => resolve('https:///')).toThrow('Invalid MeWe instance URL:');
+  });
+
+  it('handles a 100k trailing-slash string promptly', () => {
+    const url = 'https://mewe.com' + '/'.repeat(100_000);
+    const start = performance.now();
+    const result = resolve(url);
+    const elapsed = performance.now() - start;
+
+    expect(result).toBe('https://mewe.com');
+    expect(elapsed).toBeLessThan(100);
+  });
+});

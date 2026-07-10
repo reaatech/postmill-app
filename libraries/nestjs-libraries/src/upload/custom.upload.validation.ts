@@ -6,12 +6,19 @@ import {
 import { fromBuffer, fromFile } from './file-type.compat';
 import { statSync } from 'fs';
 import { promises as fs } from 'fs';
+import { resolve, sep } from 'path';
+import { tmpdir } from 'os';
 import {
   checkUploadLimit,
   UPLOAD_ALLOWED_MIME_TYPES,
 } from './upload-limits';
 
 const ALLOWED_MIME_TYPES = UPLOAD_ALLOWED_MIME_TYPES;
+
+const isInsideTmp = (p: string) => {
+  const r = resolve(p);
+  return r === resolve(tmpdir()) || r.startsWith(resolve(tmpdir()) + sep);
+};
 
 @Injectable()
 export class CustomFileValidationPipe implements PipeTransform {
@@ -39,7 +46,7 @@ export class CustomFileValidationPipe implements PipeTransform {
         throw new BadRequestException('Unsupported file type.');
       }
 
-      if (!value.size && value.path) {
+      if (!value.size && value.path && isInsideTmp(value.path)) {
         try { value.size = statSync(value.path).size; } catch {}
       }
 
@@ -59,7 +66,7 @@ export class CustomFileValidationPipe implements PipeTransform {
 
       return value;
     } catch (e) {
-      if (value?.path) { try { await fs.unlink(value.path); } catch {} }
+      if (value?.path && isInsideTmp(value.path)) { try { await fs.unlink(value.path); } catch {} }
       throw e;
     }
   }

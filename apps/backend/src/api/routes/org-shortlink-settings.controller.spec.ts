@@ -52,7 +52,7 @@ function stubService(overrides: Record<string, any> = {}) {
     getExistingConfigId: vi.fn().mockResolvedValue(null),
     requireAdapter: vi.fn(),
     ...overrides,
-  } as unknown as OrgShortLinkSettingsService;
+  };
 }
 
 function stubOAuth(overrides: Record<string, any> = {}) {
@@ -60,7 +60,7 @@ function stubOAuth(overrides: Record<string, any> = {}) {
     getOAuthUrl: vi.fn().mockResolvedValue({ url: 'https://oauth.example', state: 'state-123' }),
     oauthCallback: vi.fn().mockResolvedValue({ identifier: 'bitly', success: true }),
     ...overrides,
-  } as unknown as ShortLinkOAuthService;
+  };
 }
 
 describe('OrgShortLinkSettingsController', () => {
@@ -72,7 +72,10 @@ describe('OrgShortLinkSettingsController', () => {
     vi.clearAllMocks();
     service = stubService();
     oauth = stubOAuth();
-    controller = new OrgShortLinkSettingsController(service, oauth);
+    controller = new OrgShortLinkSettingsController(
+      service as unknown as OrgShortLinkSettingsService,
+      oauth as unknown as ShortLinkOAuthService,
+    );
   });
 
   // ---------------------------------------------------------------------------
