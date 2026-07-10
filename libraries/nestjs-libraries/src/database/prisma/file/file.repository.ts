@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
 import { Prisma } from '@prisma/client';
 import { stat } from 'fs/promises';
-import { extname, resolve, sep } from 'path';
+import { extname, resolve, relative, isAbsolute } from 'path';
 
 const MIME_MAP: Record<string, string> = {
   '.jpg': 'image/jpeg',
@@ -94,7 +94,11 @@ export class FileRepository {
     // public URLs (https://…) where stat() will fail; the caller must supply fileSize.
     const uploadRoot = resolve(process.env.UPLOAD_DIRECTORY || './uploads');
     const resolved = resolve(filePath);
-    const insideRoot = resolved === uploadRoot || resolved.startsWith(uploadRoot + sep);
+    // Confine to the upload root via a `path.relative` escape check — the sanitizer shape
+    // CodeQL's js/path-injection query recognizes. rel==='' (path IS the root), starts with
+    // '..' (escapes the root), or is absolute (different drive) ⇒ outside ⇒ skip the stat.
+    const rel = relative(uploadRoot, resolved);
+    const insideRoot = !!rel && !rel.startsWith('..') && !isAbsolute(rel);
     if (resolvedFileSize === 0 && insideRoot) {
       try {
         const s = await stat(resolved);
