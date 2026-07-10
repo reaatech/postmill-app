@@ -101,8 +101,12 @@ jobs:
 
       - name: Start backend (:3000) and frontend (:4200)
         run: |
-          node apps/backend/dist/apps/backend/src/main.js > backend.log 2>&1 &
-          (cd apps/frontend && pnpm exec next start -H 0.0.0.0 -p 4200 > ../../frontend.log 2>&1 &)
+          # Fully detach both servers (setsid + own session) so they survive this
+          # step's shell exit. A directly-backgrounded `node … &` was being reaped at
+          # the step boundary — the backend was up for the readiness curl but gone by
+          # the auth step (ERR_CONNECTION_REFUSED), while the frontend (subshell) survived.
+          setsid bash -c 'node apps/backend/dist/apps/backend/src/main.js > backend.log 2>&1' < /dev/null &
+          setsid bash -c 'cd apps/frontend && pnpm exec next start -H 0.0.0.0 -p 4200 > ../../frontend.log 2>&1' < /dev/null &
           # Wait for both to bind (backend answers 401 unauth on /user/self; frontend 307 → /auth).
           for i in $(seq 1 45); do
             be=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/user/self || true)
@@ -119,7 +123,17 @@ jobs:
 
       - name: Authenticate personas
         working-directory: e2e
-        run: npx playwright test --config playwright.audit.config.ts --project=setup
+        run: |
+          # Re-verify the backend is still reachable right before login (guards against
+          # a step-boundary process reap). curl the way the browser does — 127.0.0.1.
+          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/user/self || true)
+          echo "pre-auth backend /user/self (127.0.0.1) → $code"
+          if [ "$code" = "000" ]; then
+            echo "::error::Backend not reachable at 127.0.0.1:3000 before auth — process died after start step."
+            tail -30 ../backend.log || true
+            exit 1
+          fi
+          npx playwright test --config playwright.audit.config.ts --project=setup
 
       - name: Regression specs (GATING)
         working-directory: e2e
