@@ -11,6 +11,7 @@ import { ContextMenu } from './context-menu';
 import { fitWithin } from './panels/fit-within';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { DesignerElement, DesignerOutput } from './designer.store';
 import { VideoCanvasOverlay } from './video-canvas-overlay';
 import { sharedStageRef } from './stage-ref';
@@ -69,6 +70,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
 
   const toaster = useToaster();
   const fetch = useFetch();
+  const t = useT();
 
   const doc = store((s) => s.doc);
   const selectedIds = store((s) => s.selectedIds);
@@ -631,16 +633,16 @@ export const DesignerCanvas: FC<CanvasProps> = ({
           };
           img.onerror = () => {
             setUploadingFile(false);
-            toaster.show('Failed to load dropped image', 'warning');
+            toaster.show(t('failed_to_load_dropped_image', 'Failed to load dropped image'), 'warning');
           };
           img.src = data.path;
         })
         .catch(() => {
           setUploadingFile(false);
-          toaster.show('Failed to upload file', 'warning');
+          toaster.show(t('failed_to_upload_file', 'Failed to upload file'), 'warning');
         });
     },
-    [addElement, viewportX, viewportY, zoom, store, output, toaster, fetch, isVideo]
+    [addElement, viewportX, viewportY, zoom, store, output, toaster, fetch, isVideo, t]
   );
 
   const bg = output?.bg;
@@ -656,7 +658,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
       }`}
       tabIndex={0} // eslint-disable-line jsx-a11y/no-noninteractive-tabindex
       role="application"
-      aria-label="Design canvas"
+      aria-label={t('design_canvas', 'Design canvas')}
       onKeyDown={handleKeyDown}
       onMouseMove={(e) => {
         const rect = containerRef.current?.getBoundingClientRect();
@@ -809,7 +811,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" opacity="0.3" />
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
             </svg>
-            Uploading...
+            {t('uploading_ellipsis', 'Uploading...')}
           </div>
         </div>
       )}
@@ -850,7 +852,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         <button
           onClick={() => setZoom(zoom / 1.25)}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-studioBorder/30"
-          aria-label="Zoom out"
+          aria-label={t('zoom_out', 'Zoom out')}
         >
           −
         </button>
@@ -858,14 +860,14 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         <button
           onClick={() => setZoom(zoom * 1.25)}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-studioBorder/30"
-          aria-label="Zoom in"
+          aria-label={t('zoom_in', 'Zoom in')}
         >
           +
         </button>
         <button
           onClick={fitToScreen}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-studioBorder/30 text-[10px]"
-          aria-label="Fit to screen"
+          aria-label={t('fit_to_screen', 'Fit to screen')}
         >
           ⊞
         </button>

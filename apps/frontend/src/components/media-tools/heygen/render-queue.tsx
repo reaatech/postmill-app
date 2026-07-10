@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useCallback } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
@@ -8,34 +9,35 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { HeyGenJob } from './use-heygen';
 import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 
-const STATUS_META: Record<HeyGenJob['status'], { label: string; className: string }> = {
-  pending: { label: 'Queued', className: 'text-amber-600 bg-amber-600/10' },
-  processing: { label: 'Rendering', className: 'text-amber-600 bg-amber-600/10' },
-  completed: { label: 'Ready', className: 'text-green-700 dark:text-green-400 bg-green-400/10' },
-  failed: { label: 'Failed', className: 'text-dangerText bg-red-400/10' },
-};
-
-const OPERATION_LABEL: Record<string, string> = {
-  avatar: 'Avatar video',
-  video: 'Avatar video',
-  audio: 'Voiceover',
-};
-
 export const RenderQueue: FC<{ jobs: HeyGenJob[] | undefined; isLoading: boolean }> = ({ jobs, isLoading }) => {
+  const t = useT();
   const mediaDirectory = useMediaDirectory();
   const modal = useModals();
   const toaster = useToaster();
   const fetch = useFetch();
 
+  const STATUS_META: Record<HeyGenJob['status'], { label: string; className: string }> = {
+    pending: { label: t('heygen_status_queued', 'Queued'), className: 'text-amber-600 bg-amber-600/10' },
+    processing: { label: t('heygen_status_rendering', 'Rendering'), className: 'text-amber-600 bg-amber-600/10' },
+    completed: { label: t('heygen_status_ready', 'Ready'), className: 'text-green-700 dark:text-green-400 bg-green-400/10' },
+    failed: { label: t('failed', 'Failed'), className: 'text-dangerText bg-red-400/10' },
+  };
+
+  const OPERATION_LABEL: Record<string, string> = {
+    avatar: t('heygen_operation_avatar_video', 'Avatar video'),
+    video: t('heygen_operation_avatar_video', 'Avatar video'),
+    audio: t('heygen_operation_voiceover', 'Voiceover'),
+  };
+
   const post = useCallback(
     async (job: HeyGenJob) => {
       if (!job.artifactUrl || !job.fileId) {
-        toaster.show('This render is not ready to post yet', 'warning');
+        toaster.show(t('heygen_render_not_ready_to_post', 'This render is not ready to post yet'), 'warning');
         return;
       }
       const integrationsRes = await fetch('/integrations');
       if (!integrationsRes.ok) {
-        toaster.show('Could not load channels', 'warning');
+        toaster.show(t('heygen_could_not_load_channels', 'Could not load channels'), 'warning');
         return;
       }
       const integrations = await integrationsRes.json();
@@ -56,13 +58,13 @@ export const RenderQueue: FC<{ jobs: HeyGenJob[] | undefined; isLoading: boolean
         ),
       });
     },
-    [fetch, modal, toaster]
+    [fetch, modal, toaster, t]
   );
 
   if (!isLoading && (!jobs || jobs.length === 0)) {
     return (
       <div className="text-[12px] text-newTextColor/60 px-[4px] py-[10px]">
-        Your renders will appear here.
+        {t('heygen_renders_will_appear_here', 'Your renders will appear here.')}
       </div>
     );
   }
@@ -76,12 +78,12 @@ export const RenderQueue: FC<{ jobs: HeyGenJob[] | undefined; isLoading: boolean
         return (
           <div key={job.id} className="rounded-[10px] border border-studioBorder bg-newBgColorInner overflow-hidden">
             {job.status === 'completed' && previewUrl && !isAudio && (
-              <video src={previewUrl} className="w-full aspect-video object-cover bg-black" controls preload="metadata" aria-label="Generated video preview">
+              <video src={previewUrl} className="w-full aspect-video object-cover bg-black" controls preload="metadata" aria-label={t('generated_video_preview', 'Generated video preview')}>
                 <track kind="captions" srcLang="en" label="English" />
               </video>
             )}
             {job.status === 'completed' && previewUrl && isAudio && (
-              <audio src={previewUrl} className="w-full" controls preload="metadata" aria-label="Generated audio preview">
+              <audio src={previewUrl} className="w-full" controls preload="metadata" aria-label={t('generated_audio_preview', 'Generated audio preview')}>
                 <track kind="captions" srcLang="en" label="English" />
               </audio>
             )}
@@ -108,14 +110,14 @@ export const RenderQueue: FC<{ jobs: HeyGenJob[] | undefined; isLoading: boolean
                   onClick={() => openInDesigner(job)}
                   className="flex-1 px-[10px] py-[7px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all"
                 >
-                  Edit in Designer
+                  {t('edit_in_designer', 'Edit in Designer')}
                 </button>
                 <button
                   type="button"
                   onClick={() => post(job)}
                   className="flex-1 px-[10px] py-[7px] rounded-[8px] bg-[#2B5CD3] text-white text-[12px] font-[500] hover:bg-[#2B5CD3]/80 transition-all"
                 >
-                  Post
+                  {t('post', 'Post')}
                 </button>
               </div>
             )}

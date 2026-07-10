@@ -490,6 +490,8 @@ const MediaCategoryRow: React.FC<{
                 }
                 provider={row.providerId ?? ''}
                 operation={MEDIA_CATEGORY_OPERATION[category]}
+                keyNs={`media_defaults_${row.providerId ?? ''}`}
+                tabKey={category}
               />
               <Button
                 type="button"

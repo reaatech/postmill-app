@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useReplicateStore, type CategoryDefinition } from './replicate.store';
 import { useGenerate } from './use-generate';
 import { missingRequiredFields } from './use-generate';
@@ -14,11 +15,18 @@ interface PaletteAction {
   run: () => void;
 }
 
-const MEDIUM_LABEL: Record<string, string> = {
-  image: 'Image',
-  video: 'Video',
-  audio: 'Audio',
-};
+function mediumLabel(t: (key: string, fallback: string) => string, medium: string): string {
+  switch (medium) {
+    case 'image':
+      return t('image', 'Image');
+    case 'video':
+      return t('video', 'Video');
+    case 'audio':
+      return t('audio', 'Audio');
+    default:
+      return medium;
+  }
+}
 
 /**
  * ⌘K command palette for Replicate Studio. A single action list (categories +
@@ -26,6 +34,7 @@ const MEDIUM_LABEL: Record<string, string> = {
  * menu so the two never diverge (the Designer's actions.ts pattern).
  */
 export function CommandPalette({ categories }: { categories: CategoryDefinition[] }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -53,15 +62,15 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
   const actions = useMemo<PaletteAction[]>(() => {
     const list: PaletteAction[] = categories.map((cat) => ({
       id: `goto-${cat.key}`,
-      label: `Go to ${cat.label}`,
-      hint: MEDIUM_LABEL[cat.medium],
+      label: t('go_to_category', 'Go to {{label}}', { label: cat.label }),
+      hint: mediumLabel(t, cat.medium),
       keywords: [cat.label, cat.medium, cat.key, 'category', 'switch'],
       enabled: () => true,
       run: () => setCategory(cat.key),
     }));
     list.push({
       id: 'generate',
-      label: 'Generate',
+      label: t('generate', 'Generate'),
       hint: '↵',
       keywords: ['generate', 'run', 'create'],
       enabled: () => {
@@ -74,7 +83,7 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
     });
     list.push({
       id: 'new',
-      label: 'New / clear output',
+      label: t('new_clear_output', 'New / clear output'),
       keywords: ['new', 'clear', 'reset', 'output'],
       enabled: () => true,
       run: () => {
@@ -84,7 +93,7 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
       },
     });
     return list;
-  }, [categories, setCategory, generate, setResult, setError, setRunState]);
+  }, [categories, setCategory, generate, setResult, setError, setRunState, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -152,12 +161,12 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
               choose(filtered[active]);
             }
           }}
-          placeholder="Search commands…"
+          placeholder={t('search_commands_placeholder', 'Search commands…')}
           className="w-full px-4 py-3 bg-transparent text-textColor text-sm focus:outline-none border-b border-studioBorder"
         />
         <div className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 && (
-            <div className="px-4 py-6 text-center text-xs text-newTextColor/65">No commands</div>
+            <div className="px-4 py-6 text-center text-xs text-newTextColor/65">{t('no_commands', 'No commands')}</div>
           )}
           {filtered.map((a, i) => (
             <button

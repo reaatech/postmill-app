@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useReplicateStore, EstimateResult } from './replicate.store';
 
 const ENHANCE_SURCHARGE = 0.1; // oc-platform: $0.10 per enabled prompt enhancement
@@ -24,6 +25,7 @@ function useEstimate(modelId: string | undefined, input: Record<string, unknown>
 }
 
 export function CostBar() {
+  const t = useT();
   // Individual slice selectors — whole-store subscription loops the setEstimate effect.
   const formInput = useReplicateStore((s) => s.formInput);
   const selectedModel = useReplicateStore((s) => s.selectedModel);
@@ -56,22 +58,30 @@ export function CostBar() {
 
   let body: React.ReactNode;
   if (!storedEstimate) {
-    body = <span className="text-xs text-newTextColor/65">Estimating…</span>;
+    body = <span className="text-xs text-newTextColor/65">{t('estimating', 'Estimating…')}</span>;
   } else if (storedEstimate.approximate) {
     body = (
       <span className="text-xs text-newTextColor/70">
-        Billed by usage
-        {surcharge > 0 && <> · + ${surcharge.toFixed(2)} enhance</>}
+        {t('billed_by_usage', 'Billed by usage')}
+        {surcharge > 0 && (
+          <>
+            {' '}
+            {t('surcharge_enhance_note', '· + ${{amount}} enhance', { amount: surcharge.toFixed(2) })}
+          </>
+        )}
       </span>
     );
   } else {
     const total = storedEstimate.usd + surcharge;
     body = (
       <span className="text-sm text-newTextColor/80">
-        Estimated cost{' '}
+        {t('estimated_cost', 'Estimated cost')}{' '}
         <span className="text-textColor font-semibold">${total.toFixed(4)}</span>
         {surcharge > 0 && (
-          <span className="text-[10px] text-newTextColor/65"> (incl. ${surcharge.toFixed(2)} enhance)</span>
+          <span className="text-[10px] text-newTextColor/65">
+            {' '}
+            {t('incl_enhance_note', '(incl. ${{amount}} enhance)', { amount: surcharge.toFixed(2) })}
+          </span>
         )}
       </span>
     );

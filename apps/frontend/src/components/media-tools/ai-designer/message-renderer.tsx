@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 import { Button } from '@gitroom/react/form/button';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { InteractiveForm } from './interactive-form';
 import { markdownToHtml } from './markdown-lite';
 import type {
@@ -28,6 +29,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({
   onFormSubmit,
 }) => {
   const { content } = message;
+  const t = useT();
 
   switch (content.kind) {
     case 'text':
@@ -60,7 +62,7 @@ export const MessageRenderer: React.FC<MessageRendererProps> = ({
     default:
       return (
         <div className="text-[13px] text-textColor/60">
-          Unknown message kind
+          {t('unknown_message_kind', 'Unknown message kind')}
         </div>
       );
   }
@@ -82,43 +84,46 @@ const MarkdownMessage: React.FC<{ md: string }> = ({ md }) => {
 
 const MediaMessage: React.FC<{
   items: Extract<AiDesignerMsgContent, { kind: 'media' }>['items'];
-}> = ({ items }) => (
-  <div className="flex flex-wrap gap-3">
-    {items.map((item, idx) => (
-      <div key={`${item.fileId || item.url}-${idx}`} className="flex flex-col gap-1">
-        {item.type === 'video' ? (
-          <video
-            src={item.url}
-            controls
-            className="max-w-[280px] max-h-[200px] rounded-lg border border-studioBorder"
-          >
-            <track kind="captions" src="" label="No captions" />
-          </video>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={item.url}
-            alt={item.caption || 'Preview'}
-            className="max-w-[280px] max-h-[200px] rounded-lg border border-studioBorder object-contain"
-          />
-        )}
-        {item.caption && (
-          <span className="text-[11px] text-textColor/60">{item.caption}</span>
-        )}
-        {item.designId && (
-          <a
-            href={`/media/designer?designId=${encodeURIComponent(item.designId)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[11px] text-btnPrimaryAccent hover:underline"
-          >
-            Open in Designer
-          </a>
-        )}
-      </div>
-    ))}
-  </div>
-);
+}> = ({ items }) => {
+  const t = useT();
+  return (
+    <div className="flex flex-wrap gap-3">
+      {items.map((item, idx) => (
+        <div key={`${item.fileId || item.url}-${idx}`} className="flex flex-col gap-1">
+          {item.type === 'video' ? (
+            <video
+              src={item.url}
+              controls
+              className="max-w-[280px] max-h-[200px] rounded-lg border border-studioBorder"
+            >
+              <track kind="captions" src="" label={t('no_captions', 'No captions')} />
+            </video>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.url}
+              alt={item.caption || t('preview', 'Preview')}
+              className="max-w-[280px] max-h-[200px] rounded-lg border border-studioBorder object-contain"
+            />
+          )}
+          {item.caption && (
+            <span className="text-[11px] text-textColor/60">{item.caption}</span>
+          )}
+          {item.designId && (
+            <a
+              href={`/media/designer?designId=${encodeURIComponent(item.designId)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-btnPrimaryAccent hover:underline"
+            >
+              {t('open_in_designer', 'Open in Designer')}
+            </a>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const ProgressMessage: React.FC<{
   content: Extract<AiDesignerMsgContent, { kind: 'progress' }>;
@@ -152,6 +157,7 @@ const PlanMessage: React.FC<{
   onAccept: (replyTo: string, variantId?: string, saveTemplate?: boolean) => void;
   onRevise: (instruction: string, targetDesignId?: string) => void;
 }> = ({ content, replyTo, onAccept, onRevise }) => {
+  const t = useT();
   const [reviseOpen, setReviseOpen] = useState(false);
   const [reviseText, setReviseText] = useState('');
   const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(
@@ -166,7 +172,8 @@ const PlanMessage: React.FC<{
   return (
     <div className="flex flex-col gap-3">
       <div className="text-[14px] text-textColor">
-        <strong className="font-medium">Intent:</strong> {content.brief.intent}
+        <strong className="font-medium">{t('intent_colon', 'Intent:')}</strong>{' '}
+        {content.brief.intent}
       </div>
       {content.plans.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -193,7 +200,10 @@ const PlanMessage: React.FC<{
                 </div>
                 {plan.slots.length > 0 && (
                   <div className="mt-1 text-[12px] text-textColor/60">
-                    {plan.slots.length} slot{plan.slots.length === 1 ? '' : 's'}
+                    {t('n_slots_count', '{{count}} slot{{plural}}', {
+                      count: plan.slots.length,
+                      plural: plan.slots.length === 1 ? '' : 's',
+                    })}
                   </div>
                 )}
               </div>
@@ -210,7 +220,7 @@ const PlanMessage: React.FC<{
             onChange={(e) => setSaveTemplate(e.target.checked)}
             className="accent-designerAccent"
           />
-          Save as reusable template
+          {t('save_as_reusable_template', 'Save as reusable template')}
         </label>
       )}
 
@@ -220,7 +230,7 @@ const PlanMessage: React.FC<{
             type="button"
             onClick={() => onAccept(replyTo, selectedVariantId, saveTemplate)}
           >
-            Accept plan
+            {t('accept_plan', 'Accept plan')}
           </Button>
         )}
         {canRevise && (
@@ -229,7 +239,7 @@ const PlanMessage: React.FC<{
             secondary
             onClick={() => setReviseOpen((v) => !v)}
           >
-            Revise
+            {t('revise', 'Revise')}
           </Button>
         )}
       </div>
@@ -239,7 +249,7 @@ const PlanMessage: React.FC<{
           <textarea
             value={reviseText}
             onChange={(e) => setReviseText(e.target.value)}
-            placeholder="What would you like to change?"
+            placeholder={t('what_would_you_like_to_change', 'What would you like to change?')}
             className="min-h-[80px] rounded-lg border border-studioBorder bg-newBgColorInner p-3 text-[14px] text-textColor outline-none focus:border-designerAccent resize-none"
           />
           <div className="flex justify-end gap-2">
@@ -251,7 +261,7 @@ const PlanMessage: React.FC<{
                 setReviseText('');
               }}
             >
-              Cancel
+              {t('cancel', 'Cancel')}
             </Button>
             <Button
               type="button"
@@ -262,7 +272,7 @@ const PlanMessage: React.FC<{
                 setReviseText('');
               }}
             >
-              Send revision
+              {t('send_revision', 'Send revision')}
             </Button>
           </div>
         </div>

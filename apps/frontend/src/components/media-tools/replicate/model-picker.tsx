@@ -3,6 +3,7 @@
 import React, { useCallback, useMemo } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useReplicateStore, ModelSummary } from './replicate.store';
 
 interface ModelPickerProps {
@@ -17,14 +18,15 @@ function useModels(categoryKey: string) {
   });
 }
 
-function priceLabel(m: ModelSummary): string {
+function priceLabel(m: ModelSummary, t: (key: string, fallback: string) => string): string {
   if (m.pricing === 'output' && m.price) return `$${m.price.usd}`;
-  return 'usage-billed';
+  return t('usage_billed', 'usage-billed');
 }
 
 // oc-platform-style model dropdown: name + warm/community grouping + price. The
 // selected model's cover art is shown in the hero output "Example" pane, not here.
 export function ModelPicker({ categoryKey }: ModelPickerProps) {
+  const t = useT();
   const { data: models } = useModels(categoryKey);
   // Individual slice selectors — subscribing to the whole store re-runs effects on
   // every state change (the Maximum-update-depth loop we hit before). Actions are stable.
@@ -58,10 +60,10 @@ export function ModelPicker({ categoryKey }: ModelPickerProps) {
         const detail = await res.json();
         setSelectedModel(detail);
       } catch {
-        setError('Failed to load model');
+        setError(t('failed_to_load_model', 'Failed to load model'));
       }
     },
-    [fetch, setSelectedModel, setError]
+    [fetch, setSelectedModel, setError, t]
   );
 
   if (!models) {
@@ -71,7 +73,7 @@ export function ModelPicker({ categoryKey }: ModelPickerProps) {
   return (
     <div>
       <label htmlFor="replicate-model" className="block text-xs uppercase tracking-wider text-newTextColor/70 mb-1.5">
-        Model
+        {t('model', 'Model')}
       </label>
       <select
         id="replicate-model"
@@ -79,21 +81,21 @@ export function ModelPicker({ categoryKey }: ModelPickerProps) {
         onChange={(e) => loadModel(e.target.value)}
         className="w-full px-3 py-2.5 rounded-lg border border-studioBorder bg-newBgColorInner text-textColor text-sm focus:outline-none focus:border-designerAccent"
       >
-        <option value="">Select a model…</option>
+        <option value="">{t('select_a_model', 'Select a model…')}</option>
         {warm.length > 0 && (
-          <optgroup label="Instant (official)">
+          <optgroup label={t('instant_official', 'Instant (official)')}>
             {warm.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name} · {priceLabel(m)}
+                {m.name} · {priceLabel(m, t)}
               </option>
             ))}
           </optgroup>
         )}
         {community.length > 0 && (
-          <optgroup label="Community (may cold-start)">
+          <optgroup label={t('community_may_cold_start', 'Community (may cold-start)')}>
             {community.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.name} · {priceLabel(m)}
+                {m.name} · {priceLabel(m, t)}
               </option>
             ))}
           </optgroup>

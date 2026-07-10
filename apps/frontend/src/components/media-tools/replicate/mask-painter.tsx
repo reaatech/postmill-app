@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface MaskPainterProps {
   sourceImage: string;
@@ -8,6 +9,7 @@ interface MaskPainterProps {
 }
 
 export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
+  const t = useT();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -135,7 +137,7 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
         />
         {!imageLoaded && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
-            <p className="text-sm text-gray-500">Select a source image first</p>
+            <p className="text-sm text-gray-500">{t('select_source_image_first', 'Select a source image first')}</p>
           </div>
         )}
       </div>
@@ -145,17 +147,17 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
             onClick={() => setIsEraser(false)}
             className={`px-3 py-1 rounded-lg text-xs ${!isEraser ? 'bg-designerAccent text-white' : 'bg-btnSimple text-newTextColor/70'}`}
           >
-            Brush
+            {t('brush', 'Brush')}
           </button>
           <button
             onClick={() => setIsEraser(true)}
             className={`px-3 py-1 rounded-lg text-xs ${isEraser ? 'bg-designerAccent text-white' : 'bg-btnSimple text-newTextColor/70'}`}
           >
-            Eraser
+            {t('eraser', 'Eraser')}
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <label htmlFor="mask-brush-size" className="text-xs text-newTextColor/70">Size:</label>
+          <label htmlFor="mask-brush-size" className="text-xs text-newTextColor/70">{t('size_colon', 'Size:')}</label>
           <input
             id="mask-brush-size"
             type="range"
@@ -171,13 +173,13 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
           onClick={clearMask}
           className="px-3 py-1.5 rounded-lg bg-btnSimple text-newTextColor/70 text-xs hover:bg-boxHover transition-colors"
         >
-          Clear
+          {t('clear', 'Clear')}
         </button>
         <button
           onClick={exportMask}
           className="ml-auto px-4 py-1.5 rounded-lg bg-designerAccent text-white text-xs hover:bg-designerAccent/80"
         >
-          Use Mask
+          {t('use_mask', 'Use Mask')}
         </button>
       </div>
     </div>

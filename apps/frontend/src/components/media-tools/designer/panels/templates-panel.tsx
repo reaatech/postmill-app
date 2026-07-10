@@ -8,6 +8,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import type { DesignerStore, DesignerDoc } from '../designer.store';
 import { getThumbnailDataUrl } from '../designer';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface DesignTemplate {
   id: string;
@@ -28,6 +29,7 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
   const fetch = useFetch();
   const user = useUser();
   const toaster = useToaster();
+  const t = useT();
 
   const { data, error, isLoading, mutate } = useSWR(
     `design-templates-${user.orgId}`,
@@ -49,13 +51,13 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
       }),
     });
     if (!res.ok) {
-      toaster.show('Failed to create design from template', 'warning');
+      toaster.show(t('templates_panel_failed_to_create_from_template', 'Failed to create design from template'), 'warning');
       return;
     }
     const data = await res.json();
     store.getState().loadDesign(template.doc, data.id, template.name, template.id);
     onClose?.();
-  }, [store, onClose, fetch, toaster, guard]);
+  }, [store, onClose, fetch, toaster, guard, t]);
 
   const saveAsTemplate = useCallback(async () => {
     const state = store.getState();
@@ -87,10 +89,10 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        toaster.show('Template updated', 'success');
+        toaster.show(t('templates_panel_template_updated', 'Template updated'), 'success');
         mutate();
       } else {
-        toaster.show('Failed to update template', 'warning');
+        toaster.show(t('templates_panel_failed_to_update_template', 'Failed to update template'), 'warning');
       }
     } else {
       const res = await fetch('/media/design-templates', {
@@ -100,13 +102,13 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
       if (res.ok) {
         const data = await res.json();
         state.setTemplateId(data.id);
-        toaster.show('Saved as template', 'success');
+        toaster.show(t('templates_panel_saved_as_template', 'Saved as template'), 'success');
         mutate();
       } else {
-        toaster.show('Failed to save template', 'warning');
+        toaster.show(t('template_save_failed', 'Failed to save template'), 'warning');
       }
     }
-  }, [store, fetch, mutate, toaster]);
+  }, [store, fetch, mutate, toaster, t]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -114,16 +116,16 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
         onClick={saveAsTemplate}
         className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
       >
-        Save current as template
+        {t('templates_panel_save_current_as_template', 'Save current as template')}
       </button>
 
       {isLoading && !data ? (
         <PanelSkeletonGrid count={4} />
       ) : error && !data ? (
-        (toaster.show('Couldn\'t load templates', 'warning'), <PanelError message="Couldn\'t load templates" onRetry={() => mutate()} />)
+        (toaster.show(t('templates_panel_couldnt_load_templates', "Couldn't load templates"), 'warning'), <PanelError message={t('templates_panel_couldnt_load_templates', "Couldn't load templates")} onRetry={() => mutate()} />)
       ) : !data?.length ? (
         <div className="text-[12px] text-newTextColor/60 text-center py-4">
-          No templates yet
+          {t('templates_panel_no_templates_yet', 'No templates yet')}
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
@@ -138,13 +140,13 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
               <div className="p-2">
                 <div className="text-[11px] text-textColor truncate">{template.name}</div>
                 <div className="text-[10px] text-newTextColor/60">
-                  {template.isSystem ? 'System' : 'Org'}
+                  {template.isSystem ? t('system', 'System') : t('templates_panel_org', 'Org')}
                 </div>
                 <button
                   onClick={() => applyTemplate(template)}
                   className="mt-1 w-full px-2 py-1 rounded text-[11px] bg-designerAccent text-white hover:bg-designerAccent/80"
                 >
-                  Apply
+                  {t('apply', 'Apply')}
                 </button>
               </div>
             </div>

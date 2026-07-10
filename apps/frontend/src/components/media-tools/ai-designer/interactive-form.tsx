@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import {
   MediaSelectorModal,
   type MediaSelectorItem,
@@ -28,9 +29,11 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
   prompt,
   fields,
   replyTo,
-  submitLabel = 'Submit',
+  submitLabel,
   onSubmit,
 }) => {
+  const t = useT();
+  const resolvedSubmitLabel = submitLabel ?? t('submit', 'Submit');
   const initialValues = useMemo(() => {
     const map: Record<string, unknown> = {};
     for (const field of fields) {
@@ -145,7 +148,7 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
               onChange={(e) => setValue(field.name, e.target.value)}
               className="h-[40px] rounded-lg border border-studioBorder bg-newBgColorInner px-3 text-[14px] text-textColor outline-none focus:border-designerAccent"
             >
-              <option value="">Select…</option>
+              <option value="">{t('select_ellipsis', 'Select…')}</option>
               {field.options.map((opt) => (
                 <option key={opt.value} value={opt.value}>
                   {opt.label}
@@ -198,14 +201,18 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
                 className="px-3 py-2 rounded-lg border border-studioBorder bg-newBgColorInner text-[13px] text-textColor hover:border-designerAccent transition-colors disabled:opacity-60"
               >
                 {mediaImporting
-                  ? 'Importing…'
+                  ? t('importing_ellipsis', 'Importing…')
                   : values[field.name]
-                    ? 'Change media'
-                    : 'Pick media'}
+                    ? t('change_media', 'Change media')
+                    : t('pick_media', 'Pick media')}
               </button>
               {values[field.name] && (
                 <div className="mt-2 text-[12px] text-textColor/70">
-                  Selected: {(values[field.name] as MediaValue).name || 'media'}
+                  {t('selected_name', 'Selected: {{name}}', {
+                    name:
+                      (values[field.name] as MediaValue).name ||
+                      t('media_fallback_name', 'media'),
+                  })}
                 </div>
               )}
             </div>
@@ -215,7 +222,7 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
 
       <div className="flex justify-end pt-2">
         <Button type="submit" disabled={!canSubmit || mediaImporting}>
-          {submitLabel}
+          {resolvedSubmitLabel}
         </Button>
       </div>
 
@@ -244,7 +251,7 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
               setValue(mediaPickField, value);
             } catch (e) {
               toaster.show(
-                (e as Error).message || 'Failed to import media',
+                (e as Error).message || t('failed_to_import_media', 'Failed to import media'),
                 'warning'
               );
             } finally {

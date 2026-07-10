@@ -6,6 +6,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { StockPreviewModal } from './stock-preview-modal';
 import { StockStickerItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const SUGGESTED_SEARCHES = ['Happy', 'Cat', 'Reaction', 'Celebration', 'Meme'];
 
@@ -25,6 +26,7 @@ interface StockStickersProps {
 }
 
 export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
+  const t = useT();
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -80,7 +82,7 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
   if (lastPage && !lastPage.configured) {
     return (
       <div className="flex items-center justify-center h-full text-newTextColor/60">
-        Stock browsing isn&apos;t configured
+        {t('stock_browsing_not_configured', "Stock browsing isn't configured")}
       </div>
     );
   }
@@ -96,14 +98,14 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search stickers..."
+            placeholder={t('search_stickers_placeholder', 'Search stickers...')}
             className="w-full h-[44px] pl-[38px] pr-[34px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
-              aria-label="Clear search"
+              aria-label={t('clear_search', 'Clear search')}
               className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/60 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
             >
               ✕
@@ -118,19 +120,19 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.34 3.94l-7.5 12.99A1.5 1.5 0 004.14 19.5h15.72a1.5 1.5 0 001.3-2.25l-7.5-12.99a1.5 1.5 0 00-2.6 0z" />
           </svg>
           <div className="text-[15px] font-[600] text-textColor">
-            Something went wrong{error.status ? ` (HTTP ${error.status})` : ''}
+            {t('something_went_wrong', 'Something went wrong')}{error.status ? ` (HTTP ${error.status})` : ''}
           </div>
           <div className="text-[13px] text-newTextColor/65 max-w-[320px]">
             {error.status === 401 || error.status === 403
-              ? 'Your session may have expired — try signing in again.'
-              : "We couldn't reach the sticker library. Give it another go in a moment."}
+              ? t('session_may_have_expired', 'Your session may have expired — try signing in again.')
+              : t('could_not_reach_sticker_library', "We couldn't reach the sticker library. Give it another go in a moment.")}
           </div>
           <button
             type="button"
             onClick={() => mutate()}
             className="mt-[6px] px-[16px] h-[36px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] hover:bg-[#1e4ab5] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
           >
-            Try again
+            {t('try_again', 'Try again')}
           </button>
         </div>
       ) : initialLoading ? (
@@ -150,12 +152,14 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM7.5 9.75c0 .414.168.75.375.75S8.25 10.164 8.25 9.75 8.082 9 7.875 9s-.375.336-.375.75zm7.5 0c0 .414.168.75.375.75s.375-.336.375-.75-.168-.75-.375-.75-.375.336-.375.75z" />
           </svg>
           <div className="text-[15px] font-[600] text-textColor">
-            {debouncedQuery ? `No stickers for "${debouncedQuery}"` : 'Find the perfect sticker'}
+            {debouncedQuery
+              ? t('no_stickers_for_query', 'No stickers for "{{query}}"', { query: debouncedQuery })
+              : t('find_perfect_sticker', 'Find the perfect sticker')}
           </div>
           <div className="text-[13px] text-newTextColor/65 max-w-[340px]">
             {debouncedQuery
-              ? 'Try a different keyword or one of these popular searches.'
-              : 'Search thousands of free stickers from GIPHY to get started.'}
+              ? t('try_different_keyword', 'Try a different keyword or one of these popular searches.')
+              : t('search_free_stickers_giphy', 'Search thousands of free stickers from GIPHY to get started.')}
           </div>
           <div className="flex items-center flex-wrap justify-center gap-[8px] mt-[4px]">
             {SUGGESTED_SEARCHES.map((s) => (
@@ -233,7 +237,7 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
                 </div>
                 <div className="p-[8px]">
                   <div className="text-[11px] text-newTextColor/60 truncate">
-                    by{' '}
+                    {t('by', 'by')}{' '}
                     <a
                       href={sticker.authorUrl}
                       target="_blank"
@@ -272,7 +276,7 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
             rel="noopener noreferrer"
             className="mt-[4px] self-center text-[11px] text-newTextColor/60 hover:text-newTextColor/70 transition-colors"
           >
-            Powered By GIPHY
+            {t('powered_by_giphy_attribution', 'Powered By GIPHY')}
           </a>
         </>
       )}

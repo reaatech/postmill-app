@@ -6,6 +6,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface SaveToFilesModalProps {
   url: string;
@@ -24,6 +25,7 @@ interface SaveToFilesModalProps {
 }
 
 export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source, type, downloadLocation, attribution, allowPost = true, uploadBlob }) => {
+  const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
@@ -78,11 +80,11 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
         });
       }
       if (!res.ok) {
-        toaster.show('Failed to save file', 'warning');
+        toaster.show(t('failed_to_save_file', 'Failed to save file'), 'warning');
         return;
       }
       const savedFile = await res.json();
-      toaster.show('File saved', 'success');
+      toaster.show(t('file_saved', 'File saved'), 'success');
       modal.closeAll();
 
       if (andPost && savedFile) {
@@ -110,7 +112,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
     } finally {
       setSaving(false);
     }
-  }, [url, fileName, selectedFolderId, source, type, downloadLocation, attribution, uploadBlob, fetch, toaster, modal]);
+  }, [url, fileName, selectedFolderId, source, type, downloadLocation, attribution, uploadBlob, fetch, toaster, modal, t]);
 
   const renderFolderTree = (items: any[], depth: number = 0): React.ReactNode => {
     return (items || []).map((folder: any) => {
@@ -146,10 +148,10 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
 
   return (
     <div className="flex flex-col gap-[15px] w-[500px] max-w-full">
-      <div className="text-[16px] font-[600] text-textColor">Save to Files</div>
+      <div className="text-[16px] font-[600] text-textColor">{t('save_to_files', 'Save to Files')}</div>
 
       <div>
-        <div className="text-[13px] font-[500] text-textColor mb-[6px]">File Name</div>
+        <div className="text-[13px] font-[500] text-textColor mb-[6px]">{t('file_name_label', 'File Name')}</div>
         <input
           type="text"
           value={fileName}
@@ -160,7 +162,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
           <div className="mt-[8px] text-[12px] text-newTextColor/60">
             {source === 'pixabay' && (
               <span>
-                Powered by{' '}
+                {t('powered_by', 'Powered by')}{' '}
                 <a
                   href="https://pixabay.com"
                   target="_blank"
@@ -171,12 +173,12 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
                 </a>
               </span>
             )}
-            {source === 'giphy' && <span>Powered by GIPHY</span>}
+            {source === 'giphy' && <span>{t('powered_by_giphy', 'Powered by GIPHY')}</span>}
             {source === 'iconify' && (
               <span>
-                {(attribution as any)?.set || (attribution as any)?.prefix || 'Iconify'} · License:{' '}
-                {(attribution as any)?.license || 'Unknown'}
-                {/cc-by/i.test(String((attribution as any)?.license || '')) && ' · Attribution required'}
+                {(attribution as any)?.set || (attribution as any)?.prefix || 'Iconify'} · {t('license_label', 'License:')}{' '}
+                {(attribution as any)?.license || t('unknown', 'Unknown')}
+                {/cc-by/i.test(String((attribution as any)?.license || '')) && ` · ${t('attribution_required', 'Attribution required')}`}
               </span>
             )}
           </div>
@@ -184,7 +186,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
       </div>
 
       <div>
-        <div className="text-[13px] font-[500] text-textColor mb-[6px]">Destination</div>
+        <div className="text-[13px] font-[500] text-textColor mb-[6px]">{t('destination_label', 'Destination')}</div>
         <div className="max-h-[260px] overflow-y-auto border border-studioBorder rounded-[8px] p-[8px] bg-newBgColorInner">
           <button
             type="button"
@@ -198,7 +200,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
               <rect x="1" y="2" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.3" />
               <path d="M1 6H15" stroke="currentColor" strokeWidth="1.3" />
             </svg>
-            <span className="flex-1 truncate">All Files (root)</span>
+            <span className="flex-1 truncate">{t('all_files_root', 'All Files (root)')}</span>
           </button>
           {folders && renderFolderTree(folders)}
         </div>
@@ -209,7 +211,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
           type="text"
           value={newFolderName}
           onChange={e => setNewFolderName(e.target.value)}
-          placeholder="New folder name..."
+          placeholder={t('new_folder_name_placeholder', 'New folder name...')}
           className="flex-1 h-[36px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
           onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); }}
         />
@@ -217,7 +219,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
           onClick={handleCreateFolder}
           className="px-[12px] h-[36px] rounded-[8px] bg-btnSimple text-textColor text-[13px] hover:bg-boxHover transition-all"
         >
-          Create
+          {t('create', 'Create')}
         </button>
       </div>
 
@@ -226,14 +228,14 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
           onClick={() => modal.closeAll()}
           className="px-[16px] h-[40px] rounded-[8px] border border-newColColor text-textColor text-[13px] hover:bg-boxHover transition-all"
         >
-          Cancel
+          {t('cancel', 'Cancel')}
         </button>
         <button
           disabled={saving || !fileName.trim()}
           onClick={() => handleSave(false)}
           className="px-[16px] h-[40px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[500] hover:bg-[#2B5CD3]/80 disabled:opacity-50 transition-all"
         >
-          {saving ? 'Saving...' : 'Save File'}
+          {saving ? t('saving_dots', 'Saving...') : t('save_file', 'Save File')}
         </button>
         {allowPost && (
           <button
@@ -241,7 +243,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
             onClick={() => handleSave(true)}
             className="px-[16px] h-[40px] rounded-[8px] bg-green-600 text-white text-[13px] font-[500] hover:bg-green-700 disabled:opacity-50 transition-all"
           >
-            {saving ? 'Saving...' : 'Save & Post'}
+            {saving ? t('saving_dots', 'Saving...') : t('save_and_post', 'Save & Post')}
           </button>
         )}
       </div>

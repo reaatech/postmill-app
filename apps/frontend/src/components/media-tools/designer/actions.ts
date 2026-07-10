@@ -101,6 +101,54 @@ const MENU_LABELS: Record<DesignerMenu, string> = {
 
 export const menuLabel = (m: DesignerMenu) => MENU_LABELS[m];
 
+const MENU_LABEL_KEYS: Record<DesignerMenu, string> = {
+  file: 'designer_menu_file',
+  edit: 'designer_menu_edit',
+  view: 'designer_menu_view',
+  insert: 'designer_menu_insert',
+  format: 'designer_menu_format',
+  options: 'designer_menu_options',
+  tools: 'designer_menu_tools',
+  window: 'designer_menu_window',
+  help: 'designer_menu_help',
+};
+
+/** i18n key for a top-level menu label — used at render sites (menu-bar, command-palette). */
+export const menuLabelKey = (m: DesignerMenu) => MENU_LABEL_KEYS[m];
+
+// Labels that already have a reusable i18n key elsewhere in the app — avoid coining a
+// duplicate key for the exact same English word.
+const REUSED_ACTION_LABEL_KEYS: Record<string, string> = {
+  Image: 'provider_chip_image',
+  Video: 'provider_chip_video',
+  Text: 'provider_chip_text',
+  Save: 'save',
+  'Save as Template': 'save_as_template',
+  Close: 'close',
+  Copy: 'copy',
+  Delete: 'delete',
+  Group: 'group',
+  AI: 'ai',
+};
+
+const slugLabel = (s: string): string =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'label';
+
+/**
+ * i18n key for a menu action's *current* label — id-scoped so it never collides across
+ * actions, and includes the resolved text so state-dependent labels (e.g. Lock/Unlock,
+ * Convert to Video/Image Mode) resolve to distinct keys per state. Data-only helper (no
+ * hook call) — actions.ts stays a plain data module; translation happens at the render
+ * site (menu-bar.tsx / command-palette.tsx) via `t(actionLabelKey(action), actionLabel(action))`.
+ */
+export const actionLabelKey = (a: DesignerAction): string => {
+  const label = resolveLabel(a);
+  return REUSED_ACTION_LABEL_KEYS[label] ?? `designer_action_${a.id.replace(/-/g, '_')}_${slugLabel(label)}`;
+};
+
 /** Top-level menu order (drives the bar + the mobile overflow split). */
 export const MENU_ORDER: DesignerMenu[] = [
   'file',

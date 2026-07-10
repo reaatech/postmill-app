@@ -7,6 +7,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 import type { StudioCustomProps } from '@gitroom/frontend/components/media-tools/studio-kit/types';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface Segment {
   start: number;
@@ -27,9 +28,9 @@ interface SelectedSource {
 }
 
 const MODELS = [
-  { value: 'nova-2', label: 'Nova-2 (recommended)' },
-  { value: 'nova-3', label: 'Nova-3' },
-  { value: 'whisper', label: 'Whisper' },
+  { value: 'nova-2', labelKey: 'deepgram_model_nova_2', label: 'Nova-2 (recommended)' },
+  { value: 'nova-3', labelKey: 'deepgram_model_nova_3', label: 'Nova-3' },
+  { value: 'whisper', labelKey: 'deepgram_model_whisper', label: 'Whisper' },
 ];
 
 // seconds → SRT (00:00:00,000) / VTT (00:00:00.000) timecodes.
@@ -69,6 +70,7 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
+  const t = useT();
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [source, setSource] = useState<SelectedSource | null>(null);
@@ -88,11 +90,11 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
       height: number;
     }) => {
       if (item.type !== 'audio' && item.type !== 'video') {
-        toaster.show('Pick an audio or video file to transcribe', 'warning');
+        toaster.show(t('deepgram_pick_audio_or_video', 'Pick an audio or video file to transcribe'), 'warning');
         return;
       }
       if (!item.fileId) {
-        toaster.show('Transcription needs a file from your library', 'warning');
+        toaster.show(t('deepgram_needs_library_file', 'Transcription needs a file from your library'), 'warning');
         return;
       }
       setSource({
@@ -118,22 +120,22 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
       });
       if (!res.ok) {
         const msg = await res.text().catch(() => '');
-        toaster.show(msg || 'Transcription failed', 'warning');
+        toaster.show(msg || t('deepgram_transcription_failed', 'Transcription failed'), 'warning');
         return;
       }
       const data = (await res.json()) as TranscriptResult;
       if (!data.text) {
-        toaster.show('No speech detected', 'warning');
+        toaster.show(t('deepgram_no_speech_detected', 'No speech detected'), 'warning');
         return;
       }
       setResult(data);
       setTranscript(data.text);
     } catch {
-      toaster.show('Transcription failed', 'warning');
+      toaster.show(t('deepgram_transcription_failed', 'Transcription failed'), 'warning');
     } finally {
       setLoading(false);
     }
-  }, [source, model, language, fetch, toaster]);
+  }, [source, model, language, fetch, toaster, t]);
 
   const saveToFiles = useCallback(async () => {
     if (!result) return;
@@ -143,21 +145,21 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
         body: JSON.stringify({ text: transcript, segments: result.segments }),
       });
       if (!res.ok) {
-        toaster.show('Could not save transcript', 'warning');
+        toaster.show(t('deepgram_could_not_save_transcript', 'Could not save transcript'), 'warning');
         return;
       }
-      toaster.show('Transcript saved to Files', 'success');
+      toaster.show(t('deepgram_transcript_saved', 'Transcript saved to Files'), 'success');
       onGenerated();
     } catch {
-      toaster.show('Could not save transcript', 'warning');
+      toaster.show(t('deepgram_could_not_save_transcript', 'Could not save transcript'), 'warning');
     }
-  }, [result, transcript, fetch, toaster, onGenerated]);
+  }, [result, transcript, fetch, toaster, onGenerated, t]);
 
   const sendToComposer = useCallback(async () => {
     if (!transcript) return;
     const integrationsRes = await fetch('/integrations');
     if (!integrationsRes.ok) {
-      toaster.show('Could not load channels', 'warning');
+      toaster.show(t('deepgram_could_not_load_channels', 'Could not load channels'), 'warning');
       return;
     }
     const integrations = await integrationsRes.json();
@@ -177,14 +179,14 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
         />
       ),
     });
-  }, [transcript, fetch, modal, toaster]);
+  }, [transcript, fetch, modal, toaster, t]);
 
   const copy = useCallback(() => {
     navigator.clipboard.writeText(transcript).then(
-      () => toaster.show('Copied', 'success'),
-      () => toaster.show('Copy failed', 'warning')
+      () => toaster.show(t('deepgram_copied', 'Copied'), 'success'),
+      () => toaster.show(t('deepgram_copy_failed', 'Copy failed'), 'warning')
     );
-  }, [transcript, toaster]);
+  }, [transcript, toaster, t]);
 
   // Hand the source video + computed word timings to the Designer so it opens a video
   // project with a caption track already built — no re-transcribe. Payload rides in
@@ -201,11 +203,11 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
     try {
       window.sessionStorage.setItem('designer:caption-handoff', JSON.stringify(payload));
     } catch {
-      toaster.show('Could not open the Designer', 'warning');
+      toaster.show(t('deepgram_could_not_open_designer', 'Could not open the Designer'), 'warning');
       return;
     }
     window.open('/media/designer?captions=1', '_blank');
-  }, [source, result, toaster]);
+  }, [source, result, toaster, t]);
 
   // Audio sources open directly on the timeline audio track.
   const openAudioInDesigner = useCallback(() => {
@@ -218,13 +220,15 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
   return (
     <div className="max-w-[760px] mx-auto flex flex-col gap-[18px]">
       <p className="text-[13px] text-newTextColor/70">
-        Transcribe any audio or video from your library with Deepgram, then export captions
-        (.srt / .vtt), copy the transcript, or send it to the composer.
+        {t(
+          'deepgram_intro',
+          'Transcribe any audio or video from your library with Deepgram, then export captions (.srt / .vtt), copy the transcript, or send it to the composer.'
+        )}
       </p>
 
       {/* Source */}
       <div className="flex flex-col gap-[8px]">
-        <label htmlFor="deepgram-source" className="text-[12px] font-[600] text-textColor">Source</label>
+        <label htmlFor="deepgram-source" className="text-[12px] font-[600] text-textColor">{t('deepgram_source_label', 'Source')}</label>
         <div className="flex items-center gap-[10px] flex-wrap">
           <button
             id="deepgram-source"
@@ -232,7 +236,7 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
             onClick={() => setPickerOpen(true)}
             className="px-[14px] py-[9px] rounded-[8px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
           >
-            {source ? 'Change file' : 'Pick audio / video'}
+            {source ? t('deepgram_change_file', 'Change file') : t('deepgram_pick_audio_video', 'Pick audio / video')}
           </button>
           {source && (
             <span className="text-[12px] text-newTextColor/60 truncate max-w-[420px]">
@@ -245,7 +249,7 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
       {/* Options */}
       <div className="flex gap-[14px] flex-wrap">
         <div className="flex flex-col gap-[6px]">
-          <label htmlFor="deepgram-model" className="text-[12px] font-[600] text-textColor">Model</label>
+          <label htmlFor="deepgram-model" className="text-[12px] font-[600] text-textColor">{t('deepgram_model_label', 'Model')}</label>
           <select
             id="deepgram-model"
             value={model}
@@ -254,18 +258,18 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
           >
             {MODELS.map((m) => (
               <option key={m.value} value={m.value}>
-                {m.label}
+                {t(m.labelKey, m.label)}
               </option>
             ))}
           </select>
         </div>
         <div className="flex flex-col gap-[6px]">
-          <label htmlFor="deepgram-language" className="text-[12px] font-[600] text-textColor">Language</label>
+          <label htmlFor="deepgram-language" className="text-[12px] font-[600] text-textColor">{t('language', 'Language')}</label>
           <input
             id="deepgram-language"
             value={language}
             onChange={(e) => setLanguage(e.target.value)}
-            placeholder="auto-detect"
+            placeholder={t('deepgram_auto_detect', 'auto-detect')}
             className="h-[38px] px-[10px] rounded-[8px] border border-studioBorder bg-newBgColorInner text-[13px] text-textColor w-[160px]"
           />
         </div>
@@ -277,14 +281,14 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
         disabled={!source || loading}
         className="self-start px-[20px] py-[10px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[600] hover:bg-[#2B5CD3]/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? 'Transcribing…' : 'Transcribe'}
+        {loading ? t('deepgram_transcribing', 'Transcribing…') : t('deepgram_transcribe', 'Transcribe')}
       </button>
 
       {/* Result */}
       {result && (
         <div className="flex flex-col gap-[14px] border-t border-studioBorder pt-[18px]">
           <div className="flex flex-col gap-[8px]">
-            <label htmlFor="deepgram-transcript" className="text-[12px] font-[600] text-textColor">Transcript</label>
+            <label htmlFor="deepgram-transcript" className="text-[12px] font-[600] text-textColor">{t('deepgram_transcript_label', 'Transcript')}</label>
             <textarea
               id="deepgram-transcript"
               value={transcript}
@@ -296,32 +300,32 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
 
           <div className="flex gap-[8px] flex-wrap">
             <button type="button" onClick={copy} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
-              Copy
+              {t('copy', 'Copy')}
             </button>
             <button type="button" onClick={() => download('transcript.srt', buildSrt(segments), 'application/x-subrip')} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
-              Download .srt
+              {t('deepgram_download_srt', 'Download .srt')}
             </button>
             <button type="button" onClick={() => download('captions.vtt', buildVtt(segments), 'text/vtt')} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
-              Download .vtt
+              {t('deepgram_download_vtt', 'Download .vtt')}
             </button>
             <button type="button" onClick={() => download('transcript.txt', transcript, 'text/plain')} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
-              Download .txt
+              {t('deepgram_download_txt', 'Download .txt')}
             </button>
             <button type="button" onClick={saveToFiles} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
-              Save to Files
+              {t('deepgram_save_to_files', 'Save to Files')}
             </button>
             {source?.type === 'video' && (
               <button type="button" onClick={openCaptionInDesigner} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
-                Edit in Designer
+                {t('deepgram_edit_in_designer', 'Edit in Designer')}
               </button>
             )}
             {source?.type === 'audio' && (
               <button type="button" onClick={openAudioInDesigner} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
-                Edit in Designer
+                {t('deepgram_edit_in_designer', 'Edit in Designer')}
               </button>
             )}
             <button type="button" onClick={sendToComposer} className="px-[12px] py-[8px] rounded-[8px] bg-[#2B5CD3] text-white text-[12px] font-[500] hover:bg-[#2B5CD3]/80 transition-all">
-              Send to composer
+              {t('deepgram_send_to_composer', 'Send to composer')}
             </button>
           </div>
 

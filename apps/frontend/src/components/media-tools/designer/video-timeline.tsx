@@ -11,6 +11,7 @@ import { VoiceoverDialog } from './voiceover-dialog';
 import { addMediaToTimeline } from './add-media-to-timeline';
 import { isArtifactPath } from '@gitroom/frontend/components/launches/ai.video';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface VideoTimelineProps {
   store: ReturnType<typeof import('./designer.store').createDesignerStore>;
@@ -31,13 +32,6 @@ const TRACK_COLORS: Record<VideoTrack['type'], string> = {
   caption: '#22C55E',
   audio: '#DC2626',
   sticker: '#9333EA',
-};
-
-const TRANSITION_LABELS: Record<string, string> = {
-  cut: 'Cut',
-  fade: 'Fade',
-  dissolve: 'Dissolve',
-  slide: 'Slide',
 };
 
 const formatTime = (ms: number): string => {
@@ -185,6 +179,7 @@ interface AiVideoDialogProps {
 }
 
 const AiVideoDialog: FC<AiVideoDialogProps> = ({ fetch, toaster, selectedImageSrc, onResult }) => {
+  const t = useT();
   const modals = useModals();
   const [prompt, setPrompt] = useState('');
   const [useImage, setUseImage] = useState(false);
@@ -192,7 +187,7 @@ const AiVideoDialog: FC<AiVideoDialogProps> = ({ fetch, toaster, selectedImageSr
 
   const generate = useCallback(async () => {
     if (!prompt.trim()) {
-      toaster.show('Please enter a prompt', 'warning');
+      toaster.show(t('please_enter_a_prompt', 'Please enter a prompt'), 'warning');
       return;
     }
     setLoading(true);
@@ -206,22 +201,22 @@ const AiVideoDialog: FC<AiVideoDialogProps> = ({ fetch, toaster, selectedImageSr
           imageUrl: useImage ? selectedImageSrc : undefined,
         }),
       });
-      if (!res.ok) throw new Error('Video generation failed');
+      if (!res.ok) throw new Error(t('video_generation_failed', 'Video generation failed'));
       const data = await res.json();
       await onResult('video', data === false ? false : data.id);
     } catch (e) {
-      toaster.show((e as Error).message || 'Video generation failed', 'warning');
+      toaster.show((e as Error).message || t('video_generation_failed', 'Video generation failed'), 'warning');
     } finally {
       setLoading(false);
     }
-  }, [fetch, prompt, useImage, selectedImageSrc, onResult, toaster, modals]);
+  }, [fetch, prompt, useImage, selectedImageSrc, onResult, toaster, modals, t]);
 
   return (
     <div className="flex flex-col gap-3 min-w-[280px]">
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Describe the video you want to generate..."
+        placeholder={t('describe_the_video_you_want_to_generate', 'Describe the video you want to generate...')}
         className="w-full bg-newBgColor border border-studioBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none min-h-[80px]"
       />
       {selectedImageSrc && (
@@ -232,7 +227,7 @@ const AiVideoDialog: FC<AiVideoDialogProps> = ({ fetch, toaster, selectedImageSr
             onChange={(e) => setUseImage(e.target.checked)}
             className="accent-designerAccent w-3 h-3"
           />
-          Use selected image
+          {t('use_selected_image', 'Use selected image')}
         </label>
       )}
       <button
@@ -240,7 +235,7 @@ const AiVideoDialog: FC<AiVideoDialogProps> = ({ fetch, toaster, selectedImageSr
         disabled={loading || !prompt.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? 'Generating…' : 'Generate'}
+        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
       </button>
     </div>
   );
@@ -253,13 +248,14 @@ interface MusicDialogProps {
 }
 
 const MusicDialog: FC<MusicDialogProps> = ({ fetch, toaster, onResult }) => {
+  const t = useT();
   const modals = useModals();
   const [prompt, setPrompt] = useState('');
   const [loading, setLoading] = useState(false);
 
   const generate = useCallback(async () => {
     if (!prompt.trim()) {
-      toaster.show('Please enter a prompt', 'warning');
+      toaster.show(t('please_enter_a_prompt', 'Please enter a prompt'), 'warning');
       return;
     }
     setLoading(true);
@@ -270,22 +266,22 @@ const MusicDialog: FC<MusicDialogProps> = ({ fetch, toaster, onResult }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       });
-      if (!res.ok) throw new Error('Music generation failed');
+      if (!res.ok) throw new Error(t('music_generation_failed', 'Music generation failed'));
       const data = await res.json();
       await onResult('audio', data === false ? false : data.id);
     } catch (e) {
-      toaster.show((e as Error).message || 'Music generation failed', 'warning');
+      toaster.show((e as Error).message || t('music_generation_failed', 'Music generation failed'), 'warning');
     } finally {
       setLoading(false);
     }
-  }, [fetch, prompt, onResult, toaster, modals]);
+  }, [fetch, prompt, onResult, toaster, modals, t]);
 
   return (
     <div className="flex flex-col gap-3 min-w-[280px]">
       <textarea
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Describe the music you want to generate..."
+        placeholder={t('describe_the_music_you_want_to_generate', 'Describe the music you want to generate...')}
         className="w-full bg-newBgColor border border-studioBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none min-h-[80px]"
       />
       <button
@@ -293,7 +289,7 @@ const MusicDialog: FC<MusicDialogProps> = ({ fetch, toaster, onResult }) => {
         disabled={loading || !prompt.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? 'Generating…' : 'Generate'}
+        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
       </button>
     </div>
   );
@@ -307,6 +303,7 @@ interface AvatarDialogProps {
 }
 
 const AvatarDialog: FC<AvatarDialogProps> = ({ fetch, toaster, selectedImageSrc, onResult }) => {
+  const t = useT();
   const modals = useModals();
   const [script, setScript] = useState('');
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
@@ -315,7 +312,7 @@ const AvatarDialog: FC<AvatarDialogProps> = ({ fetch, toaster, selectedImageSrc,
 
   const generate = useCallback(async () => {
     if (!script.trim()) {
-      toaster.show('Please enter a script', 'warning');
+      toaster.show(t('please_enter_a_script', 'Please enter a script'), 'warning');
       return;
     }
     setLoading(true);
@@ -326,22 +323,22 @@ const AvatarDialog: FC<AvatarDialogProps> = ({ fetch, toaster, selectedImageSrc,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ script, imageUrl }),
       });
-      if (!res.ok) throw new Error('Avatar generation failed');
+      if (!res.ok) throw new Error(t('avatar_generation_failed', 'Avatar generation failed'));
       const data = await res.json();
       await onResult('video', data === false ? false : data.id);
     } catch (e) {
-      toaster.show((e as Error).message || 'Avatar generation failed', 'warning');
+      toaster.show((e as Error).message || t('avatar_generation_failed', 'Avatar generation failed'), 'warning');
     } finally {
       setLoading(false);
     }
-  }, [fetch, script, imageUrl, onResult, toaster, modals]);
+  }, [fetch, script, imageUrl, onResult, toaster, modals, t]);
 
   return (
     <div className="flex flex-col gap-3 min-w-[280px]">
       <textarea
         value={script}
         onChange={(e) => setScript(e.target.value)}
-        placeholder="Enter the script for the avatar..."
+        placeholder={t('enter_the_script_for_the_avatar', 'Enter the script for the avatar...')}
         className="w-full bg-newBgColor border border-studioBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none min-h-[80px]"
       />
       <div className="flex flex-wrap gap-2">
@@ -349,26 +346,26 @@ const AvatarDialog: FC<AvatarDialogProps> = ({ fetch, toaster, selectedImageSrc,
           onClick={() => setPickerOpen(true)}
           className="px-2 py-1 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
         >
-          Pick portrait
+          {t('pick_portrait', 'Pick portrait')}
         </button>
         {selectedImageSrc && (
           <button
             onClick={() => setImageUrl(selectedImageSrc)}
             className="px-2 py-1 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            Use selected image
+            {t('use_selected_image', 'Use selected image')}
           </button>
         )}
       </div>
       {imageUrl && (
-        <div className="text-[10px] text-textColor/60 truncate">Portrait: {imageUrl.split('/').pop()}</div>
+        <div className="text-[10px] text-textColor/60 truncate">{t('portrait_name', 'Portrait: {{name}}', { name: imageUrl.split('/').pop() })}</div>
       )}
       <button
         onClick={generate}
         disabled={loading || !script.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? 'Generating…' : 'Generate'}
+        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
       </button>
       <MediaSelectorModal
         open={pickerOpen}
@@ -387,6 +384,7 @@ interface SlideshowDialogProps {
 }
 
 const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult }) => {
+  const t = useT();
   const modals = useModals();
   const [prompt, setPrompt] = useState('');
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -395,7 +393,7 @@ const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult })
 
   const generate = useCallback(async () => {
     if (!prompt.trim()) {
-      toaster.show('Please enter a prompt', 'warning');
+      toaster.show(t('please_enter_a_prompt', 'Please enter a prompt'), 'warning');
       return;
     }
     setLoading(true);
@@ -406,15 +404,15 @@ const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult })
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, imageUrls: imageUrls.length ? imageUrls : undefined }),
       });
-      if (!res.ok) throw new Error('Slideshow generation failed');
+      if (!res.ok) throw new Error(t('slideshow_generation_failed', 'Slideshow generation failed'));
       const data = await res.json();
       await onResult('video', data === false ? false : data.id);
     } catch (e) {
-      toaster.show((e as Error).message || 'Slideshow generation failed', 'warning');
+      toaster.show((e as Error).message || t('slideshow_generation_failed', 'Slideshow generation failed'), 'warning');
     } finally {
       setLoading(false);
     }
-  }, [fetch, prompt, imageUrls, onResult, toaster, modals]);
+  }, [fetch, prompt, imageUrls, onResult, toaster, modals, t]);
 
   return (
     <div className="flex flex-col gap-3 min-w-[280px]">
@@ -422,14 +420,14 @@ const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult })
         type="text"
         value={prompt}
         onChange={(e) => setPrompt(e.target.value)}
-        placeholder="Describe the slideshow..."
+        placeholder={t('describe_the_slideshow', 'Describe the slideshow...')}
         className="w-full bg-newBgColor border border-studioBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none"
       />
       <button
         onClick={() => setPickerOpen(true)}
         className="px-2 py-1 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30 self-start"
       >
-        Add images
+        {t('add_images', 'Add images')}
       </button>
       {imageUrls.length > 0 && (
         <div className="flex flex-wrap gap-1">
@@ -439,7 +437,7 @@ const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult })
               <button
                 onClick={() => setImageUrls((prev) => prev.filter((_, idx) => idx !== i))}
                 className="text-textColor/60 hover:text-textColor"
-                aria-label="Remove image"
+                aria-label={t('remove_image', 'Remove image')}
               >
                 ✕
               </button>
@@ -452,7 +450,7 @@ const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult })
         disabled={loading || !prompt.trim()}
         className="px-3 py-1.5 rounded text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30 disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        {loading ? 'Generating…' : 'Generate'}
+        {loading ? t('generating', 'Generating…') : t('generate', 'Generate')}
       </button>
       <MediaSelectorModal
         open={pickerOpen}
@@ -465,7 +463,45 @@ const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult })
   );
 };
 
+const trackTypeKeys: Record<VideoTrack['type'], [string, string]> = {
+  video: ['track_type_video', 'video'],
+  image: ['file_type_image', 'image'],
+  text: ['track_type_text', 'text'],
+  caption: ['track_type_caption', 'caption'],
+  audio: ['track_type_audio', 'audio'],
+  sticker: ['track_type_sticker', 'sticker'],
+};
+
+const transitionKeys: Record<string, [string, string]> = {
+  cut: ['transition_cut', 'Cut'],
+  fade: ['transition_fade', 'Fade'],
+  dissolve: ['transition_dissolve', 'Dissolve'],
+  slide: ['transition_slide', 'Slide'],
+};
+
+const directionKeys: Record<'left' | 'right' | 'up' | 'down', [string, string]> = {
+  left: ['direction_left', 'left'],
+  right: ['direction_right', 'right'],
+  up: ['direction_up', 'up'],
+  down: ['direction_down', 'down'],
+};
+
 export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAwareness }) => {
+  // Named `translate` (not `t`) because this component uses `t` pervasively as the
+  // conventional loop/find/reduce callback var for a VideoTrack throughout its body.
+  const translate = useT();
+  const trackTypeLabel = useCallback(
+    (type: VideoTrack['type']) => translate(...trackTypeKeys[type]),
+    [translate],
+  );
+  const transitionLabel = useCallback(
+    (type: string) => (transitionKeys[type] ? translate(...transitionKeys[type]) : type),
+    [translate],
+  );
+  const directionLabel = useCallback(
+    (dir: 'left' | 'right' | 'up' | 'down') => translate(...directionKeys[dir]),
+    [translate],
+  );
   // Voiceover (TTS) and Captions (STT) hit media-provider endpoints — gate them on the
   // shared status so we don't offer a generation the org has no provider for (it would
   // 409). Optimistic while loading / fail-open on error.
@@ -1022,7 +1058,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           body: JSON.stringify({ text, voice: voiceId }),
         });
         if (!res.ok) {
-          toaster.show('Voiceover generation failed', 'warning');
+          toaster.show(translate('voiceover_generation_failed', 'Voiceover generation failed'), 'warning');
           return;
         }
         const { id, path } = await res.json();
@@ -1045,12 +1081,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         } as VideoClip;
         store.getState().addClip(currentOutput, audioTrack.id, clip);
         store.getState().pushHistory();
-        toaster.show('Voiceover added to timeline', 'success');
+        toaster.show(translate('voiceover_added_to_timeline', 'Voiceover added to timeline'), 'success');
       } catch {
-        toaster.show('Voiceover generation failed', 'warning');
+        toaster.show(translate('voiceover_generation_failed', 'Voiceover generation failed'), 'warning');
       }
     },
-    [vo, playheadMs, currentOutput, store, fetch, toaster]
+    [vo, playheadMs, currentOutput, store, fetch, toaster, translate]
   );
 
   const handleGenerateVoiceover = useCallback(() => {
@@ -1072,7 +1108,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       .flatMap((t) => t.clips)
       .filter((c) => c.src);
     if (audioClips.length === 0) {
-      toaster.show('No audio clips to transcribe', 'warning');
+      toaster.show(translate('no_audio_clips_to_transcribe', 'No audio clips to transcribe'), 'warning');
       return;
     }
     const src = audioClips[0].src;
@@ -1082,12 +1118,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         body: JSON.stringify({ audioUrl: src }),
       });
       if (!res.ok) {
-        toaster.show('Caption generation failed', 'warning');
+        toaster.show(translate('caption_generation_failed', 'Caption generation failed'), 'warning');
         return;
       }
       const { words } = await res.json() as { words?: { word: string; start: number; end: number }[] };
       if (!words?.length) {
-        toaster.show('No speech detected', 'warning');
+        toaster.show(translate('no_speech_detected', 'No speech detected'), 'warning');
         return;
       }
       const state = store.getState();
@@ -1145,11 +1181,11 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         store.getState().addClip(currentOutput, captionTrack.id, clip);
       }
       store.getState().pushHistory();
-      toaster.show('Captions added to timeline', 'success');
+      toaster.show(translate('captions_added_to_timeline', 'Captions added to timeline'), 'success');
     } catch {
-      toaster.show('Caption generation failed', 'warning');
+      toaster.show(translate('caption_generation_failed', 'Caption generation failed'), 'warning');
     }
-  }, [vo, currentOutput, store, fetch, toaster]);
+  }, [vo, currentOutput, store, fetch, toaster, translate]);
 
   const POLL_INTERVAL_MS = 3000;
   const MAX_POLLS = 200;
@@ -1159,7 +1195,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     idOrUrl: string | false
   ) => {
     if (idOrUrl === false) {
-      toaster.show('Generation was blocked or returned empty.', 'warning');
+      toaster.show(translate('generation_was_blocked_or_returned_empty', 'Generation was blocked or returned empty.'), 'warning');
       return;
     }
     if (isArtifactPath(idOrUrl)) {
@@ -1169,13 +1205,13 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     let polls = 0;
     const check = async (): Promise<string | null> => {
       const res = await fetch(`/media/jobs/${idOrUrl}`);
-      if (!res.ok) throw new Error('Failed to check job status');
+      if (!res.ok) throw new Error(translate('failed_to_check_job_status', 'Failed to check job status'));
       const job = await res.json();
       if (job.status === 'completed') {
-        if (!job.artifactUrl) throw new Error('Job completed but no artifact');
+        if (!job.artifactUrl) throw new Error(translate('job_completed_but_no_artifact', 'Job completed but no artifact'));
         return job.artifactUrl;
       }
-      if (job.status === 'failed') throw new Error(job.error || 'Generation failed');
+      if (job.status === 'failed') throw new Error(job.error || translate('generation_failed', 'Generation failed'));
       return null;
     };
     while (polls < MAX_POLLS) {
@@ -1193,8 +1229,8 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       polls++;
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
-    if (mountedRef.current) toaster.show('Generation timed out', 'warning');
-  }, [fetch, store, toaster]);
+    if (mountedRef.current) toaster.show(translate('generation_timed_out', 'Generation timed out'), 'warning');
+  }, [fetch, store, toaster, translate]);
 
   const runClipTransform = useCallback(async (
     endpoint: string,
@@ -1207,7 +1243,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     const track = vo.tracks.find((t) => t.id === clipMenu.trackId);
     const clip = track?.clips.find((c) => c.id === clipMenu.clipId);
     if (!clip?.src) {
-      toaster.show('Selected clip has no source', 'warning');
+      toaster.show(translate('clip_has_no_source', 'Selected clip has no source'), 'warning');
       return;
     }
     try {
@@ -1216,7 +1252,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Transform failed');
+      if (!res.ok) throw new Error(translate('transform_failed', 'Transform failed'));
       const { id } = await res.json();
       if (isArtifactPath(id)) {
         state.updateClip(clipMenu.outputIndex, clipMenu.trackId, clipMenu.clipId, {
@@ -1229,10 +1265,10 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         while (polls < MAX_POLLS) {
           if (!mountedRef.current) return; // timeline unmounted — stop polling
           const jobRes = await fetch(`/media/jobs/${id}`);
-          if (!jobRes.ok) throw new Error('Failed to check transform status');
+          if (!jobRes.ok) throw new Error(translate('failed_to_check_transform_status', 'Failed to check transform status'));
           const job = await jobRes.json();
           if (job.status === 'completed') {
-            if (!job.artifactUrl) throw new Error('No artifact');
+            if (!job.artifactUrl) throw new Error(translate('no_artifact', 'No artifact'));
             state.updateClip(clipMenu.outputIndex, clipMenu.trackId, clipMenu.clipId, {
               src: job.artifactUrl,
               fileId: undefined,
@@ -1240,21 +1276,21 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
             state.pushHistory();
             break;
           }
-          if (job.status === 'failed') throw new Error(job.error || 'Transform failed');
+          if (job.status === 'failed') throw new Error(job.error || translate('transform_failed', 'Transform failed'));
           polls++;
           await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         }
       }
     } catch (e) {
-      if (mountedRef.current) toaster.show((e as Error).message || 'Transform failed', 'warning');
+      if (mountedRef.current) toaster.show((e as Error).message || translate('transform_failed', 'Transform failed'), 'warning');
     } finally {
       if (clearMenu && mountedRef.current) setClipMenu(null);
     }
-  }, [clipMenu, fetch, store, toaster]);
+  }, [clipMenu, fetch, store, toaster, translate]);
 
   const handleGenerateVideo = useCallback(() => {
     modals.openModal({
-      title: 'AI Video',
+      title: translate('ai_video_label', 'AI Video'),
       children: (
         <AiVideoDialog
           fetch={fetch}
@@ -1264,11 +1300,11 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         />
       ),
     });
-  }, [modals, fetch, toaster, selectedImageSrc, landOrPoll]);
+  }, [modals, fetch, toaster, selectedImageSrc, landOrPoll, translate]);
 
   const handleGenerateMusic = useCallback(() => {
     modals.openModal({
-      title: 'Generate Music',
+      title: translate('generate_music_modal', 'Generate Music'),
       children: (
         <MusicDialog
           fetch={fetch}
@@ -1277,11 +1313,11 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         />
       ),
     });
-  }, [modals, fetch, toaster, landOrPoll]);
+  }, [modals, fetch, toaster, landOrPoll, translate]);
 
   const handleGenerateAvatar = useCallback(() => {
     modals.openModal({
-      title: 'Generate Avatar Video',
+      title: translate('generate_avatar_video_modal', 'Generate Avatar Video'),
       children: (
         <AvatarDialog
           fetch={fetch}
@@ -1291,11 +1327,11 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         />
       ),
     });
-  }, [modals, fetch, toaster, selectedImageSrc, landOrPoll]);
+  }, [modals, fetch, toaster, selectedImageSrc, landOrPoll, translate]);
 
   const handleGenerateSlideshow = useCallback(() => {
     modals.openModal({
-      title: 'Generate Slideshow',
+      title: translate('generate_slideshow_modal', 'Generate Slideshow'),
       children: (
         <SlideshowDialog
           fetch={fetch}
@@ -1304,7 +1340,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         />
       ),
     });
-  }, [modals, fetch, toaster, landOrPoll]);
+  }, [modals, fetch, toaster, landOrPoll, translate]);
 
   if (!isVideo || !vo) {
     return null;
@@ -1316,15 +1352,15 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       className="shrink-0 border-t border-studioBorder bg-newBgColorInner flex flex-col"
       role="toolbar"
       tabIndex={0}
-      aria-label="Video timeline"
+      aria-label={translate('video_timeline', 'Video timeline')}
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-studioBorder">
         <button
           onClick={handlePlayPause}
           className="w-7 h-7 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 text-[13px]"
-          title={isPlaying ? 'Pause' : 'Play'}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
+          title={isPlaying ? translate('pause', 'Pause') : translate('play', 'Play')}
+          aria-label={isPlaying ? translate('pause', 'Pause') : translate('play', 'Play')}
         >
           {isPlaying ? '⏸' : '▶'}
         </button>
@@ -1338,25 +1374,25 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         <button
           onClick={handleZoomOut}
           className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:text-textColor text-[13px]"
-          title="Zoom out"
-          aria-label="Zoom out"
+          title={translate('zoom_out', 'Zoom out')}
+          aria-label={translate('zoom_out', 'Zoom out')}
         >
           &#x2212;
         </button>
         <button
           onClick={handleZoomIn}
           className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:text-textColor text-[13px]"
-          title="Zoom in"
-          aria-label="Zoom in"
+          title={translate('zoom_in', 'Zoom in')}
+          aria-label={translate('zoom_in', 'Zoom in')}
         >
           +
         </button>
         <button
           onClick={() => store.getState().addTrack(currentOutput, 'video')}
           className="px-2 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor"
-          title="Add video track"
+          title={translate('add_video_track', 'Add video track')}
         >
-          + Track
+          {translate('plus_track', '+ Track')}
         </button>
         <button
           onClick={handleGenerateVoiceover}
@@ -1364,11 +1400,11 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           className="px-2 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
           title={
             ttsAvailable
-              ? 'Generate AI voiceover'
-              : 'Configure a text-to-speech provider in Settings → Media'
+              ? translate('generate_ai_voiceover', 'Generate AI voiceover')
+              : translate('configure_a_text_to_speech_provider_in_settings_media', 'Configure a text-to-speech provider in Settings → Media')
           }
         >
-          Voiceover
+          {translate('voiceover', 'Voiceover')}
         </button>
         <button
           onClick={handleGenerateCaptions}
@@ -1376,11 +1412,11 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           className="px-2 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
           title={
             sttAvailable
-              ? 'Auto-generate captions from audio'
-              : 'Configure a speech-to-text provider (e.g. Deepgram) in Settings → Media'
+              ? translate('auto_generate_captions_from_audio', 'Auto-generate captions from audio')
+              : translate('configure_a_speech_to_text_provider_in_settings_media', 'Configure a speech-to-text provider (e.g. Deepgram) in Settings → Media')
           }
         >
-          Captions
+          {translate('captions', 'Captions')}
         </button>
         <button
           onClick={handleGenerateVideo}
@@ -1388,13 +1424,13 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           className="px-2 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
           title={
             textToVideoAvailable || imageToVideoAvailable
-              ? 'Generate AI video from a prompt (or selected image)'
+              ? translate('generate_ai_video_from_a_prompt_or_selected_image', 'Generate AI video from a prompt (or selected image)')
               : tool('text-to-video')?.reason ||
                 tool('image-to-video')?.reason ||
-                'Configure a video provider in Settings → Media'
+                translate('configure_a_video_provider_in_settings_media', 'Configure a video provider in Settings → Media')
           }
         >
-          AI Video
+          {translate('ai_video_label', 'AI Video')}
         </button>
         <button
           onClick={handleGenerateMusic}
@@ -1402,12 +1438,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           className="px-2 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
           title={
             textToMusicAvailable
-              ? 'Generate AI music'
+              ? translate('generate_ai_music', 'Generate AI music')
               : tool('text-to-music')?.reason ||
-                'Configure a music provider in Settings → Media'
+                translate('configure_a_music_provider_in_settings_media', 'Configure a music provider in Settings → Media')
           }
         >
-          Music
+          {translate('music', 'Music')}
         </button>
         <button
           onClick={handleGenerateAvatar}
@@ -1415,12 +1451,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           className="px-2 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
           title={
             videoAvatarAvailable
-              ? 'Generate avatar video'
+              ? translate('generate_avatar_video_hint', 'Generate avatar video')
               : tool('video-avatar')?.reason ||
-                'Configure an avatar provider in Settings → Media'
+                translate('configure_an_avatar_provider_in_settings_media', 'Configure an avatar provider in Settings → Media')
           }
         >
-          Avatar
+          {translate('avatar', 'Avatar')}
         </button>
         <button
           onClick={handleGenerateSlideshow}
@@ -1428,12 +1464,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           className="px-2 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
           title={
             imageSlideAvailable
-              ? 'Generate slideshow from prompt + images'
+              ? translate('generate_slideshow_from_prompt_images', 'Generate slideshow from prompt + images')
               : tool('image-slide')?.reason ||
-                'Configure a slideshow provider in Settings → Media'
+                translate('configure_a_slideshow_provider_in_settings_media', 'Configure a slideshow provider in Settings → Media')
           }
         >
-          Slideshow
+          {translate('slideshow', 'Slideshow')}
         </button>
       </div>
 
@@ -1446,7 +1482,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           {/* Ruler */}
           <div
             role="slider"
-            aria-label="Seek timeline"
+            aria-label={translate('seek_timeline', 'Seek timeline')}
             aria-orientation="horizontal"
             aria-valuenow={Math.round(playheadMs)}
             aria-valuemin={0}
@@ -1494,12 +1530,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                 style={{ width: LABEL_WIDTH }}
               >
                 <span style={{ color: TRACK_COLORS[track.type] }}>
-                  {track.type}
+                  {trackTypeLabel(track.type)}
                 </span>
                 {track.type === 'audio' && (
                   <button
                     className="text-[9px] text-textColor/40 hover:text-textColor"
-                    title="Track audio settings"
+                    title={translate('track_audio_settings', 'Track audio settings')}
                     onClick={(e) => {
                       const rect = (e.target as HTMLElement).getBoundingClientRect();
                       setTrackSettings({ trackId: track.id, x: rect.left + rect.width / 2, y: rect.top });
@@ -1524,12 +1560,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                   return (
                     <div
                       role="slider"
-                      aria-label="Clip"
+                      aria-label={translate('clip', 'Clip')}
                       aria-orientation="horizontal"
                       aria-valuenow={Math.round(clip.startMs)}
                       aria-valuemin={0}
                       aria-valuemax={Math.round(vo.durationMs - (clip.endMs - clip.startMs))}
-                      aria-valuetext={`Start ${formatTime(clip.startMs)}`}
+                      aria-valuetext={translate('clip_start_time', 'Start {{time}}', { time: formatTime(clip.startMs) })}
                       tabIndex={0}
                       key={clip.id}
                       className={`absolute top-1 rounded-[4px] cursor-pointer group ${
@@ -1554,8 +1590,8 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       <div className="text-[9px] text-white/90 px-1.5 truncate leading-[28px] select-none">
                         {track.type === 'video' && '\uD83C\uDFAC'}
                         {track.type === 'image' && '\uD83D\uDDBC'}
-                        {track.type === 'text' && (clip.text?.substring(0, 10) || 'T')}
-                        {track.type === 'caption' && (clip.text?.substring(0, 10) || 'CC')}
+                        {track.type === 'text' && (clip.text?.substring(0, 10) || translate('clip_label_text_fallback', 'T'))}
+                        {track.type === 'caption' && (clip.text?.substring(0, 10) || translate('clip_label_caption_fallback', 'CC'))}
                         {track.type === 'audio' && '\uD83D\uDD0A'}
                         {clip.speed !== undefined && clip.speed !== 1 && ` ${clip.speed}x`}
                         {clip.reverse && ' \u21A9'}
@@ -1585,7 +1621,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                               style={{
                                 left: `${kf.tMs / (effectiveEnd - clip.startMs) * 100}%`,
                               }}
-                              title={`KF: ${formatTime(kf.tMs)}`}
+                              title={translate('kf_time', 'KF: {{time}}', { time: formatTime(kf.tMs) })}
                             />
                           ))}
                         </div>
@@ -1593,7 +1629,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       {/* Drag edges */}
                       <div
                         role="slider"
-                        aria-label="Trim clip start"
+                        aria-label={translate('trim_clip_start', 'Trim clip start')}
                         aria-orientation="horizontal"
                         aria-valuenow={Math.round(clip.startMs)}
                         aria-valuemin={0}
@@ -1607,7 +1643,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       />
                       <div
                         role="slider"
-                        aria-label="Trim clip end"
+                        aria-label={translate('trim_clip_end', 'Trim clip end')}
                         aria-orientation="horizontal"
                         aria-valuenow={Math.round(clip.endMs)}
                         aria-valuemin={Math.round(clip.startMs + 100)}
@@ -1653,8 +1689,8 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                             y: rect.top,
                           });
                         }}
-                        title={`${TRANSITION_LABELS[tType]} transition`}
-                        aria-label={`${TRANSITION_LABELS[tType]} transition`}
+                        title={translate('transition_hint', '{{label}} transition', { label: transitionLabel(tType) })}
+                        aria-label={translate('transition_hint', '{{label}} transition', { label: transitionLabel(tType) })}
                       >
                         {isTransitioning && (
                           <div className="w-1 h-3 rounded-full bg-yellow-400" />
@@ -1683,9 +1719,11 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
 
       {/* Duration indicator */}
       <div className="flex items-center justify-end px-3 py-1 text-[10px] text-textColor/40">
-        {vo.tracks.length} track{vo.tracks.length !== 1 ? 's' : ''}{' \u00B7 '}
-        {vo.tracks.reduce((sum, t) => sum + t.clips.length, 0)} clip
-        {vo.tracks.reduce((sum, t) => sum + t.clips.length, 0) !== 1 ? 's' : ''}{' \u00B7 '}
+        {translate('n_tracks_count', '{{count}} track{{plural}}', { count: vo.tracks.length, plural: vo.tracks.length !== 1 ? 's' : '' })}{' \u00B7 '}
+        {translate('n_clips_count', '{{count}} clip{{plural}}', {
+          count: vo.tracks.reduce((sum, t) => sum + t.clips.length, 0),
+          plural: vo.tracks.reduce((sum, t) => sum + t.clips.length, 0) !== 1 ? 's' : '',
+        })}{' \u00B7 '}
         {formatTime(vo.durationMs)}
       </div>
 
@@ -1694,7 +1732,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         <>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={translate('close', 'Close')}
             className="fixed inset-0 z-50"
             onClick={() => setTrackSettings(null)}
           />
@@ -1711,9 +1749,9 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
               if (!track) return null;
               return (
                 <div className="space-y-2">
-                  <div className="text-[11px] font-medium text-textColor/60 mb-1">Track Audio</div>
+                  <div className="text-[11px] font-medium text-textColor/60 mb-1">{translate('track_audio', 'Track Audio')}</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-textColor/70">Gain</span>
+                    <span className="text-[10px] text-textColor/70">{translate('gain', 'Gain')}</span>
                     <span className="text-[10px] text-textColor/40">{Math.round((track.gain ?? 1) * 100)}%</span>
                   </div>
                   <input
@@ -1731,7 +1769,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       onChange={(e) => store.getState().setTrackAutoDuck(currentOutput, track.id, e.target.checked)}
                       className="accent-designerAccent w-3 h-3"
                     />
-                    <span className="text-[10px] text-textColor/70">Auto-duck under voice</span>
+                    <span className="text-[10px] text-textColor/70">{translate('auto_duck_under_voice', 'Auto-duck under voice')}</span>
                   </label>
                 </div>
               );
@@ -1745,7 +1783,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         <>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={translate('close', 'Close')}
             className="fixed inset-0 z-50"
             onClick={() => setTransitionPopover(null)}
           />
@@ -1757,7 +1795,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
               transform: 'translateX(-50%)',
             }}
           >
-            <div className="text-[11px] font-medium text-textColor/60 mb-1.5 px-1">Transition</div>
+            <div className="text-[11px] font-medium text-textColor/60 mb-1.5 px-1">{translate('transition', 'Transition')}</div>
             {(['cut', 'fade', 'dissolve', 'slide'] as const).map((type) => (
               <button
                 key={type}
@@ -1766,12 +1804,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                   transitionPopover.trackId ? 'hover:bg-studioBorder/30 text-textColor' : 'text-textColor'
                 }`}
               >
-                {TRANSITION_LABELS[type]}
+                {transitionLabel(type)}
               </button>
             ))}
             {transitionPopover.trackId && (
               <div className="mt-1.5 pt-1.5 border-t border-studioBorder">
-                <div className="text-[10px] text-textColor/40 mb-1 px-1">Slide direction</div>
+                <div className="text-[10px] text-textColor/40 mb-1 px-1">{translate('slide_direction', 'Slide direction')}</div>
                 <div className="grid grid-cols-2 gap-1">
                   {(['left', 'right', 'up', 'down'] as const).map((dir) => (
                     <button
@@ -1779,7 +1817,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       onClick={() => handleSetTransition(transitionPopover.trackId, transitionPopover.fromClipId, transitionPopover.toClipId, 'slide', dir)}
                       className="px-1.5 py-0.5 rounded text-[10px] border border-studioBorder text-textColor/60 hover:text-textColor hover:border-newTextColor/40 capitalize"
                     >
-                      {dir}
+                      {directionLabel(dir)}
                     </button>
                   ))}
                 </div>
@@ -1794,7 +1832,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         <>
           <button
             type="button"
-            aria-label="Close"
+            aria-label={translate('close', 'Close')}
             className="fixed inset-0 z-50"
             onClick={() => {
               setClipMenu(null);
@@ -1816,25 +1854,25 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
               if (!clipSrc) {
                 return (
                   <div className="text-[11px] text-textColor/60 px-1">
-                    Selected clip has no source
+                    {translate('clip_has_no_source', 'Selected clip has no source')}
                   </div>
                 );
               }
               if (clipTransformMode === 'upscale') {
                 return (
                   <div className="flex flex-col gap-1">
-                    <div className="text-[11px] font-medium text-textColor/60 mb-1 px-1">Upscale video</div>
+                    <div className="text-[11px] font-medium text-textColor/60 mb-1 px-1">{translate('upscale_video', 'Upscale video')}</div>
                     <button
                       onClick={() => runClipTransform('/media/upscale-video', { videoUrl: clipSrc })}
                       className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor"
                     >
-                      Upscale video
+                      {translate('upscale_video', 'Upscale video')}
                     </button>
                     <button
                       onClick={() => setClipTransformMode(null)}
                       className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor"
                     >
-                      Back
+                      {translate('back', 'Back')}
                     </button>
                   </div>
                 );
@@ -1842,18 +1880,18 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
               if (clipTransformMode === 'remove-bg') {
                 return (
                   <div className="flex flex-col gap-1">
-                    <div className="text-[11px] font-medium text-textColor/60 mb-1 px-1">Remove background</div>
+                    <div className="text-[11px] font-medium text-textColor/60 mb-1 px-1">{translate('remove_background', 'Remove background')}</div>
                     <button
                       onClick={() => runClipTransform('/media/remove-video-background', { videoUrl: clipSrc })}
                       className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor"
                     >
-                      Remove background
+                      {translate('remove_background', 'Remove background')}
                     </button>
                     <button
                       onClick={() => setClipTransformMode(null)}
                       className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor"
                     >
-                      Back
+                      {translate('back', 'Back')}
                     </button>
                   </div>
                 );
@@ -1861,12 +1899,12 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
               if (clipTransformMode === 'video-to-video') {
                 return (
                   <div className="flex flex-col gap-1.5">
-                    <div className="text-[11px] font-medium text-textColor/60 px-1">Transform with prompt</div>
+                    <div className="text-[11px] font-medium text-textColor/60 px-1">{translate('transform_with_prompt', 'Transform with prompt')}</div>
                     <input
                       type="text"
                       value={clipTransformPrompt}
                       onChange={(e) => setClipTransformPrompt(e.target.value)}
-                      placeholder="Describe the transformation..."
+                      placeholder={translate('describe_the_transformation', 'Describe the transformation...')}
                       className="w-full bg-newBgColor border border-studioBorder rounded px-2 py-1 text-[11px] text-textColor placeholder:text-textColor/40 outline-none"
                     />
                     <button
@@ -1874,13 +1912,13 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                       disabled={!clipTransformPrompt.trim()}
                       className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Transform
+                      {translate('transform', 'Transform')}
                     </button>
                     <button
                       onClick={() => setClipTransformMode(null)}
                       className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor"
                     >
-                      Back
+                      {translate('back', 'Back')}
                     </button>
                   </div>
                 );
@@ -1892,28 +1930,28 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                     disabled={!videoUpscaleAvailable}
                     className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Upscale
+                    {translate('upscale', 'Upscale')}
                   </button>
                   <button
                     onClick={() => setClipTransformMode('remove-bg')}
                     disabled={!videoBackgroundAvailable}
                     className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Remove background
+                    {translate('remove_background', 'Remove background')}
                   </button>
                   <button
                     onClick={() => setClipTransformMode('video-to-video')}
                     disabled={!videoToVideoAvailable}
                     className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Transform with prompt
+                    {translate('transform_with_prompt', 'Transform with prompt')}
                   </button>
                   <div className="border-t border-studioBorder my-1" />
                   <button
                     onClick={() => setClipMenu(null)}
                     className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-studioBorder/30 text-textColor"
                   >
-                    Cancel
+                    {translate('cancel', 'Cancel')}
                   </button>
                 </div>
               );

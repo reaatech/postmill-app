@@ -2,6 +2,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useReplicateStore } from './replicate.store';
 import { FileInput, type FileValue } from './fields/file';
 import {
@@ -35,6 +36,7 @@ function PromptField({
   onChange: (v: unknown) => void;
 }) {
   const fetch = useFetch();
+  const t = useT();
   const enhanceFlags = useReplicateStore((s) => s.enhanceFlags);
   const setEnhanceFlag = useReplicateStore((s) => s.setEnhanceFlag);
   const [busy, setBusy] = useState(false);
@@ -44,7 +46,7 @@ function PromptField({
 
   const enhance = useCallback(async () => {
     if (!text.trim()) {
-      setNote('Write a prompt first.');
+      setNote(t('write_prompt_first', 'Write a prompt first.'));
       return;
     }
     setBusy(true);
@@ -60,16 +62,21 @@ function PromptField({
         onChange(data.text);
         setEnhanceFlag(name, true);
       } else if (data.reason === 'ai-not-configured') {
-        setNote('AI is not configured for this workspace — enable a provider in Settings → AI.');
+        setNote(
+          t(
+            'ai_not_configured_workspace',
+            'AI is not configured for this workspace — enable a provider in Settings → AI.'
+          )
+        );
       } else {
-        setNote('Could not enhance the prompt. Try again.');
+        setNote(t('could_not_enhance_prompt', 'Could not enhance the prompt. Try again.'));
       }
     } catch {
-      setNote('Could not enhance the prompt. Try again.');
+      setNote(t('could_not_enhance_prompt', 'Could not enhance the prompt. Try again.'));
     } finally {
       setBusy(false);
     }
-  }, [fetch, text, mode, onChange, setEnhanceFlag, name]);
+  }, [fetch, text, mode, onChange, setEnhanceFlag, name, t]);
 
   return (
     <div className="mb-4">
@@ -85,7 +92,11 @@ function PromptField({
           className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-designerAccent/15 text-btnPrimaryAccent hover:bg-designerAccent/25 disabled:opacity-50 transition-colors"
         >
           <span>✨</span>
-          {busy ? 'Enhancing…' : mode === 'negative' ? 'Build negatives' : 'Enhance'}
+          {busy
+            ? t('enhancing_ellipsis', 'Enhancing…')
+            : mode === 'negative'
+              ? t('build_negatives', 'Build negatives')
+              : t('enhance', 'Enhance')}
         </button>
       </div>
       <textarea
@@ -94,7 +105,7 @@ function PromptField({
           onChange(e.target.value);
           if (enabled) setEnhanceFlag(name, false);
         }}
-        placeholder={schema.description || `Enter ${name}…`}
+        placeholder={schema.description || t('enter_field_placeholder', 'Enter {{name}}…', { name })}
         rows={mode === 'negative' ? 2 : 4}
         className={`${inputClass} resize-none`}
       />
@@ -120,6 +131,7 @@ function AdvancedField({
   required?: boolean;
   onChange: (v: unknown) => void;
 }) {
+  const t = useT();
   const label = (
     <label className="block text-xs text-newTextColor/70 mb-1">
       {schema.title || name}
@@ -145,7 +157,7 @@ function AdvancedField({
           onChange={(e) => onChange(coerce(e.target.value))}
           className={inputClass}
         >
-          {!hasValue && <option value="">Select…</option>}
+          {!hasValue && <option value="">{t('select_ellipsis', 'Select…')}</option>}
           {schema.enum.map((opt) => (
             <option key={String(opt)} value={String(opt)}>
               {String(opt)}
@@ -273,6 +285,7 @@ function AdvancedFieldRow({ entry }: { entry: ClassifiedField }) {
 const ALWAYS_EXCLUDED = ['mask'];
 
 export function DynamicForm() {
+  const t = useT();
   const selectedModel = useReplicateStore((s) => s.selectedModel);
   const selectedCategory = useReplicateStore((s) => s.selectedCategory);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -294,7 +307,7 @@ export function DynamicForm() {
   if (primary.length === 0 && advanced.length === 0) {
     return (
       <div className="text-sm text-newTextColor/65 text-center py-4">
-        No configurable parameters for this model.
+        {t('no_configurable_parameters', 'No configurable parameters for this model.')}
       </div>
     );
   }
@@ -313,7 +326,7 @@ export function DynamicForm() {
             className="flex items-center gap-1.5 text-xs text-newTextColor/70 hover:text-textColor transition-colors"
           >
             <span className={`transition-transform ${advancedOpen ? 'rotate-90' : ''}`}>▸</span>
-            Advanced settings
+            {t('advanced_settings', 'Advanced settings')}
             <span className="text-newTextColor/65">({advanced.length})</span>
           </button>
           {advancedOpen && (

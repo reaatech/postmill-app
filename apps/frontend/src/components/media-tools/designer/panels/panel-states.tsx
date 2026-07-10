@@ -9,6 +9,7 @@
  */
 
 import React, { FC } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface PanelSkeletonGridProps {
   /** Number of skeleton tiles to render. */
@@ -25,11 +26,12 @@ export const PanelSkeletonGrid: FC<PanelSkeletonGridProps> = ({
   columnsClassName = 'grid-cols-2',
   aspectClassName = 'aspect-[4/3]',
 }) => {
+  const t = useT();
   return (
     <div
       className={`grid ${columnsClassName} gap-2`}
       role="status"
-      aria-label="Loading"
+      aria-label={t('loading', 'Loading')}
     >
       {Array.from({ length: count }).map((_, i) => (
         <div
@@ -51,6 +53,7 @@ interface PanelErrorProps {
 
 /** A retriable error state: a message plus a "Try again" button. */
 export const PanelError: FC<PanelErrorProps> = ({ message, onRetry }) => {
+  const t = useT();
   return (
     <div
       className="flex flex-col items-center gap-3 py-6 text-center"
@@ -65,7 +68,7 @@ export const PanelError: FC<PanelErrorProps> = ({ message, onRetry }) => {
         onClick={onRetry}
         className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors"
       >
-        Try again
+        {t('try_again', 'Try again')}
       </button>
     </div>
   );

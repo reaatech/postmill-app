@@ -6,6 +6,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { StockPreviewModal } from './stock-preview-modal';
 import { StockVideoItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
   { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
@@ -20,6 +21,22 @@ const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
   { value: 'purple', label: 'Purple', swatch: '#9C27B0' },
   { value: 'brown', label: 'Brown', swatch: '#795548' },
 ];
+
+// Maps a swatch's stable API `value` to its translation key (labels themselves
+// live at module scope and can't call the translation hook).
+const COLOR_KEY: Record<string, string> = {
+  black_and_white: 'color_bw',
+  black: 'color_black',
+  white: 'color_white',
+  gray: 'color_gray',
+  red: 'color_red',
+  orange: 'orange',
+  yellow: 'color_yellow',
+  green: 'green',
+  blue: 'blue',
+  purple: 'purple',
+  brown: 'color_brown',
+};
 
 const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'Ocean', 'Abstract'];
 
@@ -39,6 +56,7 @@ interface StockVideosProps {
 }
 
 export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
+  const t = useT();
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -101,7 +119,7 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
   if (lastPage && !lastPage.configured) {
     return (
       <div className="flex items-center justify-center h-full text-newTextColor/60">
-        Stock browsing isn&apos;t configured
+        {t('stock_browsing_not_configured', "Stock browsing isn't configured")}
       </div>
     );
   }
@@ -118,14 +136,14 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search videos..."
+            placeholder={t('search_videos_placeholder', 'Search videos...')}
             className="w-full h-[44px] pl-[38px] pr-[34px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
-              aria-label="Clear search"
+              aria-label={t('clear_search', 'Clear search')}
               className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center text-newTextColor/60 hover:text-newTextColor rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
             >
               ✕
@@ -136,13 +154,13 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
           <select
             value={orientation}
             onChange={e => setOrientation(e.target.value)}
-            aria-label="Filter by orientation"
+            aria-label={t('filter_by_orientation', 'Filter by orientation')}
             className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
           >
-            <option value="">All orientations</option>
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-            <option value="square">Square</option>
+            <option value="">{t('all_orientations', 'All orientations')}</option>
+            <option value="landscape">{t('landscape', 'Landscape')}</option>
+            <option value="portrait">{t('portrait', 'Portrait')}</option>
+            <option value="square">{t('square', 'Square')}</option>
           </select>
           <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/60 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -152,13 +170,13 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
           <select
             value={size}
             onChange={e => setSize(e.target.value)}
-            aria-label="Filter by size"
+            aria-label={t('filter_by_size', 'Filter by size')}
             className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
           >
-            <option value="">All sizes</option>
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
+            <option value="">{t('all_sizes', 'All sizes')}</option>
+            <option value="small">{t('small', 'Small')}</option>
+            <option value="medium">{t('priority_medium', 'Medium')}</option>
+            <option value="large">{t('large', 'Large')}</option>
           </select>
           <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/60 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -177,16 +195,18 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
               : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
           }`}
         >
-          All
+          {t('all', 'All')}
         </button>
-        {COLOR_SWATCHES.map((c) => (
+        {COLOR_SWATCHES.map((c) => {
+          const colorLabel = t(COLOR_KEY[c.value] ?? c.value, c.label);
+          return (
           <button
             key={c.value}
             type="button"
             onClick={() => setColor((cur) => (cur === c.value ? '' : c.value))}
             aria-pressed={color === c.value}
-            aria-label={`Color: ${c.label}`}
-            title={c.label}
+            aria-label={t('color_name', 'Color: {{color}}', { color: colorLabel })}
+            title={colorLabel}
             className={`relative w-[30px] h-[30px] rounded-full border transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] hover:scale-110 ${
               color === c.value ? 'border-[#2B5CD3] ring-2 ring-[#2B5CD3]/40' : 'border-newColColor'
             }`}
@@ -196,7 +216,8 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
               style={{ background: c.swatch }}
             />
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {/* Content states */}
@@ -206,19 +227,19 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m0 3.75h.008M10.34 3.94l-7.5 12.99A1.5 1.5 0 004.14 19.5h15.72a1.5 1.5 0 001.3-2.25l-7.5-12.99a1.5 1.5 0 00-2.6 0z" />
           </svg>
           <div className="text-[15px] font-[600] text-textColor">
-            Something went wrong{error.status ? ` (HTTP ${error.status})` : ''}
+            {t('something_went_wrong', 'Something went wrong')}{error.status ? ` (HTTP ${error.status})` : ''}
           </div>
           <div className="text-[13px] text-newTextColor/65 max-w-[320px]">
             {error.status === 401 || error.status === 403
-              ? 'Your session may have expired — try signing in again.'
-              : "We couldn't reach the video library. Give it another go in a moment."}
+              ? t('session_may_have_expired', 'Your session may have expired — try signing in again.')
+              : t('could_not_reach_video_library', "We couldn't reach the video library. Give it another go in a moment.")}
           </div>
           <button
             type="button"
             onClick={() => mutate()}
             className="mt-[6px] px-[16px] h-[36px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] hover:bg-[#1e4ab5] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
           >
-            Try again
+            {t('try_again', 'Try again')}
           </button>
         </div>
       ) : initialLoading ? (
@@ -238,12 +259,14 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
           </svg>
           <div className="text-[15px] font-[600] text-textColor">
-            {debouncedQuery ? `No videos for "${debouncedQuery}"` : 'Find the perfect clip'}
+            {debouncedQuery
+              ? t('no_videos_for_query', 'No videos for "{{query}}"', { query: debouncedQuery })
+              : t('find_perfect_clip', 'Find the perfect clip')}
           </div>
           <div className="text-[13px] text-newTextColor/65 max-w-[340px]">
             {debouncedQuery
-              ? 'Try a different keyword or one of these popular searches.'
-              : 'Search thousands of free, high-quality stock videos from Pexels to get started.'}
+              ? t('try_different_keyword', 'Try a different keyword or one of these popular searches.')
+              : t('search_free_videos_pexels', 'Search thousands of free, high-quality stock videos from Pexels to get started.')}
           </div>
           <div className="flex items-center flex-wrap justify-center gap-[8px] mt-[4px]">
             {SUGGESTED_SEARCHES.map((s) => (
@@ -318,7 +341,7 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
                 </div>
                 <div className="p-[8px]">
                   <div className="text-[11px] text-newTextColor/60 truncate">
-                    by{' '}
+                    {t('by', 'by')}{' '}
                     <a
                       href={video.authorUrl}
                       target="_blank"

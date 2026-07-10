@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fullscreen-button';
 import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
@@ -55,6 +56,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
   notice,
 }) => {
   const toaster = useToaster();
+  const t = useT();
   const { data: brands } = useBrands();
   const { isFullscreen } = useFullscreen();
   const [mode, setMode] = useState<AiDesignerMode>('chat');
@@ -110,11 +112,17 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
 
   const handleStart = () => {
     if (selectedChannels.length === 0 && customSizes.length === 0) {
-      toaster.show('Select at least one channel or custom size', 'warning');
+      toaster.show(
+        t(
+          'select_at_least_one_channel_or_custom_size',
+          'Select at least one channel or custom size'
+        ),
+        'warning'
+      );
       return;
     }
     if (mode === 'prompt' && !prompt.trim()) {
-      toaster.show('Enter a prompt to start', 'warning');
+      toaster.show(t('enter_a_prompt_to_start', 'Enter a prompt to start'), 'warning');
       return;
     }
 
@@ -156,7 +164,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
         <div className="flex items-center gap-[10px] shrink-0">
           <Logo size={22} className="" />
           <h1 className="text-[15px] font-[600] text-textColor whitespace-nowrap">
-            AI Designer
+            {t('ai_designer', 'AI Designer')}
           </h1>
         </div>
         <FullscreenButton />
@@ -183,7 +191,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                     : 'text-textColor/60 hover:text-textColor'
                 }`}
               >
-                {m === 'chat' ? 'Chat' : 'Prompt'}
+                {m === 'chat' ? t('chat', 'Chat') : t('prompt', 'Prompt')}
               </button>
             ))}
           </div>
@@ -191,7 +199,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
           {/* Channels */}
           <section className="space-y-3">
             <h2 className="text-[14px] font-semibold text-textColor">
-              Channels / formats
+              {t('channels_formats', 'Channels / formats')}
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {imagePresets.map((preset) => {
@@ -222,30 +230,30 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
           {/* Custom sizes */}
           <section className="space-y-3">
             <h2 className="text-[14px] font-semibold text-textColor">
-              Custom sizes
+              {t('custom_sizes', 'Custom sizes')}
             </h2>
             <div className="flex items-center gap-2">
               <label htmlFor="custom-width" className="sr-only">
-                Custom width
+                {t('custom_width', 'Custom width')}
               </label>
               <input
                 id="custom-width"
                 type="number"
                 value={customW}
                 onChange={(e) => setCustomW(e.target.value)}
-                placeholder="W"
+                placeholder={t('width_abbreviation', 'W')}
                 className="w-24 h-[40px] rounded-lg border border-studioBorder bg-newBgColorInner px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <span className="text-textColor/40">×</span>
               <label htmlFor="custom-height" className="sr-only">
-                Custom height
+                {t('custom_height', 'Custom height')}
               </label>
               <input
                 id="custom-height"
                 type="number"
                 value={customH}
                 onChange={(e) => setCustomH(e.target.value)}
-                placeholder="H"
+                placeholder={t('height_abbreviation', 'H')}
                 className="w-24 h-[40px] rounded-lg border border-studioBorder bg-newBgColorInner px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <Button
@@ -254,7 +262,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                 onClick={addCustomSize}
                 disabled={!customW || !customH}
               >
-                Add
+                {t('add', 'Add')}
               </Button>
             </div>
             {customSizes.length > 0 && (
@@ -269,7 +277,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                       type="button"
                       onClick={() => removeCustomSize(s.id)}
                       className="text-textColor/50 hover:text-dangerText"
-                      aria-label="Remove custom size"
+                      aria-label={t('remove_custom_size', 'Remove custom size')}
                     >
                       ✕
                     </button>
@@ -282,17 +290,20 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
           {/* Save path & brand */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Save path / folder"
+              label={t('save_path_folder', 'Save path / folder')}
               name="savePath"
               disableForm
               value={savePath}
               onChange={(e) => setSavePath(e.target.value)}
-              placeholder="e.g. /campaigns/summer-launch"
+              placeholder={t(
+                'save_path_placeholder_example',
+                'e.g. /campaigns/summer-launch'
+              )}
             />
 
             <div className="flex flex-col gap-[6px]">
               <label htmlFor="brandProfileId" className="text-[14px] text-textColor">
-                Brand profile
+                {t('brand_profile', 'Brand profile')}
               </label>
               <select
                 id="brandProfileId"
@@ -300,7 +311,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                 onChange={(e) => setBrandProfileId(e.target.value)}
                 className="h-[42px] rounded-[8px] border border-studioBorder bg-newBgColorInner px-[16px] text-[14px] text-textColor outline-none focus:border-designerAccent"
               >
-                <option value="">None</option>
+                <option value="">{t('none', 'None')}</option>
                 {brands?.map((brand) => (
                   <option key={brand.id} value={brand.id}>
                     {brand.name}
@@ -313,9 +324,9 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
           {/* Variants */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
-              label="Variants"
+              label={t('variants', 'Variants')}
               name="variants"
-              aria-label="Variants"
+              aria-label={t('variants', 'Variants')}
               type="number"
               disableForm
               min={1}
@@ -336,7 +347,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
           {/* Reference images */}
           <section className="space-y-3">
             <h2 className="text-[14px] font-semibold text-textColor">
-              Reference images
+              {t('reference_images', 'Reference images')}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -345,11 +356,13 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                 onClick={() => setShowMediaPicker(true)}
                 disabled={referenceImporting}
               >
-                {referenceImporting ? 'Importing…' : 'Add reference'}
+                {referenceImporting
+                  ? t('importing_ellipsis', 'Importing…')
+                  : t('add_reference', 'Add reference')}
               </Button>
               {referenceImporting && (
                 <span className="text-[12px] text-textColor/50">
-                  Importing stock reference…
+                  {t('importing_stock_reference_ellipsis', 'Importing stock reference…')}
                 </span>
               )}
               {referenceItems.map((item) => (
@@ -366,7 +379,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                     />
                   ) : null}
                   <span className="truncate max-w-[120px]">
-                    {item.name || 'Reference'}
+                    {item.name || t('reference', 'Reference')}
                   </span>
                   <button
                     type="button"
@@ -378,7 +391,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                       )
                     }
                     className="text-textColor/50 hover:text-dangerText"
-                    aria-label="Remove reference"
+                    aria-label={t('remove_reference', 'Remove reference')}
                   >
                     ✕
                   </button>
@@ -394,13 +407,16 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                 htmlFor="ai-designer-prompt"
                 className="block text-[14px] font-semibold text-textColor"
               >
-                Prompt
+                {t('prompt', 'Prompt')}
               </label>
               <textarea
                 id="ai-designer-prompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe the design you want…"
+                placeholder={t(
+                  'describe_the_design_you_want_ellipsis',
+                  'Describe the design you want…'
+                )}
                 rows={4}
                 className="w-full rounded-lg border border-studioBorder bg-newBgColorInner p-3 text-[14px] text-textColor outline-none focus:border-designerAccent resize-none"
               />
@@ -419,11 +435,13 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                 referenceImporting
               }
             >
-              {isConnected ? 'Start designing' : 'Connecting…'}
+              {isConnected
+                ? t('start_designing', 'Start designing')
+                : t('connecting_ellipsis', 'Connecting…')}
             </Button>
             {!isConnected && onReconnect && (
               <Button type="button" secondary onClick={onReconnect}>
-                Retry
+                {t('retry', 'Retry')}
               </Button>
             )}
           </div>
@@ -457,7 +475,8 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
               );
             } catch (e) {
               toaster.show(
-                (e as Error).message || 'Failed to import reference image',
+                (e as Error).message ||
+                  t('failed_to_import_reference_image', 'Failed to import reference image'),
                 'warning'
               );
             } finally {

@@ -1,5 +1,17 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// Deterministic i18n: render the English default (interpolating {{vars}}) instead of
+// relying on real i18next global state, which is non-deterministic across the suite.
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT:
+    () =>
+    (_key: string, fallback: string, vars?: Record<string, unknown>) =>
+      vars
+        ? fallback.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(vars[k] ?? ''))
+        : fallback,
+}));
+
 import { ProviderCard } from './provider-card';
 
 const makeProvider = (overrides: Record<string, any> = {}) => ({

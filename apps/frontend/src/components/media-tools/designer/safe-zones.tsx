@@ -3,6 +3,7 @@
 import React, { FC, useMemo } from 'react';
 import { Rect, Text, Group } from 'react-konva';
 import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface SafeZoneOverlayProps {
   presetId?: string;
@@ -17,6 +18,7 @@ export const SafeZoneOverlay: FC<SafeZoneOverlayProps> = ({
   height,
   visible,
 }) => {
+  const t = useT();
   const zones = useMemo(
     () => {
       if (!presetId) return null;
@@ -29,7 +31,7 @@ export const SafeZoneOverlay: FC<SafeZoneOverlayProps> = ({
 
       return [
         {
-          label: 'Title Safe (5%)',
+          label: t('title_safe_5_percent', 'Title Safe (5%)'),
           x: width * 0.05,
           y: height * 0.05,
           width: width * 0.9,
@@ -38,7 +40,7 @@ export const SafeZoneOverlay: FC<SafeZoneOverlayProps> = ({
         },
       ];
     },
-    [presetId, width, height],
+    [presetId, width, height, t],
   );
 
   if (!visible || !zones) return null;

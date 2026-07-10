@@ -4,6 +4,7 @@ import React, { FC } from 'react';
 import { ColorSwatch, Stepper } from '../controls';
 import type { DesignerElement } from '../designer.store';
 import { useBrandColors } from './use-brand-colors';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface IconInspectorProps {
   element: DesignerElement;
@@ -16,6 +17,7 @@ export const IconInspector: FC<IconInspectorProps> = ({
   ids,
   store,
 }) => {
+  const t = useT();
   const updateElements = store((s: any) => s.updateElements);
   const brandColors = useBrandColors();
   const brandEnforcement = store((s: any) => s.brandEnforcement);
@@ -25,11 +27,11 @@ export const IconInspector: FC<IconInspectorProps> = ({
   return (
     <div className="space-y-3">
       <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-        Icon
+        {t('designer_icon_heading', 'Icon')}
       </div>
 
       <ColorSwatch
-        label="Fill"
+        label={t('fill_button', 'Fill')}
         value={element.fill || '#2B5CD3'}
         onChange={(hex) => set({ fill: hex })}
         brandColors={brandColors}
@@ -37,16 +39,16 @@ export const IconInspector: FC<IconInspectorProps> = ({
       />
 
       <div className="space-y-2">
-        <div className="text-[11px] text-textColor/50">Stroke</div>
+        <div className="text-[11px] text-textColor/50">{t('designer_label_stroke', 'Stroke')}</div>
         <ColorSwatch
-          label="Color"
+          label={t('color', 'Color')}
           value={element.stroke || '#000000'}
           onChange={(hex) => set({ stroke: hex })}
           brandColors={brandColors}
           brandEnforcement={brandEnforcement}
         />
         <Stepper
-          label="Width"
+          label={t('designer_label_width', 'Width')}
           min={0}
           max={40}
           value={element.strokeWidth || 0}
@@ -56,13 +58,13 @@ export const IconInspector: FC<IconInspectorProps> = ({
 
       <div className="grid grid-cols-2 gap-2">
         <Stepper
-          label="W"
+          label={t('designer_label_w', 'W')}
           min={1}
           value={Math.round(element.width)}
           onChange={(n) => set({ width: n, height: n })}
         />
         <Stepper
-          label="H"
+          label={t('designer_label_h', 'H')}
           min={1}
           value={Math.round(element.height)}
           onChange={(n) => set({ width: n, height: n })}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useMemo, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { HeyGenAvatar } from './use-heygen';
 
@@ -11,6 +12,7 @@ interface AvatarPickerProps {
 }
 
 export const AvatarPicker: FC<AvatarPickerProps> = ({ avatars, selectedId, onSelect }) => {
+  const t = useT();
   const modal = useModals();
   const [query, setQuery] = useState('');
 
@@ -22,17 +24,19 @@ export const AvatarPicker: FC<AvatarPickerProps> = ({ avatars, selectedId, onSel
 
   return (
     <div className="flex flex-col gap-[14px] w-[640px] max-w-full">
-      <div className="text-[16px] font-[600] text-textColor">Choose an avatar</div>
+      <div className="text-[16px] font-[600] text-textColor">{t('heygen_choose_an_avatar', 'Choose an avatar')}</div>
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search avatars..."
+        placeholder={t('heygen_search_avatars', 'Search avatars...')}
         className="w-full h-[40px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[14px] text-textColor outline-none focus:border-[#2B5CD3]"
       />
       {filtered.length === 0 ? (
         <div className="h-[200px] flex items-center justify-center text-[13px] text-newTextColor/65">
-          {avatars.length === 0 ? 'No avatars available on this account' : `No avatars match "${query}"`}
+          {avatars.length === 0
+            ? t('heygen_no_avatars_available', 'No avatars available on this account')
+            : t('heygen_no_avatars_match_query', 'No avatars match "{{query}}"', { query })}
         </div>
       ) : (
         <div className="grid grid-cols-4 mobile:grid-cols-2 gap-[10px] max-h-[420px] overflow-y-auto pr-[4px]">

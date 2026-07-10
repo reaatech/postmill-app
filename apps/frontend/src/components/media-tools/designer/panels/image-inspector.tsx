@@ -3,6 +3,7 @@
 import React, { FC, useCallback, useMemo, useRef, useState } from 'react';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ColorSwatch, Slider, SegmentedControl, Stepper } from '../controls';
 import { useBrandColors } from './use-brand-colors';
 import { getImageNaturalSize } from '../elements';
@@ -32,6 +33,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
   ids,
   store,
 }) => {
+  const t = useT();
   const toaster = useToaster();
   const fetch = useFetch();
   const brandColors = useBrandColors();
@@ -152,7 +154,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       const data = await res.json();
       updateElement(element.id, { src: data.url, fileId: undefined });
     } catch {
-      toaster.show('Background removal failed', 'warning');
+      toaster.show(t('designer_bg_removal_failed', 'Background removal failed'), 'warning');
     } finally {
       setAiLoading(false);
     }
@@ -171,7 +173,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       const data = await res.json();
       updateElement(element.id, { src: data.url, fileId: undefined });
     } catch {
-      toaster.show('Upscale failed', 'warning');
+      toaster.show(t('designer_upscale_failed', 'Upscale failed'), 'warning');
     } finally {
       setAiLoading(false);
     }
@@ -190,7 +192,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       const data = await res.json();
       updateElement(element.id, { src: data.url, fileId: undefined });
     } catch {
-      toaster.show('Inpaint failed', 'warning');
+      toaster.show(t('designer_inpaint_failed', 'Inpaint failed'), 'warning');
     } finally {
       setAiLoading(false);
     }
@@ -209,7 +211,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       const data = await res.json();
       updateElement(element.id, { src: data.url, fileId: undefined });
     } catch {
-      toaster.show('Image-to-image failed', 'warning');
+      toaster.show(t('designer_image_to_image_failed', 'Image-to-image failed'), 'warning');
     } finally {
       setAiLoading(false);
     }
@@ -324,7 +326,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       setInpaintMaskUrl(url);
       setMasking(false);
     } catch {
-      toaster.show('Mask upload failed', 'warning');
+      toaster.show(t('designer_mask_upload_failed', 'Mask upload failed'), 'warning');
     } finally {
       setAiLoading(false);
     }
@@ -385,24 +387,24 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
     <>
     <div className="space-y-3">
       <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-        Image
+        {t('designer_image_heading', 'Image')}
       </div>
 
       <button
         onClick={() => setMediaModalOpen(true)}
         className="w-full px-3 py-2 rounded-md text-[12px] border border-designerAccent text-btnPrimaryAccent hover:bg-designerAccent/10 transition-colors"
       >
-        Replace image…
+        {t('designer_replace_image', 'Replace image…')}
       </button>
 
       <div>
-        <div className="text-[11px] text-textColor/50 mb-1">Fit mode</div>
+        <div className="text-[11px] text-textColor/50 mb-1">{t('designer_label_fit_mode', 'Fit mode')}</div>
         <SegmentedControl
           value={element.fitMode || 'fill'}
           options={[
-            { value: 'contain', label: 'Fit' },
-            { value: 'cover', label: 'Cover' },
-            { value: 'fill', label: 'Fill' },
+            { value: 'contain', label: t('designer_fit_option_fit', 'Fit') },
+            { value: 'cover', label: t('designer_fit_option_cover', 'Cover') },
+            { value: 'fill', label: t('fill_button', 'Fill') },
           ]}
           onChange={(v) =>
             set({ fitMode: v as 'contain' | 'cover' | 'fill' })
@@ -412,12 +414,12 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/50">Focal point</span>
+          <span className="text-[11px] text-textColor/50">{t('designer_label_focal_point', 'Focal point')}</span>
           <button
             className="text-[10px] text-btnPrimaryAccent"
             onClick={() => set({ focalPoint: { x: 0.5, y: 0.5 } })}
           >
-            Center
+            {t('designer_center', 'Center')}
           </button>
         </div>
         <div
@@ -445,7 +447,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
           <button
             className="px-2 py-1 bg-newBgColor hover:bg-studioBorder/10 rounded border border-studioBorder text-xs"
             onClick={() => nudgeFocal(0, -0.02)}
-            aria-label="Move focal point up"
+            aria-label={t('designer_move_focal_point_up', 'Move focal point up')}
           >
             ↑
           </button>
@@ -453,21 +455,21 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
           <button
             className="px-2 py-1 bg-newBgColor hover:bg-studioBorder/10 rounded border border-studioBorder text-xs"
             onClick={() => nudgeFocal(-0.02, 0)}
-            aria-label="Move focal point left"
+            aria-label={t('designer_move_focal_point_left', 'Move focal point left')}
           >
             ←
           </button>
           <button
             className="px-2 py-1 bg-newBgColor hover:bg-studioBorder/10 rounded border border-studioBorder text-xs"
             onClick={() => nudgeFocal(0, 0.02)}
-            aria-label="Move focal point down"
+            aria-label={t('designer_move_focal_point_down', 'Move focal point down')}
           >
             ↓
           </button>
           <button
             className="px-2 py-1 bg-newBgColor hover:bg-studioBorder/10 rounded border border-studioBorder text-xs"
             onClick={() => nudgeFocal(0.02, 0)}
-            aria-label="Move focal point right"
+            aria-label={t('designer_move_focal_point_right', 'Move focal point right')}
           >
             →
           </button>
@@ -478,12 +480,12 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         className="w-full px-3 py-2 bg-newBgColor hover:bg-studioBorder/10 text-sm rounded border border-studioBorder text-left"
         onClick={resetFormatLayout}
       >
-        Reset this format’s layout
+        {t('designer_reset_format_layout', 'Reset this format’s layout')}
       </button>
 
       <div className="grid grid-cols-2 gap-2">
         <Stepper
-          label="Focal X"
+          label={t('designer_focal_x', 'Focal X')}
           min={0}
           max={100}
           step={1}
@@ -502,7 +504,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
           }
         />
         <Stepper
-          label="Focal Y"
+          label={t('designer_focal_y', 'Focal Y')}
           min={0}
           max={100}
           step={1}
@@ -532,33 +534,33 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
             const fp = await detectFocalPoint(element.src, fetch);
             updateElement(element.id, { focalPoint: fp });
           } catch {
-            toaster.show('Subject detection failed; using center fallback', 'warning');
+            toaster.show(t('designer_subject_detection_failed', 'Subject detection failed; using center fallback'), 'warning');
           } finally {
             setAiLoading(false);
           }
         }}
       >
-        {aiLoading === 'detect-focal' ? 'Detecting…' : 'Auto-detect Subject'}
+        {aiLoading === 'detect-focal' ? t('designer_detecting_ellipsis', 'Detecting…') : t('designer_auto_detect_subject', 'Auto-detect Subject')}
       </button>
 
       <Stepper
-        label="Border radius"
+        label={t('designer_label_border_radius', 'Border radius')}
         min={0}
         value={element.borderRadius || 0}
         onChange={(n) => set({ borderRadius: n })}
       />
 
       <div className="space-y-2">
-        <div className="text-[11px] text-textColor/50">Border</div>
+        <div className="text-[11px] text-textColor/50">{t('designer_label_border', 'Border')}</div>
         <ColorSwatch
-          label="Color"
+          label={t('color', 'Color')}
           value={element.stroke || '#000000'}
           onChange={(hex) => set({ stroke: hex })}
           brandColors={brandColors}
           brandEnforcement={brandEnforcement}
         />
         <Stepper
-          label="Width"
+          label={t('designer_label_width', 'Width')}
           min={0}
           max={40}
           value={element.strokeWidth || 0}
@@ -568,7 +570,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
 
       <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/50">Shadow</span>
+          <span className="text-[11px] text-textColor/50">{t('designer_label_shadow', 'Shadow')}</span>
           <button
             type="button"
             role="switch"
@@ -592,7 +594,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         {shadow && (
           <div className="flex flex-col gap-3">
             <ColorSwatch
-              label="Shadow color"
+              label={t('designer_label_shadow_color', 'Shadow color')}
               value={shadow.color || '#000000'}
               onChange={(hex) =>
                 set({
@@ -603,7 +605,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
               brandEnforcement={brandEnforcement}
             />
             <Slider
-              label="Blur"
+              label={t('designer_label_blur', 'Blur')}
               min={0}
               max={40}
               value={shadow.blur}
@@ -614,7 +616,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
               }
             />
             <Slider
-              label="Offset X"
+              label={t('designer_label_offset_x', 'Offset X')}
               min={-40}
               max={40}
               value={shadow.offsetX}
@@ -625,7 +627,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
               }
             />
             <Slider
-              label="Offset Y"
+              label={t('designer_label_offset_y', 'Offset Y')}
               min={-40}
               max={40}
               value={shadow.offsetY}
@@ -640,10 +642,10 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       </div>
 
       <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
-        <div className="text-[11px] text-textColor/50">Filters</div>
+        <div className="text-[11px] text-textColor/50">{t('designer_label_filters', 'Filters')}</div>
 
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/70">Grayscale</span>
+          <span className="text-[11px] text-textColor/70">{t('designer_label_grayscale', 'Grayscale')}</span>
           <button
             type="button"
             role="switch"
@@ -662,7 +664,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/70">Sepia</span>
+          <span className="text-[11px] text-textColor/70">{t('designer_label_sepia', 'Sepia')}</span>
           <button
             type="button"
             role="switch"
@@ -681,7 +683,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         </div>
 
         <Slider
-          label="Blur"
+          label={t('designer_label_blur', 'Blur')}
           suffix="px"
           min={0}
           max={20}
@@ -690,7 +692,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
           onChange={(n) => setFilterVal('blur', n, 0)}
         />
         <Slider
-          label="Brightness"
+          label={t('designer_label_brightness', 'Brightness')}
           min={0}
           max={3}
           step={0.05}
@@ -698,7 +700,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
           onChange={(n) => setFilterVal('brightness', n, 1)}
         />
         <Slider
-          label="Contrast"
+          label={t('designer_label_contrast', 'Contrast')}
           min={0}
           max={3}
           step={0.05}
@@ -706,7 +708,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
           onChange={(n) => setFilterVal('contrast', n, 1)}
         />
         <Slider
-          label="Saturate"
+          label={t('designer_label_saturate', 'Saturate')}
           min={0}
           max={3}
           step={0.05}
@@ -716,24 +718,24 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       </div>
 
       <div className="space-y-2">
-        <div className="text-[11px] text-textColor/50">Mask / Frame</div>
+        <div className="text-[11px] text-textColor/50">{t('designer_label_mask_frame', 'Mask / Frame')}</div>
         <div className="grid grid-cols-3 gap-1.5">
           {(
             [
-              { shape: 'ellipse', label: 'Circle', icon: '⬮' },
+              { shape: 'ellipse', label: t('designer_mask_circle', 'Circle'), icon: '⬮' },
               {
                 shape: 'rounded-rect',
-                label: 'Rounded',
+                label: t('designer_mask_rounded', 'Rounded'),
                 icon: '◻',
               },
-              { shape: 'triangle', label: 'Triangle', icon: '▲' },
-              { shape: 'star', label: 'Star', icon: '★' },
+              { shape: 'triangle', label: t('designer_mask_triangle', 'Triangle'), icon: '▲' },
+              { shape: 'star', label: t('designer_mask_star', 'Star'), icon: '★' },
               {
                 shape: 'hexagon',
-                label: 'Hexagon',
+                label: t('designer_mask_hexagon', 'Hexagon'),
                 icon: '⬡',
               },
-              { shape: 'heart', label: 'Heart', icon: '♡' },
+              { shape: 'heart', label: t('designer_mask_heart', 'Heart'), icon: '♡' },
             ] as const
           ).map(({ shape, label, icon }) => {
             const active =
@@ -768,7 +770,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
 
         <div className="flex flex-col gap-1.5">
           <label htmlFor="image-photo-in-text" className="text-[11px] text-textColor/50">
-            Photo in text
+            {t('designer_label_photo_in_text', 'Photo in text')}
           </label>
           <input
             id="image-photo-in-text"
@@ -790,7 +792,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                 });
               }
             }}
-            placeholder="Enter text for photo-in-text…"
+            placeholder={t('designer_placeholder_photo_in_text', 'Enter text for photo-in-text…')}
             className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
           />
         </div>
@@ -798,7 +800,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
         {element.mask?.type === 'shape' &&
           element.mask.shape === 'rounded-rect' && (
             <Slider
-              label="Corner radius"
+              label={t('designer_label_corner_radius', 'Corner radius')}
               min={0}
               max={Math.min(element.width, element.height) / 2}
               value={element.mask.cornerRadius || 8}
@@ -815,13 +817,13 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
             onClick={() => updateElement(element.id, { mask: undefined })}
             className="w-full px-3 py-2 rounded-md text-[12px] border border-red-400/40 text-dangerText hover:bg-red-400/10 transition-colors"
           >
-            Remove frame
+            {t('designer_remove_frame', 'Remove frame')}
           </button>
         )}
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="image-alt-text" className="text-[11px] text-textColor/50">Alt text</label>
+        <label htmlFor="image-alt-text" className="text-[11px] text-textColor/50">{t('designer_label_alt_text', 'Alt text')}</label>
         <input
           id="image-alt-text"
           type="text"
@@ -829,7 +831,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
           onChange={(e) =>
             updateElement(element.id, { alt: e.target.value })
           }
-          placeholder="Describe this image…"
+          placeholder={t('designer_placeholder_describe_image', 'Describe this image…')}
           className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
         />
       </div>
@@ -837,7 +839,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       {isSingle && (
         <div className="space-y-2 pt-1">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] text-textColor/50">Crop</span>
+            <span className="text-[11px] text-textColor/50">{t('designer_label_crop', 'Crop')}</span>
             {element.crop && (
               <button
                 className="text-[10px] text-btnPrimaryAccent"
@@ -845,19 +847,19 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                   updateElement(element.id, { crop: undefined })
                 }
               >
-                Reset
+                {t('reset', 'Reset')}
               </button>
             )}
           </div>
           {!natural && (
             <div className="text-[10px] text-textColor/30">
-              Loading image…
+              {t('designer_loading_image', 'Loading image…')}
             </div>
           )}
           {natural && (
             <>
               <Slider
-                label="Left"
+                label={t('designer_label_left', 'Left')}
                 suffix="%"
                 min={0}
                 max={45}
@@ -865,7 +867,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                 onChange={(n) => applyCrop('left', n)}
               />
               <Slider
-                label="Right"
+                label={t('designer_label_right', 'Right')}
                 suffix="%"
                 min={0}
                 max={45}
@@ -873,7 +875,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                 onChange={(n) => applyCrop('right', n)}
               />
               <Slider
-                label="Top"
+                label={t('designer_label_top', 'Top')}
                 suffix="%"
                 min={0}
                 max={45}
@@ -881,7 +883,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                 onChange={(n) => applyCrop('top', n)}
               />
               <Slider
-                label="Bottom"
+                label={t('designer_label_bottom', 'Bottom')}
                 suffix="%"
                 min={0}
                 max={45}
@@ -894,14 +896,14 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       )}
 
       <div className="pt-3 border-t border-studioBorder">
-        <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">AI Tools</h4>
+        <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">{t('designer_ai_tools', 'AI Tools')}</h4>
         <div className="space-y-2">
           <button
             className="w-full px-3 py-2 bg-designerAccent/10 hover:bg-designerAccent/20 text-sm rounded border border-designerAccent/30 text-left"
             onClick={handleRemoveBackground}
             disabled={!!aiLoading}
           >
-            {aiLoading === 'remove-bg' ? 'Processing...' : 'Remove Background'}
+            {aiLoading === 'remove-bg' ? t('designer_processing_ellipsis', 'Processing...') : t('designer_remove_background', 'Remove Background')}
           </button>
 
           <div className="flex gap-2">
@@ -910,22 +912,22 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
               value={upscaleScale}
               onChange={e => setUpscaleScale(Number(e.target.value))}
             >
-              <option value={2}>2× Upscale</option>
-              <option value={4}>4× Upscale</option>
+              <option value={2}>{t('designer_upscale_2x', '2× Upscale')}</option>
+              <option value={4}>{t('designer_upscale_4x', '4× Upscale')}</option>
             </select>
             <button
               className="px-3 py-1.5 bg-designerAccent/10 hover:bg-designerAccent/20 text-sm rounded border border-designerAccent/30"
               onClick={handleUpscale}
               disabled={!!aiLoading}
             >
-              {aiLoading === 'upscale' ? '...' : 'Upscale'}
+              {aiLoading === 'upscale' ? '...' : t('designer_upscale', 'Upscale')}
             </button>
           </div>
 
           <div className="flex flex-col gap-2">
             <input
               className="w-full px-2 py-1.5 bg-newBgColor border border-studioBorder rounded text-sm text-textColor"
-              placeholder="Image-to-image prompt..."
+              placeholder={t('designer_placeholder_image_to_image', 'Image-to-image prompt...')}
               value={imageToImagePrompt}
               onChange={(e) => setImageToImagePrompt(e.target.value)}
             />
@@ -934,14 +936,14 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
               onClick={handleImageToImage}
               disabled={!!aiLoading || !imageToImagePrompt.trim()}
             >
-              {aiLoading === 'image-to-image' ? '…' : 'Image to Image'}
+              {aiLoading === 'image-to-image' ? '…' : t('designer_image_to_image', 'Image to Image')}
             </button>
           </div>
 
           <div className="flex flex-col gap-2">
             <input
               className="w-full px-2 py-1.5 bg-newBgColor border border-studioBorder rounded text-sm text-textColor"
-              placeholder="Inpaint prompt..."
+              placeholder={t('designer_placeholder_inpaint', 'Inpaint prompt...')}
               value={inpaintPrompt}
               onChange={(e) => setInpaintPrompt(e.target.value)}
             />
@@ -969,7 +971,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                   />
                 </div>
                 <Slider
-                  label="Brush"
+                  label={t('designer_label_brush', 'Brush')}
                   suffix="px"
                   min={4}
                   max={48}
@@ -982,14 +984,14 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                     className="flex-1 px-2 py-1.5 bg-newBgColor hover:bg-studioBorder/10 text-xs rounded border border-studioBorder"
                     onClick={clearMask}
                   >
-                    Clear
+                    {t('clear', 'Clear')}
                   </button>
                   <button
                     className="flex-1 px-2 py-1.5 bg-designerAccent/10 hover:bg-designerAccent/20 text-xs rounded border border-designerAccent/30"
                     onClick={uploadMask}
                     disabled={!!aiLoading}
                   >
-                    {aiLoading === 'mask-upload' ? 'Uploading…' : 'Done'}
+                    {aiLoading === 'mask-upload' ? t('designer_uploading_ellipsis_dots', 'Uploading…') : t('done', 'Done')}
                   </button>
                 </div>
               </div>
@@ -1001,12 +1003,12 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
                 onClick={() => setMasking(true)}
                 disabled={!!aiLoading}
               >
-                {inpaintMaskUrl ? 'Edit mask' : 'Draw mask…'}
+                {inpaintMaskUrl ? t('designer_edit_mask', 'Edit mask') : t('designer_draw_mask', 'Draw mask…')}
               </button>
             )}
 
             {inpaintMaskUrl && !masking && (
-              <div className="text-[10px] text-green-700 dark:text-green-400">Mask ready</div>
+              <div className="text-[10px] text-green-700 dark:text-green-400">{t('designer_mask_ready', 'Mask ready')}</div>
             )}
 
             <button
@@ -1014,7 +1016,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
               onClick={handleInpaint}
               disabled={!!aiLoading || !inpaintPrompt || !inpaintMaskUrl}
             >
-              {aiLoading === 'inpaint' ? '…' : 'Inpaint'}
+              {aiLoading === 'inpaint' ? '…' : t('designer_inpaint', 'Inpaint')}
             </button>
           </div>
         </div>

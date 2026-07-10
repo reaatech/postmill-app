@@ -2,6 +2,7 @@
 
 import React, { FC, useState } from 'react';
 import { Slider, SegmentedControl, Stepper } from '../controls';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import type { DesignerElement } from '../designer.store';
 
 interface CommonInspectorProps {
@@ -17,6 +18,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
   ids,
   store,
 }) => {
+  const t = useT();
   const updateElement = store((s: any) => s.updateElement);
   const updateElements = store((s: any) => s.updateElements);
   const updateElementsSilent = store((s: any) => s.updateElementsSilent);
@@ -151,17 +153,17 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
   return (
     <div className="space-y-3 pt-2 border-t border-studioBorder">
       <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-        Common
+        {t('designer_common', 'Common')}
       </div>
 
       <div className="grid grid-cols-2 gap-2">
         <Stepper
-          label="X"
+          label={t('designer_label_x', 'X')}
           value={Math.round(primary.x)}
           onChange={(n) => set({ x: n })}
         />
         <Stepper
-          label="Y"
+          label={t('designer_label_y', 'Y')}
           value={Math.round(primary.y)}
           onChange={(n) => set({ y: n })}
         />
@@ -169,7 +171,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-textColor/50">Size</span>
+          <span className="text-[11px] text-textColor/50">{t('size', 'Size')}</span>
           <button
             onClick={() => setAspectLocked((v) => !v)}
             className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
@@ -178,18 +180,18 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
                 : 'text-textColor/40 hover:text-textColor'
             }`}
           >
-            {aspectLocked ? 'Locked' : 'Unlocked'}
+            {aspectLocked ? t('designer_locked', 'Locked') : t('designer_unlocked', 'Unlocked')}
           </button>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <Stepper
-            label="W"
+            label={t('designer_label_w', 'W')}
             min={1}
             value={Math.round(primary.width)}
             onChange={handleWidthChange}
           />
           <Stepper
-            label="H"
+            label={t('designer_label_h', 'H')}
             min={1}
             value={Math.round(primary.height)}
             onChange={handleHeightChange}
@@ -198,7 +200,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
       </div>
 
       <Slider
-        label="Rotation"
+        label={t('designer_label_rotation', 'Rotation')}
         suffix="°"
         min={0}
         max={360}
@@ -208,7 +210,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
       />
 
       <Slider
-        label="Opacity"
+        label={t('designer_label_opacity', 'Opacity')}
         suffix="%"
         min={0}
         max={100}
@@ -218,7 +220,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
       />
 
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-textColor/50">Lock</span>
+        <span className="text-[11px] text-textColor/50">{t('designer_label_lock', 'Lock')}</span>
         <button
           type="button"
           role="switch"
@@ -237,13 +239,13 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
       </div>
 
       <div>
-        <div className="text-[11px] text-textColor/50 mb-1">Flip</div>
+        <div className="text-[11px] text-textColor/50 mb-1">{t('designer_label_flip', 'Flip')}</div>
         <SegmentedControl
           value={primary.flipX ? 'h' : primary.flipY ? 'v' : 'none'}
           options={[
-            { value: 'none', label: 'None' },
-            { value: 'h', label: 'H-Flip' },
-            { value: 'v', label: 'V-Flip' },
+            { value: 'none', label: t('gmb_cta_none', 'None') },
+            { value: 'h', label: t('designer_flip_h', 'H-Flip') },
+            { value: 'v', label: t('designer_flip_v', 'V-Flip') },
           ]}
           onChange={(v) => set({ flipX: v === 'h', flipY: v === 'v' })}
         />
@@ -251,104 +253,104 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
 
       <div>
         <div className="text-[11px] text-textColor/50 mb-1">
-          {isMulti ? 'Align to selection' : 'Align to canvas'}
+          {isMulti ? t('designer_align_to_selection', 'Align to selection') : t('designer_align_to_canvas', 'Align to canvas')}
         </div>
         <div className="flex gap-1">
           <button
             onClick={() => alignV('top')}
-            aria-label={isMulti ? 'Align tops' : 'Align top'}
+            aria-label={isMulti ? t('designer_align_tops', 'Align tops') : t('designer_align_top', 'Align top')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ↑ Top
+            {t('designer_align_btn_top', '↑ Top')}
           </button>
           <button
             onClick={() => alignV('middle')}
-            aria-label={isMulti ? 'Align vertical centers' : 'Align vertical center'}
+            aria-label={isMulti ? t('designer_align_vertical_centers', 'Align vertical centers') : t('designer_align_vertical_center', 'Align vertical center')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ↕ Middle
+            {t('designer_align_btn_middle', '↕ Middle')}
           </button>
           <button
             onClick={() => alignV('bottom')}
-            aria-label={isMulti ? 'Align bottoms' : 'Align bottom'}
+            aria-label={isMulti ? t('designer_align_bottoms', 'Align bottoms') : t('designer_align_bottom', 'Align bottom')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ↓ Bottom
+            {t('designer_align_btn_bottom', '↓ Bottom')}
           </button>
         </div>
         <div className="flex gap-1 mt-1">
           <button
             onClick={() => alignH('left')}
-            aria-label={isMulti ? 'Align left edges' : 'Align left'}
+            aria-label={isMulti ? t('designer_align_left_edges', 'Align left edges') : t('designer_align_left', 'Align left')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ← Left
+            {t('designer_align_btn_left', '← Left')}
           </button>
           <button
             onClick={() => alignH(ALIGN_CENTER)}
-            aria-label={isMulti ? 'Align horizontal centers' : 'Align horizontal center'}
+            aria-label={isMulti ? t('designer_align_horizontal_centers', 'Align horizontal centers') : t('designer_align_horizontal_center', 'Align horizontal center')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ↔ Center
+            {t('designer_align_btn_center', '↔ Center')}
           </button>
           <button
             onClick={() => alignH('right')}
-            aria-label={isMulti ? 'Align right edges' : 'Align right'}
+            aria-label={isMulti ? t('designer_align_right_edges', 'Align right edges') : t('designer_align_right', 'Align right')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            → Right
+            {t('designer_align_btn_right', '→ Right')}
           </button>
         </div>
         {selected.length >= 3 && (
           <div className="flex gap-1 mt-1">
             <button
               onClick={distributeHorizontal}
-              aria-label="Distribute horizontally"
+              aria-label={t('designer_distribute_horizontally', 'Distribute horizontally')}
               className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
             >
-              ↔ H
+              {t('designer_distribute_btn_h', '↔ H')}
             </button>
             <button
               onClick={distributeVertical}
-              aria-label="Distribute vertically"
+              aria-label={t('designer_distribute_vertically', 'Distribute vertically')}
               className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
             >
-              ↕ V
+              {t('designer_distribute_btn_v', '↕ V')}
             </button>
           </div>
         )}
       </div>
 
       <div>
-        <div className="text-[11px] text-textColor/50 mb-1">Layer order</div>
+        <div className="text-[11px] text-textColor/50 mb-1">{t('designer_label_layer_order', 'Layer order')}</div>
         <div className="flex gap-1">
           <button
             onClick={() => reorder(ids, 'back')}
-            aria-label="Send to back"
+            aria-label={t('designer_send_to_back', 'Send to back')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ⤒ Back
+            {t('designer_layer_btn_back', '⤒ Back')}
           </button>
           <button
             onClick={() => reorder(ids, 'backward')}
-            aria-label="Send backward"
+            aria-label={t('designer_send_backward', 'Send backward')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ↓ Bwd
+            {t('designer_layer_btn_bwd', '↓ Bwd')}
           </button>
           <button
             onClick={() => reorder(ids, 'forward')}
-            aria-label="Bring forward"
+            aria-label={t('designer_bring_forward', 'Bring forward')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ↑ Fwd
+            {t('designer_layer_btn_fwd', '↑ Fwd')}
           </button>
           <button
             onClick={() => reorder(ids, 'front')}
-            aria-label="Bring to front"
+            aria-label={t('designer_bring_to_front', 'Bring to front')}
             className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
-            ⤓ Front
+            {t('designer_layer_btn_front', '⤓ Front')}
           </button>
         </div>
       </div>
@@ -358,7 +360,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
           onClick={resetToOriginal}
           className="w-full px-3 py-2 rounded-md text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
         >
-          Reset to original size
+          {t('designer_reset_to_original_size', 'Reset to original size')}
         </button>
       )}
     </div>

@@ -4,6 +4,20 @@ import React, { useMemo } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+
+function mediaTypeNoun(t: (key: string, fallback: string) => string, type: string): string {
+  switch (type) {
+    case 'image':
+      return t('media_noun_image', 'image');
+    case 'video':
+      return t('media_noun_video', 'video');
+    case 'audio':
+      return t('media_noun_audio', 'audio');
+    default:
+      return type;
+  }
+}
 
 export interface FileValue {
   fileId?: string;
@@ -20,6 +34,7 @@ interface FileInputProps {
 }
 
 export function FileInput({ value, onChange, label, required, acceptType = 'image' }: FileInputProps) {
+  const t = useT();
   const modals = useModals();
   const toaster = useToaster();
 
@@ -33,7 +48,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
 
   const handleChooseFile = () => {
     modals.openModal({
-      title: `Select ${acceptType} file`,
+      title: t('select_x_file', 'Select {{type}} file', { type: mediaTypeNoun(t, acceptType) }),
       removeLayout: true,
       children: (close) => (
         <MediaSelectorModal
@@ -42,7 +57,12 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
           kinds={[acceptType]}
           onSelect={(item) => {
             if (item.type !== acceptType) {
-              toaster.show(`Please choose a ${acceptType} file`, 'warning');
+              toaster.show(
+                t('please_choose_x_file', 'Please choose a {{type}} file', {
+                  type: mediaTypeNoun(t, acceptType),
+                }),
+                'warning'
+              );
               return;
             }
             onChange({
@@ -78,7 +98,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
           {display ? (
             <span className="truncate block">{display}</span>
           ) : (
-            `Choose ${acceptType} file...`
+            t('choose_x_file_ellipsis', 'Choose {{type}} file...', { type: mediaTypeNoun(t, acceptType) })
           )}
         </button>
         {display && (
@@ -86,7 +106,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
             type="button"
             onClick={handleClear}
             className="px-2 py-2 rounded-lg text-newTextColor/60 hover:text-dangerText transition-colors"
-            aria-label="Clear file"
+            aria-label={t('clear_file', 'Clear file')}
           >
             ✕
           </button>
@@ -94,7 +114,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
       </div>
       {selected?.url && acceptType === 'image' && (
         // eslint-disable-next-line @next/next/no-img-element -- external media preview
-        <img src={selected.url} alt="Preview" className="mt-2 w-full max-h-32 object-cover rounded-lg" />
+        <img src={selected.url} alt={t('preview', 'Preview')} className="mt-2 w-full max-h-32 object-cover rounded-lg" />
       )}
     </div>
   );

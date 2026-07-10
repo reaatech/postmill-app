@@ -1,5 +1,17 @@
 import type { DesignerDoc, DesignerElement, TextRun } from './designer.store';
 
+/**
+ * A single brand-compliance violation. `text` is the fully-interpolated English message
+ * (kept for any caller that only needs plain text / a count); `key` + `vars` let the sole
+ * render site (panels/brand-panel.tsx) translate it via `t(key, text, vars)` — this module
+ * is a plain data/logic module (not a hook), so it can't call useT()/getT() itself.
+ */
+export interface BrandViolation {
+  key: string;
+  text: string;
+  vars: Record<string, string | number>;
+}
+
 function normalizeHex(input: string): string | null {
   let v = input.trim();
   if (!v) return null;
@@ -22,37 +34,46 @@ function isBrandFont(value: string | undefined, brandFonts: string[]): boolean {
   return brandFonts.some((f) => f.toLowerCase() === value.toLowerCase());
 }
 
+function push(
+  violations: BrandViolation[],
+  key: string,
+  text: string,
+  vars: Record<string, string | number>
+) {
+  violations.push({ key, text, vars });
+}
+
 function collectColorViolations(
   el: DesignerElement,
   brandColors: string[],
-  violations: string[]
+  violations: BrandViolation[]
 ) {
   if (el.fill && !isBrandColor(el.fill, brandColors)) {
-    violations.push(`${el.type} element uses off-brand fill ${el.fill}`);
+    push(violations, 'designer_brand_violation_fill', `${el.type} element uses off-brand fill ${el.fill}`, { type: el.type, fill: el.fill });
   }
   if (el.stroke && !isBrandColor(el.stroke, brandColors)) {
-    violations.push(`${el.type} element uses off-brand stroke ${el.stroke}`);
+    push(violations, 'designer_brand_violation_stroke', `${el.type} element uses off-brand stroke ${el.stroke}`, { type: el.type, stroke: el.stroke });
   }
   if (el.textShadow?.color && !isBrandColor(el.textShadow.color, brandColors)) {
-    violations.push(`text shadow uses off-brand color ${el.textShadow.color}`);
+    push(violations, 'designer_brand_violation_text_shadow', `text shadow uses off-brand color ${el.textShadow.color}`, { color: el.textShadow.color });
   }
   if (el.textStroke?.color && !isBrandColor(el.textStroke.color, brandColors)) {
-    violations.push(`text outline uses off-brand color ${el.textStroke.color}`);
+    push(violations, 'designer_brand_violation_text_outline', `text outline uses off-brand color ${el.textStroke.color}`, { color: el.textStroke.color });
   }
   if (el.boxShadow?.color && !isBrandColor(el.boxShadow.color, brandColors)) {
-    violations.push(`box shadow uses off-brand color ${el.boxShadow.color}`);
+    push(violations, 'designer_brand_violation_box_shadow', `box shadow uses off-brand color ${el.boxShadow.color}`, { color: el.boxShadow.color });
   }
   if (el.fillGradient?.stops?.length) {
     el.fillGradient.stops.forEach((stop, i) => {
       if (!isBrandColor(stop.color, brandColors)) {
-        violations.push(`gradient stop ${i + 1} uses off-brand color ${stop.color}`);
+        push(violations, 'designer_brand_violation_gradient_stop', `gradient stop ${i + 1} uses off-brand color ${stop.color}`, { index: i + 1, color: stop.color });
       }
     });
   }
   if (el.richText?.length) {
     el.richText.forEach((run, i) => {
       if (run.fill && !isBrandColor(run.fill, brandColors)) {
-        violations.push(`rich-text run ${i + 1} uses off-brand color ${run.fill}`);
+        push(violations, 'designer_brand_violation_rich_text_color', `rich-text run ${i + 1} uses off-brand color ${run.fill}`, { index: i + 1, color: run.fill });
       }
     });
   }
@@ -61,16 +82,16 @@ function collectColorViolations(
 function collectFontViolations(
   el: DesignerElement,
   brandFonts: string[],
-  violations: string[]
+  violations: BrandViolation[]
 ) {
   if (el.type !== 'text') return;
   if (el.fontFamily && !isBrandFont(el.fontFamily, brandFonts)) {
-    violations.push(`text element uses off-brand font ${el.fontFamily}`);
+    push(violations, 'designer_brand_violation_font', `text element uses off-brand font ${el.fontFamily}`, { font: el.fontFamily });
   }
   if (el.richText?.length) {
     el.richText.forEach((run, i) => {
       if (run.fontFamily && !isBrandFont(run.fontFamily, brandFonts)) {
-        violations.push(`rich-text run ${i + 1} uses off-brand font ${run.fontFamily}`);
+        push(violations, 'designer_brand_violation_rich_text_font', `rich-text run ${i + 1} uses off-brand font ${run.fontFamily}`, { index: i + 1, font: run.fontFamily });
       }
     });
   }
@@ -86,14 +107,14 @@ export interface BrandComplianceConfig {
 export function getBrandViolations(
   doc: DesignerDoc,
   config: BrandComplianceConfig
-): string[] {
+): BrandViolation[] {
   if (!config.enforcement || config.adminOverride) return [];
 
   const colorEnforced = config.brandColors.length > 0;
   const fontEnforced = config.brandFonts.length > 0;
   if (!colorEnforced && !fontEnforced) return [];
 
-  const violations: string[] = [];
+  const violations: BrandViolation[] = [];
   for (const output of doc.outputs) {
     if (!('children' in output)) continue;
     for (const el of output.children) {

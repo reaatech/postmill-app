@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fullscreen-button';
 import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
@@ -38,6 +39,7 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
   onReset,
 }) => {
   const toaster = useToaster();
+  const t = useT();
   const { isFullscreen } = useFullscreen();
   const { data: hydrate } = useAiDesignerSession(sessionId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -147,9 +149,12 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
       setSending(false);
       // An error mid-render means the in-flight progress bubble is stale.
       setProgress(null);
-      toaster.show(err.message || err.code || 'AI Designer error', 'warning');
+      toaster.show(
+        err.message || err.code || t('ai_designer_error', 'AI Designer error'),
+        'warning'
+      );
     },
-    [toaster, failPendingSend]
+    [toaster, t, failPendingSend]
   );
 
   const socket = useAiDesignerSocket(
@@ -247,7 +252,10 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
         // No echo within the window — treat the send as undelivered.
         failPendingSend();
         toaster.show(
-          'Your message was not delivered. Please try again.',
+          t(
+            'message_not_delivered_retry',
+            'Your message was not delivered. Please try again.'
+          ),
           'warning'
         );
       }, SEND_SAFETY_TIMEOUT_MS),
@@ -271,7 +279,7 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
         <div className="flex items-center gap-[10px] min-w-0">
           <Logo size={22} className="" />
           <h1 className="text-[15px] font-[600] text-textColor whitespace-nowrap">
-            AI Designer
+            {t('ai_designer', 'AI Designer')}
           </h1>
           {displaySession?.state && (
             <span className="text-[12px] text-textColor/50 capitalize truncate">
@@ -284,16 +292,20 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
             className={`w-2 h-2 rounded-full ${
               socket.connected ? 'bg-green-500' : 'bg-amber-500'
             }`}
-            title={socket.connected ? 'Connected' : 'Disconnected'}
+            title={
+              socket.connected
+                ? t('status_connected', 'Connected')
+                : t('status_disconnected', 'Disconnected')
+            }
           />
           {!socket.connected && (
             <Button type="button" secondary onClick={socket.reconnect}>
-              Reconnect
+              {t('reconnect', 'Reconnect')}
             </Button>
           )}
           {onReset && (
             <Button type="button" secondary onClick={onReset}>
-              New design
+              {t('new_design', 'New design')}
             </Button>
           )}
           <FullscreenButton />
@@ -308,8 +320,14 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
         {allMessages.length === 0 && !progress && !preview && (
           <div className="text-center text-[14px] text-textColor/50 py-10">
             {(displaySession?.mode ?? mode) === 'prompt'
-              ? 'Your prompt has been sent. The agent will respond here.'
-              : 'Describe what you want to design.'}
+              ? t(
+                  'prompt_sent_agent_will_respond',
+                  'Your prompt has been sent. The agent will respond here.'
+                )
+              : t(
+                  'describe_what_you_want_to_design',
+                  'Describe what you want to design.'
+                )}
           </div>
         )}
 
@@ -350,14 +368,14 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
       <div className="border-t border-studioBorder p-[12px] shrink-0">
         <div className="flex items-end gap-[10px]">
           <label htmlFor="ai-designer-message-input" className="sr-only">
-            Message
+            {t('message', 'Message')}
           </label>
           <textarea
             id="ai-designer-message-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message…"
+            placeholder={t('type_a_message_ellipsis', 'Type a message…')}
             rows={2}
             className="flex-1 min-h-[48px] max-h-[160px] rounded-lg border border-studioBorder bg-newBgColorInner p-3 text-[14px] text-textColor outline-none focus:border-designerAccent resize-none"
           />
@@ -367,7 +385,7 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
             disabled={!input.trim() || !socket.connected}
             onClick={handleSend}
           >
-            Send
+            {t('send', 'Send')}
           </Button>
         </div>
       </div>

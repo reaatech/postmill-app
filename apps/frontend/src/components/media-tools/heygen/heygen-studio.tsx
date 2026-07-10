@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fullscreen-button';
 import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
@@ -29,14 +30,14 @@ const HEYGEN_LANDING = {
 
 type TabKey = 'storyboard' | 'talking-photo' | 'translate' | 'voiceover';
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: 'storyboard', label: 'Storyboard' },
-  { key: 'talking-photo', label: 'Talking Photo' },
-  { key: 'translate', label: 'Translate' },
-  { key: 'voiceover', label: 'Voiceover' },
-];
-
 export function HeyGenStudio() {
+  const t = useT();
+  const TABS: { key: TabKey; label: string }[] = [
+    { key: 'storyboard', label: t('heygen_tab_storyboard', 'Storyboard') },
+    { key: 'talking-photo', label: t('heygen_tab_talking_photo', 'Talking Photo') },
+    { key: 'translate', label: t('heygen_tab_translate', 'Translate') },
+    { key: 'voiceover', label: t('heygen_tab_voiceover', 'Voiceover') },
+  ];
   const { data: status } = useHeygenStatus();
   const configured = status?.configured ?? false;
 
@@ -67,7 +68,7 @@ export function HeyGenStudio() {
       <div className="flex items-center justify-between gap-[10px] px-[16px] h-[52px] border-b border-studioBorder shrink-0">
         <div className="flex items-center gap-[10px] shrink-0">
           <Logo size={22} className="" />
-          <h1 className="text-[15px] font-[600] text-textColor whitespace-nowrap">HeyGen Studio</h1>
+          <h1 className="text-[15px] font-[600] text-textColor whitespace-nowrap">{t('heygen_studio_title', 'HeyGen Studio')}</h1>
         </div>
         <div className="flex items-center gap-[8px] min-w-0">
           <div className="flex items-center gap-[4px] overflow-x-auto">
@@ -112,11 +113,11 @@ export function HeyGenStudio() {
         {/* Render queue */}
         <div className="w-[320px] mobile:w-full shrink-0 border-l mobile:border-l-0 mobile:border-t border-studioBorder flex flex-col min-h-0">
           <div className="flex items-center justify-between px-[14px] h-[44px] border-b border-studioBorder shrink-0">
-            <span className="text-[12px] font-[600] uppercase tracking-wider text-newTableText">Render queue</span>
+            <span className="text-[12px] font-[600] uppercase tracking-wider text-newTableText">{t('studio_render_queue', 'Render queue')}</span>
             <button
               type="button"
               onClick={() => mutateJobs()}
-              aria-label="Refresh queue"
+              aria-label={t('studio_refresh_queue', 'Refresh queue')}
               className="w-[26px] h-[26px] flex items-center justify-center rounded-[6px] text-newTextColor/65 hover:text-textColor hover:bg-boxHover transition-all"
             >
               ⟳
