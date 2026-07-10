@@ -5,6 +5,16 @@ import { Prisma } from '@prisma/client';
 import { stat } from 'fs/promises';
 import { extname, resolve, relative, isAbsolute } from 'path';
 
+// Resolve a (possibly user-influenced) path and confine it to `root`, returning the
+// resolved path only when it stays inside the root (else null). The containment test is a
+// `path.relative` escape check — the sanitizer shape CodeQL's js/path-injection query
+// recognizes — and callers must feed the RETURNED value into fs sinks, never the raw input.
+const confineToRoot = (root: string, p: string): string | null => {
+  const resolved = resolve(p);
+  const rel = relative(root, resolved);
+  return rel && !rel.startsWith('..') && !isAbsolute(rel) ? resolved : null;
+};
+
 const MIME_MAP: Record<string, string> = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -93,21 +103,16 @@ export class FileRepository {
     // Only stat paths inside the configured upload root. Cloud adapters return
     // public URLs (https://…) where stat() will fail; the caller must supply fileSize.
     const uploadRoot = resolve(process.env.UPLOAD_DIRECTORY || './uploads');
-    const resolved = resolve(filePath);
-    // Confine to the upload root via a `path.relative` escape check — the sanitizer shape
-    // CodeQL's js/path-injection query recognizes. rel==='' (path IS the root), starts with
-    // '..' (escapes the root), or is absolute (different drive) ⇒ outside ⇒ skip the stat.
-    const rel = relative(uploadRoot, resolved);
-    const insideRoot = !!rel && !rel.startsWith('..') && !isAbsolute(rel);
-    if (resolvedFileSize === 0 && insideRoot) {
+    const safePath = confineToRoot(uploadRoot, filePath);
+    if (resolvedFileSize === 0 && safePath) {
       try {
-        const s = await stat(resolved);
+        const s = await stat(safePath);
         resolvedFileSize = s.size;
 
         if (IMAGE_EXTS.has(extname(fileName).toLowerCase())) {
           try {
             const sharp = (await import('sharp')).default;
-            const metadata = await sharp(resolved).metadata();
+            const metadata = await sharp(safePath).metadata();
             meta.dimensions = { width: metadata.width, height: metadata.height };
           } catch {
           }
