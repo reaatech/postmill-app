@@ -6,7 +6,7 @@ import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encrypti
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
@@ -36,7 +36,11 @@ export class StorageService {
     private _auditService: AuditService,
     private _encryptionService: EncryptionService,
     private _resolution: ProviderResolutionService,
-    private _subscriptionService: SubscriptionService,
+    // layering: sanctioned leaf-read — reading the subscription through
+    // SubscriptionService would close a DI cycle (IntegrationService → StorageService →
+    // SubscriptionService → IntegrationService, the last edge already forwardRef'd), which
+    // crashes Nest at boot. The repository is a pure leaf with no back-edge, so read it directly.
+    private _subscriptionRepository: SubscriptionRepository,
     private _fileRepository: FileRepository,
   ) {}
 
@@ -453,7 +457,7 @@ export class StorageService {
     }
 
     const subscription =
-      await this._subscriptionService.getSubscriptionByOrganizationId(orgId);
+      await this._subscriptionRepository.getSubscriptionByOrganizationId(orgId);
     const tier = subscription?.subscriptionTier || 'STARTER';
     const plan = pricing[tier] ?? pricing['STARTER'];
     const capBytes =
