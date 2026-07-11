@@ -27,10 +27,12 @@ const ctx = (over: Partial<SettingsGateCtx>): SettingsGateCtx => ({
 });
 
 describe('settings nav config', () => {
-  it('every href is unique and under /settings/', () => {
+  it('every href is unique and either under /settings/ or the campaigns shortcut', () => {
     const hrefs = SETTINGS_NAV.map((i) => i.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
-    for (const h of hrefs) expect(h.startsWith('/settings/')).toBe(true);
+    for (const h of hrefs) {
+      expect(h.startsWith('/settings/') || h === '/campaigns').toBe(true);
+    }
   });
 
   it('has no standalone roles item (folded into Team)', () => {
@@ -60,19 +62,24 @@ describe('settings nav config', () => {
     }
   });
 
-  it('team gate requires the team_members tier and isGeneral', () => {
+  it('team gate requires a multi-seat plan (team_members > 1) and isGeneral', () => {
     const gate = item('team').gate!;
-    expect(gate(ctx({ user: { tier: { team_members: true } }, isGeneral: true }))).toBe(true);
-    expect(gate(ctx({ user: { tier: { team_members: true } }, isGeneral: false }))).toBe(false);
+    // Multi-seat plan (e.g. Pro=3) shows Team management.
+    expect(gate(ctx({ user: { tier: { team_members: 3 } }, isGeneral: true }))).toBe(true);
+    expect(gate(ctx({ user: { tier: { team_members: 3 } }, isGeneral: false }))).toBe(false);
+    // Starter (1 seat = owner only) must NOT show Team management.
+    expect(gate(ctx({ user: { tier: { team_members: 1 } }, isGeneral: true }))).toBe(false);
     expect(gate(ctx({ user: { tier: {} } }))).toBe(false);
     expect(gate(ctx({ user: undefined }))).toBe(false);
   });
 
-  it('webhooks/autopost gates require their tier flags', () => {
+  it('webhooks gate requires its tier flag and autopost is always visible', () => {
     expect(item('webhooks').gate!(ctx({ user: { tier: { webhooks: true } } }))).toBe(true);
     expect(item('webhooks').gate!(ctx({ user: { tier: {} } }))).toBe(false);
+    // Auto Post was moved out of the tier gate during the subscription revamp
+    // and is now available to every org.
     expect(item('autopost').gate!(ctx({ user: { tier: { autoPost: true } } }))).toBe(true);
-    expect(item('autopost').gate!(ctx({ user: { tier: {} } }))).toBe(false);
+    expect(item('autopost').gate!(ctx({ user: { tier: {} } }))).toBe(true);
   });
 
   it('broadcast gate requires notifications:manage', () => {
@@ -81,11 +88,11 @@ describe('settings nav config', () => {
     expect(gate(ctx({ permissions: { hasPermission: () => false } }))).toBe(false);
   });
 
-  it('developers gate requires public_api + isGeneral + showLogout', () => {
+  it('developers gate requires api + isGeneral + showLogout', () => {
     const gate = item('developers').gate!;
-    expect(gate(ctx({ user: { tier: { public_api: true } }, isGeneral: true, showLogout: true }))).toBe(true);
-    expect(gate(ctx({ user: { tier: { public_api: true } }, isGeneral: true, showLogout: false }))).toBe(false);
-    expect(gate(ctx({ user: { tier: { public_api: true } }, isGeneral: false, showLogout: true }))).toBe(false);
+    expect(gate(ctx({ user: { tier: { api: true } }, isGeneral: true, showLogout: true }))).toBe(true);
+    expect(gate(ctx({ user: { tier: { api: true } }, isGeneral: true, showLogout: false }))).toBe(false);
+    expect(gate(ctx({ user: { tier: { api: true } }, isGeneral: false, showLogout: true }))).toBe(false);
     expect(gate(ctx({ user: { tier: {} }, isGeneral: true, showLogout: true }))).toBe(false);
   });
 });

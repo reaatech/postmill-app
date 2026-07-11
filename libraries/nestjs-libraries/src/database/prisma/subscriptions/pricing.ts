@@ -1,113 +1,134 @@
-export interface PricingInnerInterface {
-  current: string;
+export interface PlanInterface {
+  current: 'STARTER' | 'PRO' | 'TEAM' | 'AGENCY';
   month_price: number;
   year_price: number;
-  channel?: number;
+  channel: number;
   posts_per_month: number;
-  team_members: boolean;
-  community_features: boolean;
-  featured_by_gitroom: boolean;
-  ai: boolean;
-  import_from_channels: boolean;
-  image_generator?: boolean;
-  image_generation_count: number;
-  generate_videos: number;
-  public_api: boolean;
+  team_members: number;
+  brand_kits: number;
+  campaigns: boolean;
+  api: boolean;
+  mcp: boolean;
   webhooks: number;
-  autoPost: boolean;
+  competitors: number;
+  analytics_retention_days: number;
+  video_exports: number;
+  storage_gb: number;
+  byo_storage: boolean;
+  priority: boolean;
 }
+
 export interface PricingInterface {
-  [key: string]: PricingInnerInterface;
+  [key: string]: PlanInterface;
 }
+
+export const SELF_HOST_PLAN = 'AGENCY';
+
+export type AddonType = 'storage' | 'video_exports';
+
+export const ADDONS = {
+  storage: {
+    priceCents: 1900,
+    productName: 'Postmill Extra Storage',
+    packSizeEnv: 'ADDON_STORAGE_GB_PER_PACK',
+    defaultPackSize: 25,
+  },
+  video_exports: {
+    priceCents: 1900,
+    productName: 'Postmill Extra Video Exports',
+    packSizeEnv: 'ADDON_VIDEO_EXPORTS_PER_PACK',
+    defaultPackSize: 50,
+  },
+} as const satisfies Record<
+  AddonType,
+  {
+    priceCents: number;
+    productName: string;
+    packSizeEnv: string;
+    defaultPackSize: number;
+  }
+>;
+
+export function addonPackSize(type: AddonType): number {
+  const { packSizeEnv, defaultPackSize } = ADDONS[type];
+  return Number(process.env[packSizeEnv] || defaultPackSize);
+}
+
 export const pricing: PricingInterface = {
-  FREE: {
-    current: 'FREE',
-    month_price: 0,
-    year_price: 0,
-    channel: 0,
-    image_generation_count: 0,
-    posts_per_month: 0,
-    team_members: false,
-    community_features: true,
-    featured_by_gitroom: false,
-    ai: false,
-    import_from_channels: false,
-    image_generator: false,
-    public_api: false,
-    webhooks: 0,
-    autoPost: false,
-    generate_videos: 0,
-  },
-  STANDARD: {
-    current: 'STANDARD',
-    month_price: 29,
-    year_price: 278,
-    channel: 5,
-    posts_per_month: 400,
-    image_generation_count: 20,
-    team_members: false,
-    ai: true,
-    community_features: true,
-    featured_by_gitroom: false,
-    import_from_channels: true,
-    image_generator: false,
-    public_api: true,
-    webhooks: 2,
-    autoPost: false,
-    generate_videos: 3,
-  },
-  TEAM: {
-    current: 'TEAM',
-    month_price: 39,
-    year_price: 374,
-    channel: 10,
-    posts_per_month: 1000000,
-    image_generation_count: 100,
-    community_features: true,
-    team_members: true,
-    featured_by_gitroom: true,
-    ai: true,
-    import_from_channels: true,
-    image_generator: true,
-    public_api: true,
-    webhooks: 10,
-    autoPost: true,
-    generate_videos: 10,
+  STARTER: {
+    current: 'STARTER',
+    month_price: 9,
+    year_price: 90,
+    channel: 3,
+    posts_per_month: 100,
+    team_members: 1,
+    brand_kits: 0,
+    campaigns: false,
+    api: false,
+    mcp: false,
+    webhooks: 1,
+    competitors: 1,
+    analytics_retention_days: 180,
+    video_exports: 15,
+    storage_gb: 1,
+    byo_storage: false,
+    priority: false,
   },
   PRO: {
     current: 'PRO',
-    month_price: 49,
-    year_price: 470,
+    month_price: 29,
+    year_price: 290,
+    channel: 10,
+    posts_per_month: 1000000,
+    team_members: 3,
+    brand_kits: 2,
+    campaigns: true,
+    api: true,
+    mcp: true,
+    webhooks: 5,
+    competitors: 5,
+    analytics_retention_days: 548,
+    video_exports: 60,
+    storage_gb: 5,
+    byo_storage: false,
+    priority: false,
+  },
+  TEAM: {
+    current: 'TEAM',
+    month_price: 99,
+    year_price: 990,
     channel: 30,
     posts_per_month: 1000000,
-    image_generation_count: 300,
-    community_features: true,
-    team_members: true,
-    featured_by_gitroom: true,
-    ai: true,
-    import_from_channels: true,
-    image_generator: true,
-    public_api: true,
-    webhooks: 30,
-    autoPost: true,
-    generate_videos: 30,
+    team_members: 10,
+    brand_kits: 10,
+    campaigns: true,
+    api: true,
+    mcp: true,
+    webhooks: 20,
+    competitors: 20,
+    analytics_retention_days: 548,
+    video_exports: 200,
+    storage_gb: 20,
+    byo_storage: true,
+    priority: false,
   },
-  ULTIMATE: {
-    current: 'ULTIMATE',
-    month_price: 99,
-    year_price: 950,
+  AGENCY: {
+    current: 'AGENCY',
+    month_price: 249,
+    year_price: 2490,
     channel: 100,
     posts_per_month: 1000000,
-    image_generation_count: 500,
-    community_features: true,
-    team_members: true,
-    featured_by_gitroom: true,
-    ai: true,
-    import_from_channels: true,
-    image_generator: true,
-    public_api: true,
-    webhooks: 10000,
-    autoPost: true,
-    generate_videos: 60,
+    team_members: 25,
+    brand_kits: 1000000,
+    campaigns: true,
+    api: true,
+    mcp: true,
+    webhooks: 1000000,
+    competitors: 50,
+    analytics_retention_days: 548,
+    video_exports: 600,
+    storage_gb: 100,
+    byo_storage: true,
+    priority: true,
   },
 };

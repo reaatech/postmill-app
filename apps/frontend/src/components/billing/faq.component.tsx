@@ -25,18 +25,18 @@ const useFaqList = () => {
       : []),
     {
       title: t(
-        'faq_can_i_trust_postiz_gitroom',
+        'faq_can_i_trust_postmill',
         `Can I trust Postmill?`
       ),
       description: t(
-        'faq_postiz_gitroom_is_proudly_open_source',
-        `Postmill is proudly open-source! We believe in an ethical and transparent culture, meaning that Postmill will live forever. You can check out the entire code or use it for personal projects. To view the open-source repository, <a href="https://github.com/gitroomhq/postiz-app" target="_blank" style="text-decoration: underline;">click here</a>.`
+        'faq_postmill_is_proudly_open_source',
+        `Postmill is proudly open-source! We believe in an ethical and transparent culture, meaning that Postmill will live forever. You can check out the entire code or use it for personal projects. To view the open-source repository, <a href="https://github.com/reaatech/postmill-app" target="_blank" style="text-decoration: underline;">click here</a>.`
       ),
     },
     {
       title: t('faq_what_are_channels', 'What are channels?'),
       description: t(
-        'faq_postiz_gitroom_allows_you_to_schedule_posts',
+        'faq_postmill_allows_you_to_schedule_posts',
         `Postmill allows you to schedule your posts between different channels.
 A channel is a publishing platform where you can schedule your posts.
 For example, you can schedule your posts on X, Facebook, Instagram, TikTok, YouTube, Reddit, Linkedin, Dribbble, Threads and Pinterest.`
@@ -64,6 +64,14 @@ export const FAQSection: FC<{
     <div
       className="bg-newBgColorInner p-[24px] border border-newTableBorder rounded-[8px] flex flex-col"
       onClick={changeShow}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          changeShow();
+        }
+      }}
+      role="button"
+      tabIndex={0}
     >
       <div className={`text-[20px] cursor-pointer flex justify-center`}>
         <div className="flex-1">{title}</div>

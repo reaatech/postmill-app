@@ -7,7 +7,7 @@ import { Autopost } from '@gitroom/frontend/components/autopost/autopost';
 export default function Page() {
   const user = useUser();
   return (
-    <SettingsGate allow={user ? !!user.tier?.autoPost : undefined}>
+    <SettingsGate allow={user ? !!user.tier : undefined}>
       <Autopost />
     </SettingsGate>
   );

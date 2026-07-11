@@ -188,10 +188,10 @@ export const CommentInbox: FC = () => {
           </svg>
         </div>
         <p className="text-textColor text-[14px] font-medium mb-[8px]">
-          {t('comment_inbox.upgrade_required', 'Replies not available on your current plan')}
+          {t('comment_inbox.upgrade_required', 'The reply inbox is a Pro, Team, and Agency feature')}
         </p>
         <p className="text-newTableText text-[12px] mb-[16px] max-w-[360px]">
-          {t('comment_inbox.upgrade_description', 'Upgrade your plan to access the unified reply inbox across all your social channels.')}
+          {t('comment_inbox.upgrade_description', 'Upgrade your plan to manage and reply to comments across all your social channels in one place.')}
         </p>
         <a
           href="/billing"

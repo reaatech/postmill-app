@@ -301,7 +301,7 @@ export const TaggedItemsPanels: FC<{
   // Signatures: no dedicated RBAC resource — the Settings → Content → Signatures
   // tab is tier-gated (non-FREE), so eligible members jump there; everyone else
   // gets a read-only info modal with the signature's content preview.
-  const canManageSignatures = user?.tier?.current !== 'FREE';
+  const canManageSignatures = user?.tier?.current !== 'STARTER';
   const openSignature = useCallback(
     (item: ResolvedCampaignItem) => {
       if (canManageSignatures) {

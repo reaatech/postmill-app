@@ -194,7 +194,10 @@ export class DesignController {
   }
 
   @Post('/render-video')
-  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.MEDIA],
+    [AuthorizationActions.Create, Sections.VIDEO_EXPORTS]
+  )
   @RequirePermission('media', 'create')
   async renderVideo(
     @GetOrgFromRequest() org: Organization,

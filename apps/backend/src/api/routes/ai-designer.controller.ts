@@ -7,11 +7,6 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import {
-  AuthorizationActions,
-  Sections,
-} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
@@ -25,7 +20,6 @@ export class AiDesignerController {
   constructor(private readonly _service: AiDesignerService) {}
 
   @Get('/sessions')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @RequirePermission('media', 'create')
   async listSessions(
     @GetOrgFromRequest() org: Organization,
@@ -50,7 +44,6 @@ export class AiDesignerController {
   }
 
   @Get('/sessions/:id')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @RequirePermission('media', 'create')
   async getSession(
     @Param('id') id: string,
@@ -69,7 +62,6 @@ export class AiDesignerController {
   }
 
   @Delete('/sessions/:id')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @RequirePermission('media', 'create')
   async deleteSession(
     @Param('id') id: string,

@@ -8,17 +8,14 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { ReplicateCatalogService } from './replicate-catalog.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
-import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { estimate } from './replicate-cost';
 import { isWarm, MODEL_ALLOWLIST } from './replicate-catalog.allowlist';
 import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
 import { renderWorkDir } from '@gitroom/nestjs-libraries/media/design-render/render-job-spec';
 import * as fs from 'fs';
-import { Organization } from '@prisma/client';
 
 const BASE = 'https://api.replicate.com/v1';
 
@@ -73,11 +70,9 @@ export class ReplicateRunnerService {
     private readonly _catalog: ReplicateCatalogService,
     private readonly _aiSettings: AiSettingsService,
     private readonly _lifecycle: MediaJobLifecycleService,
-    private readonly _subscription: SubscriptionService,
     private readonly _storage: StorageService,
     private readonly _orgMediaProviderSettings: OrgMediaProviderSettingsService,
     private readonly _fileService: FileService,
-    private readonly _organizationService: OrganizationService,
     private readonly _videoRender: VideoRenderService,
   ) {}
 
@@ -240,18 +235,14 @@ export class ReplicateRunnerService {
   }
 
   private async _withCredit<T>(
-    orgId: string,
-    creditType: string | undefined,
+    _orgId: string,
+    _creditType: string | undefined,
     fn: () => Promise<T>,
   ): Promise<T> {
-    if (!creditType) {
-      return fn();
-    }
-    const org = await this._organizationService.getOrgById(orgId);
-    if (!org) {
-      throw new ForbiddenException('Organization not found');
-    }
-    return this._subscription.useCredit(org as Organization, creditType, fn);
+    // Postmill BYOK model: Replicate media generation is unlimited and no longer
+    // consumes platform credits. creditType is preserved in the job row for
+    // observability only.
+    return fn();
   }
 
   async runSync(

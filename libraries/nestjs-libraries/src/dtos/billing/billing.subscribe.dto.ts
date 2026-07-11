@@ -4,8 +4,8 @@ export class BillingSubscribeDto {
   @IsIn(['MONTHLY', 'YEARLY'])
   period: 'MONTHLY' | 'YEARLY';
 
-  @IsIn(['STANDARD', 'PRO', 'TEAM', 'ULTIMATE'])
-  billing: 'STANDARD' | 'PRO' | 'TEAM' | 'ULTIMATE';
+  @IsIn(['STARTER', 'PRO', 'TEAM', 'AGENCY'])
+  billing: 'STARTER' | 'PRO' | 'TEAM' | 'AGENCY';
 
   // Optional analytics/attribution fields the frontend always sends (utm string from
   // useUtmUrl, dub click id, datafast cookies). Declare them so the global

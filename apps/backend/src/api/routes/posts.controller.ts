@@ -93,7 +93,6 @@ export class PostsController {
   }
 
   @Post('/should-shortlink')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   async shouldShortlink(
     @GetOrgFromRequest() org: Organization,
@@ -381,7 +380,6 @@ export class PostsController {
   }
 
   @Post('/separate-posts')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   async separatePosts(
     @GetOrgFromRequest() org: Organization,

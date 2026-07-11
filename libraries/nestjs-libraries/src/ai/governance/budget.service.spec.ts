@@ -2,9 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGroupBy = vi.fn().mockResolvedValue([]);
 const mockCreateSpendLog = vi.fn().mockResolvedValue(undefined);
-const mockFindUnique = vi.fn().mockResolvedValue(null);
-const mockCheckCredits = vi.fn().mockResolvedValue({ credits: 100, remaining: 100 });
-
 const mockGetSettings = vi.fn().mockResolvedValue(null);
 
 vi.mock('@gitroom/nestjs-libraries/ai/ai-settings.manager', () => ({
@@ -19,9 +16,9 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
   },
 }));
 
-vi.mock('@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service', () => ({
-  SubscriptionService: class MockSub {
-    checkCredits = mockCheckCredits;
+vi.mock('@gitroom/nestjs-libraries/database/prisma/notifications/notification.service', () => ({
+  NotificationService: class MockNotifications {
+    notifyBudgetThreshold = vi.fn().mockResolvedValue(undefined);
   },
 }));
 
@@ -35,10 +32,10 @@ vi.mock('@reaatech/agent-budget-pricing', () => ({
 import { BudgetService } from './budget.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 
 const mockSpendLogRepo = { model: { aISpendLog: { groupBy: mockGroupBy } } };
-const mockOrgRepo = { model: { organization: { findUnique: mockFindUnique } } };
+const mockNotificationService = { notifyBudgetThreshold: vi.fn().mockResolvedValue(undefined) };
 
 describe('BudgetService', () => {
   let service: BudgetService;
@@ -47,9 +44,8 @@ describe('BudgetService', () => {
     return new BudgetService(
       new (AiSettingsManager as any)(),
       new (AiSettingsService as any)(),
-      new (SubscriptionService as any)(),
       mockSpendLogRepo as any,
-      mockOrgRepo as any,
+      mockNotificationService as any,
     );
   }
 
@@ -57,8 +53,6 @@ describe('BudgetService', () => {
     vi.clearAllMocks();
     mockGroupBy.mockResolvedValue([]);
     mockGetSettings.mockResolvedValue(null);
-    mockFindUnique.mockResolvedValue(null);
-    mockCheckCredits.mockResolvedValue({ credits: 100, remaining: 100 });
     service = freshService();
   });
 
@@ -82,7 +76,7 @@ describe('BudgetService', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('returns allowed:true when spend is under the global monthly cap', async () => {
+    it('returns allowed:true even when a global monthly cap is configured', async () => {
       mockGetSettings.mockResolvedValue({
         budgetSettings: { monthlyCap: 100 },
       });
@@ -91,7 +85,7 @@ describe('BudgetService', () => {
       expect(result.allowed).toBe(true);
     });
 
-    it('blocks when global monthly cap is exceeded', async () => {
+    it('returns allowed:true even when spend is over the global monthly cap', async () => {
       mockGetSettings.mockResolvedValue({
         budgetSettings: { monthlyCap: 100 },
       });
@@ -103,99 +97,10 @@ describe('BudgetService', () => {
 
       service = freshService();
       const result = await service.checkBudget('utility', 'org-1');
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Global monthly cap');
+      expect(result.allowed).toBe(true);
     });
 
-    it('blocks when global daily cap is exceeded', async () => {
-      mockGetSettings.mockResolvedValue({
-        budgetSettings: { dailyCap: 10 },
-      });
-      mockGroupBy
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { organizationId: 'org-1', scope: 'utility', _sum: { costUsd: 50 } },
-        ]);
-
-      service = freshService();
-      const result = await service.checkBudget('utility', 'org-1');
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Global daily cap');
-    });
-
-    it('blocks when per-org monthly cap is exceeded', async () => {
-      mockGetSettings.mockResolvedValue({
-        budgetSettings: {
-          perOrgCaps: { 'org-1': { monthly: 50 } },
-        },
-      });
-      mockGroupBy
-        .mockResolvedValueOnce([
-          { organizationId: 'org-1', scope: 'utility', _sum: { costUsd: 80 } },
-        ])
-        .mockResolvedValueOnce([]);
-
-      service = freshService();
-      const result = await service.checkBudget('utility', 'org-1');
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Org monthly cap');
-    });
-
-    it('blocks when per-org daily cap is exceeded', async () => {
-      mockGetSettings.mockResolvedValue({
-        budgetSettings: {
-          perOrgCaps: { 'org-1': { daily: 5 } },
-        },
-      });
-      mockGroupBy
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { organizationId: 'org-1', scope: 'utility', _sum: { costUsd: 20 } },
-        ]);
-
-      service = freshService();
-      const result = await service.checkBudget('utility', 'org-1');
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Org daily cap');
-    });
-
-    it('blocks when per-scope monthly cap is exceeded', async () => {
-      mockGetSettings.mockResolvedValue({
-        budgetSettings: {
-          scopeCaps: { utility: { monthly: 30 } },
-        },
-      });
-      mockGroupBy
-        .mockResolvedValueOnce([
-          { organizationId: 'org-1', scope: 'utility', _sum: { costUsd: 50 } },
-        ])
-        .mockResolvedValueOnce([]);
-
-      service = freshService();
-      const result = await service.checkBudget('utility', 'org-1');
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Scope "utility" monthly cap');
-    });
-
-    it('blocks when per-scope daily cap is exceeded', async () => {
-      mockGetSettings.mockResolvedValue({
-        budgetSettings: {
-          scopeCaps: { utility: { daily: 5 } },
-        },
-      });
-      mockGroupBy
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          { organizationId: 'org-1', scope: 'utility', _sum: { costUsd: 10 } },
-        ]);
-
-      service = freshService();
-      const result = await service.checkBudget('utility', 'org-1');
-      expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('Scope "utility" daily cap');
-    });
-
-    it('allows when no organizationId is provided and only per-org caps exist', async () => {
+    it('returns allowed:true when no organizationId is provided', async () => {
       mockGetSettings.mockResolvedValue({
         budgetSettings: {
           perOrgCaps: { 'org-1': { monthly: 1 } },
@@ -325,118 +230,298 @@ describe('BudgetService', () => {
     });
   });
 
-  describe('checkMediaCredits', () => {
-    it('returns allowed:false with remaining:0 when org not found', async () => {
-      mockFindUnique.mockResolvedValue(null);
-      service = freshService();
-      const result = await service.checkMediaCredits('nonexistent-org', 'ai_images');
-      expect(result.allowed).toBe(false);
-      expect(result.remaining).toBe(0);
-    });
-
-    it('returns allowed:true with positive remaining when credits exist', async () => {
-      mockFindUnique.mockResolvedValue({
-        id: 'org-1',
-        subscription: { credits: 100 },
+  describe('cost resolution (_resolveCost / pricing engine)', () => {
+    it('falls back to the caller cost when the pricing engine throws', async () => {
+      mockComputeCost.mockImplementation(() => {
+        throw new Error('pricing boom');
       });
-      mockCheckCredits.mockResolvedValue({ credits: 50, remaining: 50 });
-
-      service = freshService();
-      const result = await service.checkMediaCredits('org-1', 'ai_images');
-      expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(50);
-      expect(mockCheckCredits).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'org-1' }),
-        'ai_images',
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 100,
+        outputTokens: 50,
+        costUsd: 0,
+      });
+      expect(mockComputeCost).toHaveBeenCalled();
+      // computeCost threw → cost stays at the caller-supplied 0
+      expect(mockCreateSpendLog).toHaveBeenCalledWith(
+        expect.objectContaining({ costUsd: 0 }),
       );
     });
 
-    it('returns allowed:false with remaining:0 when credits are zero', async () => {
-      mockFindUnique.mockResolvedValue({
-        id: 'org-1',
-        subscription: { credits: 0 },
+    it('falls back to the caller cost when the pricing engine returns a non-number', async () => {
+      mockComputeCost.mockReturnValue('not-a-number' as any);
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 100,
+        outputTokens: 50,
+        costUsd: 0,
       });
-      mockCheckCredits.mockResolvedValue({ credits: 0, remaining: 0 });
-
-      service = freshService();
-      const result = await service.checkMediaCredits('org-1', 'ai_videos');
-      expect(result.allowed).toBe(false);
-      expect(result.remaining).toBe(0);
-    });
-
-    it('caches the org lookup within TTL', async () => {
-      mockFindUnique.mockResolvedValue({
-        id: 'org-1',
-        subscription: { credits: 100 },
-      });
-      mockCheckCredits.mockResolvedValue({ credits: 50, remaining: 50 });
-
-      service = freshService();
-      await service.checkMediaCredits('org-1', 'ai_images');
-      await service.checkMediaCredits('org-1', 'ai_images');
-
-      expect(mockFindUnique).toHaveBeenCalledTimes(1);
-      expect(mockCheckCredits).toHaveBeenCalledTimes(2);
-    });
-
-    it('caches org lookups independently per organization', async () => {
-      mockFindUnique
-        .mockResolvedValueOnce({ id: 'org-1', subscription: { credits: 100 } })
-        .mockResolvedValueOnce({ id: 'org-2', subscription: { credits: 100 } });
-      mockCheckCredits.mockResolvedValue({ credits: 50, remaining: 50 });
-
-      service = freshService();
-      await service.checkMediaCredits('org-1', 'ai_images');
-      await service.checkMediaCredits('org-2', 'ai_images');
-      await service.checkMediaCredits('org-1', 'ai_images');
-
-      expect(mockFindUnique).toHaveBeenCalledTimes(2);
-      expect(mockFindUnique).toHaveBeenNthCalledWith(1, expect.objectContaining({
-        where: { id: 'org-1' },
-      }));
-      expect(mockFindUnique).toHaveBeenNthCalledWith(2, expect.objectContaining({
-        where: { id: 'org-2' },
-      }));
-      expect(mockCheckCredits).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ id: 'org-2' }),
-        'ai_images',
+      expect(mockCreateSpendLog).toHaveBeenCalledWith(
+        expect.objectContaining({ costUsd: 0 }),
       );
     });
 
-    it('supports ai_videos credit type', async () => {
-      mockFindUnique.mockResolvedValue({
-        id: 'org-1',
-        subscription: { credits: 100 },
+    it('falls back to the caller cost when the pricing engine returns a negative number', async () => {
+      mockComputeCost.mockReturnValue(-5);
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 100,
+        outputTokens: 50,
+        costUsd: 0,
       });
-      mockCheckCredits.mockResolvedValue({ credits: 10, remaining: 10 });
-
-      service = freshService();
-      const result = await service.checkMediaCredits('org-1', 'ai_videos');
-      expect(mockCheckCredits).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'org-1' }),
-        'ai_videos',
+      expect(mockCreateSpendLog).toHaveBeenCalledWith(
+        expect.objectContaining({ costUsd: 0 }),
       );
-      expect(result.allowed).toBe(true);
-      expect(result.remaining).toBe(10);
+    });
+
+    it('reuses the cached pricing engine across calls', async () => {
+      mockComputeCost.mockReturnValue(0.5);
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 10,
+        outputTokens: 10,
+        costUsd: 0,
+      });
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 10,
+        outputTokens: 10,
+        costUsd: 0,
+      });
+      expect(mockComputeCost).toHaveBeenCalledTimes(2);
     });
   });
 
-  describe('clearSubCache', () => {
-    it('clears the subscription cache', async () => {
-      mockFindUnique.mockResolvedValue({
-        id: 'org-1',
-        subscription: { credits: 100 },
+  describe('budget alerts (threshold firing + dedupe)', () => {
+    it('fires a global-monthly budget alert once when crossing the 80% threshold', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: { monthlyCap: 100 },
       });
-      mockCheckCredits.mockResolvedValue({ credits: 50, remaining: 50 });
-
       service = freshService();
-      await service.checkMediaCredits('org-1', 'ai_images');
-      expect(mockFindUnique).toHaveBeenCalledTimes(1);
 
-      service.clearSubCache();
-      await service.checkMediaCredits('org-1', 'ai_images');
-      expect(mockFindUnique).toHaveBeenCalledTimes(2);
+      // globalMonthly starts at 0 (empty ledger); a single $80 spend hits 80% of $100.
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 80,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledTimes(1);
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledWith(
+        'org-1',
+        'utility',
+        80,
+      );
+
+      // A second spend crosses again but the alert key is already fired → no re-notify.
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 10,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not fire a global-monthly alert below the threshold', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: { monthlyCap: 100 },
+      });
+      service = freshService();
+
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 50,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).not.toHaveBeenCalled();
+    });
+
+    it('honors a custom alertThresholdPct', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: { monthlyCap: 100, alertThresholdPct: 0.5 },
+      });
+      service = freshService();
+
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 50,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledTimes(1);
+    });
+
+    it('fires a per-org monthly alert, normalizing a percent-style threshold (>1)', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: {
+          perOrgCaps: { 'org-1': { monthly: 100, alertThresholdPct: 80 } },
+        },
+      });
+      service = freshService();
+
+      // rawOrgThreshold 80 > 1 → normalized to 0.8; $80 hits the per-org alert.
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 80,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledWith(
+        'org-1',
+        'utility',
+        80,
+      );
+    });
+
+    it('fires a per-org monthly alert using the default (sub-1) threshold and pre-existing ledger spend', async () => {
+      // Seed the accumulator from the DB: org-1 already spent $40 this month/day.
+      mockGroupBy
+        .mockResolvedValueOnce([
+          { organizationId: 'org-1', scope: 'utility', _sum: { costUsd: 40 } },
+        ])
+        .mockResolvedValueOnce([
+          { organizationId: 'org-1', scope: 'utility', _sum: { costUsd: 40 } },
+        ]);
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: {
+          perOrgCaps: { 'org-1': { monthly: 100 } },
+        },
+      });
+      service = freshService();
+
+      // 40 (ledger) + 40 (this spend) = 80 ≥ 100 * 0.8 default → fires.
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 40,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledWith(
+        'org-1',
+        'utility',
+        80,
+      );
+    });
+
+    it('fires a global daily-cap alert when exceeded', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: { dailyCap: 50 },
+      });
+      service = freshService();
+
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 50,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledWith(
+        'org-1',
+        'daily_cap',
+        100,
+      );
+    });
+
+    it('fires a per-org daily-cap alert when exceeded', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: {
+          perOrgCaps: { 'org-1': { daily: 25 } },
+        },
+      });
+      service = freshService();
+
+      await service.recordSpend({
+        organizationId: 'org-1',
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 25,
+      });
+      expect(mockNotificationService.notifyBudgetThreshold).toHaveBeenCalledWith(
+        'org-1',
+        'daily_cap',
+        100,
+      );
+    });
+
+    it('does not notify when a cap is crossed but no organizationId is present', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: { monthlyCap: 100 },
+      });
+      service = freshService();
+
+      await service.recordSpend({
+        provider: 'openai',
+        model: 'gpt-4.1',
+        scope: 'utility',
+        inputTokens: 0,
+        outputTokens: 0,
+        costUsd: 80,
+      });
+      // global-monthly threshold crossed and logged, but notify is org-gated.
+      expect(mockNotificationService.notifyBudgetThreshold).not.toHaveBeenCalled();
+    });
+
+    it('swallows a NotificationService failure without throwing', async () => {
+      mockGetSettings.mockResolvedValue({
+        budgetSettings: { monthlyCap: 100 },
+      });
+      mockNotificationService.notifyBudgetThreshold.mockRejectedValueOnce(
+        new Error('notify down'),
+      );
+      service = freshService();
+
+      await expect(
+        service.recordSpend({
+          organizationId: 'org-1',
+          provider: 'openai',
+          model: 'gpt-4.1',
+          scope: 'utility',
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: 80,
+        }),
+      ).resolves.toBeUndefined();
     });
   });
 });

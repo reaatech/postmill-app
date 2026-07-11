@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // The controller module imports the shared ioRedis client at load time; stub it so
 // importing the controller never opens a real Redis connection.
@@ -14,7 +14,7 @@ import { DefaultNotConfiguredError } from '@gitroom/nestjs-libraries/ai/defaults
 
 const org = { id: 'org-1' } as any;
 
-function build(defaultsOverride: Record<string, any> = {}, credits = 100, budgetAllowed = true) {
+function build(defaultsOverride: Record<string, any> = {}) {
   const aiDefaults = {
     imageToImage: vi.fn().mockResolvedValue('https://cdn/out.png'),
     textToImage: vi.fn().mockResolvedValue('https://cdn/gen.png'),
@@ -27,14 +27,7 @@ function build(defaultsOverride: Record<string, any> = {}, credits = 100, budget
     imageSlide: vi.fn().mockResolvedValue('https://cdn/slide.mp4'),
     ...defaultsOverride,
   };
-  const subscription = { checkCredits: vi.fn().mockResolvedValue({ credits }) };
-  const budget = { checkBudget: vi.fn().mockResolvedValue({ allowed: budgetAllowed, reason: 'over' }) };
   const aiMediaService = {
-    checkMediaBudget: vi.fn().mockImplementation(async () => {
-      if (!budgetAllowed) {
-        throw { status: HttpStatus.TOO_MANY_REQUESTS, response: { error: 'AI budget exceeded' } };
-      }
-    }),
     urlToBase64Image: vi.fn().mockResolvedValue('data:image/png;base64,abc'),
     saveUrlToFile: vi.fn().mockResolvedValue({
       id: 'file-1',
@@ -47,13 +40,11 @@ function build(defaultsOverride: Record<string, any> = {}, credits = 100, budget
     aiMediaService as any,
     {} as any, // _defaultsResolution
     {} as any, // _fileService
-    subscription as any,
     {} as any, // _storageService
     {} as any, // _stockMediaService
-    {} as any, // _brandsService
-    budget as any
+    {} as any // _brandsService
   );
-  return { controller, aiDefaults, subscription, budget, aiMediaService };
+  return { controller, aiDefaults, aiMediaService };
 }
 
 afterEach(() => {
@@ -62,7 +53,7 @@ afterEach(() => {
 });
 
 describe('MediaController — Designer AI-media routes', () => {
-  describe('transform family (source asset, no Stripe short-circuit)', () => {
+  describe('transform family', () => {
     it('image-to-image delegates (org, prompt, imageUrl) and returns { url }', async () => {
       const { controller, aiDefaults } = build();
       const res = await controller.imageToImage(org, { imageUrl: 'https://x/a.png', prompt: 'make it blue' } as any);
@@ -91,15 +82,6 @@ describe('MediaController — Designer AI-media routes', () => {
       expect(res).toEqual({ id: 'job-v2v', status: 'pending' });
     });
 
-    it('transform routes do NOT short-circuit on zero credits (no Stripe gate)', async () => {
-      vi.stubEnv('STRIPE_PUBLISHABLE_KEY', 'pk_test');
-      const { controller, aiDefaults } = build({}, 0);
-      const res = await controller.imageToImage(org, { imageUrl: 'https://x/a.png', prompt: 'p' } as any);
-      // Unlike the generative family, the transform family still runs at 0 credits.
-      expect(aiDefaults.imageToImage).toHaveBeenCalled();
-      expect(res).toEqual({ url: 'https://cdn/out.png' });
-    });
-
     it('maps DefaultNotConfiguredError to HTTP 409 CONFLICT', async () => {
       const { controller } = build({
         videoUpscale: vi.fn().mockRejectedValue(new DefaultNotConfiguredError('video-upscale')),
@@ -108,17 +90,9 @@ describe('MediaController — Designer AI-media routes', () => {
         controller.upscaleVideo(org, { videoUrl: 'https://x/v.mp4' } as any)
       ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
     });
-
-    it('rejects with HTTP 429 when the media budget is exceeded', async () => {
-      const { controller, aiDefaults } = build({}, 100, false);
-      await expect(
-        controller.imageToImage(org, { imageUrl: 'https://x/a.png', prompt: 'p' } as any)
-      ).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS });
-      expect(aiDefaults.imageToImage).not.toHaveBeenCalled();
-    });
   });
 
-  describe('generative family (Stripe credit short-circuit)', () => {
+  describe('generative family', () => {
     it('generate-music delegates (org, prompt) and returns { id, status:pending }', async () => {
       const { controller, aiDefaults } = build();
       const res = await controller.generateMusic(org, { prompt: 'lofi beat' } as any);
@@ -138,22 +112,6 @@ describe('MediaController — Designer AI-media routes', () => {
       const res = await controller.generateSlide(org, { prompt: 'trip', imageUrls: ['https://x/1.png'] } as any);
       expect(aiDefaults.imageSlide).toHaveBeenCalledWith('org-1', 'trip', ['https://x/1.png']);
       expect(res).toEqual({ id: 'https://cdn/slide.mp4', status: 'pending' });
-    });
-
-    it('returns false (never calls the provider) when Stripe is set and credits are exhausted', async () => {
-      vi.stubEnv('STRIPE_PUBLISHABLE_KEY', 'pk_test');
-      const { controller, aiDefaults } = build({}, 0);
-      const res = await controller.generateMusic(org, { prompt: 'x' } as any);
-      expect(res).toBe(false);
-      expect(aiDefaults.textToMusic).not.toHaveBeenCalled();
-    });
-
-    it('runs at zero credits when Stripe is NOT configured (self-hosted)', async () => {
-      // STRIPE_PUBLISHABLE_KEY unset → no credit gate.
-      const { controller, aiDefaults } = build({}, 0);
-      const res = await controller.generateMusic(org, { prompt: 'x' } as any);
-      expect(aiDefaults.textToMusic).toHaveBeenCalled();
-      expect(res).toEqual({ id: 'job-music', status: 'pending' });
     });
 
     it('maps DefaultNotConfiguredError to HTTP 409 CONFLICT', async () => {

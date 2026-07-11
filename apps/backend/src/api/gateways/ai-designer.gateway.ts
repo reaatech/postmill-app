@@ -18,10 +18,6 @@ import {
 } from '@gitroom/nestjs-libraries/auth/auth-context.resolver';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
-import {
-  AuthorizationActions,
-  Sections,
-} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { AiDesignerService } from '@gitroom/nestjs-libraries/ai-designer/ai-designer.service';
 import { AiDesignerBudgetGuard } from '@gitroom/nestjs-libraries/ai-designer/guards/ai-designer-budget.guard';
 import { AiDesignerDefaultsGate } from '@gitroom/nestjs-libraries/ai-designer/guards/ai-designer-defaults.gate';
@@ -828,19 +824,6 @@ export class AiDesignerGateway
         this._disconnect(client, 'rbac_media_create');
         return false;
       }
-    }
-
-    // roleKey is an AppRole key (owner/admin/…); permissions.check's legacy
-    // union predates RBAC keys — same loose pass-through the HTTP guard does.
-    const ability = await this._permissions.check(
-      ctx.orgId,
-      ctx.orgCreatedAt,
-      ctx.roleKey as Parameters<PermissionsService['check']>[2],
-      [[AuthorizationActions.Create, Sections.AI]]
-    );
-    if (!ability.can(AuthorizationActions.Create, Sections.AI)) {
-      this._disconnect(client, 'billing_ai');
-      return false;
     }
 
     ctx.lastAuthzAt = Date.now();

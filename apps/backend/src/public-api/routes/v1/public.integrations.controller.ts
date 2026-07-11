@@ -74,7 +74,6 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import {
   AiDefaultsService,
   DefaultNotConfiguredError,
@@ -99,7 +98,6 @@ export class PublicIntegrationsController {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _analyticsService: AnalyticsService,
     private _storageService: StorageService,
-    private _subscriptionService: SubscriptionService,
     private _aiDefaults: AiDefaultsService,
     private _aiMediaService: AiMediaService,
     private _campaignsService: CampaignsService
@@ -226,7 +224,10 @@ export class PublicIntegrationsController {
       'Optional. Repeats with the same key within 24h replay the first response instead of creating a duplicate post.',
   })
   @ApiResponse({ status: 201, description: 'The created post group.' })
-  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.API],
+    [AuthorizationActions.Create, Sections.POSTS_PER_MONTH]
+  )
   async createPost(
     @GetOrgFromRequest() org: Organization,
     @Body() rawBody: CreatePostDto
@@ -341,7 +342,10 @@ export class PublicIntegrationsController {
   }
 
   @Get('/social/:integration')
-  @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.API],
+    [AuthorizationActions.Create, Sections.CHANNEL]
+  )
   @ApiQuery({
     name: 'version',
     required: false,
@@ -443,40 +447,26 @@ export class PublicIntegrationsController {
   ) {
     Sentry.metrics.count('public_api-request', 1);
 
-    const totalCredits = await this._subscriptionService.checkCredits(org, 'ai_videos');
-    if (totalCredits.credits <= 0) {
-      throw new HttpException('Not enough AI video credits', 402);
-    }
-
     const params = body.customParams || {};
     const prompt = typeof params.prompt === 'string' ? params.prompt : '';
 
-    // Consume one `ai_videos` credit on successful generation — restores the legacy
-    // billing semantics (the pre-async route wrapped generation in `useCredit`). The
-    // credit is spent only if the callback resolves; a provider error / 409 does not bill.
     let artifact: string;
     try {
-      artifact = await this._subscriptionService.useCredit(
-        org,
-        'ai_videos',
-        async () => {
-          if (body.type === 'image-to-video' || params.imageUrl) {
-            return this._aiDefaults.imageToVideo(
-              org.id,
-              prompt,
-              params.imageUrl as string,
-            );
-          }
-          if (body.type === 'video-to-video' || params.videoUrl) {
-            return this._aiDefaults.videoToVideo(
-              org.id,
-              prompt,
-              params.videoUrl as string,
-            );
-          }
-          return this._aiDefaults.textToVideo(org.id, prompt);
-        },
-      );
+      if (body.type === 'image-to-video' || params.imageUrl) {
+        artifact = await this._aiDefaults.imageToVideo(
+          org.id,
+          prompt,
+          params.imageUrl as string,
+        );
+      } else if (body.type === 'video-to-video' || params.videoUrl) {
+        artifact = await this._aiDefaults.videoToVideo(
+          org.id,
+          prompt,
+          params.videoUrl as string,
+        );
+      } else {
+        artifact = await this._aiDefaults.textToVideo(org.id, prompt);
+      }
     } catch (err) {
       if (err instanceof DefaultNotConfiguredError) {
         throw new HttpException(
@@ -660,7 +650,10 @@ export class PublicIntegrationsController {
   }
 
   @Put('/posts/:id/status')
-  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.API],
+    [AuthorizationActions.Create, Sections.POSTS_PER_MONTH]
+  )
   async changePostStatus(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,

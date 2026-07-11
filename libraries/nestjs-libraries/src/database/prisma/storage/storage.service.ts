@@ -6,6 +6,9 @@ import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encrypti
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
+import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
+import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 type StorageConfigRow = {
   id: string;
@@ -32,7 +35,13 @@ export class StorageService {
     private _storageRepository: StorageRepository,
     private _auditService: AuditService,
     private _encryptionService: EncryptionService,
-    private _resolution: ProviderResolutionService
+    private _resolution: ProviderResolutionService,
+    // layering: sanctioned leaf-read — reading the subscription through
+    // SubscriptionService would close a DI cycle (IntegrationService → StorageService →
+    // SubscriptionService → IntegrationService, the last edge already forwardRef'd), which
+    // crashes Nest at boot. The repository is a pure leaf with no back-edge, so read it directly.
+    private _subscriptionRepository: SubscriptionRepository,
+    private _fileRepository: FileRepository,
   ) {}
 
   // Strip the (encrypted) credential blob from anything returned to a client (#54).
@@ -436,23 +445,32 @@ export class StorageService {
 
   // Enforce per-org local storage quota before a local write (#57).
   async assertWithinQuota(orgId: string, incomingBytes: number) {
-    const configs = await this._storageRepository.findByOrg(orgId);
-    const local = configs.find((c) => c.type === StorageProviderType.LOCAL);
-    if (!local) return;
-
-    let usage: bigint | null = null;
-    try {
-      usage = await this.#buildAdapter(local as StorageConfigRow).getUsageBytes();
-    } catch {
-      usage = null;
+    // Self-host deployments are fully unlocked.
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return;
     }
-    if (usage === null) return;
 
-    const quota = await this._storageRepository.getOrgQuota(orgId);
-    if (usage + BigInt(Math.max(0, Math.floor(incomingBytes))) > quota) {
+    // BYO bucket (any mounted non-LOCAL provider) waives the hosted storage meter.
+    const mounted = await this.getMountedConfigs(orgId);
+    if (mounted.some((c) => c.type !== StorageProviderType.LOCAL)) {
+      return;
+    }
+
+    const subscription =
+      await this._subscriptionRepository.getSubscriptionByOrganizationId(orgId);
+    const tier = subscription?.subscriptionTier || 'STARTER';
+    const plan = pricing[tier] ?? pricing['STARTER'];
+    const capBytes =
+      (plan.storage_gb + (subscription?.extraStorageGb ?? 0)) *
+      1024 *
+      1024 *
+      1024;
+    const used = await this._fileRepository.getStorageBytes(orgId);
+
+    if (used + incomingBytes > capBytes) {
       throw new HttpException(
-        'Storage quota exceeded. Free up space or increase your quota.',
-        413
+        'Hosted storage limit reached. Connect your own storage bucket for unlimited storage, buy a storage add-on, or upgrade your plan.',
+        402
       );
     }
   }

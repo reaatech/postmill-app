@@ -11,7 +11,7 @@ export default function ContentSettingsLayout({ children }: { children: React.Re
   const user = useUser();
   const permissions = usePermissions();
   const canManagePacks = permissions.hasPermission('media-config', 'manage');
-  const canManageTemplates = user?.tier?.current !== 'FREE';
+  const canManageTemplates = !!user?.tier;
   const items = [
     { href: '/settings/content/ai-media', label: t('ai_media', 'AI Media') },
     { href: '/settings/content/media-defaults', label: t('media_defaults', 'Media Defaults') },

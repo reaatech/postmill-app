@@ -4,7 +4,7 @@ import { createContext, FC, ReactNode, useContext } from 'react';
 import { User } from '@prisma/client';
 import {
   pricing,
-  PricingInnerInterface,
+  PlanInterface,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 /** Profile fields returned by GET /user/self (UserProfile split, v3.8.10). */
@@ -22,7 +22,7 @@ export const UserContext = createContext<
   | undefined
   | (User & {
       orgId: string;
-      tier: PricingInnerInterface;
+      tier: PlanInterface;
       /** The member's AppRole reference for the current org (v3.8.10 RBAC). */
       role: string;
       totalChannels: number;
@@ -38,7 +38,7 @@ export const UserContext = createContext<
 export const ContextWrapper: FC<{
   user: User & {
     orgId: string;
-    tier: 'FREE' | 'STANDARD' | 'PRO' | 'ULTIMATE' | 'TEAM';
+    tier: 'STARTER' | 'PRO' | 'TEAM' | 'AGENCY';
     role: string;
     totalChannels: number;
     setupCompleted?: boolean;

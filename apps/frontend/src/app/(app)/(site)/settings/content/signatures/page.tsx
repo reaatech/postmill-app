@@ -7,7 +7,7 @@ import { SignaturesComponent } from '@gitroom/frontend/components/settings/signa
 export default function Page() {
   const user = useUser();
   return (
-    <SettingsGate allow={user ? user.tier?.current !== 'FREE' : undefined}>
+    <SettingsGate allow={user ? user.tier?.current !== 'STARTER' : undefined}>
       <SignaturesComponent />
     </SettingsGate>
   );

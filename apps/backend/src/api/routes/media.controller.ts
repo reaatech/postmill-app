@@ -19,7 +19,6 @@ import { Organization } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { ApiTags } from '@nestjs/swagger';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
@@ -39,7 +38,6 @@ import { VideoFunctionDto } from '@gitroom/backend/dtos/media/video-function.dto
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BadRequestException } from '@nestjs/common';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
-import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { AiDefaultsService, DefaultNotConfiguredError } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
@@ -56,11 +54,9 @@ export class MediaController {
     private _aiMediaService: AiMediaService,
     private _defaultsResolution: DefaultsResolutionService,
     private _fileService: FileService,
-    private _subscriptionService: SubscriptionService,
     private _storageService: StorageService,
     private _stockMediaService: StockMediaService,
-    private _brandsService: BrandsService,
-    private _budgetService: BudgetService
+    private _brandsService: BrandsService
   ) {}
 
   @Post('/generate-video')
@@ -69,12 +65,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateVideoDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    const total = await this._subscriptionService.checkCredits(org);
-    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
-      return false;
-    }
-
     try {
       let artifact: string;
       const prompt = body.output && body.prompt
@@ -178,12 +168,6 @@ export class MediaController {
     @Body('prompt') prompt: string,
     isPicturePrompt = false
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    const total = await this._subscriptionService.checkCredits(org);
-    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
-      return false;
-    }
-
     try {
       let finalPrompt = prompt;
       if (isPicturePrompt) {
@@ -225,8 +209,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: RemoveBackgroundDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    await this._subscriptionService.checkCredits(org);
     return { url: await this._aiMediaService.removeBackground(body.imageUrl, { orgId: org.id }) };
   }
 
@@ -237,8 +219,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: InpaintImageDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    await this._subscriptionService.checkCredits(org);
     return {
       url: await this._aiMediaService.inpaintImage(
         body.imageUrl,
@@ -256,8 +236,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpscaleImageDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    await this._subscriptionService.checkCredits(org);
     return { url: await this._aiMediaService.upscaleImage(body.imageUrl, { orgId: org.id, scale: body.scale }) };
   }
 
@@ -268,8 +246,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: ImageToImageDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    await this._subscriptionService.checkCredits(org);
     try {
       return { url: await this._aiDefaults.imageToImage(org.id, body.prompt, body.imageUrl) };
     } catch (err) {
@@ -287,8 +263,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpscaleVideoDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    await this._subscriptionService.checkCredits(org);
     try {
       const result = await this._aiDefaults.videoUpscale(org.id, body.videoUrl);
       return { id: result, status: 'pending' };
@@ -307,8 +281,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: RemoveVideoBackgroundDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    await this._subscriptionService.checkCredits(org);
     try {
       const result = await this._aiDefaults.videoBackground(org.id, body.videoUrl);
       return { id: result, status: 'pending' };
@@ -327,8 +299,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoToVideoDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    await this._subscriptionService.checkCredits(org);
     try {
       const result = await this._aiDefaults.videoToVideo(org.id, body.prompt, body.videoUrl);
       return { id: result, status: 'pending' };
@@ -346,11 +316,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateMusicDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    const total = await this._subscriptionService.checkCredits(org);
-    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
-      return false;
-    }
     try {
       const result = await this._aiDefaults.textToMusic(org.id, body.prompt);
       return { id: result, status: 'pending' };
@@ -368,11 +333,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateAvatarDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    const total = await this._subscriptionService.checkCredits(org);
-    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
-      return false;
-    }
     try {
       const result = await this._aiDefaults.videoAvatar(org.id, body.script, { imageUrl: body.imageUrl });
       return { id: result, status: 'pending' };
@@ -390,11 +350,6 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: GenerateSlideDto
   ) {
-    await this._aiMediaService.checkMediaBudget(org.id);
-    const total = await this._subscriptionService.checkCredits(org);
-    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
-      return false;
-    }
     try {
       const result = await this._aiDefaults.imageSlide(org.id, body.prompt, body.imageUrls);
       return { id: result, status: 'pending' };
@@ -466,7 +421,6 @@ export class MediaController {
     if (!text?.trim()) {
       throw new BadRequestException('Text is required');
     }
-    await this._aiMediaService.checkMediaBudget(org.id);
     return this._aiMediaService.textToSpeechAndSave(text, { orgId: org.id, voice });
   }
 

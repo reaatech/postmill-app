@@ -6,9 +6,13 @@ no longer describes this fork's behavior. This page is the canonical summary of 
 organized by release. The [CHANGELOG](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md)
 has the full per-commit detail.
 
+> **Note on the upstream AI/credit model:** the original Postiz stack metered AI usage through a bundled credit system. Postmill replaces that with an **unlimited-AI, bring-your-own-key** model: you configure your own provider keys per organization, and AI is gated only by your own provider quotas and per-org spend caps.
+
 ---
 
 ### Unreleased
+
+**Subscription revamp.** The billing model is rebuilt around four fixed plans (Starter $9/mo, Pro $29/mo, Team $99/mo, Agency $249/mo) defined in `pricing.ts`; no `STRIPE_PRICE_*` environment variables are read. All plans include unlimited AI via the BYOK provider layer, and paid plans include a 30-day trial. Video exports and hosted storage are metered with hard caps; add-on packs extend them ($19/mo, defaults 25 GB storage / 50 video exports). BYO storage buckets waive the hosted-storage cap. Self-host deployments without Stripe default to the Agency feature set. Remaining upstream/Postiz-branded user-facing strings were replaced with Postmill.
 
 **AI-agent surface remediation (security & correctness).** A full-surface review of the `/agents` +
 MCP + LangGraph-generator stack was remediated: a cross-tenant unscoping bug (MCP auth wrapper
@@ -285,7 +289,7 @@ Identity, tenancy, RBAC & provider-surface redesign:
   timezone-aware time picker
 
 **Breaking changes:**
-- Single destructive schema push (snapshot first): dead Gitroom marketplace/GitHub-stars tables
+- Single destructive schema push (snapshot first): dead upstream marketplace/GitHub-stars tables
   dropped (`SocialMediaAgency`, `Orders`, `Messages`, `GitHub`, `Star`, `Trending`, …), legacy
   `UserOrganization.role` enum column dropped, `imageModel` columns dropped, migrated `User`
   profile columns dropped. See [Upgrading](../operations-guide/upgrading.md#v3-8-9-v3-8-10).
@@ -465,7 +469,7 @@ renames for self-hosters.
 
 - **Branding** — product name `Postiz` → `Postmill` across UI copy, page titles, emails, OpenAPI,
   and all translation locales; primary brand color `#612bd3` → `#2b5cd3`; logos and the browser
-  extension rebranded. The `isGeneralServerSide()`/`isGeneral` "Postiz vs Gitroom" display toggles
+  extension rebranded. The `isGeneralServerSide()`/`isGeneral` "Postiz vs upstream" display toggles
   collapse to always render Postmill.
 - **Packages & SDK** — workspace names `postiz-*` → `postmill-*` (internal; scripts target by path).
   The Node SDK is republished as **`@reaatech/postmill-sdk`** (was `@postiz/node`).

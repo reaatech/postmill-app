@@ -2,7 +2,6 @@ import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 
 export interface BudgetSettings {
@@ -28,11 +27,8 @@ export class BudgetService {
   private readonly _logger = new Logger(BudgetService.name);
   private readonly DEFAULT_ALERT_THRESHOLD = 0.8;
   private readonly RESERVATION_BUFFER = 0.001;
-  private readonly SUBSCRIPTION_CACHE_TTL = 10_000;
   private readonly SPEND_ACCUMULATOR_TTL = 60_000;
   private readonly MAX_ORG_MAP_SIZE = 10_000;
-  private _subCache = new Map<string, { data: any; ts: number }>();
-
   // In-memory spend accumulator — tracks cumulative spend for the current month/day
   // to avoid re-querying the DB after each recordSpend call.
   private _spendAccum: {
@@ -126,16 +122,9 @@ export class BudgetService {
   constructor(
     private _aiSettingsManager: AiSettingsManager,
     private _aiSettings: AiSettingsService,
-    @Inject(forwardRef(() => SubscriptionService))
-    private _subscriptionService: SubscriptionService,
     private _spendLogRepo: PrismaRepository<'aISpendLog'>,
-    private _orgRepo: PrismaRepository<'organization'>,
     private _notificationService: NotificationService,
   ) {}
-
-  clearSubCache() {
-    this._subCache.clear();
-  }
 
   private async _getCaps(): Promise<BudgetSettings> {
     const settings = await this._aiSettingsManager.getSettings();
@@ -187,108 +176,9 @@ export class BudgetService {
     scope: string,
     organizationId?: string,
   ): Promise<{ allowed: boolean; reason?: string }> {
-    if (scope === 'backfill') {
-      return { allowed: true };
-    }
-
-    const caps = await this._getCaps();
-    if (!caps.monthlyCap && !caps.dailyCap && !caps.perOrgCaps && !caps.scopeCaps) {
-      return { allowed: true };
-    }
-
-    await this._ensureAccum();
-
-    // DB-authoritative read: the persisted AISpendLog is the source of truth for the cap
-    // decision, so a stale/lost in-memory accumulator can't let spend drift under-counted.
-    // The accumulator stays a fast-path floor (never under-count) via Math.max below.
-    // NOTE: this does NOT make the cap a hard transactional limit — two concurrent checks
-    // can still each pass just under the cap and both proceed (check-then-act). It closes
-    // the stale-accumulator gap, not the concurrent-overshoot one. Caps are a soft guardrail.
-    // Perf: when no GLOBAL cap is configured we only need this org's totals, so scope the
-    // aggregation to the org (indexed) rather than scanning the whole ledger per request.
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const needsGlobal = !!(caps.monthlyCap || caps.dailyCap);
-    const db = this._computeMaps(
-      await this._batchTotals(
-        startOfMonth,
-        startOfDay,
-        needsGlobal ? undefined : organizationId,
-      )
-    );
-
-    const globalMonthly = Math.max(this._spendAccum!.globalMonthly, db.globalMonthly);
-    const globalDaily = Math.max(this._spendAccum!.globalDaily, db.globalDaily);
-
-    if (caps.monthlyCap && globalMonthly + this.RESERVATION_BUFFER > caps.monthlyCap) {
-      return {
-        allowed: false,
-        reason: `Global monthly cap of $${caps.monthlyCap} exceeded ($${globalMonthly.toFixed(4)})`,
-      };
-    }
-
-    if (caps.dailyCap && globalDaily + this.RESERVATION_BUFFER > caps.dailyCap) {
-      return {
-        allowed: false,
-        reason: `Global daily cap of $${caps.dailyCap} exceeded ($${globalDaily.toFixed(4)})`,
-      };
-    }
-
-    if (organizationId) {
-      const orgCaps = caps.perOrgCaps?.[organizationId];
-      // 5.5 (review F1): per-org caps are ALWAYS enforced when present — no
-      // org-writable `enabled` bypass (a tenant must not be able to self-exempt
-      // from an operator-imposed cap living in the same slice).
-      const orgMonthly = Math.max(
-        this._spendAccum!.orgMonthly.get(organizationId) ?? 0,
-        db.orgMonthly.get(organizationId) ?? 0
-      );
-      const orgDaily = Math.max(
-        this._spendAccum!.orgDaily.get(organizationId) ?? 0,
-        db.orgDaily.get(organizationId) ?? 0
-      );
-
-      if (orgCaps?.monthly && orgMonthly + this.RESERVATION_BUFFER > orgCaps.monthly) {
-        return {
-          allowed: false,
-          reason: `Org monthly cap of $${orgCaps.monthly} exceeded ($${orgMonthly.toFixed(4)})`,
-        };
-      }
-      if (orgCaps?.daily && orgDaily + this.RESERVATION_BUFFER > orgCaps.daily) {
-        return {
-          allowed: false,
-          reason: `Org daily cap of $${orgCaps.daily} exceeded ($${orgDaily.toFixed(4)})`,
-        };
-      }
-    }
-
-    const scopeCaps = caps.scopeCaps?.[scope];
-    if (scopeCaps) {
-      const scopeKey = `${organizationId ?? '__global'}::${scope}`;
-      const scopeMonthly = Math.max(
-        this._spendAccum!.scopeMonthly.get(scopeKey) ?? 0,
-        db.scopeMonthly.get(scopeKey) ?? 0
-      );
-      const scopeDaily = Math.max(
-        this._spendAccum!.scopeDaily.get(scopeKey) ?? 0,
-        db.scopeDaily.get(scopeKey) ?? 0
-      );
-
-      if (scopeCaps.monthly && scopeMonthly + this.RESERVATION_BUFFER > scopeCaps.monthly) {
-        return {
-          allowed: false,
-          reason: `Scope "${scope}" monthly cap of $${scopeCaps.monthly} exceeded`,
-        };
-      }
-      if (scopeCaps.daily && scopeDaily + this.RESERVATION_BUFFER > scopeCaps.daily) {
-        return {
-          allowed: false,
-          reason: `Scope "${scope}" daily cap of $${scopeCaps.daily} exceeded`,
-        };
-      }
-    }
-
+    // Postmill BYOK model: AI usage is unlimited and never gated by a platform
+    // budget. Spend telemetry continues to be recorded via recordSpend(); this
+    // method remains as a non-blocking hook for callers that already ask.
     return { allowed: true };
   }
 
@@ -475,33 +365,4 @@ export class BudgetService {
     }
   }
 
-  async checkMediaCredits(
-    organizationId: string,
-    creditType: 'ai_images' | 'ai_videos',
-  ): Promise<{ allowed: boolean; remaining: number }> {
-    const cached = this._subCache.get(organizationId);
-    if (!cached || Date.now() - cached.ts > this.SUBSCRIPTION_CACHE_TTL) {
-      this._subCache.set(organizationId, {
-        data: await this._orgRepo.model.organization.findUnique({
-          where: { id: organizationId },
-          include: { subscription: true },
-        }),
-        ts: Date.now(),
-      });
-    }
-
-    const org = this._subCache.get(organizationId)?.data;
-
-    if (!org) {
-      return { allowed: false, remaining: 0 };
-    }
-
-    const { credits } = await this._subscriptionService.checkCredits(org as any, creditType);
-
-    if (credits <= 0) {
-      return { allowed: false, remaining: 0 };
-    }
-
-    return { allowed: true, remaining: credits };
-  }
 }

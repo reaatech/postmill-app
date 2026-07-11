@@ -23,7 +23,6 @@ const make = () => {
     {}, // refreshIntegrationService
     analyticsService,
     {}, // storageService
-    {}, // subscriptionService
     {}, // aiDefaults
     {}, // aiMediaService
     campaignsService,

@@ -7,9 +7,10 @@ import { MCPServer } from '@mastra/mcp';
 import { randomUUID, createHash } from 'crypto';
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
 import { ApiKeysService } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { IdempotencyFactory } from '@gitroom/nestjs-libraries/ai/governance/idempotency.factory';
-import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { runWithContext } from './async.storage';
 import { createOAuthMiddleware } from './oauth-middleware';
@@ -52,6 +53,33 @@ function noteRedisFallback(err: unknown) {
   logger.warn(
     `[startMcp] Redis unavailable for MCP rate-limit/idempotency — using in-memory fallback: ${(err as Error)?.message ?? err}`,
   );
+}
+
+async function checkMcpAccess(
+  subscriptionService: SubscriptionService,
+  organizationId: string
+): Promise<{ allowed: boolean; reason?: string }> {
+  if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+    return { allowed: true };
+  }
+  const subscription =
+    await subscriptionService.getSubscriptionByOrganizationId(organizationId);
+  // Reached only when Stripe IS configured (self-host returned above), so a
+  // subscription-less hosted org must fail closed to STARTER (mcp:false) — mirrors
+  // permissions.service.ts and users.controller.ts. Do NOT fall back to SELF_HOST_PLAN
+  // here or every subscription-less hosted org would get free AGENCY-tier MCP access.
+  const tier = subscription?.subscriptionTier || 'STARTER';
+  const plan = pricing[tier];
+  if (!plan) {
+    return { allowed: false, reason: 'Unknown subscription tier' };
+  }
+  if (!plan.mcp) {
+    return {
+      allowed: false,
+      reason: 'AI-assistant access is not included in this plan. Please upgrade.',
+    };
+  }
+  return { allowed: true };
 }
 
 // ── Rate limiter (Redis-backed with in-memory fallback) ──
@@ -251,7 +279,7 @@ export const startMcp = async (app: INestApplication) => {
     idempotencyFactory = null;
   }
   const idempotencyMiddleware = idempotencyFactory?.getMiddleware() ?? null;
-  const budgetService = app.get(BudgetService, { strict: false });
+  const subscriptionService = app.get(SubscriptionService, { strict: false });
 
   let mcpSettings: McpSettings | null = null;
   try {
@@ -478,12 +506,12 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('agent', auth.org.id);
-    if (!budgetResult.allowed) {
-      res.status(429).json({
-        statusCode: 429,
-        error: 'BudgetExceeded',
-        message: budgetResult.reason,
+    const mcpAccess = await checkMcpAccess(subscriptionService, auth.org.id);
+    if (!mcpAccess.allowed) {
+      res.status(402).json({
+        statusCode: 402,
+        error: 'PaymentRequired',
+        message: mcpAccess.reason,
       });
       return;
     }
@@ -589,12 +617,12 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('agent', req.auth.org.id);
-    if (!budgetResult.allowed) {
-      res.status(429).json({
-        statusCode: 429,
-        error: 'BudgetExceeded',
-        message: budgetResult.reason,
+    const mcpAccess = await checkMcpAccess(subscriptionService, req.auth.org.id);
+    if (!mcpAccess.allowed) {
+      res.status(402).json({
+        statusCode: 402,
+        error: 'PaymentRequired',
+        message: mcpAccess.reason,
       });
       return;
     }
@@ -693,12 +721,12 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('agent', req.auth.org.id);
-    if (!budgetResult.allowed) {
-      res.status(429).json({
-        statusCode: 429,
-        error: 'BudgetExceeded',
-        message: budgetResult.reason,
+    const mcpAccess = await checkMcpAccess(subscriptionService, req.auth.org.id);
+    if (!mcpAccess.allowed) {
+      res.status(402).json({
+        statusCode: 402,
+        error: 'PaymentRequired',
+        message: mcpAccess.reason,
       });
       return;
     }
@@ -802,12 +830,12 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('agent', req.auth.org.id);
-    if (!budgetResult.allowed) {
-      res.status(429).json({
-        statusCode: 429,
-        error: 'BudgetExceeded',
-        message: budgetResult.reason,
+    const mcpAccess = await checkMcpAccess(subscriptionService, req.auth.org.id);
+    if (!mcpAccess.allowed) {
+      res.status(402).json({
+        statusCode: 402,
+        error: 'PaymentRequired',
+        message: mcpAccess.reason,
       });
       return;
     }
@@ -935,12 +963,12 @@ export const startMcp = async (app: INestApplication) => {
                 return;
               }
 
-              const budgetResult = await budgetService.checkBudget('agent', resolved.org.id);
-              if (!budgetResult.allowed) {
-                res.status(429).json({
-                  statusCode: 429,
-                  error: 'BudgetExceeded',
-                  message: budgetResult.reason,
+              const mcpAccess = await checkMcpAccess(subscriptionService, resolved.org.id);
+              if (!mcpAccess.allowed) {
+                res.status(402).json({
+                  statusCode: 402,
+                  error: 'PaymentRequired',
+                  message: mcpAccess.reason,
                 });
                 return;
               }

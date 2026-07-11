@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { inngest, isInngestEnabled } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { getRenderConcurrency } from '@gitroom/nestjs-libraries/media/design-render/render-config';
 import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
@@ -19,6 +21,8 @@ export class MediaJobsActivity {
     private _lifecycle: MediaJobLifecycleService,
     private _aiSettings: AiSettingsService,
     private _videoRenderService: VideoRenderService,
+    private _subscriptionService: SubscriptionService,
+    private _organizationService: OrganizationService,
   ) {}
 
   /**
@@ -62,11 +66,44 @@ export class MediaJobsActivity {
   async processRenderJob(jobId: string): Promise<void> {
     const job = await this._aiSettings.getMediaJobByIdUnscoped(jobId);
     if (!job) return;
+
+    const org = await this._organizationService.getOrgById(job.organizationId);
+    if (!org) {
+      this.logger.warn(`Render ${jobId}: organization ${job.organizationId} not found`);
+      return;
+    }
+
+    // Idempotency guard (matches this method's contract): only the invocation that
+    // finds the job still `pending` performs the render and charges the export credit.
+    // A retried or re-dispatched already-terminal job (completed/processing/failed)
+    // no-ops here — otherwise `useCredit` would run, the inner render would no-op (it
+    // also gates on `pending`), the `after.status === 'completed'` check would pass on
+    // the PRIOR run's result, and a second `video_export` credit would be committed.
+    if (job.status !== 'pending') {
+      return;
+    }
+
     if (job.model === 'local/ffmpeg-merge') {
       await this._videoRenderService.processMergeRender(jobId);
     } else if (job.provider === 'chromium-ffmpeg') {
       await this._videoRenderService.processVideoRender(jobId);
     }
+
+    const after = await this._aiSettings.getMediaJobByIdUnscoped(jobId);
+    if (!after || after.status !== 'completed') {
+      throw new Error(
+        `Render ${jobId} did not complete (status: ${after?.status ?? 'missing'})`
+      );
+    }
+
+    // Charge one video_export credit AFTER a confirmed-completed render, as a plain insert.
+    // NOT the $transaction-wrapped useCredit: an interactive transaction's ~5s timeout would
+    // abort a multi-second/minute render and roll the charge back — the render would complete
+    // but never be metered (leaving the VIDEO_EXPORTS gate permanently bypassable). A failed
+    // render never reaches this line (we threw above), so there is nothing to roll back.
+    // Idempotency: the `status !== 'pending'` guard above no-ops sequential retries, so a
+    // completed job is charged exactly once.
+    await this._subscriptionService.recordCredit(org, 'video_export');
   }
 
   async processPendingMediaJobs(): Promise<{ processed: number; completed: number; failed: number }> {

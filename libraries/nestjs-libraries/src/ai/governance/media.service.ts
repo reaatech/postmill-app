@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, HttpStatus, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { randomBytes } from 'crypto';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
@@ -99,24 +99,24 @@ const OPERATION_CAPABILITY: Record<MediaOperation, keyof MediaProviderCapabiliti
   'video-upscale': 'videoUpscale',
 };
 
-// §6.4 reconciliation — map each media operation back onto the legacy ai_images /
-// ai_videos credit counters so SubscriptionService.getCreditsFrom keeps seeing
-// consumption. TTS/STT/audio have no legacy credit equivalent → undefined.
-const OPERATION_CREDIT_TYPE: Record<MediaOperation, 'ai_images' | 'ai_videos' | undefined> = {
-  image: 'ai_images',
-  upscale: 'ai_images',
-  'bg-remove': 'ai_images',
-  inpaint: 'ai_images',
-  video: 'ai_videos',
-  avatar: 'ai_videos',
+// Postmill BYOK model: AI media generation is unlimited and no longer consumes
+// legacy ai_images / ai_videos credits. creditType is kept as a nullable column
+// for observability but is always undefined for new jobs.
+const OPERATION_CREDIT_TYPE: Record<MediaOperation, undefined> = {
+  image: undefined,
+  upscale: undefined,
+  'bg-remove': undefined,
+  inpaint: undefined,
+  video: undefined,
+  avatar: undefined,
   audio: undefined,
   tts: undefined,
   stt: undefined,
   'focal-point': undefined,
-  slide: 'ai_videos',
+  slide: undefined,
   caption: undefined,
-  'video-bg': 'ai_videos',
-  'video-upscale': 'ai_videos',
+  'video-bg': undefined,
+  'video-upscale': undefined,
 };
 
 // Rough default per-operation USD cost. The @reaatech/media-pipeline-mcp-cost ledger
@@ -566,16 +566,6 @@ export class AiMediaService {
   }
 
   // ── Controller-delegated media utilities (A-20) ──
-
-  async checkMediaBudget(orgId: string): Promise<void> {
-    const check = await this._budget?.checkBudget('media', orgId);
-    if (check && !check.allowed) {
-      throw new HttpException(
-        { error: 'AI budget exceeded', detail: check.reason },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
-  }
 
   async getVideoOptions(orgId: string): Promise<Record<string, { available: boolean }>> {
     const categories = [

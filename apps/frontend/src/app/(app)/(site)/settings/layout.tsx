@@ -24,20 +24,20 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const t = useT();
   const user = useUser();
   const permissions = usePermissions();
-  const { isGeneral } = useVariables();
+  const { isGeneral, billingEnabled } = useVariables();
   const url = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const { collapsed, toggle } = useSidebarCollapse('settings:sidebar-collapsed');
 
-  const showLogout = !url.get('onboarding') || user?.tier?.current === 'FREE';
+  const showLogout = !url.get('onboarding') || user?.tier?.current === 'STARTER';
 
   // R5: members whose role lacks settings:read get a no-access state.
   const settingsDenied =
     permissions.isResolved && !permissions.hasPermission('settings', 'read');
 
   const items = useMemo(() => {
-    const ctx = { user, permissions, isGeneral, showLogout };
+    const ctx = { user, permissions, isGeneral, billingEnabled, showLogout };
     const visible = SETTINGS_NAV.filter((i) => (i.gate ? i.gate(ctx) : true));
     // Keep the category order, sort alphabetically within each category (matches old nav).
     return [...visible].sort((a, b) => {
@@ -47,7 +47,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       if (sectionDiff !== 0) return sectionDiff;
       return t(a.labelKey, a.labelDefault).localeCompare(t(b.labelKey, b.labelDefault));
     });
-  }, [user, permissions, isGeneral, showLogout, t]);
+  }, [user, permissions, isGeneral, billingEnabled, showLogout, t]);
 
   const isActive = (item: SettingsNavItem) => pathname.startsWith(item.href);
   const activeItem = items.find(isActive);

@@ -19,7 +19,6 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { ApiTags } from '@nestjs/swagger';
 import { AnalyticsService, BestTimeEntry } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { AnalyticsShareService } from '@gitroom/nestjs-libraries/analytics/analytics-share.service';
-import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import {
   AnalyticsDateRangeDto,
   AnalyticsPostsQueryDto,
@@ -107,7 +106,6 @@ export class AnalyticsV2Controller {
   constructor(
     private _analyticsService: AnalyticsService,
     private _watchlistService: WatchlistService,
-    private _budgetService: BudgetService,
     private _shareService: AnalyticsShareService,
   ) {}
 
@@ -293,7 +291,7 @@ export class AnalyticsV2Controller {
   // The no-provider rule is enforced in the service (standard "AI not
   // configured" error, no env-key fallback).
   @Post('/narrate')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @RequirePermission('analytics', 'read')
   async narrate(
     @GetOrgFromRequest() org: Organization,
     @Query() query: AnalyticsDateRangeDto,
@@ -301,14 +299,6 @@ export class AnalyticsV2Controller {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
     validateWindowCap(query.from, query.to);
-
-    const budget = await this._budgetService.checkBudget('utility', org.id);
-    if (!budget.allowed) {
-      throw new HttpException(
-        { error: 'AI budget exceeded', detail: budget.reason },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
-    }
 
     return this._analyticsService.narrate(org, query.from, query.to);
   }
@@ -471,6 +461,7 @@ export class AnalyticsV2Controller {
 
   @Post('/watchlist')
   @RequirePermission('analytics', 'update')
+  @CheckPolicies([AuthorizationActions.Create, Sections.COMPETITORS])
   async addWatchlistEntry(
     @GetOrgFromRequest() org: Organization,
     @Body() body: AddWatchlistDto,

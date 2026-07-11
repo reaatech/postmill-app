@@ -147,12 +147,6 @@ vi.mock('@gitroom/nestjs-libraries/chat/mastra.service', () => ({
   },
 }));
 
-vi.mock('@gitroom/nestjs-libraries/ai/governance/budget.service', () => ({
-  BudgetService: class {
-    checkBudget = vi.fn().mockResolvedValue({ allowed: true });
-  },
-}));
-
 const mockCheckInput = vi.fn().mockResolvedValue('guarded input');
 vi.mock('@gitroom/nestjs-libraries/ai/governance/guardrail.service', () => ({
   GuardrailService: class {
@@ -192,10 +186,8 @@ import {
   copilotRuntimeNodeHttpEndpoint,
   copilotRuntimeNestEndpoint,
 } from '@copilotkit/runtime';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
-import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
@@ -208,7 +200,6 @@ function expectWrappedAdapter(result: any, rawInstance: any) {
 
 describe('CopilotController', () => {
   let controller: CopilotController;
-  let subscriptionService: SubscriptionService;
   let mastraService: MastraService;
   let aiModelProvider: AIModelProvider;
 
@@ -222,19 +213,15 @@ describe('CopilotController', () => {
     mockStartSpan.mockClear();
     mockResolveConfigForScope.mockResolvedValue(null);
 
-    subscriptionService = new (SubscriptionService as any)();
     mastraService = new (MastraService as any)();
     aiModelProvider = new (AIModelProvider as any)();
 
-    const budgetService = new (BudgetService as any)();
     const guardrailService = new (GuardrailService as any)();
     const telemetryService = new (TelemetryService as any)();
     const featureFlagsService = new (FeatureFlagsService as any)();
     controller = new CopilotController(
-      subscriptionService,
       mastraService,
       aiModelProvider,
-      budgetService,
       guardrailService,
       telemetryService,
       featureFlagsService,
@@ -480,14 +467,14 @@ describe('CopilotController', () => {
   });
 
   describe('/chat endpoint', () => {
-    // §3.5 #3AM: /chat is now gated with @CheckPolicies and budget check.
+    // §3.5 #3AM: /chat is now gated with @CheckPolicies([Create, MCP]).
     it('is gated with CheckPolicies', () => {
       const policies = Reflect.getMetadata(
         CHECK_POLICIES_KEY,
         CopilotController.prototype.chatAgent,
       );
 
-      expect(policies).toEqual([[AuthorizationActions.Create, Sections.AI]]);
+      expect(policies).toEqual([[AuthorizationActions.Create, Sections.MCP]]);
     });
 
     it('calls service adapter builder with organization.id', async () => {

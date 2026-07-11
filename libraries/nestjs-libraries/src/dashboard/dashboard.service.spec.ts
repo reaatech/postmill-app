@@ -88,6 +88,14 @@ function buildService(overrides: {
     getSpendSummary: vi.fn().mockResolvedValue([]),
   } as any;
 
+  const subscriptionService = {
+    getCreditsFrom: vi.fn().mockResolvedValue(3),
+  } as any;
+
+  const fileRepository = {
+    getStorageBytes: vi.fn().mockResolvedValue(1024 * 1024),
+  } as any;
+
   const service = new DashboardService(
     postsService,
     integrationService,
@@ -101,6 +109,8 @@ function buildService(overrides: {
     analyticsService,
     aiSettingsManager,
     redisService,
+    subscriptionService,
+    fileRepository,
   );
 
   return {

@@ -10,6 +10,7 @@ export interface SettingsGateCtx {
   user: any;
   permissions: { hasPermission: (resource: string, action: string) => boolean };
   isGeneral: boolean;
+  billingEnabled: boolean;
   showLogout: boolean;
 }
 
@@ -29,6 +30,20 @@ export const SETTINGS_SECTION_ORDER = ['Workspace', 'Automation', 'Developer'];
 
 export const SETTINGS_NAV: SettingsNavItem[] = [
   {
+    key: 'subscription',
+    href: '/settings/subscription',
+    labelKey: 'subscription',
+    labelDefault: 'Subscription',
+    descKey: 'subscription_settings_description',
+    descDefault:
+      'Manage your plan, billing cycle, usage, and add-ons.',
+    section: 'Workspace',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg>
+    ),
+    gate: ({ billingEnabled, isGeneral }) => billingEnabled && isGeneral,
+  },
+  {
     key: 'team',
     href: '/settings/team',
     labelKey: 'team',
@@ -40,7 +55,7 @@ export const SETTINGS_NAV: SettingsNavItem[] = [
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
     ),
-    gate: ({ user, isGeneral }) => !!user?.tier?.team_members && isGeneral,
+    gate: ({ user, isGeneral }) => (user?.tier?.team_members ?? 0) > 1 && isGeneral,
   },
   {
     key: 'broadcast',
@@ -78,6 +93,20 @@ export const SETTINGS_NAV: SettingsNavItem[] = [
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10l5.1-1.7z"/><path d="M18.5 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg>
     ),
+  },
+  {
+    key: 'brands',
+    href: '/settings/ai/brands',
+    labelKey: 'brands',
+    labelDefault: 'Brands',
+    descKey: 'brands_settings_description',
+    descDefault:
+      'Create and manage brand voices so your AI-generated content stays on message.',
+    section: 'Workspace',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    ),
+    gate: ({ user }) => (user?.tier?.brand_kits ?? 0) > 0,
   },
   {
     key: 'shortlinks',
@@ -128,6 +157,20 @@ export const SETTINGS_NAV: SettingsNavItem[] = [
     ),
   },
   {
+    key: 'campaigns',
+    href: '/campaigns',
+    labelKey: 'campaigns',
+    labelDefault: 'Campaigns',
+    descKey: 'campaigns_settings_description',
+    descDefault:
+      'Organize posts, channels, files, and planning notes into campaigns.',
+    section: 'Workspace',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2a2 2 0 0 0-1.66-.9H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" /></svg>
+    ),
+    gate: ({ user }) => user?.tier?.campaigns === true,
+  },
+  {
     key: 'webhooks',
     href: '/settings/webhooks',
     labelKey: 'webhooks_1',
@@ -153,7 +196,7 @@ export const SETTINGS_NAV: SettingsNavItem[] = [
     icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     ),
-    gate: ({ user }) => !!user?.tier?.autoPost,
+    gate: () => true,
   },
   {
     key: 'developers',
@@ -168,7 +211,7 @@ export const SETTINGS_NAV: SettingsNavItem[] = [
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
     ),
     gate: ({ user, isGeneral, showLogout }) =>
-      !!user?.tier?.public_api && isGeneral && showLogout,
+      !!user?.tier?.api && isGeneral && showLogout,
   },
   {
     key: 'approved-apps',

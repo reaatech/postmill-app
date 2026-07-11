@@ -1,6 +1,7 @@
-import { IsString } from 'class-validator';
+import { IsIn } from 'class-validator';
+import { BillingTier } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 
 export class AddSubscriptionDto {
-  @IsString()
-  subscription!: string;
+  @IsIn(['STARTER', 'PRO', 'TEAM', 'AGENCY'])
+  subscription!: BillingTier;
 }

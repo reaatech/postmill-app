@@ -3,7 +3,10 @@
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useCallback, useMemo, useState } from 'react';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  pricing,
+  PlanInterface,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { Input } from '@gitroom/react/form/input';
 import { Button } from '@gitroom/react/form/button';
 import { useSWRConfig } from 'swr';
@@ -11,6 +14,9 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useRouter } from 'next/navigation';
 import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+
+const LIFETIME_PLAN: PlanInterface['current'] = 'AGENCY';
+
 export const LifetimeDeal = () => {
   const t = useT();
   const fetch = useFetch();
@@ -20,6 +26,7 @@ export const LifetimeDeal = () => {
   const { mutate } = useSWRConfig();
   const router = useRouter();
   const fireEvents = useFireEvents();
+
   const claim = useCallback(async () => {
     const { success } = await (
       await fetch('/billing/lifetime', {
@@ -48,25 +55,29 @@ export const LifetimeDeal = () => {
       );
     }
     setCode('');
-  }, [code, fetch, fireEvents, mutate, toast]);
-  const nextPackage = useMemo(() => {
-    if (user?.tier?.current === 'STANDARD') {
-      return 'PRO';
-    }
-    return 'STANDARD';
-  }, [user?.tier]);
-  const features = useMemo(() => {
+  }, [code, fetch, fireEvents, mutate, toast, t]);
+
+  const agencyPricing = pricing[LIFETIME_PLAN];
+
+  const currentFeatures = useMemo(() => {
     if (!user?.tier) {
       return [];
     }
-    const currentPricing = user?.tier;
-    const channelsOr = currentPricing.channel;
-    const list = [];
+    const currentPricing = user.tier;
+    const list: string[] = [];
+
     list.push(
-      t('billing_n_channels', '{{count}} channel', { count: user.totalChannels })
+      t('billing_unlimited_ai_creation', 'Unlimited AI creation')
     );
+
     list.push(
-      currentPricing.posts_per_month > 10000
+      t('billing_n_channels', '{{count}} channel', {
+        count: user.totalChannels || currentPricing.channel,
+      })
+    );
+
+    list.push(
+      currentPricing.posts_per_month >= 10000
         ? t('billing_unlimited_feature', 'Unlimited {{feature}}', {
             feature: t('billing_posts_per_month', 'posts per month'),
           })
@@ -74,26 +85,102 @@ export const LifetimeDeal = () => {
             count: currentPricing.posts_per_month,
           })
     );
-    if (currentPricing.team_members) {
-      list.push(t('billing_unlimited_team_members', 'Unlimited team members'));
-    }
-    if (currentPricing?.ai) {
-      list.push(t('billing_ai_auto_complete', 'AI auto-complete'));
-    }
+
+    list.push(
+      t('billing_n_team_members', '{{count}} team members', {
+        count: currentPricing.team_members,
+      })
+    );
+
+    list.push(
+      t('billing_n_brand_kits', '{{count}} brand kits', {
+        count: currentPricing.brand_kits,
+      })
+    );
+
+    list.push(
+      `${t('billing_campaigns', 'Campaigns')}: ${
+        currentPricing.campaigns
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
+    list.push(
+      `${t('billing_api_and_mcp', 'API & MCP')}: ${
+        currentPricing.api && currentPricing.mcp
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
+    list.push(
+      t('billing_n_webhooks', '{{count}} webhooks', {
+        count: currentPricing.webhooks,
+      })
+    );
+
+    list.push(
+      t('billing_n_competitors', '{{count}} competitors', {
+        count: currentPricing.competitors,
+      })
+    );
+
+    list.push(
+      t(
+        'billing_n_days_analytics_retention',
+        '{{count}} days analytics retention',
+        { count: currentPricing.analytics_retention_days }
+      )
+    );
+
+    list.push(
+      t('billing_n_video_exports_per_month', '{{count}} video exports/mo', {
+        count: currentPricing.video_exports,
+      })
+    );
+
+    list.push(
+      t('billing_n_gb_hosted_storage', '{{count}} GB hosted storage', {
+        count: currentPricing.storage_gb,
+      })
+    );
+
+    list.push(
+      `${t('billing_byo_storage', 'BYO storage')}: ${
+        currentPricing.byo_storage
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
+    list.push(
+      `${t('billing_priority_support', 'Priority support')}: ${
+        currentPricing.priority
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
     return list;
   }, [user, t]);
-  const nextFeature = useMemo(() => {
-    if (!user?.tier) {
-      return [];
-    }
-    const currentPricing = pricing[nextPackage];
-    const channelsOr = currentPricing.channel;
-    const list = [];
+
+  const agencyFeatures = useMemo(() => {
+    const currentPricing = agencyPricing;
+    const list: string[] = [];
+
     list.push(
-      t('billing_n_channels', '{{count}} channel', { count: channelsOr })
+      t('billing_unlimited_ai_creation', 'Unlimited AI creation')
     );
+
     list.push(
-      currentPricing.posts_per_month > 10000
+      t('billing_n_channels', '{{count}} channel', {
+        count: currentPricing.channel,
+      })
+    );
+
+    list.push(
+      currentPricing.posts_per_month >= 10000
         ? t('billing_unlimited_feature', 'Unlimited {{feature}}', {
             feature: t('billing_posts_per_month', 'posts per month'),
           })
@@ -101,31 +188,110 @@ export const LifetimeDeal = () => {
             count: currentPricing.posts_per_month,
           })
     );
-    if (currentPricing.team_members) {
-      list.push(t('billing_unlimited_team_members', 'Unlimited team members'));
-    }
-    if (currentPricing?.ai) {
-      list.push(t('billing_ai_auto_complete', 'AI auto-complete'));
-    }
+
+    list.push(
+      t('billing_n_team_members', '{{count}} team members', {
+        count: currentPricing.team_members,
+      })
+    );
+
+    list.push(
+      t('billing_n_brand_kits', '{{count}} brand kits', {
+        count: currentPricing.brand_kits,
+      })
+    );
+
+    list.push(
+      `${t('billing_campaigns', 'Campaigns')}: ${
+        currentPricing.campaigns
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
+    list.push(
+      `${t('billing_api_and_mcp', 'API & MCP')}: ${
+        currentPricing.api && currentPricing.mcp
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
+    list.push(
+      t('billing_n_webhooks', '{{count}} webhooks', {
+        count: currentPricing.webhooks,
+      })
+    );
+
+    list.push(
+      t('billing_n_competitors', '{{count}} competitors', {
+        count: currentPricing.competitors,
+      })
+    );
+
+    list.push(
+      t(
+        'billing_n_days_analytics_retention',
+        '{{count}} days analytics retention',
+        { count: currentPricing.analytics_retention_days }
+      )
+    );
+
+    list.push(
+      t('billing_n_video_exports_per_month', '{{count}} video exports/mo', {
+        count: currentPricing.video_exports,
+      })
+    );
+
+    list.push(
+      t('billing_n_gb_hosted_storage', '{{count}} GB hosted storage', {
+        count: currentPricing.storage_gb,
+      })
+    );
+
+    list.push(
+      `${t('billing_byo_storage', 'BYO storage')}: ${
+        currentPricing.byo_storage
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
+    list.push(
+      `${t('billing_priority_support', 'Priority support')}: ${
+        currentPricing.priority
+          ? t('billing_yes_badge', 'Yes')
+          : t('billing_no_badge', 'No')
+      }`
+    );
+
     return list;
-  }, [user, nextPackage, t]);
+  }, [agencyPricing, t]);
+
   if (!user?.tier) {
     return null;
   }
-  if (user?.id && user?.tier?.current !== 'FREE' && !user?.isLifetime) {
+
+  const isPaidTier =
+    user.tier.current === 'PRO' ||
+    user.tier.current === 'TEAM' ||
+    user.tier.current === 'AGENCY';
+
+  if (user?.id && isPaidTier && !user?.isLifetime) {
     router.replace('/billing');
     return null;
   }
+
   return (
     <div className="flex gap-[30px]">
       <div className="border border-newTableBorder bg-newBgColorInner p-[24px] flex flex-col gap-[20px] flex-1 rounded-[4px]">
         <div className="text-[30px]">
-          {t('current_package', 'Current Package:')}
-          {user?.totalChannels > 8 ? 'EXTRA' : user?.tier?.current}
+          {t('current_package', 'Current Package:')}{' '}
+          {user?.tier?.current || t('billing_none', 'None')}
         </div>
 
         <div className="flex flex-col gap-[10px] justify-center text-[16px] text-newTableText">
-          {features.map((feature) => (
+          {currentFeatures.map((feature) => (
             <div key={feature} className="flex gap-[20px]">
               <div>
                 <svg
@@ -149,25 +315,11 @@ export const LifetimeDeal = () => {
 
       <div className="border border-newTableBorder bg-newBgColorInner p-[24px] flex flex-col gap-[20px] flex-1 rounded-[4px]">
         <div className="text-[30px]">
-          {t('next_package', 'Next Package:')}
-          {user?.tier?.current === 'PRO'
-            ? 'EXTRA'
-            : !user?.tier?.current
-            ? 'FREE'
-            : user?.tier?.current === 'STANDARD'
-            ? 'PRO'
-            : 'STANDARD'}
+          {t('lifetime_deal', 'Lifetime Deal:')} {LIFETIME_PLAN}
         </div>
 
         <div className="flex flex-col gap-[10px] justify-center text-[16px] text-newTableText">
-          {(user?.tier?.current === 'PRO'
-            ? [
-                t('billing_n_channels', '{{count}} channel', {
-                  count: (user?.totalChannels || 0) + 5,
-                }),
-              ]
-            : nextFeature
-          ).map((feature) => (
+          {agencyFeatures.map((feature) => (
             <div key={feature} className="flex gap-[20px]">
               <div>
                 <svg

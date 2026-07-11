@@ -5,7 +5,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 > **v3.8.10 restructure:** the `User` god-table was split (profile fields moved to `UserProfile`),
 > the flat `Role` enum was replaced by a full RBAC layer (`AppRole`/`Permission`/`AppRolePermission`),
-> and the dead Gitroom marketplace/GitHub-stars models were dropped. See
+> and the dead upstream marketplace/GitHub-stars models were dropped. See
 > [Dropped in v3.8.10](#dropped-in-v3-8-10) below.
 
 ---
@@ -224,7 +224,7 @@ through Prisma repositories — Mastra manages its own tables.
 
 ## Dropped in v3.8.10
 
-The dead Gitroom creator-marketplace and GitHub-stars subsystems were removed in a single
+The dead upstream creator-marketplace and GitHub-stars subsystems were removed in a single
 destructive push (preceded by a DB snapshot):
 
 - **Models:** `SocialMediaAgency`, `SocialMediaAgencyNiche`, `MessagesGroup`, `Messages`,

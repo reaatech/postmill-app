@@ -37,7 +37,27 @@ function makeRepo(model = makeModel()) {
 }
 
 function makeService(fileRepo: FileRepository) {
-  return new FileService(fileRepo, {} as any);
+  const storageService = {
+    assertWithinQuota: vi.fn().mockResolvedValue(undefined),
+    resolveAdapterForFolder: vi.fn().mockResolvedValue({
+      getFileUrl: vi.fn().mockReturnValue('https://example.com/file.png'),
+      readFile: vi.fn().mockResolvedValue(Buffer.from('file')),
+      writeBuffer: vi.fn().mockResolvedValue('path'),
+      removeFile: vi.fn().mockResolvedValue(undefined),
+    }),
+    resolveAdapterForFolderWithConfigId: vi.fn().mockResolvedValue({
+      adapter: {
+        getFileUrl: vi.fn().mockReturnValue('https://example.com/file.png'),
+        readFile: vi.fn().mockResolvedValue(Buffer.from('file')),
+        writeBuffer: vi.fn().mockResolvedValue('path'),
+        removeFile: vi.fn().mockResolvedValue(undefined),
+      },
+      configId: null,
+    }),
+    getOrgStoragePublicPrefixes: vi.fn().mockResolvedValue([]),
+    assertWithinProviderQuota: vi.fn().mockResolvedValue(undefined),
+  };
+  return new FileService(fileRepo, storageService as any);
 }
 
 beforeEach(() => {

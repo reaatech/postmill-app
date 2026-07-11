@@ -174,6 +174,10 @@ export class OrganizationService {
     );
   }
 
+  disableExcessNonOwnerUsers(orgId: string, keep: number) {
+    return this._organizationRepository.disableExcessNonOwnerUsers(orgId, keep);
+  }
+
   getShortlinkPreference(orgId: string) {
     return this._organizationRepository.getShortlinkPreference(orgId);
   }

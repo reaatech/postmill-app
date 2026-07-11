@@ -88,7 +88,10 @@ export class FilesController {
   }
 
   @Post('/upload-server')
-  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.MEDIA],
+    [AuthorizationActions.Create, Sections.STORAGE]
+  )
   @RequirePermission('media', 'create')
   @UseInterceptors(FileInterceptor('file', {
       storage: diskStorage({
@@ -122,7 +125,10 @@ export class FilesController {
   }
 
   @Post('/upload-simple')
-  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.MEDIA],
+    [AuthorizationActions.Create, Sections.STORAGE]
+  )
   @RequirePermission('media', 'create')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: UPLOAD_LIMITS.maxBytes } }))
   @UsePipes(new CustomFileValidationPipe())
@@ -154,7 +160,10 @@ export class FilesController {
   }
 
   @Post('/save-media')
-  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.MEDIA],
+    [AuthorizationActions.Create, Sections.STORAGE]
+  )
   @RequirePermission('media', 'create')
   async saveMedia(
     @GetOrgFromRequest() org: Organization,
@@ -350,7 +359,10 @@ export class FilesController {
   }
 
   @Post('/bulk/save')
-  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.MEDIA],
+    [AuthorizationActions.Create, Sections.STORAGE]
+  )
   @RequirePermission('media', 'create')
   async bulkSaveFiles(
     @GetOrgFromRequest() org: Organization,
@@ -392,7 +404,10 @@ export class FilesController {
   // ── Import from URL ────────────────────────────────────
 
   @Post('/import')
-  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.MEDIA],
+    [AuthorizationActions.Create, Sections.STORAGE]
+  )
   @RequirePermission('media', 'create')
   async importFromUrl(
     @GetOrgFromRequest() org: Organization,

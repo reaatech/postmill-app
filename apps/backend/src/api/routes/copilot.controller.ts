@@ -27,7 +27,6 @@ import { Groq } from 'groq-sdk';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { Organization, User } from '@prisma/client';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { MastraAgent } from '@ag-ui/mastra';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { Request, Response } from 'express';
@@ -35,7 +34,6 @@ import { RequestContext } from '@mastra/core/di';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
-import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
@@ -53,10 +51,8 @@ export type ChannelsContext = {
 @Controller('/copilot')
 export class CopilotController {
   constructor(
-    private _subscriptionService: SubscriptionService,
     private _mastraService: MastraService,
     private _aiModelProvider: AIModelProvider,
-    private _budgetService: BudgetService,
     private _guardrails: GuardrailService,
     private _telemetry: TelemetryService,
     private _featureFlagsService: FeatureFlagsService,
@@ -259,7 +255,7 @@ export class CopilotController {
   }
 
   @Post('/chat')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @CheckPolicies([AuthorizationActions.Create, Sections.MCP])
   async chatAgent(
     @Req() req: Request,
     @Res() res: Response,
@@ -269,13 +265,6 @@ export class CopilotController {
       return res.status(422).json({ error: 'AI agent is disabled' });
     }
 
-    const inDevMode = process.env.NOT_SECURED && process.env.NODE_ENV === 'development';
-    if (!inDevMode && organization) {
-      const budgetCheck = await this._budgetService.checkBudget('agent', organization.id);
-      if (!budgetCheck.allowed) {
-        return res.status(429).json({ error: 'AI budget exceeded', detail: budgetCheck.reason });
-      }
-    }
     try {
       const serviceAdapter = await this._serviceAdapterOrEmpty(organization?.id);
       const copilotRuntimeHandler = copilotRuntimeNodeHttpEndpoint({
@@ -295,7 +284,7 @@ export class CopilotController {
   }
 
   @Post('/agent')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @CheckPolicies([AuthorizationActions.Create, Sections.MCP])
   async agent(
     @Req() req: Request,
     @Res() res: Response,
@@ -306,13 +295,6 @@ export class CopilotController {
       return res.status(422).json({ error: 'AI agent is disabled' });
     }
 
-    const inDevMode = process.env.NOT_SECURED && process.env.NODE_ENV === 'development';
-    if (!inDevMode && organization) {
-      const budgetCheck = await this._budgetService.checkBudget('agent', organization.id);
-      if (!budgetCheck.allowed) {
-        return res.status(429).json({ error: 'AI budget exceeded', detail: budgetCheck.reason });
-      }
-    }
     try {
       const serviceAdapter = await this._serviceAdapterOrEmpty(organization.id);
       const mastra = await this._mastraService.mastra();
@@ -360,19 +342,8 @@ export class CopilotController {
     }
   }
 
-  @Get('/credits')
-  calculateCredits(
-    @GetOrgFromRequest() organization: Organization,
-    @Query('type') type: 'ai_images' | 'ai_videos'
-  ) {
-    return this._subscriptionService.checkCredits(
-      organization,
-      type || 'ai_images'
-    );
-  }
-
   @Get('/:thread/list')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @CheckPolicies([AuthorizationActions.Create, Sections.MCP])
   async getMessagesList(
     @GetOrgFromRequest() organization: Organization,
     @Param('thread') threadId: string
@@ -393,7 +364,7 @@ export class CopilotController {
   }
 
   @Get('/list')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @CheckPolicies([AuthorizationActions.Create, Sections.MCP])
   async getList(
     @GetOrgFromRequest() organization: Organization,
     @Query('perPage') perPage?: string

@@ -196,6 +196,9 @@ const INTENTIONALLY_UNGATED = new Set<string>([
   'BillingController.cancel',
   'BillingController.prorate',
   'BillingController.lifetime',
+  'BillingController.changePlan',
+  'BillingController.manageAddons',
+  'BillingController.cancelAddon',
 
   // Enterprise onboarding/integration handshake endpoints. Auth is via signed JWT +
   // API-key hash, not org RBAC.
@@ -221,6 +224,26 @@ const INTENTIONALLY_UNGATED = new Set<string>([
 
   // Stateless outbound webhook sender; no org config is mutated.
   'WebhookController.sendWebhook',
+
+  // Transient short-link classifier — inspects message text and returns a
+  // boolean recommendation; persists no org config.
+  'PostsController.shouldShortlink',
+
+  // Transient text-splitting utility for the composer — no persistence.
+  'PostsController.separatePosts',
+
+  // RAG is a read/search/utility surface gated by AI provider budget and
+  // throttle. Mutations target the org's own ephemeral vector index, not
+  // governed org config; RBAC resource is not yet defined for this feature.
+  'RagController.indexContent',
+  'RagController.deleteItem',
+  'RagController.search',
+  'RagController.triggerBackfill',
+  'RagController.saveSettings',
+  'RagController.testConnection',
+
+  // Stateless AI guardrail check — returns moderation result, persists nothing.
+  'AiModerateController.moderate',
 ]);
 
 const MUTATING = new Set<number>([

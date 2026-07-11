@@ -17,19 +17,14 @@ const humanizeAiError = (
   t: ReturnType<typeof useT>,
   status: number,
   body: any
-): string => {
+): React.ReactNode => {
   if (status === 429) {
     const message = body?.message || body?.error;
-    return message === 'BudgetExceeded' || body?.error === 'BudgetExceeded'
-      ? t(
-          'ai_budget_exceeded',
-          'AI budget exceeded — contact your admin to increase limits.'
-        )
-      : t('ai_rate_limited', 'Rate limited: {{message}}', {
-          message:
-            message ||
-            t('please_try_again_later', 'please try again later.'),
-        });
+    return t('ai_rate_limited', 'Rate limited: {{message}}', {
+      message:
+        message ||
+        t('please_try_again_later', 'please try again later.'),
+    });
   }
   if (status === 403) {
     const policy = body?.policy;
@@ -49,7 +44,17 @@ const humanizeAiError = (
     );
   }
   if (status === 402) {
-    return t('ai_spend_cap_reached', 'AI spend cap reached. Contact your admin.');
+    return (
+      <>
+        {t(
+          'feature_not_available_on_plan',
+          'This feature is not available on your plan — upgrade to unlock it.'
+        )}{' '}
+        <a href="/billing" className="underline hover:text-textColor">
+          {t('upgrade_now', 'Upgrade now')}
+        </a>
+      </>
+    );
   }
   return t('ai_draft_failed', 'AI draft failed. Please try again.');
 };
@@ -66,7 +71,7 @@ export const CommentComposer: FC<CommentComposerProps> = ({
   const fetch = useFetch();
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<React.ReactNode>('');
   const [aiLoading, setAiLoading] = useState(false);
 
   const handleSend = async () => {

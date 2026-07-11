@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -8,6 +8,8 @@ import { CancelSubscriptionDto } from '@gitroom/backend/dtos/billing/cancel-subs
 import { LifetimeCodeDto } from '@gitroom/backend/dtos/billing/lifetime-code.dto';
 import { RefundChargesDto } from '@gitroom/backend/dtos/billing/refund-charges.dto';
 import { AddSubscriptionDto } from '@gitroom/backend/dtos/billing/add-subscription.dto';
+import { ChangePlanDto } from '@gitroom/nestjs-libraries/dtos/billing/change-plan.dto';
+import { ManageAddonsDto } from '@gitroom/nestjs-libraries/dtos/billing/manage-addons.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
@@ -188,6 +190,41 @@ export class BillingController {
       user.id,
       body.subscription
     );
+  }
+
+  @Post('/change-plan')
+  @RequirePermission('billing', 'manage')
+  async changePlan(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Body() body: ChangePlanDto
+  ) {
+    return this._stripeService.changePlan(org.id, user.id, body.tier);
+  }
+
+  @Post('/addons')
+  @RequirePermission('billing', 'manage')
+  async manageAddons(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: ManageAddonsDto
+  ) {
+    return this._stripeService.createOrUpdateAddon(
+      org.id,
+      body.type,
+      body.packs
+    );
+  }
+
+  @Delete('/addons/:type')
+  @RequirePermission('billing', 'manage')
+  async cancelAddon(
+    @GetOrgFromRequest() org: Organization,
+    @Param('type') type: 'storage' | 'video_exports'
+  ) {
+    if (type !== 'storage' && type !== 'video_exports') {
+      throw new BadRequestException('Invalid add-on type');
+    }
+    return this._stripeService.cancelAddon(org.id, type);
   }
 
 }

@@ -503,7 +503,7 @@ export const MultiFileComponent: FC<{
                   </div>
                 </div>
               </button>
-              {!!user?.tier?.ai && (
+              {!!user?.tier && (
                 <ToolbarDropdown
                   label={t('ai_tools', 'AI')}
                   icon={<SparkleIcon />}

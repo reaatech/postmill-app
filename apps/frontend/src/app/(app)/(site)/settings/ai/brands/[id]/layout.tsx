@@ -95,7 +95,7 @@ function BrandEditLayoutInner({ children }: { children: React.ReactNode }) {
 export default function BrandEditLayout({ children }: { children: React.ReactNode }) {
   const user = useUser();
   return (
-    <SettingsGate allow={user ? user.tier?.current !== 'FREE' : undefined}>
+    <SettingsGate allow={user ? !!user.tier?.brand_kits : undefined}>
       <BrandEditLayoutInner>{children}</BrandEditLayoutInner>
     </SettingsGate>
   );

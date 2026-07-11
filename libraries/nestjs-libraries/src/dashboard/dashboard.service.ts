@@ -8,6 +8,8 @@ import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/in
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
@@ -137,7 +139,9 @@ export class DashboardService {
     private _campaignsService: CampaignsService,
     private _analyticsService: AnalyticsService,
     private _aiSettingsManager: AiSettingsManager,
-    private _redisService: RedisService
+    private _redisService: RedisService,
+    private _subscriptionService: SubscriptionService,
+    private _fileRepository: FileRepository,
   ) {}
 
   private _summaryCacheKey(orgId: string, userId: string) {
@@ -282,42 +286,62 @@ export class DashboardService {
 
   async buildUsage(
     org: Organization,
-    subscription: { subscriptionTier?: string; createdAt?: Date } | null | undefined,
+    subscription: { subscriptionTier?: string; createdAt?: Date; extraVideoExports?: number; totalChannels?: number } | null | undefined,
     options: {
       posts_per_month: number | boolean;
       channel: number | boolean;
       team_members: number | boolean;
-    }
+      storage_gb: number;
+      video_exports: number;
+    },
+    byoStorageActive: boolean
   ) {
     const createdAt = subscription?.createdAt || org.createdAt;
     const totalMonthPast = Math.abs(dayjs(createdAt).diff(dayjs(), 'month'));
     const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
 
-    const [postsThisCycle, integrations, team] = await Promise.all([
-      this._postsService.countPostsFromDay(org.id, checkFrom.toDate()),
-      this._integrationService.getIntegrationsList(org.id),
-      this._organizationService.getTeam(org.id),
-    ]);
+    const [postsThisCycle, integrations, team, storageBytes, videoExportsUsed] =
+      await Promise.all([
+        this._postsService.countPostsFromDay(org.id, checkFrom.toDate()),
+        this._integrationService.getIntegrationsList(org.id),
+        this._organizationService.getTeam(org.id),
+        this._fileRepository.getStorageBytes(org.id),
+        this._subscriptionService.getCreditsFrom(
+          org.id,
+          checkFrom,
+          'video_export'
+        ),
+      ]);
 
     return {
       billingEnabled: true,
-      tier: subscription?.subscriptionTier || 'FREE',
+      tier: subscription?.subscriptionTier || 'STARTER',
+      byoStorageActive,
       limits: {
         postsPerMonth: options.posts_per_month,
-        channels: options.channel,
+        // A subscribed org's real channel cap is subscription.totalChannels;
+        // options.channel is the -10 "effectively unlimited when paid" sentinel.
+        channels: subscription ? subscription.totalChannels : options.channel,
         teamMembers: options.team_members,
+        storageGb: options.storage_gb,
+        videoExports: options.video_exports,
       },
       usage: {
         postsThisCycle,
         channels: integrations.filter((i) => !i.refreshNeeded).length,
-        teamMembers: team?.users?.length ?? 0,
+        teamMembers: team?.users?.filter((u) => !u.disabled).length ?? 0,
+        storageBytes,
+        videoExports: videoExportsUsed,
       },
     };
   }
 
   async buildPlanUsage(
     org: Organization,
-    subscription: { subscriptionTier?: string; createdAt?: Date } | null | undefined,
+    subscription:
+      | { subscriptionTier?: string; createdAt?: Date; totalChannels?: number }
+      | null
+      | undefined,
     options: {
       posts_per_month: number | boolean;
       channel: number | boolean;
@@ -338,8 +362,8 @@ export class DashboardService {
       postsThisCycle,
       postsLimit: options.posts_per_month,
       channels: integrations.filter((i) => !i.refreshNeeded).length,
-      channelsLimit: options.channel,
-      teamMembers: team?.users?.length ?? 0,
+      channelsLimit: subscription?.totalChannels ?? options.channel,
+      teamMembers: team?.users?.filter((u) => !u.disabled).length ?? 0,
       teamLimit: options.team_members,
     };
   }

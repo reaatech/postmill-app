@@ -78,7 +78,6 @@ describe('AnalyticsV2Controller', () => {
   let controller: AnalyticsV2Controller;
   let service: AnalyticsService;
   let watchlistService: any;
-  let budgetService: any;
   let shareService: any;
 
   beforeEach(() => {
@@ -91,9 +90,6 @@ describe('AnalyticsV2Controller', () => {
       remove: vi.fn(),
       getSeries: vi.fn(),
     } as any;
-    budgetService = {
-      checkBudget: vi.fn().mockResolvedValue({ allowed: true }),
-    } as any;
     shareService = {
       getShare: vi.fn(),
       mintShare: vi.fn(),
@@ -102,7 +98,6 @@ describe('AnalyticsV2Controller', () => {
     controller = new AnalyticsV2Controller(
       service as unknown as AnalyticsService,
       watchlistService,
-      budgetService,
       shareService,
     );
   });
@@ -474,25 +469,15 @@ describe('AnalyticsV2Controller', () => {
   });
 
   describe('narrate (7.5)', () => {
-    it('checks budget then delegates to narrate', async () => {
+    it('delegates to narrate without a budget gate', async () => {
       (service.narrate as any).mockResolvedValue({ narrative: 'text' });
       const result = await controller.narrate(mockOrg, dq());
-      expect(budgetService.checkBudget).toHaveBeenCalledWith('utility', 'test-org-id');
       expect(service.narrate).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07');
       expect(result).toEqual({ narrative: 'text' });
     });
 
-    it('returns 429 when budget is exceeded and does NOT call narrate', async () => {
-      budgetService.checkBudget.mockResolvedValue({ allowed: false, reason: 'over cap' });
-      await expect(controller.narrate(mockOrg, dq())).rejects.toMatchObject({
-        status: 429,
-      });
-      expect(service.narrate).not.toHaveBeenCalled();
-    });
-
-    it('validates the date range before the budget check', async () => {
+    it('validates the date range', async () => {
       await expect(controller.narrate(mockOrg, dq({ from: '' }))).rejects.toThrow(BadRequestException);
-      expect(budgetService.checkBudget).not.toHaveBeenCalled();
     });
   });
 
@@ -648,12 +633,12 @@ describe('AuthZ decorator metadata (R2.1 / R2.2)', () => {
     });
   }
 
-  // R2.2 — narrate is AI-billing-gated, NOT rbac-gated.
-  it('narrate is gated by CheckPolicies([Create, AI]) and not RBAC', () => {
-    expect(checkPolicies('narrate')).toEqual([
-      [AuthorizationActions.Create, Sections.AI],
-    ]);
-    expect(requirePerm('narrate')).toBeUndefined();
+  // R2.2 — narrate is no longer AI-billing-gated under BYOK, but it is a
+  // mutating POST on an org-resource controller and therefore carries
+  // @RequirePermission('analytics', 'read').
+  it('narrate requires analytics:read and has no CheckPolicies gate', () => {
+    expect(checkPolicies('narrate')).toBeUndefined();
+    expect(requirePerm('narrate')).toEqual({ resource: 'analytics', action: 'read' });
   });
 
   // GET routes stay on the org-scope default (no RequirePermission).

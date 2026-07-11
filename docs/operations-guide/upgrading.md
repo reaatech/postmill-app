@@ -294,7 +294,7 @@ docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local > pre_3
 pnpm run prisma-db-push   # applies the schema, including the drops below
 ```
 
-**Dropped tables** (dead Gitroom marketplace/GitHub-stars subsystems, no reachable entrypoints):
+**Dropped tables** (dead upstream marketplace/GitHub-stars subsystems, no reachable entrypoints):
 `SocialMediaAgency`, `SocialMediaAgencyNiche`, `MessagesGroup`, `Messages`, `Orders`,
 `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`.
 

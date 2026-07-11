@@ -57,6 +57,7 @@ describe('DashboardController', () => {
   };
   let permissionsService: {
     getPackageOptions: ReturnType<typeof vi.fn>;
+    getEffectiveLimits: ReturnType<typeof vi.fn>;
   };
   let rolesService: {
     getEffectivePermissions: ReturnType<typeof vi.fn>;
@@ -101,6 +102,11 @@ describe('DashboardController', () => {
       getPackageOptions: vi.fn().mockResolvedValue({
         subscription: { subscriptionTier: 'PRO', createdAt: new Date('2024-01-01') },
         options: { posts_per_month: 1000, channel: -10, team_members: 5 },
+      }),
+      getEffectiveLimits: vi.fn().mockResolvedValue({
+        subscription: { subscriptionTier: 'PRO', createdAt: new Date('2024-01-01') },
+        options: { posts_per_month: 1000, channel: -10, team_members: 5, storage_gb: 5, video_exports: 60 },
+        byoStorageActive: false,
       }),
     };
     rolesService = {
@@ -153,6 +159,7 @@ describe('DashboardController', () => {
       org,
       expect.objectContaining({ subscriptionTier: 'PRO' }),
       expect.objectContaining({ posts_per_month: 1000 }),
+      false,
     );
     delete process.env.STRIPE_PUBLISHABLE_KEY;
   });

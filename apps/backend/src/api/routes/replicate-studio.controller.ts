@@ -8,7 +8,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections, SubscriptionException } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
@@ -17,7 +17,6 @@ import { ReplicateRunnerService } from '@gitroom/nestjs-libraries/media/replicat
 import { ReplicateCatalogService } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-catalog.service';
 import { ReplicateEnhanceService } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-enhance.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { EstimateDto, RunSyncDto, RunAsyncDto, SaveUrlDto, MergeDto, EnhancePromptDto } from '@gitroom/nestjs-libraries/dtos/replicate';
 import { estimate } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-cost';
 
@@ -29,7 +28,6 @@ export class ReplicateStudioController {
     private readonly _catalog: ReplicateCatalogService,
     private readonly _enhance: ReplicateEnhanceService,
     private readonly _fileService: FileService,
-    private readonly _subscription: SubscriptionService,
   ) {}
 
   @Get('/status')
@@ -91,27 +89,12 @@ export class ReplicateStudioController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
-    // Image ops: read-only credit gate; actual consumption happens in the runner.
     if (body.operation === 'image') {
-      if (process.env.STRIPE_PUBLISHABLE_KEY) {
-        const { credits } = await this._subscription.checkCredits(org, 'ai_images');
-        if (credits <= 0) {
-          throw new SubscriptionException({
-            section: Sections.MEDIA,
-            action: AuthorizationActions.Create,
-          });
-        }
-      }
-      return this._runner.runSync(
-        org.id,
-        user.id,
-        {
-          modelId: body.modelId,
-          input: body.input,
-          operation: body.operation,
-        },
-        { creditType: 'ai_images' },
-      );
+      return this._runner.runSync(org.id, user.id, {
+        modelId: body.modelId,
+        input: body.input,
+        operation: body.operation,
+      });
     }
 
     // STT: no credit gate, no credit consumption
@@ -131,53 +114,14 @@ export class ReplicateStudioController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
-    // Video/image ops: read-only credit gate; actual consumption happens in the runner.
-    if (body.operation === 'video') {
-      if (process.env.STRIPE_PUBLISHABLE_KEY) {
-        const { credits } = await this._subscription.checkCredits(org, 'ai_videos');
-        if (credits <= 0) {
-          throw new SubscriptionException({
-            section: Sections.VIDEOS_PER_MONTH,
-            action: AuthorizationActions.Create,
-          });
-        }
-      }
-      return this._runner.runAsync(
-        org.id,
-        user.id,
-        {
-          modelId: body.modelId,
-          versionId: body.versionId,
-          input: body.input,
-          folderId: body.folderId,
-          operation: body.operation,
-        },
-        { creditType: 'ai_videos' },
-      );
-    }
-
-    if (body.operation === 'image') {
-      if (process.env.STRIPE_PUBLISHABLE_KEY) {
-        const { credits } = await this._subscription.checkCredits(org, 'ai_images');
-        if (credits <= 0) {
-          throw new SubscriptionException({
-            section: Sections.MEDIA,
-            action: AuthorizationActions.Create,
-          });
-        }
-      }
-      return this._runner.runAsync(
-        org.id,
-        user.id,
-        {
-          modelId: body.modelId,
-          versionId: body.versionId,
-          input: body.input,
-          folderId: body.folderId,
-          operation: body.operation,
-        },
-        { creditType: 'ai_images' },
-      );
+    if (body.operation === 'video' || body.operation === 'image') {
+      return this._runner.runAsync(org.id, user.id, {
+        modelId: body.modelId,
+        versionId: body.versionId,
+        input: body.input,
+        folderId: body.folderId,
+        operation: body.operation,
+      });
     }
 
     // Audio: no gate, no credit consumption

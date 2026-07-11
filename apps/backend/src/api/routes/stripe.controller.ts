@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { ApiTags } from '@nestjs/swagger';
+import Stripe from 'stripe';
 
 @ApiTags('Stripe')
 @Controller('/stripe')
@@ -26,7 +27,7 @@ export class StripeController {
     if (
        
       // @ts-ignore
-      event?.data?.object?.metadata?.service !== 'gitroom' &&
+      event?.data?.object?.metadata?.service !== 'postmill' &&
       event.type !== 'invoice.payment_succeeded' &&
       event.type !== 'invoice.payment_failed'
     ) {
@@ -41,6 +42,12 @@ export class StripeController {
 
     try {
       let result: any;
+      // @ts-ignore
+      const metadata = event?.data?.object?.metadata || {};
+      const isAddon =
+        metadata.service === 'postmill' &&
+        (metadata.addon === 'storage' || metadata.addon === 'video_exports');
+
       switch (event.type) {
         case 'invoice.payment_succeeded':
           result = await this._stripeService.paymentSucceeded(event);
@@ -49,13 +56,13 @@ export class StripeController {
           result = await this._stripeService.paymentFailed(event);
           break;
         case 'customer.subscription.created':
-          result = await this._stripeService.createSubscription(event);
-          break;
         case 'customer.subscription.updated':
-          result = await this._stripeService.updateSubscription(event);
-          break;
         case 'customer.subscription.deleted':
-          result = await this._stripeService.deleteSubscription(event);
+          result = isAddon
+            ? await this._stripeService.syncAddonQuantities(
+                event.data.object.customer as string
+              )
+            : await this._routeBaseSubscriptionEvent(event);
           break;
         default:
           result = { ok: true };
@@ -66,6 +73,24 @@ export class StripeController {
       return result;
     } catch (e) {
       throw new HttpException(e, 500);
+    }
+  }
+
+  private async _routeBaseSubscriptionEvent(
+    event:
+      | Stripe.CustomerSubscriptionCreatedEvent
+      | Stripe.CustomerSubscriptionUpdatedEvent
+      | Stripe.CustomerSubscriptionDeletedEvent
+  ) {
+    switch (event.type) {
+      case 'customer.subscription.created':
+        return this._stripeService.createSubscription(event);
+      case 'customer.subscription.updated':
+        return this._stripeService.updateSubscription(event);
+      case 'customer.subscription.deleted':
+        return this._stripeService.deleteSubscription(event);
+      default:
+        return { ok: true };
     }
   }
 }

@@ -11,15 +11,15 @@ import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/se
 import NotificationComponent from '@gitroom/frontend/components/notifications/notification.component';
 import dynamic from 'next/dynamic';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  pricing,
+  PlanInterface,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { capitalize } from 'lodash';
 import clsx from 'clsx';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { CheckIconComponent } from '@gitroom/frontend/components/ui/check.icon.component';
-import {
-  FAQComponent,
-  FAQSection,
-} from '@gitroom/frontend/components/billing/faq.component';
+import { FAQComponent } from '@gitroom/frontend/components/billing/faq.component';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
@@ -101,8 +101,8 @@ const JoinOver: FC<{ onShowYouTube: () => void }> = ({ onShowYouTube }) => {
             </div>
             <div>
               {t(
-                'billing_pay_nothing_7_days',
-                'Pay NOTHING for the first 7-days'
+                'billing_pay_nothing_30_days',
+                'Pay NOTHING for the first 30 days'
               )}
             </div>
           </div>
@@ -127,15 +127,13 @@ export const FirstBillingComponent = () => {
   const [stripe] = useState<Promise<Stripe | null> | null>(() =>
     stripeClient ? loadStripe(stripeClient) : null
   );
-  const [tier, setTier] = useState('STANDARD');
+  const [tier, setTier] = useState<PlanInterface['current']>('STARTER');
   const [period, setPeriod] = useState('MONTHLY');
   const fetch = useFetch();
   const modals = useModals();
   const t = useT();
   const [datafast_visitor_id] = useCookie('datafast_visitor_id', '');
   const [datafast_session_id] = useCookie('datafast_session_id', '');
-
-
 
   const loadCheckout = useCallback(async () => {
     return (
@@ -183,10 +181,7 @@ export const FirstBillingComponent = () => {
     }
   );
 
-  const price = useMemo(
-    () => Object.entries(pricing).filter(([key, value]) => key !== 'FREE'),
-    []
-  );
+  const price = useMemo(() => Object.entries(pricing), []);
 
   return (
     <div className="blurMe flex flex-1 flex-col bg-newBgColorInner pb-[60px] mobile:pb-[100px]">
@@ -207,9 +202,7 @@ export const FirstBillingComponent = () => {
             <DeveloperIconComponent />
             <NotificationComponent />
             <div className="hover:text-newTextColor">
-              {user?.tier.current === 'FREE' && (
-                <LogoutComponent isIcon={true} />
-              )}
+              <LogoutComponent isIcon={true} />
             </div>
           </div>
         </div>
@@ -274,7 +267,7 @@ export const FirstBillingComponent = () => {
                 ([key, value]) => (
                   <button
                     type="button"
-                    onClick={() => setTier(key)}
+                    onClick={() => setTier(key as PlanInterface['current'])}
                     key={key}
                     className={clsx(
                       'm-0 p-0 border-0 bg-transparent text-left cursor-pointer select-none w-[266px] h-[138px] tablet:w-full tablet:h-[124px] p-[24px] tablet:p-[15px] rounded-[20px] flex flex-col',
@@ -325,71 +318,132 @@ type FeatureItem = {
   key: string;
   defaultValue: string;
   prefix?: string | number;
+  badge?: 'yes' | 'no' | 'unlimited';
 };
 
-export const BillingFeatures: FC<{ tier: string }> = ({ tier }) => {
+export const BillingFeatures: FC<{ tier: PlanInterface['current'] }> = ({
+  tier,
+}) => {
   const t = useT();
-  const features = useMemo(() => {
-    const currentPricing = pricing[tier];
-    const channelsOr = currentPricing.channel;
+  const currentPricing = pricing[tier];
+
+  const features = useMemo((): FeatureItem[] => {
     const list: FeatureItem[] = [];
 
     list.push({
-      key: channelsOr === 1 ? 'billing_channel' : 'billing_channels',
-      defaultValue: channelsOr === 1 ? 'channel' : 'channels',
-      prefix: channelsOr,
+      key: 'billing_unlimited_ai_creation',
+      defaultValue: 'Unlimited AI creation',
+    });
+
+    list.push({
+      key:
+        currentPricing.channel === 1
+          ? 'billing_social_channel'
+          : 'billing_social_channels',
+      defaultValue:
+        currentPricing.channel === 1 ? 'social channel' : 'social channels',
+      prefix:
+        currentPricing.channel >= 10000
+          ? 'unlimited'
+          : currentPricing.channel,
     });
 
     list.push({
       key: 'billing_posts_per_month',
       defaultValue: 'posts per month',
       prefix:
-        currentPricing.posts_per_month > 10000
+        currentPricing.posts_per_month >= 10000
           ? 'unlimited'
           : currentPricing.posts_per_month,
     });
 
-    if (currentPricing.team_members) {
-      list.push({
-        key: 'billing_unlimited_team_members',
-        defaultValue: 'Unlimited team members',
-      });
-    }
-    if (currentPricing?.ai) {
-      list.push({
-        key: 'billing_ai_auto_complete',
-        defaultValue: 'AI auto-complete',
-      });
-      list.push({ key: 'billing_ai_copilots', defaultValue: 'AI copilots' });
-      list.push({
-        key: 'billing_ai_autocomplete',
-        defaultValue: 'AI Autocomplete',
-      });
-    }
     list.push({
-      key: 'billing_advanced_picture_editor',
-      defaultValue: 'Advanced Picture Editor',
+      key:
+        currentPricing.team_members === 1
+          ? 'billing_team_member'
+          : 'billing_team_members',
+      defaultValue:
+        currentPricing.team_members === 1 ? 'team member' : 'team members',
+      prefix: currentPricing.team_members,
     });
-    if (currentPricing?.image_generator) {
-      list.push({
-        key: 'billing_ai_images_per_month',
-        defaultValue: 'AI Images per month',
-        prefix: currentPricing?.image_generation_count,
-      });
-    }
-    if (currentPricing?.generate_videos) {
-      list.push({
-        key: 'billing_ai_videos_per_month',
-        defaultValue: 'AI Videos per month',
-        prefix: currentPricing?.generate_videos,
-      });
-    }
+
+    list.push({
+      key:
+        currentPricing.brand_kits === 1
+          ? 'billing_brand_kit'
+          : 'billing_brand_kits',
+      defaultValue:
+        currentPricing.brand_kits === 1 ? 'brand kit' : 'brand kits',
+      prefix: currentPricing.brand_kits,
+    });
+
+    list.push({
+      key: 'billing_campaigns',
+      defaultValue: 'Campaigns',
+      badge: currentPricing.campaigns ? 'yes' : 'no',
+    });
+
+    list.push({
+      key: 'billing_api_and_mcp',
+      defaultValue: 'API & MCP',
+      badge: currentPricing.api && currentPricing.mcp ? 'yes' : 'no',
+    });
+
+    list.push({
+      key:
+        currentPricing.webhooks === 1
+          ? 'billing_webhook'
+          : 'billing_webhooks',
+      defaultValue: currentPricing.webhooks === 1 ? 'webhook' : 'webhooks',
+      prefix: currentPricing.webhooks,
+    });
+
+    list.push({
+      key:
+        currentPricing.competitors === 1
+          ? 'billing_competitor'
+          : 'billing_competitors',
+      defaultValue:
+        currentPricing.competitors === 1 ? 'competitor' : 'competitors',
+      prefix: currentPricing.competitors,
+    });
+
+    list.push({
+      key: 'billing_analytics_retention',
+      defaultValue: 'analytics retention',
+      prefix: `${currentPricing.analytics_retention_days} days`,
+    });
+
+    list.push({
+      key: 'billing_video_exports_per_month',
+      defaultValue: 'video exports/mo',
+      prefix: currentPricing.video_exports,
+    });
+
+    list.push({
+      key: 'billing_hosted_storage',
+      defaultValue: 'hosted storage',
+      prefix: `${currentPricing.storage_gb} GB`,
+    });
+
+    list.push({
+      key: 'billing_byo_storage',
+      defaultValue: 'BYO storage',
+      badge: currentPricing.byo_storage ? 'yes' : 'no',
+    });
+
+    list.push({
+      key: 'billing_priority_support',
+      defaultValue: 'Priority support',
+      badge: currentPricing.priority ? 'yes' : 'no',
+    });
+
     return list;
-  }, [tier]);
+  }, [currentPricing, t]);
 
   const renderFeature = (feature: FeatureItem) => {
     const translatedText = t(feature.key, feature.defaultValue);
-    if (feature.prefix === 'unlimited') {
+    if (feature.badge === 'unlimited' || feature.prefix === 'unlimited') {
       return t('billing_unlimited_feature', 'Unlimited {{feature}}', {
         feature: translatedText,
       });
@@ -421,7 +475,23 @@ export const BillingFeatures: FC<{ tier: string }> = ({ tier }) => {
               />
             </svg>
           </div>
-          <div>{renderFeature(feature)}</div>
+          <div className="flex items-center gap-[8px]">
+            {feature.badge && feature.badge !== 'unlimited' && (
+              <span
+                className={clsx(
+                  'inline-flex items-center px-[6px] py-[1px] rounded-[4px] text-[11px] font-[500]',
+                  feature.badge === 'no'
+                    ? 'bg-red-500/20 text-red-500'
+                    : 'bg-green-500/20 text-green-500'
+                )}
+              >
+                {feature.badge === 'yes'
+                  ? t('billing_yes_badge', 'Yes')
+                  : t('billing_no_badge', 'No')}
+              </span>
+            )}
+            <span>{renderFeature(feature)}</span>
+          </div>
         </div>
       ))}
     </div>

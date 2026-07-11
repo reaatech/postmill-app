@@ -138,14 +138,14 @@ export class BrandsController {
 
   @Get('/')
   @RequirePermission('brands', 'read')
-  @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
+  @CheckPolicies([AuthorizationActions.Read, Sections.BRANDS])
   async list(@GetOrgFromRequest() org: Organization) {
     return this._brandsService.getBrands(org.id);
   }
 
   @Post('/')
   @RequirePermission('brands', 'manage')
-  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+  @CheckPolicies([AuthorizationActions.Create, Sections.BRANDS])
   async create(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreateBrandDto,
@@ -155,7 +155,7 @@ export class BrandsController {
 
   @Put('/:id')
   @RequirePermission('brands', 'manage')
-  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  @CheckPolicies([AuthorizationActions.Update, Sections.BRANDS])
   async update(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -170,7 +170,7 @@ export class BrandsController {
 
   @Delete('/:id')
   @RequirePermission('brands', 'manage')
-  @CheckPolicies([AuthorizationActions.Delete, Sections.POSTS_PER_MONTH])
+  @CheckPolicies([AuthorizationActions.Delete, Sections.BRANDS])
   async delete(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -184,7 +184,7 @@ export class BrandsController {
 
   @Post('/:id/default')
   @RequirePermission('brands', 'manage')
-  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  @CheckPolicies([AuthorizationActions.Update, Sections.BRANDS])
   async setDefault(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,

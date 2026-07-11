@@ -675,4 +675,15 @@ export class FileRepository {
       orderBy: { deletedAt: 'desc' },
     });
   }
+
+  async getStorageBytes(org: string): Promise<number> {
+    const result = await this._file.model.file.aggregate({
+      _sum: { fileSize: true },
+      where: {
+        organizationId: org,
+        deletedAt: null,
+      },
+    });
+    return result._sum.fileSize ?? 0;
+  }
 }

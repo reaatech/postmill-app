@@ -8,6 +8,8 @@ import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
+export type BillingTier = 'STARTER' | 'PRO' | 'TEAM' | 'AGENCY';
+
 @Injectable()
 export class SubscriptionService {
   constructor(
@@ -24,12 +26,21 @@ export class SubscriptionService {
     );
   }
 
+  getCreditsFrom(organizationId: string, from: dayjs.Dayjs, type: string) {
+    return this._subscriptionRepository.getCreditsFrom(organizationId, from, type);
+  }
+
   useCredit<T>(
     organization: Organization,
-    type = 'ai_images',
+    type = 'video_export',
     func: () => Promise<T>
   ): Promise<T> {
     return this._subscriptionRepository.useCredit(organization, type, func);
+  }
+
+  // Record one credit for an already-completed operation (plain insert, no transaction).
+  recordCredit(organization: Organization, type = 'video_export') {
+    return this._subscriptionRepository.recordCredit(organization.id, type);
   }
 
   getCode(code: string) {
@@ -39,8 +50,8 @@ export class SubscriptionService {
   async deleteSubscription(customerId: string) {
     await this.modifySubscription(
       customerId,
-      pricing.FREE.channel || 0,
-      'FREE'
+      pricing.STARTER.channel || 0,
+      'STARTER'
     );
     return this._subscriptionRepository.deleteSubscriptionByCustomerId(
       customerId
@@ -61,23 +72,11 @@ export class SubscriptionService {
     );
   }
 
-  async modifySubscriptionByOrg(
+  private async _pruneToPlanLimits(
     organizationId: string,
     totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
+    teamMembers: number
   ) {
-    if (!organizationId) {
-      return false;
-    }
-
-    const getCurrentSubscription =
-      (await this._subscriptionRepository.getSubscriptionByOrgId(
-        organizationId
-      ))!;
-
-    const from = pricing[getCurrentSubscription?.subscriptionTier || 'FREE'];
-    const to = pricing[billing];
-
     const currentTotalChannels = (
       await this._integrationService.getIntegrationsList(organizationId)
     ).filter((f) => !f.disabled);
@@ -89,24 +88,27 @@ export class SubscriptionService {
       );
     }
 
-    if (from.team_members && !to.team_members) {
-      await this._organizationService.disableOrEnableNonSuperAdminUsers(
-        organizationId,
-        true
-      );
+    await this._organizationService.disableExcessNonOwnerUsers(
+      organizationId,
+      teamMembers
+    );
+  }
+
+  async modifySubscriptionByOrg(
+    organizationId: string,
+    totalChannels: number,
+    billing: BillingTier
+  ) {
+    if (!organizationId) {
+      return false;
     }
 
-    if (!from.team_members && to.team_members) {
-      await this._organizationService.disableOrEnableNonSuperAdminUsers(
-        organizationId,
-        false
-      );
-    }
-
-    if (billing === 'FREE') {
-      await this._integrationService.changeActiveCron(organizationId);
-    }
-
+    await this._pruneToPlanLimits(organizationId, totalChannels, pricing[billing].team_members);
+    // Persist the applied tier + channel cap. _pruneToPlanLimits only disables excess
+    // resources; without this the Subscription row keeps its old subscriptionTier and every
+    // tier-keyed gate (campaigns/api/mcp/brand_kits/analytics/storage) would still grant the
+    // pre-change tier — e.g. a scheduled downgrade would never actually take effect.
+    await this._subscriptionRepository.applyTier(organizationId, billing, totalChannels);
     return true;
   }
 
@@ -119,18 +121,18 @@ export class SubscriptionService {
     try {
       const load = AuthService.verifyJWT(params) as {
         orgId: string;
-        billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE';
+        billing: BillingTier;
       };
 
       if (!load || !load.orgId || !load.billing || !pricing[load.billing]) {
         return { success: false };
       }
 
-      const totalChannels = pricing[load.billing].channel || 0;
+      const plan = pricing[load.billing];
 
       await this.modifySubscriptionByOrg(
         load.orgId,
-        totalChannels,
+        plan.channel,
         load.billing
       );
 
@@ -143,7 +145,7 @@ export class SubscriptionService {
   async modifySubscription(
     customerId: string,
     totalChannels: number,
-    billing: 'FREE' | 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE'
+    billing: BillingTier
   ) {
     if (!customerId) {
       return false;
@@ -166,39 +168,11 @@ export class SubscriptionService {
       return false;
     }
 
-    const from = pricing[getCurrentSubscription?.subscriptionTier || 'FREE'];
-    const to = pricing[billing];
-
-    const currentTotalChannels = (
-      await this._integrationService.getIntegrationsList(
-        getOrgByCustomerId?.id!
-      )
-    ).filter((f) => !f.disabled);
-
-    if (currentTotalChannels.length > totalChannels) {
-      await this._integrationService.disableIntegrations(
-        getOrgByCustomerId?.id!,
-        currentTotalChannels.length - totalChannels
-      );
-    }
-
-    if (from.team_members && !to.team_members) {
-      await this._organizationService.disableOrEnableNonSuperAdminUsers(
-        getOrgByCustomerId?.id!,
-        true
-      );
-    }
-
-    if (!from.team_members && to.team_members) {
-      await this._organizationService.disableOrEnableNonSuperAdminUsers(
-        getOrgByCustomerId?.id!,
-        false
-      );
-    }
-
-    if (billing === 'FREE') {
-      await this._integrationService.changeActiveCron(getOrgByCustomerId?.id!);
-    }
+    await this._pruneToPlanLimits(
+      getOrgByCustomerId.id,
+      totalChannels,
+      pricing[billing].team_members
+    );
 
     return true;
   }
@@ -208,7 +182,7 @@ export class SubscriptionService {
     identifier: string,
     customerId: string,
     totalChannels: number,
-    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    billing: BillingTier,
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,
@@ -249,49 +223,36 @@ export class SubscriptionService {
     return this._subscriptionRepository.getSubscription(organizationId);
   }
 
-  async checkCredits(organization: Organization, checkType = 'ai_images') {
-    // @ts-ignore
-    const type = organization?.subscription?.subscriptionTier || 'FREE';
-
-    if (type === 'FREE') {
-      return { credits: 0 };
-    }
-
-    // @ts-ignore
-    let date = dayjs(organization.subscription.createdAt);
-    while (date.isBefore(dayjs())) {
-      date = date.add(1, 'month');
-    }
-
-    const checkFromMonth = date.subtract(1, 'month');
-    const imageGenerationCount =
-      checkType === 'ai_images'
-        ? pricing[type].image_generation_count
-        : pricing[type].generate_videos;
-
-    const totalUse = await this._subscriptionRepository.getCreditsFrom(
-      organization.id,
-      checkFromMonth,
-      checkType
-    );
-
-    return {
-      credits: imageGenerationCount - totalUse,
-    };
-  }
-
-  async addSubscription(orgId: string, userId: string, subscription: any) {
+  async addSubscription(orgId: string, userId: string, subscription: BillingTier) {
     await this._subscriptionRepository.setCustomerId(orgId, userId);
     return this.createOrUpdateSubscription(
       false,
       makeId(5),
       userId,
-      pricing[subscription].channel!,
+      pricing[subscription].channel,
       subscription,
       'MONTHLY',
       null,
       undefined,
       orgId
+    );
+  }
+
+  async setPendingTier(organizationId: string, tier: BillingTier) {
+    return this._subscriptionRepository.setPendingTier(organizationId, tier);
+  }
+
+  async clearPendingTier(organizationId: string) {
+    return this._subscriptionRepository.clearPendingTier(organizationId);
+  }
+
+  async updateAddonQuantities(
+    organizationId: string,
+    quantities: { extraStorageGb: number; extraVideoExports: number }
+  ) {
+    return this._subscriptionRepository.updateAddonQuantities(
+      organizationId,
+      quantities
     );
   }
 }

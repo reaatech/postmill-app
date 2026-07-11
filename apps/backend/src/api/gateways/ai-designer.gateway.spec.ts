@@ -519,27 +519,7 @@ describe('AiDesignerGateway _authorize', () => {
     });
   });
 
-  it('disconnects with billing_ai when billing check denies', async () => {
-    const roles = {
-      getEffectivePermissions: vi.fn().mockResolvedValue({
-        permissions: ['media:create'],
-      }),
-    } as any;
-    const permissions = { check: vi.fn().mockResolvedValue(abilityThatCannot()) } as any;
-    const gw = makeGateway({ authContext, roles, permissions }) as any;
-    const client = fakeClient('10.0.0.9');
-    const ctx = { userId: 'u1', orgId: 'o1', isSuperAdmin: false, roleKey: 'member', orgCreatedAt: new Date(), lastAuthzAt: 0, lastAcked: 0 };
-
-    const ok = await gw._authorize(client, ctx);
-
-    expect(ok).toBe(false);
-    expect(client.emit).toHaveBeenCalledWith('error', {
-      code: 'billing_ai',
-      message: expect.any(String),
-    });
-  });
-
-  it('super-admin bypasses RBAC but still checks billing', async () => {
+  it('super-admin bypasses RBAC and needs no permission check', async () => {
     const roles = { getEffectivePermissions: vi.fn() } as any;
     const permissions = { check: vi.fn().mockResolvedValue(abilityThatCan()) } as any;
     const gw = makeGateway({ authContext, roles, permissions }) as any;
@@ -550,7 +530,7 @@ describe('AiDesignerGateway _authorize', () => {
 
     expect(ok).toBe(true);
     expect(roles.getEffectivePermissions).not.toHaveBeenCalled();
-    expect(permissions.check).toHaveBeenCalled();
+    expect(permissions.check).not.toHaveBeenCalled();
     expect(ctx.lastAuthzAt).toBeGreaterThan(0);
   });
 });
@@ -586,7 +566,7 @@ describe('AiDesignerGateway _gate', () => {
     await gw._gate(client, 'message');
 
     expect(roles.getEffectivePermissions).toHaveBeenCalledWith('o1', 'u1');
-    expect(permissions.check).toHaveBeenCalled();
+    expect(permissions.check).not.toHaveBeenCalled();
     expect(ctx.lastAuthzAt).toBeGreaterThan(0);
   });
 

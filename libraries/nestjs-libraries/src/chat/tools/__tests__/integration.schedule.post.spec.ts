@@ -50,7 +50,7 @@ function makeServices(overrides: {
   const subscriptionService = {
     getSubscriptionByOrganizationId: vi
       .fn()
-      .mockResolvedValue({ subscriptionTier: 'STANDARD' }),
+      .mockResolvedValue({ subscriptionTier: 'STARTER' }),
     getSubscription: vi.fn().mockResolvedValue({ createdAt: new Date() }),
     ...overrides.subscription,
   };

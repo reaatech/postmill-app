@@ -21,6 +21,8 @@ This repository is an **AI-native** fork of [gitroomhq/postiz-app](https://githu
 
 Everything else builds around that: persisted multi-channel analytics, a cross-channel comment inbox, campaigns, native polls, **36+ channels**, and a security-hardened, self-hosted stack.
 
+> **Note on the upstream AI/credit model:** the original Postiz stack metered AI usage through a bundled credit system. Postmill replaces that with an **unlimited-AI, bring-your-own-key** model: you configure your own provider keys per organization, and AI is gated only by your own provider quotas and per-org spend caps.
+
 **Full changelog below (newest first):**
 
 **[v4.0.0]** — Unified, versioned provider framework. AI, Media, Storage, Short-link, Social, VPN,
