@@ -154,6 +154,12 @@ AI_MODEL_DEFAULTS_ENABLED=false
 | `STRIPE_PUBLISHABLE_KEY` | — | Stripe publishable key |
 | `STRIPE_SECRET_KEY` | — | Stripe secret key |
 | `STRIPE_SIGNING_KEY` | — | Stripe webhook signing secret |
+| `ADDON_STORAGE_GB_PER_PACK` | `25` | Gigabytes added by one storage add-on pack |
+| `ADDON_VIDEO_EXPORTS_PER_PACK` | `50` | Video exports added by one video-exports add-on pack |
+| `NEXT_PUBLIC_ADDON_STORAGE_GB_PER_PACK` | `25` | Browser-visible mirror of `ADDON_STORAGE_GB_PER_PACK` |
+| `NEXT_PUBLIC_ADDON_VIDEO_EXPORTS_PER_PACK` | `50` | Browser-visible mirror of `ADDON_VIDEO_EXPORTS_PER_PACK` |
+
+Plan and add-on prices are created dynamically from `pricing.ts`; no `STRIPE_PRICE_*` IDs are read from the environment.
 
 ## SSO / OIDC login
 

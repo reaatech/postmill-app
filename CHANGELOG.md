@@ -58,6 +58,7 @@ but external clients / budget config may need action:
   it (this is the intended, previously-missing enforcement).
 
 ### Added
+- **Subscription revamp — Postmill plans, unlimited AI, and metered add-ons.** The billing model is rebuilt around four fixed plans (Starter $9/mo, Pro $29/mo, Team $99/mo, Agency $249/mo) defined in `pricing.ts`; no `STRIPE_PRICE_*` environment variables are used. Every plan includes unlimited AI through the bring-your-own-key provider layer. New 30-day trials apply to all paid plans. Video exports and hosted storage are metered with hard caps; add-on packs extend them ($19/mo per pack, defaults 25 GB storage / 50 video exports, configurable via `ADDON_STORAGE_GB_PER_PACK` and `ADDON_VIDEO_EXPORTS_PER_PACK`). BYO storage buckets waive the hosted-storage cap. Plan changes are prorated on upgrade and deferred on downgrade; self-host deployments without Stripe default to the Agency feature set. Remaining upstream/Postiz-branded user-facing strings were replaced with Postmill.
 - **Dashboard v2 — operational command center.** The post-login landing page (`/dashboard`) is
   rebuilt as a prioritized command center: **Needs Attention** feed (failed posts with per-post
   retry, channel health, pending approvals, unread comments, schedule gaps, budget, failed media

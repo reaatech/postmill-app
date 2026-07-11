@@ -33,13 +33,13 @@ describe('AiModerateController', () => {
     controller = new AiModerateController(new (GuardrailService as any)());
   });
 
-  it('requires AI create permission', () => {
+  it('has no CheckPolicies gate (AI moderation is unlimited under BYOK)', () => {
     const policies = Reflect.getMetadata(
       CHECK_POLICIES_KEY,
       AiModerateController.prototype.moderate,
     );
 
-    expect(policies).toEqual([[AuthorizationActions.Create, Sections.AI]]);
+    expect(policies).toBeUndefined();
   });
 
   it('uses authenticated request org and ignores body org spoofing', async () => {

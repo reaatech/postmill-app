@@ -20,11 +20,6 @@ import { Organization, User } from '@prisma/client';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
-import {
-  AuthorizationActions,
-  Sections,
-} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 
 const KIND_PERMISSION_MAP: Record<AttentionKind, string> = {
   'failed-posts': 'posts:read',
@@ -114,10 +109,15 @@ export class DashboardController {
       return { billingEnabled: false };
     }
 
-    const { subscription, options } =
-      await this._permissionsService.getPackageOptions(org.id);
+    const { subscription, options, byoStorageActive } =
+      await this._permissionsService.getEffectiveLimits(org.id);
 
-    return this._dashboardService.buildUsage(org, subscription, options);
+    return this._dashboardService.buildUsage(
+      org,
+      subscription,
+      options,
+      byoStorageActive
+    );
   }
 
   @Get('/attention')
@@ -158,7 +158,6 @@ export class DashboardController {
 
   @Get('/brief')
   @RequirePermission('analytics', 'read')
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getBrief(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -171,7 +170,6 @@ export class DashboardController {
 
   @Post('/brief')
   @RequirePermission('analytics', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateBrief(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,

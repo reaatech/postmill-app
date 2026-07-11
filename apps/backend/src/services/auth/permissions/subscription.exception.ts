@@ -34,24 +34,26 @@ const getErrorMessage = (error: {
 }) => {
   switch (error.section) {
     case Sections.POSTS_PER_MONTH:
-      switch (error.action) {
-        default:
-          return 'You have reached the maximum number of posts for your subscription. Please upgrade your subscription to add more posts.';
-      }
+      return 'You have reached the maximum number of posts for your subscription. Please upgrade your subscription to add more posts.';
     case Sections.CHANNEL:
-      switch (error.action) {
-        default:
-          return 'You have reached the maximum number of channels for your subscription. Please upgrade your subscription to add more channels.';
-      }
+      return 'You have reached the maximum number of channels for your subscription. Please upgrade your subscription to add more channels.';
     case Sections.WEBHOOKS:
-      switch (error.action) {
-        default:
-          return 'You have reached the maximum number of webhooks for your subscription. Please upgrade your subscription to add more webhooks.';
-      }
-    case Sections.VIDEOS_PER_MONTH:
-      switch (error.action) {
-        default:
-          return 'You have reached the maximum number of generated videos for your subscription. Please upgrade your subscription to generate more videos.';
-      }
+      return 'You have reached the maximum number of webhooks for your subscription. Please upgrade your subscription to add more webhooks.';
+    case Sections.TEAM_MEMBERS:
+      return 'Your plan does not support additional team members. Please upgrade your subscription to invite more people.';
+    case Sections.BRANDS:
+      return 'Your plan does not support brand kits. Please upgrade your subscription to create brand kits.';
+    case Sections.CAMPAIGNS:
+      return 'Campaigns are not included in your plan. Please upgrade your subscription to use campaigns.';
+    case Sections.API:
+      return 'The developer API is not included in your plan. Please upgrade your subscription to enable API access.';
+    case Sections.MCP:
+      return 'AI-assistant access is not included in your plan. Please upgrade your subscription to use the AI assistant.';
+    case Sections.COMPETITORS:
+      return 'You have reached the maximum number of competitor tracking accounts for your subscription. Please upgrade your subscription to track more accounts.';
+    case Sections.VIDEO_EXPORTS:
+      return 'You have reached the maximum number of video exports for this billing cycle. Buy an add-on or upgrade your subscription to export more videos.';
+    case Sections.STORAGE:
+      return 'You have reached the hosted storage limit for your subscription. Connect your own storage bucket for unlimited storage, buy a storage add-on, or upgrade your plan.';
   }
 };

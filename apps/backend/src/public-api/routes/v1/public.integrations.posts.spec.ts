@@ -24,9 +24,9 @@ describe('PublicIntegrationsController.getPosts — J2 pagination cap', () => {
       {}, // refreshIntegrationService
       {}, // analyticsService
       {}, // storageService
-      { checkCredits: vi.fn().mockResolvedValue({ credits: 5 }) }, // subscriptionService
       {}, // aiDefaults
-      {} // aiMediaService
+      {}, // aiMediaService
+      {} // campaignsService
     );
     return { ctrl, all };
   };
@@ -196,26 +196,21 @@ describe('PublicIntegrationsController.generate-video — legacy public API re-p
   const org = { id: 'org-1' } as any;
 
   const make = (overrides: {
-    credits?: number;
     textToVideo?: string;
     imageToVideo?: string;
     videoToVideo?: string;
   } = {}) => {
-    const subscriptionService = {
-      checkCredits: vi.fn().mockResolvedValue({ credits: overrides.credits ?? 5 }),
-      // useCredit wraps the generation callback and bills on success — pass through.
-      useCredit: vi.fn((_org: any, _type: string, fn: () => Promise<any>) => fn()),
-    };
     const aiDefaults = {
       textToVideo: vi.fn().mockResolvedValue(overrides.textToVideo ?? 'job-tts'),
       imageToVideo: vi.fn().mockResolvedValue(overrides.imageToVideo ?? 'job-i2v'),
       videoToVideo: vi.fn().mockResolvedValue(overrides.videoToVideo ?? 'job-v2v'),
     };
     const aiMediaService = {};
+    const campaignsService = {};
     const ctrl = new (PublicIntegrationsController as any)(
-      {}, {}, {}, {}, {}, {}, {}, {}, subscriptionService, aiDefaults, aiMediaService
+      {}, {}, {}, {}, {}, {}, {}, {}, aiDefaults, aiMediaService, campaignsService
     );
-    return { ctrl, subscriptionService, aiDefaults };
+    return { ctrl, aiDefaults };
   };
 
   // FROZEN PUBLIC CONTRACT — these assertions guard the documented self-describing,
@@ -226,7 +221,7 @@ describe('PublicIntegrationsController.generate-video — legacy public API re-p
   // that is a breaking change to the public API and requires a new versioned route.
 
   it('PENDING: queued async job returns the documented self-describing shape with a pollUrl', async () => {
-    const { ctrl, aiDefaults, subscriptionService } = make({ textToVideo: 'job-123' });
+    const { ctrl, aiDefaults } = make({ textToVideo: 'job-123' });
     const res = await ctrl.generateVideo(org, {
       type: 'text-to-video',
       output: 'vertical',
@@ -246,12 +241,6 @@ describe('PublicIntegrationsController.generate-video — legacy public API re-p
     expect(res.path).toBe(''); // never a URL while pending
     expect(res.pollUrl).toBe(`/public/v1/generate-video/${res.jobId}`); // poll target is set
     expect(aiDefaults.textToVideo).toHaveBeenCalledWith('org-1', 'a cat');
-    // Billing must not regress: legacy consumed an `ai_videos` credit on success.
-    expect(subscriptionService.useCredit).toHaveBeenCalledWith(
-      org,
-      'ai_videos',
-      expect.any(Function),
-    );
   });
 
   it('COMPLETED: synchronous URL fallback returns path=URL, status=completed, empty pollUrl', async () => {
@@ -324,7 +313,7 @@ describe('PublicIntegrationsController.generate-video — legacy public API re-p
   const makePoll = (job: any) => {
     const aiMediaService = { getJob: vi.fn().mockResolvedValue(job) };
     const ctrl = new (PublicIntegrationsController as any)(
-      {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, aiMediaService
+      {}, {}, {}, {}, {}, {}, {}, {}, {}, aiMediaService, {}
     );
     return { ctrl, aiMediaService };
   };
@@ -386,13 +375,6 @@ describe('PublicIntegrationsController.generate-video — legacy public API re-p
     await expect(ctrl.getGenerateVideoJob(org, 'job-x')).rejects.toThrow();
   });
 
-  it('throws 402 when the org has no AI video credits', async () => {
-    const { ctrl } = make({ credits: 0 });
-    await expect(
-      ctrl.generateVideo(org, { type: 'text-to-video', output: 'vertical' }),
-    ).rejects.toThrow(expect.objectContaining({ status: 402 }));
-  });
-
   it('maps DefaultNotConfiguredError to a 409 conflict', async () => {
     const { ctrl, aiDefaults } = make();
     aiDefaults.textToVideo.mockRejectedValueOnce(
@@ -420,7 +402,7 @@ describe('PublicIntegrationsController.video/function — loadVoices compat', ()
       ]),
     };
     const ctrl = new (PublicIntegrationsController as any)(
-      {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, aiMediaService
+      {}, {}, {}, {}, {}, {}, {}, {}, {}, aiMediaService, {}
     );
     return { ctrl, aiMediaService };
   };

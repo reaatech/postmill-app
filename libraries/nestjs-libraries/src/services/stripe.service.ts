@@ -1,12 +1,15 @@
 import Stripe from 'stripe';
 import { Injectable, Logger } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
-import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { BillingTier, SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { BillingSubscribeDto } from '@gitroom/nestjs-libraries/dtos/billing/billing.subscribe.dto';
-import { groupBy } from 'lodash';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  pricing,
+  ADDONS,
+  addonPackSize,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
@@ -146,7 +149,7 @@ export class StripeService {
       billing,
       period,
     } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
+      billing: BillingTier;
       period: 'MONTHLY' | 'YEARLY';
       uniqueId: string;
     };
@@ -231,7 +234,7 @@ export class StripeService {
       billing,
       period,
     } = event.data.object.metadata as {
-      billing: 'STANDARD' | 'PRO';
+      billing: BillingTier;
       period: 'MONTHLY' | 'YEARLY';
       uniqueId: string;
     };
@@ -295,32 +298,278 @@ export class StripeService {
       return {};
     }
 
-    try {
-      const products = await stripe.prices.list({
+    // Prices are created dynamically from pricing.ts; the catalog is always the
+    // current Postmill plan model.
+    const plans = Object.entries(pricing).map(([name, plan]) => ({
+      name,
+      month: plan.month_price,
+      year: plan.year_price,
+    }));
+
+    return {
+      month: plans.map((p) => ({ name: p.name, recurring: 'month', price: p.month })),
+      year: plans.map((p) => ({ name: p.name, recurring: 'year', price: p.year })),
+    };
+  }
+
+  private static readonly TIER_RANK: Record<BillingTier, number> = {
+    STARTER: 1,
+    PRO: 2,
+    TEAM: 3,
+    AGENCY: 4,
+  };
+
+  private async _getBaseSubscription(customer: string) {
+    const subs = (
+      await stripe.subscriptions.list({
+        customer,
+        status: 'all',
+        expand: ['data.items.data.price'],
+      })
+    ).data.filter(
+      (f) =>
+        f.status === 'active' ||
+        f.status === 'trialing'
+    );
+    return subs.find((s) => !s.metadata?.addon);
+  }
+
+  private async _getAddonSubscriptions(customer: string) {
+    const subs = (
+      await stripe.subscriptions.list({
+        customer,
+        status: 'all',
+      })
+    ).data.filter(
+      (f) =>
+        f.status === 'active' ||
+        f.status === 'trialing'
+    );
+    return subs.filter((s) => s.metadata?.addon);
+  }
+
+  private async _getOrCreatePrice(tier: BillingTier, period: 'MONTHLY' | 'YEARLY') {
+    const priceData = pricing[tier];
+    const allProducts = await stripe.products.list({ active: true });
+    const findProduct =
+      allProducts.data.find(
+        (product) => product.name.toUpperCase() === tier.toUpperCase()
+      ) ||
+      (await stripe.products.create({
         active: true,
-        expand: ['data.tiers', 'data.product'],
-        lookup_keys: [
-          'standard_monthly',
-          'standard_yearly',
-          'pro_monthly',
-          'pro_yearly',
-        ],
-      });
+        name: tier,
+        metadata: { service: 'postmill' },
+      }));
 
-      const productsList = groupBy(
-        products.data.map((p) => ({
-          name: (p.product as Stripe.Product)?.name,
-          recurring: p?.recurring?.interval!,
-          price: p?.tiers?.[0]?.unit_amount! / 100,
-        })),
-        'recurring'
-      );
+    const pricesList = await stripe.prices.list({
+      active: true,
+      product: findProduct!.id,
+    });
 
-      return { ...productsList };
-    } catch (err) {
-      Logger.warn('Stripe getPackages failed; returning empty tiers');
-      return {};
+    return (
+      pricesList.data.find(
+        (p) =>
+          p?.recurring?.interval?.toLowerCase() ===
+            (period === 'MONTHLY' ? 'month' : 'year') &&
+          p?.unit_amount ===
+            (period === 'MONTHLY' ? priceData.month_price : priceData.year_price) *
+              100
+      ) ||
+      (await stripe.prices.create({
+        active: true,
+        product: findProduct!.id,
+        currency: 'usd',
+        nickname: `${tier} ${period}`,
+        unit_amount:
+          (period === 'MONTHLY'
+            ? priceData.month_price
+            : priceData.year_price) * 100,
+        recurring: {
+          interval: period === 'MONTHLY' ? 'month' : 'year',
+        },
+        metadata: { service: 'postmill', tier },
+      }))
+    );
+  }
+
+  async changePlan(organizationId: string, userId: string, tier: BillingTier) {
+    const currentSubscription =
+      await this._subscriptionService.getSubscription(organizationId);
+    const currentTier = currentSubscription?.subscriptionTier || 'STARTER';
+    if (currentTier === tier) {
+      return { ok: true };
     }
+
+    const isUpgrade =
+      StripeService.TIER_RANK[tier] > StripeService.TIER_RANK[currentTier];
+
+    if (isUpgrade) {
+      await this._subscriptionService.clearPendingTier(organizationId);
+      const period = currentSubscription?.period || 'MONTHLY';
+      return this.subscribe(
+        makeId(10),
+        organizationId,
+        userId,
+        { billing: tier, period } as BillingSubscribeDto,
+        false
+      );
+    }
+
+    // Downgrade: set pendingTier and update Stripe price so the next invoice
+    // uses the lower-tier price. Limits stay on the current tier until renewal.
+    const org = await this._organizationService.getOrgById(organizationId);
+    const customer = await this.createOrGetCustomer(org!);
+    const baseSub = await this._getBaseSubscription(customer);
+    if (!baseSub) {
+      throw new Error('No active base subscription to downgrade');
+    }
+
+    const period =
+      (baseSub.items.data[0]?.price?.recurring?.interval === 'year'
+        ? 'YEARLY'
+        : 'MONTHLY') as 'MONTHLY' | 'YEARLY';
+    const newPrice = await this._getOrCreatePrice(tier, period);
+
+    // Preserve the existing identifier and keep `billing` as the current tier so
+    // the next `customer.subscription.updated` webhook does not prune limits
+    // before the renewal. The new Stripe price still ensures the next invoice
+    // uses the lower-tier price.
+    const uniqueId = baseSub.metadata?.uniqueId || makeId(10);
+    await stripe.subscriptions.update(baseSub.id, {
+      cancel_at_period_end: false,
+      proration_behavior: 'none',
+      items: [
+        {
+          id: baseSub.items.data[0].id,
+          price: newPrice.id,
+          quantity: 1,
+        },
+      ],
+      metadata: {
+        ...(baseSub.metadata || {}),
+        service: 'postmill',
+        billing: currentTier,
+        period,
+        uniqueId,
+        pendingTier: tier,
+      },
+    });
+
+    await this._subscriptionService.setPendingTier(organizationId, tier);
+    return { pendingTier: tier };
+  }
+
+  async createOrUpdateAddon(
+    organizationId: string,
+    type: 'storage' | 'video_exports',
+    packs: number
+  ) {
+    const org = await this._organizationService.getOrgById(organizationId);
+    const customer = await this.createOrGetCustomer(org!);
+
+    const existingAddons = await this._getAddonSubscriptions(customer);
+    const existing = existingAddons.find((s) => s.metadata?.addon === type);
+
+    if (existing) {
+      await stripe.subscriptions.update(existing.id, {
+        cancel_at_period_end: false,
+        items: [
+          {
+            id: existing.items.data[0].id,
+            quantity: Math.max(1, Math.floor(packs)),
+          },
+        ],
+        metadata: { service: 'postmill', addon: type },
+      });
+    } else {
+      const allProducts = await stripe.products.list({ active: true });
+      const productName = ADDONS[type].productName;
+      const findProduct =
+        allProducts.data.find((p) => p.name === productName) ||
+        (await stripe.products.create({
+          active: true,
+          name: productName,
+          metadata: { service: 'postmill', addon: type },
+        }));
+
+      const pricesList = await stripe.prices.list({
+        active: true,
+        product: findProduct.id,
+      });
+      const findPrice =
+        pricesList.data.find(
+          (p) =>
+            p.recurring?.interval === 'month' &&
+            p.unit_amount === ADDONS[type].priceCents
+        ) ||
+        (await stripe.prices.create({
+          active: true,
+          product: findProduct.id,
+          currency: 'usd',
+          nickname: `${productName} monthly`,
+          unit_amount: ADDONS[type].priceCents,
+          recurring: { interval: 'month' },
+          metadata: { service: 'postmill', addon: type },
+        }));
+
+      await stripe.subscriptions.create({
+        customer,
+        items: [{ price: findPrice.id, quantity: Math.max(1, Math.floor(packs)) }],
+        metadata: { service: 'postmill', addon: type },
+      });
+    }
+
+    // Write-through so the purchased capacity reflects immediately instead of waiting
+    // for the customer.subscription webhook (which stays the reconciler). Recomputes
+    // from Stripe's active add-on subs — idempotent.
+    await this.syncAddonQuantities(customer);
+    return { ok: true };
+  }
+
+  async cancelAddon(organizationId: string, type: 'storage' | 'video_exports') {
+    const org = await this._organizationService.getOrgById(organizationId);
+    const customer = await this.createOrGetCustomer(org!);
+    const existingAddons = await this._getAddonSubscriptions(customer);
+    const existing = existingAddons.find((s) => s.metadata?.addon === type);
+    if (!existing) {
+      return { ok: true };
+    }
+    await stripe.subscriptions.update(existing.id, {
+      cancel_at_period_end: true,
+      metadata: { service: 'postmill', addon: type },
+    });
+    // Cancel is period-end: the add-on stays active (and its capacity retained) until
+    // then, so this recompute is a no-op today but keeps DB ↔ Stripe consistent.
+    await this.syncAddonQuantities(customer);
+    return { ok: true };
+  }
+
+  async syncAddonQuantities(customerId: string) {
+    const org = await this._organizationService.getOrgByCustomerId(customerId);
+    if (!org?.id) {
+      return { ok: true };
+    }
+
+    const addonSubs = await this._getAddonSubscriptions(customerId);
+    const quantities: Record<string, number> = {};
+    for (const sub of addonSubs) {
+      const type = sub.metadata?.addon;
+      if (!type) continue;
+      const qty = sub.items.data[0]?.quantity ?? 1;
+      quantities[type] = (quantities[type] || 0) + qty;
+    }
+
+    const extraStorageGb =
+      (quantities['storage'] || 0) * addonPackSize('storage');
+    const extraVideoExports =
+      (quantities['video_exports'] || 0) * addonPackSize('video_exports');
+
+    await this._subscriptionService.updateAddonQuantities(org.id, {
+      extraStorageGb,
+      extraVideoExports,
+    });
+
+    return { ok: true };
   }
 
   async prorate(organizationId: string, body: BillingSubscribeDto) {
@@ -422,24 +671,27 @@ export class StripeService {
     const id = makeId(10);
     const org = await this._organizationService.getOrgById(organizationId);
     const customer = await this.createOrGetCustomer(org!);
-    const currentUserSubscription = {
-      data: (
-        await stripe.subscriptions.list({
-          customer,
-          status: 'all',
-          expand: ['data.latest_invoice'],
-        })
-      ).data.filter((f) => f.status !== 'canceled'),
-    };
+    const baseSub = await this._getBaseSubscription(customer);
+    const addonSubs = await this._getAddonSubscriptions(customer);
 
-    const sub = currentUserSubscription.data[0];
+    if (!baseSub) {
+      throw new Error('No active subscription found');
+    }
 
     // If the user is toggling back (un-cancelling), just remove the cancel
-    if (sub.cancel_at_period_end) {
-      const { cancel_at } = await stripe.subscriptions.update(sub.id, {
+    if (baseSub.cancel_at_period_end) {
+      const { cancel_at } = await stripe.subscriptions.update(baseSub.id, {
         cancel_at_period_end: false,
-        metadata: { service: 'gitroom', id },
+        metadata: { service: 'postmill', id },
       });
+      // Also resume any add-ons that were set to cancel
+      await Promise.all(
+        addonSubs.map((s) =>
+          s.cancel_at_period_end
+            ? stripe.subscriptions.update(s.id, { cancel_at_period_end: false })
+            : Promise.resolve()
+        )
+      );
 
       return {
         id,
@@ -448,15 +700,16 @@ export class StripeService {
     }
 
     // Check if the latest invoice has a failed payment
-    const latestInvoice = sub.latest_invoice as Stripe.Invoice | null;
+    const latestInvoice = baseSub.latest_invoice as Stripe.Invoice | null;
     const hasFailedPayment =
-      sub.status === 'past_due' ||
+      baseSub.status === 'past_due' ||
       latestInvoice?.status === 'open' ||
       latestInvoice?.status === 'uncollectible';
 
     if (hasFailedPayment) {
       // Payment already failed — cancel immediately and delete subscription
-      await stripe.subscriptions.cancel(sub.id);
+      await stripe.subscriptions.cancel(baseSub.id);
+      await Promise.all(addonSubs.map((s) => stripe.subscriptions.cancel(s.id)));
       await this._subscriptionService.deleteSubscription(customer);
 
       return {
@@ -465,11 +718,16 @@ export class StripeService {
       };
     }
 
-    // Payment succeeded — cancel at end of billing period
-    const { cancel_at } = await stripe.subscriptions.update(sub.id, {
+    // Payment succeeded — cancel base and all add-ons at end of billing period
+    const { cancel_at } = await stripe.subscriptions.update(baseSub.id, {
       cancel_at_period_end: true,
-      metadata: { service: 'gitroom', id },
+      metadata: { service: 'postmill', id },
     });
+    await Promise.all(
+      addonSubs.map((s) =>
+        stripe.subscriptions.update(s.id, { cancel_at_period_end: true })
+      )
+    );
 
     return {
       id,
@@ -585,9 +843,9 @@ export class StripeService {
         `/posts?onboarding=true&check=${uniqueId}${isUtm}`,
       mode: 'subscription',
       subscription_data: {
-        ...(allowTrial ? { trial_period_days: 7 } : {}),
+        ...(allowTrial ? { trial_period_days: 30 } : {}),
         metadata: {
-          service: 'gitroom',
+          service: 'postmill',
           ...body,
           userId,
           uniqueId,
@@ -646,9 +904,9 @@ export class StripeService {
         `/posts?onboarding=true&check=${uniqueId}${isUtm}`,
       mode: 'subscription',
       subscription_data: {
-        ...(allowTrial ? { trial_period_days: 7 } : {}),
+        ...(allowTrial ? { trial_period_days: 30 } : {}),
         metadata: {
-          service: 'gitroom',
+          service: 'postmill',
           ...body,
           userId,
           uniqueId,
@@ -922,7 +1180,7 @@ export class StripeService {
       await stripe.subscriptions.update(currentUserSubscription.data[0].id, {
         cancel_at_period_end: false,
         metadata: {
-          service: 'gitroom',
+          service: 'postmill',
           ...body,
           userId,
           id,
@@ -958,12 +1216,41 @@ export class StripeService {
       typeof subscriptionId === 'string' ? subscriptionId : subscriptionId.id
     );
 
-    const { userId, ud } = subscription.metadata;
-    const user = await this._userService.getUserById(userId);
-    if (user && user.ip && user.agent) {
-      this._trackService.track(ud, user.ip, user.agent, TrackEnum.Purchase, {
-        value: event.data.object.amount_paid / 100,
-      });
+    // Add-on invoices have no purchase attribution and no pending tier.
+    if (!subscription.metadata?.addon) {
+      const { userId, ud } = subscription.metadata;
+      const user = await this._userService.getUserById(userId);
+      if (user && user.ip && user.agent) {
+        this._trackService.track(ud, user.ip, user.agent, TrackEnum.Purchase, {
+          value: event.data.object.amount_paid / 100,
+        });
+      }
+
+      // Apply a scheduled downgrade now that the current billing period has
+      // been paid for and the new price is in effect.
+      const org = await this._organizationService.getOrgByCustomerId(
+        subscription.customer as string
+      );
+      if (org?.id) {
+        const dbSub = await this._subscriptionService.getSubscription(org.id);
+        if (dbSub?.pendingTier) {
+          await this._subscriptionService.modifySubscriptionByOrg(
+            org.id,
+            pricing[dbSub.pendingTier].channel,
+            dbSub.pendingTier
+          );
+          await this._subscriptionService.clearPendingTier(org.id);
+          // Sync Stripe with the applied downgrade. `changePlan` deliberately left
+          // metadata.billing = the pre-downgrade tier so the immediate subscription.updated
+          // wouldn't prune early; now that it's applied, rewrite it so a later
+          // customer.subscription.updated (which re-derives the tier from metadata.billing)
+          // doesn't revert to the old tier.
+          await stripe.subscriptions.update(
+            typeof subscriptionId === 'string' ? subscriptionId : subscriptionId.id,
+            { metadata: { ...subscription.metadata, billing: dbSub.pendingTier } }
+          );
+        }
+      }
     }
 
     return { ok: true };
@@ -1084,16 +1371,14 @@ export class StripeService {
         };
       }
 
-      const nextPackage = !getCurrentSubscription ? 'STANDARD' : 'PRO';
+      const nextPackage: BillingTier = 'AGENCY';
       const findPricing = pricing[nextPackage];
 
       await this._subscriptionService.createOrUpdateSubscription(
         false,
         makeId(10),
         organizationId,
-        getCurrentSubscription?.subscriptionTier === 'PRO'
-          ? getCurrentSubscription.totalChannels + 5
-          : findPricing.channel!,
+        findPricing.channel,
         nextPackage,
         'MONTHLY',
         null,

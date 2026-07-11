@@ -133,7 +133,7 @@ export class VideoRenderService {
       provider: 'chromium-ffmpeg',
       operation: 'video',
       costUsd: 0,
-      creditType: 'ai_videos',
+      creditType: 'video_export',
     });
 
     const payload = {

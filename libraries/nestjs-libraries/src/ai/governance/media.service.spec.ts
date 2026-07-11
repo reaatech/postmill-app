@@ -214,7 +214,7 @@ describe('AiMediaService', () => {
           operation: 'image',
           status: 'done',
           artifactUrl: 'https://cdn.example.com/image.png',
-          creditType: 'ai_images',
+          creditType: undefined,
         }),
       );
       const job = mockCreateMediaJob.mock.calls[0][0];
@@ -393,7 +393,7 @@ describe('AiMediaService', () => {
           userId: 'u-1',
           provider: 'luma',
           operation: 'video',
-          creditType: 'ai_videos',
+          creditType: undefined,
         }),
       );
       expect(adapter.generateVideo).toHaveBeenCalledWith('a sunset', expect.objectContaining({
@@ -475,7 +475,7 @@ describe('AiMediaService', () => {
       const result = await service.generateAvatar('hello world', { orgId: 'org-1' });
 
       expect(lifecycle.createPendingJob).toHaveBeenCalledWith(
-        expect.objectContaining({ provider: 'heygen', operation: 'avatar', creditType: 'ai_videos' }),
+        expect.objectContaining({ provider: 'heygen', operation: 'avatar', creditType: undefined }),
       );
       expect(adapter.generateAvatar).toHaveBeenCalled();
       expect(result).toBe('tracked-job-1');

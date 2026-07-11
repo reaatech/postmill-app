@@ -9,7 +9,7 @@ export default function Page() {
   const user = useUser();
   const { isGeneral } = useVariables();
   return (
-    <SettingsGate allow={user ? !!user.tier?.team_members && isGeneral : undefined}>
+    <SettingsGate allow={user ? (user.tier?.team_members ?? 0) > 1 && isGeneral : undefined}>
       <TeamsComponent />
     </SettingsGate>
   );

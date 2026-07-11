@@ -24,7 +24,10 @@ import { Response, Request } from 'express';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  pricing,
+  SELF_HOST_PLAN,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
@@ -90,18 +93,23 @@ export class UsersController {
 
     const impersonate = req.cookies.impersonate || req.headers.impersonate;
     const profile = await this._userService.getProfileByUserId(user.id);
+    const org = organization as any;
     // @ts-ignore
     return {
       ...user,
       orgId: organization.id,
       // @ts-ignore
-      totalChannels: !process.env.STRIPE_PUBLISHABLE_KEY ? 10000 : organization?.subscription?.totalChannels || pricing.FREE.channel,
+      totalChannels: !process.env.STRIPE_PUBLISHABLE_KEY
+        ? 10000
+        : org?.subscription?.totalChannels || pricing.STARTER.channel,
       // @ts-ignore
-      tier: organization?.subscription?.subscriptionTier || (!process.env.STRIPE_PUBLISHABLE_KEY ? 'ULTIMATE' : 'FREE'),
+      tier:
+        org?.subscription?.subscriptionTier ||
+        (!process.env.STRIPE_PUBLISHABLE_KEY ? SELF_HOST_PLAN : 'STARTER'),
       // @ts-ignore
-      role: organization?.users[0]?.roleId,
+      role: org?.users[0]?.roleId,
       // @ts-ignore
-      isLifetime: !!organization?.subscription?.isLifetime,
+      isLifetime: !!org?.subscription?.isLifetime,
       admin: !!user.isSuperAdmin,
       impersonate: !!impersonate,
       isTrailing: !process.env.STRIPE_PUBLISHABLE_KEY ? false : organization?.isTrailing,

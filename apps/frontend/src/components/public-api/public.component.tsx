@@ -404,7 +404,7 @@ const localCliSteps = [
   {
     labelKey: 'cli_step_install_skill',
     label: 'Install the Postmill skill for your AI agent',
-    code: 'npx skills add gitroomhq/postmill-agent',
+    code: 'npx skills add @reaatech/postmill-agent',
   },
 ] as const;
 
@@ -422,7 +422,7 @@ const ciCliSteps = [
   {
     labelKey: 'cli_step_install_skill',
     label: 'Install the Postmill skill for your AI agent',
-    code: 'npx skills add gitroomhq/postmill-agent',
+    code: 'npx skills add @reaatech/postmill-agent',
   },
 ] as const;
 

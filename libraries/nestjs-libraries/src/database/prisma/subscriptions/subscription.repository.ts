@@ -108,7 +108,7 @@ export class SubscriptionRepository {
     identifier: string,
     customerId: string,
     totalChannels: number,
-    billing: 'STANDARD' | 'TEAM' | 'PRO' | 'ULTIMATE',
+    billing: 'STARTER' | 'PRO' | 'TEAM' | 'AGENCY',
     period: 'MONTHLY' | 'YEARLY',
     cancelAt: number | null,
     code?: string,
@@ -197,7 +197,7 @@ export class SubscriptionRepository {
   async getCreditsFrom(
     organizationId: string,
     from: dayjs.Dayjs,
-    type = 'ai_images'
+    type = 'video_export'
   ) {
     const load = await this._credits.model.credits.groupBy({
       by: ['organizationId'],
@@ -218,7 +218,7 @@ export class SubscriptionRepository {
 
   async useCredit<T>(
     org: Organization,
-    type = 'ai_images',
+    type = 'video_export',
     func: () => Promise<T>
   ) {
     return this._prisma.$transaction(async (tx: any) => {
@@ -250,6 +250,56 @@ export class SubscriptionRepository {
       },
       data: {
         paymentId: customerId,
+      },
+    });
+  }
+
+  setPendingTier(
+    organizationId: string,
+    tier: 'STARTER' | 'PRO' | 'TEAM' | 'AGENCY'
+  ) {
+    return this._subscription.model.subscription.updateMany({
+      where: { organizationId, deletedAt: null },
+      data: { pendingTier: tier },
+    });
+  }
+
+  clearPendingTier(organizationId: string) {
+    return this._subscription.model.subscription.updateMany({
+      where: { organizationId, deletedAt: null },
+      data: { pendingTier: null },
+    });
+  }
+
+  applyTier(
+    organizationId: string,
+    tier: 'STARTER' | 'PRO' | 'TEAM' | 'AGENCY',
+    totalChannels: number
+  ) {
+    return this._subscription.model.subscription.updateMany({
+      where: { organizationId, deletedAt: null },
+      data: { subscriptionTier: tier, totalChannels },
+    });
+  }
+
+  // Plain single-credit insert (no $transaction) — for metering an operation that has
+  // ALREADY succeeded, where wrapping the work in an interactive transaction would risk a
+  // timeout rollback. Idempotency is the caller's responsibility.
+  recordCredit(organizationId: string, type: string) {
+    return this._credits.model.credits.create({
+      data: { organizationId, credits: 1, type },
+    });
+  }
+
+  updateAddonQuantities(
+    organizationId: string,
+    quantities: { extraStorageGb: number; extraVideoExports: number }
+  ) {
+    return this._subscription.model.subscription.updateMany({
+      where: { organizationId, deletedAt: null },
+      data: {
+        extraStorageGb: quantities.extraStorageGb,
+        extraVideoExports: quantities.extraVideoExports,
       },
     });
   }

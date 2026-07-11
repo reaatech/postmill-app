@@ -33,7 +33,7 @@ export class OrganizationRepository {
         subscription: {
           create: {
             totalChannels: 1000000,
-            subscriptionTier: 'ULTIMATE',
+            subscriptionTier: 'AGENCY',
             isLifetime: true,
             period: 'YEARLY',
           },
@@ -243,7 +243,7 @@ export class OrganizationRepository {
     if (
       process.env.STRIPE_PUBLISHABLE_KEY &&
       checkForSubscription?.subscription?.subscriptionTier ===
-        SubscriptionTier.STANDARD
+        SubscriptionTier.STARTER
     ) {
       return false;
     }
@@ -531,6 +531,36 @@ export class OrganizationRepository {
       data: {
         disabled: disable,
       },
+    });
+  }
+
+  /**
+   * Disable non-owner members past the requested seat limit.
+   * `keep` includes the owner, so keep=1 leaves only the owner enabled.
+   */
+  async disableExcessNonOwnerUsers(orgId: string, keep: number) {
+    const ownerRole = await this._appRole.model.appRole.findFirst({
+      where: { organizationId: null, key: 'owner', isSystem: true },
+    });
+    const ownerRoleId = ownerRole?.id || '';
+
+    const members = await this._userOrg.model.userOrganization.findMany({
+      where: {
+        organizationId: orgId,
+        roleId: { not: ownerRoleId },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+
+    const excess = members.slice(Math.max(0, keep - 1));
+    if (!excess.length) return;
+
+    await this._userOrg.model.userOrganization.updateMany({
+      where: {
+        id: { in: excess.map((m) => m.id) },
+      },
+      data: { disabled: true },
     });
   }
 

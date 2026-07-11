@@ -4,8 +4,6 @@ import { IsString, IsOptional, IsIn } from 'class-validator';
 import { Request } from 'express';
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { GuardrailViolation } from '@gitroom/nestjs-libraries/ai/governance/errors';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 class ModerateRequest {
   @IsString()
@@ -28,7 +26,6 @@ export class AiModerateController {
   constructor(private readonly _guardrails: GuardrailService) {}
 
   @Post('/moderate')
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @HttpCode(HttpStatus.OK)
   async moderate(@Body() body: ModerateRequest, @Req() req: Request): Promise<ModerateResponse> {
     const { content, direction = 'output' } = body;

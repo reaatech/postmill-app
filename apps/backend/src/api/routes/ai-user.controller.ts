@@ -19,8 +19,6 @@ import { z } from 'zod';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { CapabilityNotAvailable } from '@gitroom/nestjs-libraries/ai/governance/errors';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
@@ -223,14 +221,12 @@ export class AiUserController {
 
   @Get('/usage')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getUsage(@GetOrgFromRequest() org: Organization) {
     return this._aiSettingsService.getUsageSummary(org.id);
   }
 
   @Get('/media-providers')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getMediaProviders(@GetOrgFromRequest() org: Organization) {
     return this._aiMediaService.getMediaProviderSummary(org.id);
   }
@@ -238,7 +234,6 @@ export class AiUserController {
   @Put('/brand-profile')
   @RequirePermission('ai-config', 'update')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async upsertBrandProfile(
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpsertBrandProfileDto,
@@ -248,7 +243,6 @@ export class AiUserController {
 
   @Get('/brand-profile')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getBrandProfile(@GetOrgFromRequest() org: Organization, @Query('brandId') brandId?: string) {
     const profile = await this._aiSettingsService.getBrandProfile(org.id, brandId);
     return profile || {};
@@ -256,7 +250,6 @@ export class AiUserController {
 
   @Get('/prompt-templates')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getPromptTemplates(@GetOrgFromRequest() org: Organization) {
     return this._aiSettingsService.getPromptTemplates(org.id);
   }
@@ -264,7 +257,6 @@ export class AiUserController {
   @Put('/prompt-templates')
   @RequirePermission('ai-config', 'update')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async upsertPromptTemplate(
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpsertPromptTemplateDto,
@@ -279,7 +271,6 @@ export class AiUserController {
   @Delete('/prompt-templates/:key')
   @RequirePermission('ai-config', 'delete')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deletePromptTemplate(
     @GetOrgFromRequest() org: Organization,
     @Param('key') key: string,
@@ -290,7 +281,6 @@ export class AiUserController {
 
   @Get('/prompt-library')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getPromptLibrary(@GetOrgFromRequest() org: Organization) {
     return this._aiSettingsService.getPromptLibraryItems(org.id);
   }
@@ -298,7 +288,6 @@ export class AiUserController {
   @Post('/prompt-library')
   @RequirePermission('ai-config', 'create')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async createPromptLibraryItem(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreatePromptLibraryItemDto,
@@ -313,7 +302,6 @@ export class AiUserController {
   @Delete('/prompt-library/:id')
   @RequirePermission('ai-config', 'delete')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deletePromptLibraryItem(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -324,7 +312,6 @@ export class AiUserController {
 
   @Post('/media')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async createMediaJob(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -430,7 +417,6 @@ export class AiUserController {
 
   @Get('/search')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async search(
     @GetOrgFromRequest() org: Organization,
     @Query() query: SearchQueryDto,
@@ -451,7 +437,6 @@ export class AiUserController {
 
   @Post('/hashtags')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateHashtags(
     @GetOrgFromRequest() org: Organization,
     @Body() body: HashtagsDto,
@@ -502,7 +487,6 @@ Include a mix of popular and niche hashtags. Return only the hashtags array.`;
 
   @Post('/comment-reply')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async draftCommentReply(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CommentActionDto,
@@ -599,7 +583,6 @@ Draft a friendly, professional reply from the social media manager's perspective
 
   @Post('/best-time')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async bestTimeToPost(@GetOrgFromRequest() org: Organization) {
     try {
       const context = await this._analyticsService.getBestTimeAnalyticsContext(
@@ -674,7 +657,6 @@ Draft a friendly, professional reply from the social media manager's perspective
 
   @Post('/repurpose')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async repurposeContent(
     @GetOrgFromRequest() org: Organization,
     @Body() body: RepurposeDto,
@@ -746,7 +728,6 @@ Return exactly ${body.platforms.length} results, one per requested platform.`;
 
   @Post('/compliance')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async checkCompliance(
     @GetOrgFromRequest() org: Organization,
     @Body() body: ComplianceCheckDto,
@@ -788,7 +769,6 @@ Return exactly ${body.platforms.length} results, one per requested platform.`;
 
   @Post('/translate')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async translateContent(
     @GetOrgFromRequest() org: Organization,
     @Body() body: TranslateDto,
@@ -837,7 +817,6 @@ For each locale, provide an accurate translation that preserves the meaning, ton
   @Post('/brand-memory/index')
   @RequirePermission('ai-config', 'update')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async indexBrandMemory(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -862,7 +841,6 @@ For each locale, provide an accurate translation that preserves the meaning, ton
 
   @Post('/brand-memory/search')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async searchBrandMemory(
     @GetOrgFromRequest() org: Organization,
     @Body() body: BrandMemorySearchDto,
@@ -886,7 +864,6 @@ For each locale, provide an accurate translation that preserves the meaning, ton
 
   @Post('/variants')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateVariants(
     @GetOrgFromRequest() org: Organization,
     @Body() body: VariantsDto,

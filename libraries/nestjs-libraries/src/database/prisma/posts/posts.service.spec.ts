@@ -785,7 +785,7 @@ describe('1.5 — bulkCreate enforces remaining POSTS_PER_MONTH budget', () => {
       subscriptionService: {
         getSubscriptionByOrganizationId: vi
           .fn()
-          .mockResolvedValue({ subscriptionTier: 'STANDARD', createdAt: new Date() }), // 400/mo
+          .mockResolvedValue({ subscriptionTier: 'STARTER', createdAt: new Date() }), // 100/mo
       },
       postRepository: {
         countPostsFromDay: vi.fn().mockResolvedValue(400),

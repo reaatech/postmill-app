@@ -90,6 +90,7 @@ export class FileService {
     folderId?: string,
     fileSize?: number
   ) {
+    await this._storageService.assertWithinQuota(org, fileSize ?? 0);
     const ownedFolderId = await this.resolveOwnedFolderId(org, folderId);
     return this._fileRepository.saveFile(org, fileName, filePath, originalName, ownedFolderId, fileSize);
   }
@@ -112,7 +113,7 @@ export class FileService {
     return this._fileRepository.saveMediaInformation(org, data);
   }
 
-  saveGeneratedMedia(
+  async saveGeneratedMedia(
     org: string,
     data: {
       name: string;
@@ -123,6 +124,7 @@ export class FileService {
       metadata?: Record<string, unknown>;
     },
   ) {
+    await this._storageService.assertWithinQuota(org, data.fileSize ?? 0);
     return this._fileRepository.saveGeneratedMedia(org, data);
   }
 
@@ -312,6 +314,7 @@ export class FileService {
   ) {
     return Promise.all(
       items.map(async (item) => {
+        await this._storageService.assertWithinQuota(org, item.fileSize ?? 0);
         const ownedFolderId = await this.resolveOwnedFolderId(org, item.folderId);
         return this._fileRepository.saveFile(
           org,
@@ -367,6 +370,7 @@ export class FileService {
     );
     try {
       const buffer = await adapter.readFile(filePath);
+      await this._storageService.assertWithinQuota(orgId, buffer.length);
       return { buffer, fileSize: buffer.length };
     } catch (err) {
       this._logger.warn(

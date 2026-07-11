@@ -21,6 +21,12 @@ export class WatchlistRepository {
     });
   }
 
+  countByOrg(organizationId: string) {
+    return this._prisma.watchedAccount.count({
+      where: { organizationId, deletedAt: null },
+    });
+  }
+
   // Org-scoped single lookup (6.3) — null when the id isn't this org's (or is
   // soft-deleted), so the service can 404 instead of leaking a cross-org row.
   findByIdForOrg(id: string, organizationId: string) {

@@ -12,8 +12,6 @@ import { BulkMarkReadDto } from '@gitroom/nestjs-libraries/dtos/social-comments/
 import { UpdateCommentStatusDto } from '@gitroom/nestjs-libraries/dtos/social-comments/update-comment-status.dto';
 import { AssignCommentDto } from '@gitroom/nestjs-libraries/dtos/social-comments/assign-comment.dto';
 import { Organization, User } from '@prisma/client';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 @Controller('/posts')
@@ -21,7 +19,6 @@ export class SocialCommentsController {
   constructor(private _socialCommentsService: SocialCommentsService) {}
 
   @Get('/inbox')
-  @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getInbox(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -33,7 +30,6 @@ export class SocialCommentsController {
 
   @Post('/inbox/bulk-read')
   @RequirePermission('comments', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async bulkMarkRead(
     @GetOrgFromRequest() org: Organization,
     @Body() body: BulkMarkReadDto,
@@ -42,7 +38,6 @@ export class SocialCommentsController {
   }
 
   @Get('/inbox/unread-count')
-  @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getInboxUnreadCount(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -52,7 +47,6 @@ export class SocialCommentsController {
 
   @Post('/inbox/sync')
   @RequirePermission('comments', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async syncInbox(
     @GetOrgFromRequest() org: Organization,
   ) {
@@ -60,7 +54,6 @@ export class SocialCommentsController {
   }
 
   @Get('/:id/social-comments')
-  @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getComments(
     @Param('id', ParseCuidPipe) id: string,
     @Query('cursor') cursor: string | undefined,
@@ -72,7 +65,6 @@ export class SocialCommentsController {
 
   @Post('/:id/social-comments')
   @RequirePermission('comments', 'create')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async addComment(
     @Param('id', ParseCuidPipe) id: string,
     @Body() body: ReplyCommentDto,
@@ -93,7 +85,6 @@ export class SocialCommentsController {
 
   @Post('/:id/social-comments/:commentId/reply')
   @RequirePermission('comments', 'create')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async replyToComment(
     @Param('id', ParseCuidPipe) id: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
@@ -116,7 +107,6 @@ export class SocialCommentsController {
 
   @Post('/:id/social-comments/:commentId/like')
   @RequirePermission('comments', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async likeComment(
     @Param('id', ParseCuidPipe) id: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
@@ -129,7 +119,6 @@ export class SocialCommentsController {
 
   @Post('/:id/social-comments/read')
   @RequirePermission('comments', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async markAsRead(
     @Param('id', ParseCuidPipe) id: string,
     @GetOrgFromRequest() org: Organization,
@@ -140,7 +129,6 @@ export class SocialCommentsController {
 
   @Post('/:id/social-comments/:commentId/status')
   @RequirePermission('comments', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async updateCommentStatus(
     @Param('id', ParseCuidPipe) id: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
@@ -153,7 +141,6 @@ export class SocialCommentsController {
 
   @Post('/:id/social-comments/:commentId/assign')
   @RequirePermission('comments', 'update')
-  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async assignComment(
     @Param('id', ParseCuidPipe) id: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
@@ -165,7 +152,6 @@ export class SocialCommentsController {
   }
 
   @Get('/:id/social-comments/unread-count')
-  @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getUnreadCount(
     @Param('id', ParseCuidPipe) id: string,
     @GetOrgFromRequest() org: Organization,

@@ -17,11 +17,11 @@ import type { StripeService } from '@gitroom/nestjs-libraries/services/stripe.se
 //   * the privileged billing mutating routes carry the @RequirePermission guard.
 // ---------------------------------------------------------------------------
 
-function gitroomEvent(type: string, id = 'evt_1') {
+function postmillEvent(type: string, id = 'evt_1') {
   return {
     id,
     type,
-    data: { object: { metadata: { service: 'gitroom' } } },
+    data: { object: { metadata: { service: 'postmill' } } },
   };
 }
 
@@ -70,7 +70,7 @@ describe('StripeController — F2 behavioural tests', () => {
 
   it('drives the tier transition for customer.subscription.updated and records the event', async () => {
     const { controller, stripeService } = makeController();
-    const event = gitroomEvent('customer.subscription.updated');
+    const event = postmillEvent('customer.subscription.updated');
     stripeService.validateRequest.mockReturnValue(event);
 
     await controller.stripe(req());
@@ -82,7 +82,7 @@ describe('StripeController — F2 behavioural tests', () => {
 
   it('drives the teardown transition for customer.subscription.deleted', async () => {
     const { controller, stripeService } = makeController();
-    const event = gitroomEvent('customer.subscription.deleted');
+    const event = postmillEvent('customer.subscription.deleted');
     stripeService.validateRequest.mockReturnValue(event);
 
     await controller.stripe(req());
@@ -93,7 +93,7 @@ describe('StripeController — F2 behavioural tests', () => {
 
   it('ignores a duplicate event.id — the transition runs once across two identical events', async () => {
     const { controller, stripeService } = makeController();
-    const event = gitroomEvent('customer.subscription.updated', 'evt_dup');
+    const event = postmillEvent('customer.subscription.updated', 'evt_dup');
     stripeService.validateRequest.mockReturnValue(event);
 
     // First delivery processes; second (same event.id) is short-circuited.
@@ -107,7 +107,7 @@ describe('StripeController — F2 behavioural tests', () => {
 
   it('dispatches customer.subscription.created to createSubscription', async () => {
     const { controller, stripeService } = makeController();
-    const event = gitroomEvent('customer.subscription.created', 'evt_created');
+    const event = postmillEvent('customer.subscription.created', 'evt_created');
     stripeService.validateRequest.mockReturnValue(event);
 
     await controller.stripe(req());
@@ -116,7 +116,7 @@ describe('StripeController — F2 behavioural tests', () => {
     expect(stripeService.recordEvent).toHaveBeenCalledWith('evt_created', 'customer.subscription.created');
   });
 
-  it('dispatches invoice.payment_succeeded / invoice.payment_failed even without gitroom metadata', async () => {
+  it('dispatches invoice.payment_succeeded / invoice.payment_failed even without postmill metadata', async () => {
     const { controller, stripeService } = makeController();
 
     stripeService.validateRequest.mockReturnValue({
@@ -136,9 +136,9 @@ describe('StripeController — F2 behavioural tests', () => {
     expect(stripeService.paymentFailed).toHaveBeenCalledTimes(1);
   });
 
-  it('returns ok for an unhandled gitroom event type (default case) and records it', async () => {
+  it('returns ok for an unhandled postmill event type (default case) and records it', async () => {
     const { controller, stripeService } = makeController();
-    const event = gitroomEvent('customer.subscription.paused', 'evt_paused');
+    const event = postmillEvent('customer.subscription.paused', 'evt_paused');
     stripeService.validateRequest.mockReturnValue(event);
 
     const result = await controller.stripe(req());
@@ -150,7 +150,7 @@ describe('StripeController — F2 behavioural tests', () => {
 
   it('wraps a processing error in a 500 and does NOT record the event (keeps it retryable)', async () => {
     const { controller, stripeService } = makeController();
-    const event = gitroomEvent('customer.subscription.updated', 'evt_boom');
+    const event = postmillEvent('customer.subscription.updated', 'evt_boom');
     stripeService.validateRequest.mockReturnValue(event);
     stripeService.updateSubscription.mockRejectedValue(new Error('downstream failure'));
 
@@ -158,7 +158,7 @@ describe('StripeController — F2 behavioural tests', () => {
     expect(stripeService.recordEvent).not.toHaveBeenCalled();
   });
 
-  it('ignores webhooks from other Stripe integrations (no gitroom metadata)', async () => {
+  it('ignores webhooks from other Stripe integrations (no postmill metadata)', async () => {
     const { controller, stripeService } = makeController();
     stripeService.validateRequest.mockReturnValue({
       id: 'evt_other',

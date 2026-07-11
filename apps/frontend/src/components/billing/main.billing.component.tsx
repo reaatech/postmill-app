@@ -9,14 +9,15 @@ import { useDebouncedCallback } from 'use-debounce';
 import ReactLoading from '@gitroom/frontend/components/layout/loading';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import dayjs from 'dayjs';
 import clsx from 'clsx';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  pricing,
+  PlanInterface,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { FAQComponent } from '@gitroom/frontend/components/billing/faq.component';
 import { useSWRConfig } from 'swr';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Textarea } from '@gitroom/react/form/textarea';
 import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
@@ -30,9 +31,11 @@ import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics'
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 
+type TierKey = PlanInterface['current'];
+
 export const Prorate: FC<{
   period: 'MONTHLY' | 'YEARLY';
-  pack: 'STANDARD' | 'PRO';
+  pack: TierKey;
 }> = (props) => {
   const { period, pack } = props;
   const t = useT();
@@ -76,56 +79,127 @@ export const Prorate: FC<{
     </div>
   );
 };
+
+type FeatureRow = {
+  label: string;
+  value?: string | number;
+  badge?: 'yes' | 'no' | 'unlimited';
+};
+
 export const Features: FC<{
-  pack: 'FREE' | 'STANDARD' | 'PRO';
+  pack: TierKey;
 }> = (props) => {
   const { pack } = props;
   const t = useT();
-  const features = useMemo(() => {
-    const currentPricing = pricing[pack];
-    const channelsOr = currentPricing.channel;
-    const list = [];
-    list.push(
-      t('billing_n_channels', '{{count}} channel', { count: channelsOr })
-    );
-    list.push(
-      currentPricing.posts_per_month > 10000
-        ? t('billing_unlimited_feature', 'Unlimited {{feature}}', {
-            feature: t('billing_posts_per_month', 'posts per month'),
-          })
-        : t('billing_n_posts_per_month', '{{count}} posts per month', {
-            count: currentPricing.posts_per_month,
-          })
-    );
-    if (currentPricing.team_members) {
-      list.push(t('billing_unlimited_team_members', 'Unlimited team members'));
+  const currentPricing = pricing[pack];
+
+  const features: FeatureRow[] = useMemo(() => {
+    const unlimited = (n: number) => n >= 10000;
+
+    return [
+      {
+        label: t('billing_unlimited_ai_creation', 'Unlimited AI creation'),
+      },
+      {
+        label: t(
+          currentPricing.channel === 1
+            ? 'billing_social_channel'
+            : 'billing_social_channels',
+          currentPricing.channel === 1 ? 'social channel' : 'social channels'
+        ),
+        value: unlimited(currentPricing.channel)
+          ? undefined
+          : currentPricing.channel,
+      },
+      {
+        label: t('billing_posts_per_month', 'posts per month'),
+        value: unlimited(currentPricing.posts_per_month)
+          ? undefined
+          : currentPricing.posts_per_month,
+      },
+      {
+        label: t(
+          currentPricing.team_members === 1
+            ? 'billing_team_member'
+            : 'billing_team_members',
+          currentPricing.team_members === 1 ? 'team member' : 'team members'
+        ),
+        value: currentPricing.team_members,
+      },
+      {
+        label: t(
+          currentPricing.brand_kits === 1
+            ? 'billing_brand_kit'
+            : 'billing_brand_kits',
+          currentPricing.brand_kits === 1 ? 'brand kit' : 'brand kits'
+        ),
+        value: unlimited(currentPricing.brand_kits)
+          ? undefined
+          : currentPricing.brand_kits,
+      },
+      {
+        label: t('billing_campaigns', 'Campaigns'),
+        badge: currentPricing.campaigns ? 'yes' : 'no',
+      },
+      {
+        label: t('billing_api_and_mcp', 'API & MCP'),
+        badge: currentPricing.api && currentPricing.mcp ? 'yes' : 'no',
+      },
+      {
+        label: t(
+          currentPricing.webhooks === 1
+            ? 'billing_webhook'
+            : 'billing_webhooks',
+          currentPricing.webhooks === 1 ? 'webhook' : 'webhooks'
+        ),
+        value: currentPricing.webhooks,
+      },
+      {
+        label: t(
+          currentPricing.competitors === 1
+            ? 'billing_competitor'
+            : 'billing_competitors',
+          currentPricing.competitors === 1 ? 'competitor' : 'competitors'
+        ),
+        value: currentPricing.competitors,
+      },
+      {
+        label: t('billing_analytics_retention', 'analytics retention'),
+        value: `${currentPricing.analytics_retention_days} days`,
+      },
+      {
+        label: t('billing_video_exports_per_month', 'video exports/mo'),
+        value: currentPricing.video_exports,
+      },
+      {
+        label: t('billing_hosted_storage', 'hosted storage'),
+        value: `${currentPricing.storage_gb} GB`,
+      },
+      {
+        label: t('billing_byo_storage', 'BYO storage'),
+        badge: currentPricing.byo_storage ? 'yes' : 'no',
+      },
+      {
+        label: t('billing_priority_support', 'Priority support'),
+        badge: currentPricing.priority ? 'yes' : 'no',
+      },
+    ];
+  }, [currentPricing, t]);
+
+  const badgeLabel = (badge: FeatureRow['badge']) => {
+    if (badge === 'unlimited') {
+      return t('billing_unlimited_badge', 'Unlimited');
     }
-    if (currentPricing?.ai) {
-      list.push(t('billing_ai_auto_complete', 'AI auto-complete'));
-      list.push(t('billing_ai_copilots', 'AI copilots'));
-      list.push(t('billing_ai_autocomplete', 'AI Autocomplete'));
+    if (badge === 'yes') {
+      return t('billing_yes_badge', 'Yes');
     }
-    list.push(t('billing_advanced_picture_editor', 'Advanced Picture Editor'));
-    if (currentPricing?.image_generator) {
-      list.push(
-        t('billing_n_ai_images_per_month', '{{count}} AI Images per month', {
-          count: currentPricing?.image_generation_count,
-        })
-      );
-    }
-    if (currentPricing?.generate_videos) {
-      list.push(
-        t('billing_n_ai_videos_per_month', '{{count}} AI Videos per month', {
-          count: currentPricing?.generate_videos,
-        })
-      );
-    }
-    return list;
-  }, [pack, t]);
+    return t('billing_no_badge', 'No');
+  };
+
   return (
     <div className="flex flex-col gap-[10px] justify-center text-[16px] text-newTableText">
       {features.map((feature) => (
-        <div key={feature} className="flex gap-[20px]">
+        <div key={feature.label} className="flex gap-[20px] items-start">
           <div>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -140,7 +214,26 @@ export const Features: FC<{
               />
             </svg>
           </div>
-          <div>{feature}</div>
+          <div className="flex-1 flex flex-col gap-[4px]">
+            <div className="flex items-center gap-[10px]">
+              {feature.value !== undefined && (
+                <span className="font-[600]">{feature.value}</span>
+              )}
+              <span>{feature.label}</span>
+            </div>
+            {feature.badge && (
+              <span
+                className={clsx(
+                  'inline-flex items-center px-[8px] py-[2px] rounded-[4px] text-[12px] font-[500] w-fit',
+                  feature.badge === 'no'
+                    ? 'bg-red-500/20 text-red-500'
+                    : 'bg-green-500/20 text-green-500'
+                )}
+              >
+                {badgeLabel(feature.badge)}
+              </span>
+            )}
+          </div>
         </div>
       ))}
     </div>
@@ -233,7 +326,6 @@ export const MainBillingComponent: FC<{
   sub?: Subscription;
 }> = (props) => {
   const { sub } = props;
-  const { isGeneral } = useVariables();
   const { mutate } = useSWRConfig();
   const fetch = useFetch();
   const toast = useToaster();
@@ -260,9 +352,6 @@ export const MainBillingComponent: FC<{
   const [monthlyOrYearly, setMonthlyOrYearly] = useState<'on' | 'off'>(
     period === 'MONTHLY' ? 'off' : 'on'
   );
-  const [initialChannels, setInitialChannels] = useState(
-    sub?.totalChannels || 1
-  );
 
   useEffect(() => {
     // Sync local UI state when the subscription prop changes (e.g. after a
@@ -274,7 +363,6 @@ export const MainBillingComponent: FC<{
       const subPeriod = normalizePeriod(sub?.period);
       setPeriod(subPeriod);
       setMonthlyOrYearly(subPeriod === 'MONTHLY' ? 'off' : 'on');
-      setInitialChannels(sub?.totalChannels || 1);
     }
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [sub, subscription?.id]);
@@ -283,9 +371,10 @@ export const MainBillingComponent: FC<{
     const { portal } = await (await fetch('/billing/portal')).json();
     window.location.href = portal;
   }, [fetch]);
+
   const currentPackage = useMemo(() => {
     if (!subscription) {
-      return 'FREE';
+      return '';
     }
     if (period === 'YEARLY' && monthlyOrYearly === 'off') {
       return '';
@@ -295,195 +384,207 @@ export const MainBillingComponent: FC<{
     }
     return subscription?.subscriptionTier;
   }, [subscription, monthlyOrYearly, period]);
-  const moveToCheckout = useCallback(
-    (billing: 'STANDARD' | 'PRO' | 'FREE', reactivate = false) =>
-      async () => {
-        if (reactivate) {
-          setLoading(true);
-          const { cancel_at } = await (
-            await fetch('/billing/cancel', {
-              method: 'POST',
-              body: JSON.stringify({
-                feedback: '',
-              }),
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            })
-          ).json();
-          setSubscription((subs) => ({
-            ...subs!,
-            cancelAt: cancel_at,
-          }));
 
-          toast.show(
-            t('billing_subscription_reactivated_successfully', 'Subscription reactivated successfully')
-          );
-          setLoading(false);
-          return;
-        }
-
-        const messages = [];
-        if (
-          !pricing[billing].team_members &&
-          pricing[subscription?.subscriptionTier!]?.team_members
-        ) {
-          messages.push(
-            t(
-              'billing_team_members_will_be_removed',
-              'Your team members will be removed from your organization'
-            )
-          );
-        }
-        if (billing === 'FREE') {
-          if (
-            subscription?.cancelAt ||
-            (await deleteDialog(
-              t(
-                'billing_cancel_subscription_confirmation',
-                'Are you sure you want to cancel your subscription?\n{{messages}}',
-                { messages: messages.join(', ') }
-              ),
-              t('billing_yes_cancel', 'Yes, cancel'),
-              t('cancel_subscription', 'Cancel Subscription')
-            ))
-          ) {
-            const checkDiscount = await (
-              await fetch('/billing/check-discount')
-            ).json();
-            if (checkDiscount.offerCoupon) {
-              const info = await new Promise((res) => {
-                modal.openModal({
-                  title: t('billing_before_you_cancel', 'Before you cancel'),
-                  withCloseButton: true,
-                  classNames: {
-                    modal: 'bg-transparent text-textColor',
-                  },
-                  children: <Accept resolve={res} />,
-                });
-              });
-
-              modal.closeAll();
-
-              if (info) {
-                return;
-              }
-            }
-
-            const info = await new Promise((res) => {
-              modal.openModal({
-                title: t(
-                  'we_are_sorry_to_see_you_go',
-                  'We are sorry to see you go :('
-                ),
-                withCloseButton: true,
-                classNames: {
-                  modal: 'bg-transparent text-textColor',
-                },
-                children: <Info proceed={(e) => res(e)} />,
-              });
-            });
-
-            setLoading(true);
-            const { cancel_at } = await (
-              await fetch('/billing/cancel', {
-                method: 'POST',
-                body: JSON.stringify({
-                  feedback: info,
-                }),
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-              })
-            ).json();
-            setSubscription((subs) => ({
-              ...subs!,
-              cancelAt: cancel_at,
-            }));
-            if (cancel_at)
-              toast.show(
-                t(
-                  'billing_subscription_set_to_canceled_successfully',
-                  'Subscription set to canceled successfully'
-                )
-              );
-            setLoading(false);
-          }
-          return;
-        }
-        if (
-          messages.length &&
-          !(await deleteDialog(
-            messages.join(', '),
-            t('billing_yes_continue', 'Yes, continue')
-          ))
-        ) {
-          return;
-        }
+  const handleCancelOrReactivate = useCallback(
+    (reactivate = false) => async () => {
+      if (reactivate) {
         setLoading(true);
-        const { url, portal } = await (
-          await fetch('/billing/subscribe', {
+        const { cancel_at } = await (
+          await fetch('/billing/cancel', {
             method: 'POST',
             body: JSON.stringify({
-              period: monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY',
-              utm,
-              billing,
-              ...(dub ? { dub } : {}),
+              feedback: '',
             }),
+            headers: {
+              'Content-Type': 'application/json',
+            },
           })
         ).json();
-        if (url) {
-          await track(TrackEnum.InitiateCheckout, {
-            value:
-              pricing[billing][
-                monthlyOrYearly === 'on' ? 'year_price' : 'month_price'
-              ],
-          });
-          window.location.href = url;
-          return;
-        }
-        if (portal) {
-          if (
-            await deleteDialog(
-              t(
-                'billing_could_not_charge_credit_card',
-                'We could not charge your credit card, please update your payment method'
-              ),
-              t('update', 'Update'),
-              t('billing_payment_method_required', 'Payment Method Required')
-            )
-          ) {
-            window.open(portal);
-          }
-        } else {
-          setPeriod(monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY');
-          setSubscription((subs) => ({
-            ...subs!,
-            subscriptionTier: billing,
-            cancelAt: null,
-          }));
-          mutate(
-            '/user/self',
-            {
-              ...user,
-              tier: billing,
-            },
-            {
-              revalidate: false,
-            }
-          );
-          toast.show(
-            t('billing_subscription_updated_successfully', 'Subscription updated successfully')
-          );
-        }
+        setSubscription((subs) => ({
+          ...subs!,
+          cancelAt: cancel_at,
+        }));
+
+        toast.show(
+          t(
+            'billing_subscription_reactivated_successfully',
+            'Subscription reactivated successfully'
+          )
+        );
         setLoading(false);
-      },
-    [dub, fetch, modal, monthlyOrYearly, mutate, subscription, t, toast, track, user, utm]
+        return;
+      }
+
+      if (
+        subscription?.cancelAt ||
+        (await deleteDialog(
+          t(
+            'billing_cancel_subscription_confirmation',
+            'Are you sure you want to cancel your subscription?'
+          ),
+          t('billing_yes_cancel', 'Yes, cancel'),
+          t('cancel_subscription', 'Cancel Subscription')
+        ))
+      ) {
+        const checkDiscount = await (
+          await fetch('/billing/check-discount')
+        ).json();
+        if (checkDiscount.offerCoupon) {
+          const info = await new Promise((res) => {
+            modal.openModal({
+              title: t('billing_before_you_cancel', 'Before you cancel'),
+              withCloseButton: true,
+              classNames: {
+                modal: 'bg-transparent text-textColor',
+              },
+              children: <Accept resolve={res} />,
+            });
+          });
+
+          modal.closeAll();
+
+          if (info) {
+            return;
+          }
+        }
+
+        const info = await new Promise((res) => {
+          modal.openModal({
+            title: t(
+              'we_are_sorry_to_see_you_go',
+              'We are sorry to see you go :('
+            ),
+            withCloseButton: true,
+            classNames: {
+              modal: 'bg-transparent text-textColor',
+            },
+            children: <Info proceed={(e) => res(e)} />,
+          });
+        });
+
+        setLoading(true);
+        const { cancel_at } = await (
+          await fetch('/billing/cancel', {
+            method: 'POST',
+            body: JSON.stringify({
+              feedback: info,
+            }),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          })
+        ).json();
+        setSubscription((subs) => ({
+          ...subs!,
+          cancelAt: cancel_at,
+        }));
+        if (cancel_at)
+          toast.show(
+            t(
+              'billing_subscription_set_to_canceled_successfully',
+              'Subscription set to canceled successfully'
+            )
+          );
+        setLoading(false);
+      }
+    },
+    [fetch, modal, subscription, t, toast]
   );
+
+  const moveToCheckout = useCallback(
+    (billing: TierKey) => async () => {
+      const messages = [];
+      const currentTier = subscription?.subscriptionTier as TierKey | undefined;
+      if (
+        currentTier &&
+        pricing[billing].team_members < pricing[currentTier].team_members
+      ) {
+        messages.push(
+          t(
+            'billing_team_members_may_be_removed',
+            'Your team members may be removed from your organization'
+          )
+        );
+      }
+
+      if (
+        messages.length &&
+        !(await deleteDialog(
+          messages.join(', '),
+          t('billing_yes_continue', 'Yes, continue')
+        ))
+      ) {
+        return;
+      }
+      setLoading(true);
+      const { url, portal } = await (
+        await fetch('/billing/subscribe', {
+          method: 'POST',
+          body: JSON.stringify({
+            period: monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY',
+            utm,
+            billing,
+            ...(dub ? { dub } : {}),
+          }),
+        })
+      ).json();
+      if (url) {
+        await track(TrackEnum.InitiateCheckout, {
+          value:
+            pricing[billing][
+              monthlyOrYearly === 'on' ? 'year_price' : 'month_price'
+            ],
+        });
+        window.location.href = url;
+        return;
+      }
+      if (portal) {
+        if (
+          await deleteDialog(
+            t(
+              'billing_could_not_charge_credit_card',
+              'We could not charge your credit card, please update your payment method'
+            ),
+            t('update', 'Update'),
+            t('billing_payment_method_required', 'Payment Method Required')
+          )
+        ) {
+          window.open(portal);
+        }
+      } else {
+        setPeriod(monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY');
+        setSubscription((subs) => ({
+          ...subs!,
+          subscriptionTier: billing,
+          cancelAt: null,
+        }));
+        mutate(
+          '/user/self',
+          {
+            ...user,
+            tier: pricing[billing],
+          },
+          {
+            revalidate: false,
+          }
+        );
+        toast.show(
+          t(
+            'billing_subscription_updated_successfully',
+            'Subscription updated successfully'
+          )
+        );
+      }
+      setLoading(false);
+    },
+    [dub, fetch, monthlyOrYearly, mutate, subscription, t, toast, track, user, utm]
+  );
+
   if (user?.isLifetime) {
     router.replace('/');
     return null;
   }
+
   return (
     <div className="flex flex-col gap-[16px]">
       <PageHeader
@@ -505,94 +606,66 @@ export const MainBillingComponent: FC<{
 
       {finishTrial && <FinishTrial close={() => setFinishTrial(false)} />}
       <div className="flex gap-[16px] [@media(max-width:1024px)]:flex-col [@media(max-width:1024px)]:text-center">
-        {Object.entries(pricing)
-          .filter((f) => !isGeneral || f[0] !== 'FREE')
-          .map(([name, values]) => (
-            <div
-              key={name}
-              className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[4px] p-[24px] gap-[16px] flex flex-col [@media(max-width:1024px)]:items-center"
-            >
-              <div className="text-[18px]">{name}</div>
-              <div className="text-[38px] flex gap-[2px] items-center">
-                <div>
-                  $
-                  {monthlyOrYearly === 'on'
-                    ? values.year_price
-                    : values.month_price}
-                </div>
-                <div className={`text-[14px] text-newTableText`}>
-                  {monthlyOrYearly === 'on'
-                    ? t('billing_slash_year', '/year')
-                    : t('billing_slash_month', '/month')}
-                </div>
+        {Object.entries(pricing).map(([name, values]) => (
+          <div
+            key={name}
+            className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[4px] p-[24px] gap-[16px] flex flex-col [@media(max-width:1024px)]:items-center"
+          >
+            <div className="text-[18px]">{name}</div>
+            <div className="text-[38px] flex gap-[2px] items-center">
+              <div>
+                ${monthlyOrYearly === 'on' ? values.year_price : values.month_price}
               </div>
-              <div className="text-[14px] flex gap-[10px]">
-                {currentPackage === name.toUpperCase() &&
-                subscription?.cancelAt ? (
-                  <div className="gap-[3px] flex flex-col">
-                    <div>
-                      <Button
-                        onClick={moveToCheckout('FREE', true)}
-                        loading={loading}
-                      >
-                        {t(
-                          'reactivate_subscription',
-                          'Reactivate subscription'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <Button
-                    loading={loading}
-                    disabled={
-                      (!!subscription?.cancelAt &&
-                        name.toUpperCase() === 'FREE') ||
-                      currentPackage === name.toUpperCase()
-                    }
-                    className={clsx(
-                      subscription &&
-                        name.toUpperCase() === 'FREE' &&
-                        '!bg-red-500'
-                    )}
-                    onClick={moveToCheckout(
-                      name.toUpperCase() as 'STANDARD' | 'PRO'
-                    )}
-                  >
-                    {currentPackage === name.toUpperCase()
-                      ? t('billing_current_plan', 'Current Plan')
-                      : name.toUpperCase() === 'FREE'
-                      ? subscription?.cancelAt
-                        ? t('billing_downgrade_on', 'Downgrade on {{date}}', {
-                            date: dayjs
-                              .utc(subscription?.cancelAt)
-                              .local()
-                              .format(t('billing_date_format', 'D MMM, YYYY')),
-                          })
-                        : t('cancel_subscription_1', 'Cancel subscription')
-                      : // @ts-ignore
-                      (user?.tier === 'FREE' ||
-                          user?.tier?.current === 'FREE') &&
-                        user.allowTrial
-                      ? t('start_7_days_free_trial', 'Start 7 days free trial')
-                      : t('billing_purchase', 'Purchase')}
-                  </Button>
-                )}
-                {subscription &&
-                  currentPackage !== name.toUpperCase() &&
-                  name !== 'FREE' &&
-                  !!name && (
-                    <Prorate
-                      period={monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY'}
-                      pack={name.toUpperCase() as 'STANDARD' | 'PRO'}
-                    />
-                  )}
+              <div className={`text-[14px] text-newTableText`}>
+                {monthlyOrYearly === 'on'
+                  ? t('billing_slash_year', '/year')
+                  : t('billing_slash_month', '/month')}
               </div>
-              <Features
-                pack={name.toUpperCase() as 'FREE' | 'STANDARD' | 'PRO'}
-              />
             </div>
-          ))}
+            <div className="text-[14px] flex gap-[10px]">
+              {currentPackage === name.toUpperCase() &&
+              subscription?.cancelAt ? (
+                <div className="gap-[3px] flex flex-col">
+                  <div>
+                    <Button
+                      onClick={handleCancelOrReactivate(true)}
+                      loading={loading}
+                    >
+                      {t(
+                        'reactivate_subscription',
+                        'Reactivate subscription'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  loading={loading}
+                  disabled={currentPackage === name.toUpperCase()}
+                  onClick={moveToCheckout(name.toUpperCase() as TierKey)}
+                >
+                  {currentPackage === name.toUpperCase()
+                    ? t('billing_current_plan', 'Current Plan')
+                    : user?.allowTrial
+                    ? t(
+                        'start_30_days_free_trial',
+                        'Start 30 days free trial'
+                      )
+                    : t('billing_purchase', 'Purchase')}
+                </Button>
+              )}
+              {subscription &&
+                currentPackage !== name.toUpperCase() &&
+                !!name && (
+                  <Prorate
+                    period={monthlyOrYearly === 'on' ? 'YEARLY' : 'MONTHLY'}
+                    pack={name.toUpperCase() as TierKey}
+                  />
+                )}
+            </div>
+            <Features pack={name.toUpperCase() as TierKey} />
+          </div>
+        ))}
       </div>
       {!!subscription?.id && (
         <div className="flex justify-center mt-[20px] gap-[10px]">
@@ -602,24 +675,26 @@ export const MainBillingComponent: FC<{
               'Update Payment Method / Invoices History'
             )}
           </Button>
-          {isGeneral && !subscription?.cancelAt && (
+          {!subscription?.cancelAt && (
             <Button
               className="bg-red-500"
               loading={loading}
-              onClick={moveToCheckout('FREE')}
+              onClick={handleCancelOrReactivate(false)}
             >
               {t('cancel_subscription_1', 'Cancel subscription')}
             </Button>
           )}
         </div>
       )}
-      {subscription?.cancelAt && isGeneral && (
+      {subscription?.cancelAt && (
         <div className="text-center">
           {t(
             'your_subscription_will_be_canceled_at',
             'Your subscription will be canceled at'
           )}{' '}
-          {newDayjs(subscription.cancelAt).local().format(t('billing_date_format', 'D MMM, YYYY'))}
+          {newDayjs(subscription.cancelAt)
+            .local()
+            .format(t('billing_date_format', 'D MMM, YYYY'))}
           <br />
           {t(
             'you_will_never_be_charged_again',

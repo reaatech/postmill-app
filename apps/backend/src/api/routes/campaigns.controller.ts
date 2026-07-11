@@ -109,7 +109,7 @@ export class CampaignsController {
 
   @Post('/')
   @RequirePermission('posts', 'create')
-  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+  @CheckPolicies([AuthorizationActions.Create, Sections.CAMPAIGNS])
   async create(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,

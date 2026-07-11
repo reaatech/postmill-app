@@ -7,7 +7,7 @@ import { BrandList } from '@gitroom/frontend/components/settings/brand/brand-lis
 export default function Page() {
   const user = useUser();
   return (
-    <SettingsGate allow={user ? user.tier?.current !== 'FREE' : undefined}>
+    <SettingsGate allow={user ? !!user.tier?.brand_kits : undefined}>
       <BrandList />
     </SettingsGate>
   );

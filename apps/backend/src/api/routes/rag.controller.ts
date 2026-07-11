@@ -17,8 +17,6 @@ import { Organization, User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
-import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
-import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RagService, RagSettings } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
@@ -40,14 +38,12 @@ export class RagController {
 
   @Get('/status')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getStatus(@GetOrgFromRequest() org: Organization) {
     return this._ragService.getStatus(org.id);
   }
 
   @Post('/index')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async indexContent(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -89,7 +85,6 @@ export class RagController {
 
   @Get('/items')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async listItems(
     @GetOrgFromRequest() org: Organization,
     @Query('offset') offset?: string,
@@ -110,7 +105,6 @@ export class RagController {
 
   @Delete('/items/:sourceType/:sourceId')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deleteItem(
     @GetOrgFromRequest() org: Organization,
     @Param('sourceType') sourceType: string,
@@ -132,7 +126,6 @@ export class RagController {
 
   @Post('/search')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async search(
     @GetOrgFromRequest() org: Organization,
     @Body() body: RagSearchDto,
@@ -157,7 +150,6 @@ export class RagController {
 
   @Post('/backfill')
   @Throttle({ default: { limit: 3, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async triggerBackfill(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -178,7 +170,6 @@ export class RagController {
 
   @Get('/settings')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getSettings() {
     const settings = await this._aiSettingsManager.getSettings();
     const rag = (settings?.ragSettings || {}) as Record<string, any>;
@@ -208,7 +199,6 @@ export class RagController {
 
   @Put('/settings')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async saveSettings(
     @Body()
     body: {
@@ -277,7 +267,6 @@ export class RagController {
 
   @Post('/settings/test-connection')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
-  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async testConnection(
     @Body()
     body: {

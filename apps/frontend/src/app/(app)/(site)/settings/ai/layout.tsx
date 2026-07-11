@@ -11,7 +11,7 @@ export default function AiSettingsLayout({ children }: { children: React.ReactNo
   const items = [
     { href: '/settings/ai/llm-providers', label: t('llm_providers', 'LLM Providers') },
     { href: '/settings/ai/model-defaults', label: t('model_defaults', 'Model Defaults') },
-    ...(user?.tier?.current !== 'FREE'
+    ...(user?.tier?.brand_kits
       ? [{ href: '/settings/ai/brands', label: t('brands', 'Brands') }]
       : []),
     { href: '/settings/ai/prompt-templates', label: t('prompt_templates', 'Prompt Templates') },

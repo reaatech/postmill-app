@@ -24,11 +24,10 @@ describe('ReplicateRunnerService', () => {
   let mockCatalog: any;
   let mockAiSettings: any;
   let mockLifecycle: any;
-  let mockSubscription: any;
   let mockStorage: any;
   let mockOrgMediaProviderSettings: any;
   let mockFileService: any;
-  let mockOrganizationService: any;
+  let mockVideoRender: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -51,10 +50,6 @@ describe('ReplicateRunnerService', () => {
       failJob: vi.fn().mockResolvedValue(undefined),
       webhookUrlFor: vi.fn().mockReturnValue('https://api.example.com/webhook'),
       completeJobWithBuffer: vi.fn().mockResolvedValue(true),
-    };
-
-    mockSubscription = {
-      useCredit: vi.fn(async (_org: unknown, _type: string, fn: () => Promise<any>) => fn()),
     };
 
     mockStorage = {
@@ -80,19 +75,18 @@ describe('ReplicateRunnerService', () => {
       }),
     };
 
-    mockOrganizationService = {
-      getOrgById: vi.fn().mockResolvedValue({ id: 'org1' }),
+    mockVideoRender = {
+      enqueueMerge: vi.fn().mockResolvedValue({ jobId: 'merge-job-1' }),
     };
 
     runner = new ReplicateRunnerService(
       mockCatalog as ReplicateCatalogService,
       mockAiSettings,
       mockLifecycle,
-      mockSubscription,
       mockStorage,
       mockOrgMediaProviderSettings,
       mockFileService,
-      mockOrganizationService,
+      mockVideoRender,
     );
   });
 
@@ -131,16 +125,15 @@ describe('ReplicateRunnerService', () => {
       });
     });
 
-    it('wraps image ops in useCredit when creditType is provided', async () => {
+    it('does not consume platform credits for image generation (BYOK)', async () => {
       mockSafeFetch.mockResolvedValue(
         jsonResponse({
           id: 'pred-1',
-          status: 'succeeded',
-          output: 'https://rep/out.png',
+          status: 'starting',
         }),
       );
 
-      await runner.runSync(
+      const result = await runner.runSync(
         'org1',
         '',
         {
@@ -151,10 +144,10 @@ describe('ReplicateRunnerService', () => {
         { creditType: 'ai_images' },
       );
 
-      expect(mockSubscription.useCredit).toHaveBeenCalledWith(
-        { id: 'org1' },
-        'ai_images',
-        expect.any(Function),
+      // No subscriptionService in this service; creditType is preserved in the job row only.
+      expect(result).toMatchObject({ status: 'pending', kind: 'image' });
+      expect(mockAiSettings.createMediaJob).toHaveBeenCalledWith(
+        expect.objectContaining({ creditType: 'ai_images' }),
       );
     });
 
@@ -218,7 +211,6 @@ describe('ReplicateRunnerService', () => {
         'org1',
         '',
         {
-          // allowlisted community (non-warm) model → hits /predictions
           modelId: 'arielreplicate/robust_video_matting',
           versionId: 'v-community',
           input: { prompt: 'cat' },

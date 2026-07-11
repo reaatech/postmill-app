@@ -310,10 +310,10 @@ export const GeneratorComponent = () => {
   const modal = useModals();
   const all = useCalendar();
   const generate = useCallback(async () => {
-    if (!user?.tier?.ai) {
+    if (!user?.tier?.mcp) {
       if (
         await deleteDialog(
-          t('upgrade_required', 'You need to upgrade to use this feature'),
+          t('upgrade_required', 'AI assistant access is available on Pro, Team, and Agency plans. Upgrade to generate posts with the AI agent.'),
           t('move_to_billing', 'Move to billing'),
           t('payment_required', 'Payment Required')
         )

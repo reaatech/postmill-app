@@ -23,15 +23,29 @@ function makeActivity(opts: {
     getMediaJobByIdUnscoped: vi.fn(async (id: string) => opts.jobsById?.[id]),
   };
   const videoRender = {
-    processVideoRender: vi.fn().mockResolvedValue(undefined),
-    processMergeRender: vi.fn().mockResolvedValue(undefined),
+    // A successful render transitions the job pending→completed (so the after-read passes).
+    // Failure tests override these to resolve without flipping the status.
+    processVideoRender: vi.fn(async (id: string) => {
+      if (opts.jobsById?.[id]) opts.jobsById[id].status = 'completed';
+    }),
+    processMergeRender: vi.fn(async (id: string) => {
+      if (opts.jobsById?.[id]) opts.jobsById[id].status = 'completed';
+    }),
+  };
+  const subscriptionService = {
+    recordCredit: vi.fn(async (_org: unknown, _type: string) => undefined),
+  };
+  const organizationService = {
+    getOrgById: vi.fn(async (_orgId: string) => ({ id: _orgId, name: 'Test Org' })),
   };
   const activity = new MediaJobsActivity(
     lifecycle as any,
     aiSettings as any,
     videoRender as any,
+    subscriptionService as any,
+    organizationService as any,
   );
-  return { activity, lifecycle, aiSettings, videoRender };
+  return { activity, lifecycle, aiSettings, videoRender, subscriptionService, organizationService };
 }
 
 describe('MediaJobsActivity', () => {
@@ -116,7 +130,7 @@ describe('MediaJobsActivity', () => {
     h.enabled = false;
     const { activity, videoRender } = makeActivity({
       pending: [{ id: 'd1', provider: 'chromium-ffmpeg', model: null, updatedAt: new Date(Date.now() - 300_000) }],
-      jobsById: { d1: { id: 'd1', provider: 'chromium-ffmpeg', model: null } },
+      jobsById: { d1: { id: 'd1', provider: 'chromium-ffmpeg', model: null, status: 'pending' } },
     });
 
     const result = await activity.processPendingMediaJobs();
@@ -131,7 +145,7 @@ describe('MediaJobsActivity', () => {
     h.enabled = false;
     const { activity, videoRender } = makeActivity({
       pending: [{ id: 'd1', provider: 'chromium-ffmpeg', model: null, updatedAt: new Date(Date.now() - 300_000) }],
-      jobsById: { d1: { id: 'd1', provider: 'chromium-ffmpeg', model: null } },
+      jobsById: { d1: { id: 'd1', provider: 'chromium-ffmpeg', model: null, status: 'pending' } },
     });
     vi.mocked(videoRender.processVideoRender).mockImplementation(
       () => new Promise(() => {})
@@ -153,11 +167,11 @@ describe('MediaJobsActivity', () => {
     expect(lifecycle.processJob).toHaveBeenCalledWith('job-1');
   });
 
-  it('processRenderJob dispatches design vs merge by job shape', async () => {
-    const { activity, videoRender } = makeActivity({
+  it('processRenderJob dispatches design vs merge by job shape and charges one video_export credit', async () => {
+    const { activity, videoRender, subscriptionService } = makeActivity({
       jobsById: {
-        d1: { id: 'd1', provider: 'chromium-ffmpeg', model: null },
-        m1: { id: 'm1', provider: 'replicate', model: 'local/ffmpeg-merge' },
+        d1: { id: 'd1', provider: 'chromium-ffmpeg', model: null, organizationId: 'org-1', status: 'pending' },
+        m1: { id: 'm1', provider: 'replicate', model: 'local/ffmpeg-merge', organizationId: 'org-1', status: 'pending' },
       },
     });
 
@@ -166,5 +180,25 @@ describe('MediaJobsActivity', () => {
 
     expect(videoRender.processVideoRender).toHaveBeenCalledWith('d1');
     expect(videoRender.processMergeRender).toHaveBeenCalledWith('m1');
+    expect(subscriptionService.recordCredit).toHaveBeenCalledTimes(2);
+    expect(subscriptionService.recordCredit).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'org-1' }),
+      'video_export',
+    );
+  });
+
+  it('processRenderJob does not charge when the render does not reach completed', async () => {
+    const { activity, videoRender, subscriptionService } = makeActivity({
+      jobsById: {
+        d1: { id: 'd1', provider: 'chromium-ffmpeg', model: null, organizationId: 'org-1', status: 'pending' },
+      },
+    });
+    // Render runs but does not transition the job to completed.
+    videoRender.processVideoRender.mockResolvedValue(undefined);
+
+    await expect(activity.processRenderJob('d1')).rejects.toThrow('did not complete');
+
+    expect(videoRender.processVideoRender).toHaveBeenCalledWith('d1');
+    expect(subscriptionService.recordCredit).not.toHaveBeenCalled();
   });
 });

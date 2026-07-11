@@ -102,7 +102,7 @@ export const LinkedinCompany: FC<{
     return () => {
       setActivateExitButton(true);
     };
-  }, []);
+  }, [setActivateExitButton]);
   const fetch = useFetch();
   const [company, setCompany] = useState<any>(null);
   const toast = useToaster();
@@ -167,7 +167,7 @@ export const LinkedinCompany: FC<{
             onChange={(e) => setCompany(e.target.value)}
             placeholder={t(
               'linkedin_company_placeholder',
-              'https://www.linkedin.com/company/gitroom'
+              'https://www.linkedin.com/company/postmill'
             )}
           />
           <Button onClick={getCompany}>{t('add', 'Add')}</Button>

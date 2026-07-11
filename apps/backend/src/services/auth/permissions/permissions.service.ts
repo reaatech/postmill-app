@@ -1,14 +1,39 @@
 import { Ability, AbilityBuilder, AbilityClass } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
-import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import {
+  pricing,
+  SELF_HOST_PLAN,
+} from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import dayjs from 'dayjs';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
+import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.repository';
+import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import { StorageProviderType } from '@prisma/client';
 import { AuthorizationActions, Sections } from './permission.exception.class';
 
 export type AppAbility = Ability<[AuthorizationActions, Sections]>;
+
+const BYTES_PER_GB = 1024 * 1024 * 1024;
+
+function getBillingMonthStart(createdAt: Date): dayjs.Dayjs {
+  const start = dayjs(createdAt);
+  const now = dayjs();
+  let current = start;
+  while (current.isBefore(now, 'month') || current.isBefore(now, 'day')) {
+    const next = current.add(1, 'month');
+    if (next.isAfter(now)) {
+      break;
+    }
+    current = next;
+  }
+  return current;
+}
 
 @Injectable()
 export class PermissionsService {
@@ -16,23 +41,49 @@ export class PermissionsService {
     private _subscriptionService: SubscriptionService,
     private _postsService: PostsService,
     private _integrationService: IntegrationService,
-    private _webhooksService: WebhooksService
+    private _webhooksService: WebhooksService,
+    private _organizationService: OrganizationService,
+    private _brandsRepository: BrandsRepository,
+    private _watchlistRepository: WatchlistRepository,
+    private _fileRepository: FileRepository,
+    private _storageService: StorageService
   ) {}
+
   async getPackageOptions(orgId: string) {
     const subscription =
       await this._subscriptionService.getSubscriptionByOrganizationId(orgId);
 
     const tier =
       subscription?.subscriptionTier ||
-      (!process.env.STRIPE_PUBLISHABLE_KEY ? 'PRO' : 'FREE');
+      (!process.env.STRIPE_PUBLISHABLE_KEY ? SELF_HOST_PLAN : 'STARTER');
 
-    const { channel, ...all } = pricing[tier];
+    const { channel, ...all } = pricing[tier] ?? pricing['STARTER'];
     return {
       subscription,
       options: {
         ...all,
-        ...{ channel: tier === 'FREE' ? channel : -10 },
+        channel: subscription ? -10 : channel,
       },
+    };
+  }
+
+  async getEffectiveLimits(orgId: string) {
+    const { subscription, options } = await this.getPackageOptions(orgId);
+    const extraStorageGb = subscription?.extraStorageGb ?? 0;
+    const extraVideoExports = subscription?.extraVideoExports ?? 0;
+    const mounted = await this._storageService.getMountedConfigs(orgId);
+    const byoStorageActive = mounted.some(
+      (c) => c.type !== StorageProviderType.LOCAL
+    );
+
+    return {
+      subscription,
+      options: {
+        ...options,
+        storage_gb: options.storage_gb + extraStorageGb,
+        video_exports: options.video_exports + extraVideoExports,
+      },
+      byoStorageActive,
     };
   }
 
@@ -61,7 +112,11 @@ export class PermissionsService {
       });
     }
 
-    const { subscription, options } = await this.getPackageOptions(orgId);
+    const { subscription, options, byoStorageActive } =
+      await this.getEffectiveLimits(orgId);
+
+    const teamPromise = this._organizationService.getTeam(orgId);
+
     for (const [action, section] of requestedPermission) {
       // check for the amount of channels
       if (section === Sections.CHANNEL) {
@@ -103,8 +158,7 @@ export class PermissionsService {
       // check for posts per month
       if (section === Sections.POSTS_PER_MONTH) {
         const createdAt =
-          (await this._subscriptionService.getSubscription(orgId))?.createdAt ||
-          created_at;
+          subscription?.createdAt || created_at;
         const totalMonthPast = Math.abs(
           dayjs(createdAt).diff(dayjs(), 'month')
         );
@@ -120,9 +174,16 @@ export class PermissionsService {
         }
       }
 
-      if (section === Sections.TEAM_MEMBERS && options.team_members) {
-        can(action, section);
-        continue;
+      if (section === Sections.TEAM_MEMBERS) {
+        const team = await teamPromise;
+        // Count only ENABLED seats — a disabled member (e.g. one pruned on downgrade) must
+        // not consume the cap, or an entitled active invite would be wrongly blocked.
+        const totalMembers =
+          team?.users?.filter((u: { disabled?: boolean }) => !u.disabled).length ?? 0;
+        if (totalMembers < options.team_members) {
+          can(action, section);
+          continue;
+        }
       }
 
       // Media management is not a billed dimension — any authenticated org
@@ -133,33 +194,63 @@ export class PermissionsService {
         continue;
       }
 
-      if (
-        section === Sections.COMMUNITY_FEATURES &&
-        options.community_features
-      ) {
+      if (section === Sections.BRANDS) {
+        const totalBrands = await this._brandsRepository.countBrands(orgId);
+        if (totalBrands < options.brand_kits) {
+          can(action, section);
+          continue;
+        }
+      }
+
+      if (section === Sections.CAMPAIGNS && options.campaigns) {
         can(action, section);
         continue;
       }
 
-      if (
-        section === Sections.FEATURED_BY_GITROOM &&
-        options.featured_by_gitroom
-      ) {
+      if (section === Sections.API && options.api) {
         can(action, section);
         continue;
       }
 
-      if (section === Sections.AI && options.ai) {
+      if (section === Sections.MCP && options.mcp) {
         can(action, section);
         continue;
       }
 
-      if (
-        section === Sections.IMPORT_FROM_CHANNELS &&
-        options.import_from_channels
-      ) {
-        can(action, section);
-        continue;
+      if (section === Sections.COMPETITORS) {
+        const totalCompetitors =
+          await this._watchlistRepository.countByOrg(orgId);
+        if (totalCompetitors < options.competitors) {
+          can(action, section);
+          continue;
+        }
+      }
+
+      if (section === Sections.VIDEO_EXPORTS) {
+        const createdAt = subscription?.createdAt || created_at;
+        const checkFrom = getBillingMonthStart(createdAt);
+        const used = await this._subscriptionService.getCreditsFrom(
+          orgId,
+          checkFrom,
+          'video_export'
+        );
+        if (used < options.video_exports) {
+          can(action, section);
+          continue;
+        }
+      }
+
+      if (section === Sections.STORAGE) {
+        if (byoStorageActive) {
+          can(action, section);
+          continue;
+        }
+        const usedBytes = await this._fileRepository.getStorageBytes(orgId);
+        const capBytes = (options.storage_gb as number) * BYTES_PER_GB;
+        if (usedBytes < capBytes) {
+          can(action, section);
+          continue;
+        }
       }
     }
 

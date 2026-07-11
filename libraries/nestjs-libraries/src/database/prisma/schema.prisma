@@ -222,19 +222,22 @@ model Credits {
 }
 
 model Subscription {
-  id               String           @id @default(cuid())
-  organizationId   String           @unique
-  subscriptionTier SubscriptionTier
-  identifier       String?
-  cancelAt         DateTime?
-  period           String          @default("MONTHLY")
-  totalChannels    Int
-  isLifetime       Boolean          @default(false)
-  gracePeriodEnd   DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  deletedAt        DateTime?
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id                String           @id @default(cuid())
+  organizationId    String           @unique
+  subscriptionTier  SubscriptionTier
+  identifier        String?
+  cancelAt          DateTime?
+  period            String          @default("MONTHLY")
+  totalChannels     Int
+  isLifetime        Boolean          @default(false)
+  gracePeriodEnd    DateTime?
+  extraStorageGb    Int              @default(0)
+  extraVideoExports Int              @default(0)
+  pendingTier       SubscriptionTier?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  deletedAt         DateTime?
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([deletedAt])
@@ -1598,10 +1601,10 @@ enum State {
 }
 
 enum SubscriptionTier {
-  STANDARD
+  STARTER
   PRO
   TEAM
-  ULTIMATE
+  AGENCY
 }
 
 enum Provider {
