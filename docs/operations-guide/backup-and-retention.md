@@ -112,4 +112,4 @@ find "$BACKUP_DIR" -name '*.sql' -mtime +7 -delete
 find "$BACKUP_DIR" -name '*.tar.gz' -mtime +7 -delete
 ```
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

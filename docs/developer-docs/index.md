@@ -83,4 +83,4 @@ libraries/
   providers/           Provider kernel + per-provider packages
 ```
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

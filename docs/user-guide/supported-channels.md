@@ -123,4 +123,4 @@ the adapter classes in `libraries/nestjs-libraries/src/short-linking/adapters/`.
 - [Adding a Provider](../developer-docs/adding-a-provider.md) — How to register capability flags when adding a new channel provider.
 - [Short-link Providers](#short-link-providers) — Short-link provider capability matrix (above).
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

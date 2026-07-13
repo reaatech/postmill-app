@@ -1,6 +1,6 @@
 # Designer
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 The Designer is the native canvas design editor at `/media/designer`. It is built on **react-konva** (Konva.js) and reads input from and writes output to the **Files** library; it never stores its own assets outside `/files`.
 

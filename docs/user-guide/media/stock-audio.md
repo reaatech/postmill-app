@@ -43,4 +43,4 @@ For Envato Elements audio, a licensed preview URL is minted from the item id bef
 
 ---
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

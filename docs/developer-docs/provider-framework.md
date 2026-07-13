@@ -1,6 +1,6 @@
 # Provider framework
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 Postmill integrates with external services across AI, media generation, social channels, short-links, VPN egress, storage, email, auth, and content packs. The **unified provider framework** replaces the previous collection of bespoke registries with a single `ProviderKernel` and a consistent package-per-provider model.
 
@@ -67,7 +67,7 @@ See [Adding a Provider](./adding-a-provider.md) for the social-channel recipe. T
 3. Add a `src/v1/metadata.ts` with the static `ProviderMetadata` the defaults resolver and catalog read.
 4. Add the package import to `apps/backend/src/providers.generated.ts` (or re-run `scripts/generate-provider-packages.mjs` if the provider fits its templates).
 5. Add a conformance test under `libraries/providers/<id>/src/__tests__/`.
-6. Update [Provider Versions](./provider-versions.md) and bump the "Verified against main (post-3.8.10)" note.
+6. Update [Provider Versions](./provider-versions.md) and bump the "Verified against v1.0.0" note.
 
 ## Provider metadata (`src/v1/metadata.ts`)
 

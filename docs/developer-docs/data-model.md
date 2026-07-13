@@ -240,4 +240,4 @@ The dead marketplace/GitHub-stars subsystems were removed in a single destructiv
 
 See [Upgrading → v3.8.9 → v3.8.10](../operations-guide/upgrading.md#v3-8-9-v3-8-10) for the operational procedure.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

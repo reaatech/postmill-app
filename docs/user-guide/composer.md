@@ -197,4 +197,4 @@ validation as the composer — each row is validated individually, and per-row s
 and errors are reported. Failed rows do not block successful rows. See [Bulk Import](./bulk-import.md)
 for details.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

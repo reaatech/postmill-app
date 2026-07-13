@@ -226,4 +226,4 @@ total_connections ≈ (backend_replicas + inngest_workers) × DATABASE_CONNECTIO
 
 A reasonable start for a small/medium deployment: `DATABASE_CONNECTION_LIMIT=10`, `DATABASE_POOL_TIMEOUT=20`. Raise the limit only after confirming Postgres `max_connections` (or the pgBouncer pool) has room across **all** backend replicas plus the Inngest worker. When fronted by pgBouncer in transaction mode, set a low per-process limit and let the bouncer pool.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

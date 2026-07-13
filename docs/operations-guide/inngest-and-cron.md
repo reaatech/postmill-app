@@ -168,4 +168,4 @@ Enable in `.env`:
 AGENT_DIGEST_ENABLED=true
 ```
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

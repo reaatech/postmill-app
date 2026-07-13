@@ -1,6 +1,6 @@
 # SDK
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 The `@reaatech/postmill-sdk` is the official Node.js SDK for the Postmill Public API. It provides typed methods for creating posts, uploading media, listing integrations, and more.
 

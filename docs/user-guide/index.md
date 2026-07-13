@@ -42,4 +42,4 @@ ListMonk, Moltbook, Whop, Skool, MeWe, Tumblr, Pixelfed, PeerTube.
 | [Subscription & Billing](./subscription-and-billing.md) | Plans, trials, metered caps, add-ons, payment methods, and invoices. |
 | [Supported Channels](./supported-channels.md) | Capability matrix for every provider — analytics, comments, first comment, polls, video, carousel, alt text, and more. |
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

@@ -29,4 +29,4 @@ The studio calls Fireworks' workflow endpoint with `Accept: application/json` an
 - [Settings](../settings) — configuring AI providers.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

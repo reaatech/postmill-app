@@ -178,4 +178,4 @@ In the MCP server, token resolution works as follows:
 - Redirect URIs are matched exactly.
 - PKCE is required for new authorizations; legacy authorizations without a code challenge still work for token exchange but cannot verify a verifier.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

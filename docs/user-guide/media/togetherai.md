@@ -34,4 +34,4 @@ Image and TTS generations are **synchronous** and appear immediately. Video gene
 - [Settings](../settings)
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

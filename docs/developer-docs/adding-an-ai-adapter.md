@@ -2,7 +2,7 @@
 
 Postmill's AI layer supports 25 providers through a pluggable adapter system. Each adapter lives in its own workspace package under `libraries/providers/<id>/` and is registered into the `ProviderKernel` at backend boot.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 ---
 

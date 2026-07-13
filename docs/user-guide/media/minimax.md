@@ -28,4 +28,4 @@ Video jobs submit to MiniMax and appear in the **Render Queue**. When a job comp
 - Native parameters such as `prompt_optimizer` ride straight through to the provider request body.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

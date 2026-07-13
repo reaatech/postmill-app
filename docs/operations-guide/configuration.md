@@ -309,4 +309,4 @@ The following patterns are no longer supported as environment variables. Configu
 
 The **login** provider env vars (`GITHUB_CLIENT_*`, `YOUTUBE_CLIENT_*`, `POSTMILL_OAUTH_*`) remain readable as the bootstrap fallback for `/admin`-managed auth providers and must never be used for channel or AI credentials.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

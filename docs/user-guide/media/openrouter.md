@@ -29,4 +29,4 @@ Image generation is synchronous. The finished image lands in `/files` via the **
 - [Settings](../settings.md) — configuring AI and media providers.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

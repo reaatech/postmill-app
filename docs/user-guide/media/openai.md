@@ -27,4 +27,4 @@ Image and audio generations complete synchronously and land directly in `/files`
 - The model and native parameter names in each tab are passed straight to the OpenAI API, so the available options match the provider's current API.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

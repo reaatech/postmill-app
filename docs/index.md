@@ -44,4 +44,4 @@ features:
 - [Operations Guide](/operations-guide/) — self-host, configure, and operate
 :::
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

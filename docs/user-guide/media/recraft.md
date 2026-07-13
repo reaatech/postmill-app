@@ -27,4 +27,4 @@ Image generation is synchronous, so results usually appear immediately.
 - Extra native Recraft parameters (for example `substyle` or `response_format`) ride through automatically when supplied by the descriptor defaults; the visible form covers the common cases.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

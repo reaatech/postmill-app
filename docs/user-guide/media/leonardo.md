@@ -34,4 +34,4 @@ Leonardo's API is asynchronous (create → `generationId` → poll), but the ada
 - [Settings](../settings) — configuring the Leonardo.ai media provider.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

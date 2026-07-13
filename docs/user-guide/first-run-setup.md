@@ -1,6 +1,6 @@
 # First-run setup
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 When a brand-new organization is created, Postmill shows a one-time onboarding wizard at **`/setup`**. The wizard walks the first user through the minimum configuration needed before the app is usable:
 

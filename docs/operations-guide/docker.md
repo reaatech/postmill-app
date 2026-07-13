@@ -157,4 +157,4 @@ docker exec postmill pnpm dlx prisma@6.5.0 migrate deploy \
 For local prototyping or reset only, `pnpm run prisma-db-push` is available; never use it against a
 shared or production database.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

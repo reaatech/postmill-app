@@ -32,4 +32,4 @@ Suno generations are **asynchronous**. After you click **Generate**, the job ent
 - [Settings](../settings)
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

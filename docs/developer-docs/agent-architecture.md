@@ -5,7 +5,7 @@ Postmill's chat agent is a Mastra/CopilotKit agent that lives at `/agents`. It u
 > For the end-user view of what the agent can do, see [Agent User Guide](../user-guide/agent.md).
 > For the MCP/A2A surfaces that expose the same tools to external clients, see [MCP Server](./mcp.md).
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 ---
 

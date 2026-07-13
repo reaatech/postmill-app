@@ -59,4 +59,4 @@ Konva snapshot can't produce real animation, so those two only exist as video-mo
 Exports can save back into `/files` (with folder selection) or post directly into the composer.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

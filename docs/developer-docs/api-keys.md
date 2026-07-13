@@ -130,4 +130,4 @@ These scopes are intersected with `mcpsettings.allowedScopes` if configured.
 
 If you have integrations still using the old `Organization.apiKey`, generate a new per-user key from **Settings → API Keys** and update the `Authorization` header. The old key type is no longer accepted by the Public API or MCP.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

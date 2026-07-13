@@ -160,4 +160,4 @@ channel data. Watched-account metrics also appear in the **Insights → Recommen
 compared against channel performance for competitive insights. See [Watchlist](watchlist.md) for
 setup and configuration.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

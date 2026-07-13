@@ -349,4 +349,4 @@ If an upgrade causes issues:
 - [Backup & Retention](./backup-and-retention.md) — backup before upgrade
 - [Developer Docs: Database](../developer-docs/database.md) — schema management and safety
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
