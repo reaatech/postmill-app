@@ -1096,10 +1096,6 @@ importers:
         version: 4.1.8(@opentelemetry/api@1.9.1)(@types/node@22.19.20)(@vitest/coverage-v8@4.1.8)(@vitest/ui@4.1.8)(happy-dom@20.10.2(bufferutil@4.1.0)(utf-8-validate@6.0.6))(jsdom@29.1.1(@noble/hashes@2.0.1)(canvas@3.2.3))(vite@6.4.3(@types/node@22.19.20)(jiti@1.21.7)(lightningcss@1.31.1)(sass@1.100.0)(terser@5.48.0)(yaml@2.9.0))
 
   apps/sdk:
-    dependencies:
-      '@gitroom/nestjs-libraries':
-        specifier: workspace:*
-        version: file:libraries/nestjs-libraries(418179b18ab8f15fd7b13dbf14e71f77)
     devDependencies:
       '@types/node':
         specifier: ^22.13.0
