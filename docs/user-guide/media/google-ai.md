@@ -25,4 +25,4 @@ Generations follow the standard [Media Studios flow](./index.md): the job enters
 - One Gemini key drives both the LLM and media surfaces; configure it once.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

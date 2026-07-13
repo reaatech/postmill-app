@@ -8,7 +8,7 @@ This page covers the conversational agent at `/agents`. For the canvas AI
 Designer assistant in `/media/ai-designer`, see [AI Designer](./media/ai-designer.md);
 for the manual Konva Designer, see [Designer](./media/designer.md).
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 ---
 

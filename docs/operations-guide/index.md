@@ -46,4 +46,4 @@ through Inngest, and media can live on local disk or cloud object storage.
 | [OAuth / SSO](./oauth-sso.md) | Generic OIDC provider setup (Authentik, Keycloak, etc.) |
 | [Subscriptions & Stripe](./subscriptions.md) | Stripe config, plans, metered caps, add-ons, and self-host defaults |
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

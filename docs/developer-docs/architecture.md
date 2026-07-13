@@ -227,4 +227,4 @@ The AI, Media, Storage, and Shortlinks settings surfaces share one foundation:
 
 The post composer lives on dedicated routes: `/posts/post` (create — accepts `date`/`channel`/`content` query params) and `/posts/post/:id` (edit). Both render the shared `PostComposer` component; the time picker displays in the user's IANA timezone and saves UTC.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

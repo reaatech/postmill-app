@@ -59,4 +59,4 @@ Finished designs are saved as real `Design` records (with rendered preview files
 opened directly in the [Designer](./designer) for manual refinement, just like any other design.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

@@ -87,4 +87,4 @@ creation. This means:
 - **Date formats** — ISO 8601 (`2026-06-09T14:30:00Z`) is the most reliable format. Include
   timezone offsets to avoid ambiguity.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

@@ -35,4 +35,4 @@ Luma video generation is async. After submission, the job appears in the **Rende
 - [Settings](../settings) — configuring the Luma media provider.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

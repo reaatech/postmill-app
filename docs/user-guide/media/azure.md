@@ -29,4 +29,4 @@ The studio posts the job through the shared Studio Kit pipeline. Completed image
 - [Settings](../settings) — configuring AI providers.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

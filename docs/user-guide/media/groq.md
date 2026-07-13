@@ -23,4 +23,4 @@ Audio generations complete synchronously and land in `/files` through the standa
 - The model list is curated; Groq's `/models` endpoint does not reliably tag TTS models, so the studio exposes the known PlayAI and Orpheus options directly.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

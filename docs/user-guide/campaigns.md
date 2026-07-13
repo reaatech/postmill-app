@@ -105,4 +105,4 @@ Campaign-aware filters derive through the post's `campaignId`: the [Media Librar
 
 A daily cron (`campaign-tag-purge`) deletes a finished campaign's tagged items `CAMPAIGN_PURGE_DAYS` (default 30) after its `endDate`. Ongoing campaigns with no end date are never purged.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

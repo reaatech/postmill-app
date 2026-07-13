@@ -84,4 +84,4 @@ A list of past invoices with:
 - Payment status (paid, pending, failed).
 - Downloadable PDF receipt.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

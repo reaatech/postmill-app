@@ -122,4 +122,4 @@ cloud object storage.
 Configure storage providers in **Settings → Storage**. See
 [Storage Setup](../operations-guide/storage.md) for provider configuration and quota management.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

@@ -1,6 +1,6 @@
 # Provider versions catalog
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
 
 This page lists every provider currently registered in the unified provider framework, grouped by domain. All current providers are at version `v1`.
 

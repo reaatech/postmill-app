@@ -225,4 +225,4 @@ The legacy single-channel response shape is preserved for backward compatibility
 | `ANALYTICS_DAILY_RETENTION_DAYS` | `548` | Keep raw daily channel snapshots this long before weekly rollup |
 | `ANALYTICS_POST_RETENTION_DAYS` | `90` | Prune per-post daily snapshots older than this |
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

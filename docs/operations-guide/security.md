@@ -348,4 +348,4 @@ fields on all DTOs. Declare new optional fields explicitly on their DTO.
 - [Configuration](./configuration.md) — `ENCRYPTION_KEY`, `SSRF_ALLOWED_PRIVATE_CIDRS`,
   `INTEGRATION_RETURN_URL_ALLOWLIST`, `NOT_SECURED`
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

@@ -58,4 +58,4 @@ The wizard has seven steps. Only the first step is required; the rest can be ski
 
 After completion, the org can still change every configured provider from the corresponding Settings tab.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

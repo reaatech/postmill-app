@@ -224,4 +224,4 @@ Media-generation providers follow the same shape: `MediaProviderRegistry` (`libr
 
 All of these ultimately resolve through the shared `ProviderKernel` (see [Architecture](./architecture.md) and [Provider Framework](./provider-framework.md)).
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

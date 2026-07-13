@@ -65,4 +65,4 @@ local compute; without bounds a backlog can starve the host.
 | `VIDEO_RENDER_TIMEOUT_MS` | `120000` | Per-container hard timeout |
 | `VIDEO_RENDER_SPLIT_FALLBACK` | `true` | Even-split caps if the pod can't be created |
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

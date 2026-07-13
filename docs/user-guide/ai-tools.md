@@ -251,4 +251,4 @@ All AI operations are subject to three governance layers:
 
 All AI operations log to the spend ledger (`AISpendLog`) for audit and cost tracking.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

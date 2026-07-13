@@ -84,4 +84,4 @@ You can manage your watched accounts (edit display name, enable/disable, delete)
 watchlist section of the Analytics page or via the watchlist API endpoints under
 `/analytics/v2/watchlist`.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

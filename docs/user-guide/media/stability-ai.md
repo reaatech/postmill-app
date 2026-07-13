@@ -31,4 +31,4 @@ Stable Image completes **synchronously**, so the generated image appears in the 
 - [Settings](../settings)
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

@@ -29,4 +29,4 @@ Replica videos are **asynchronous**. After submission, the job appears in the Re
 - [Settings](../settings)
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

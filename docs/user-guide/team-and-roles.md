@@ -67,4 +67,4 @@ Role creates/updates/deletes and member role assignments are written to the orga
 
 > See also [Settings](./settings.md) for the settings layout, [Subscription & Billing](./subscription-and-billing.md) for team-member limits, and [Operations Guide → Security](../operations-guide/security.md) for access-control invariants.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

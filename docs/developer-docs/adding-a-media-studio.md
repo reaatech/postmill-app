@@ -290,4 +290,4 @@ Use a bespoke studio when the workflow does not match "form inputs → media art
 - [User Guide: Media studios](../user-guide/media/index.md)
 - [Backend conventions](./backend-conventions.md)
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

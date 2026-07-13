@@ -117,4 +117,4 @@ Common MCP error responses:
 - `409 idempotency_conflict` — duplicate idempotency key.
 - `403 mcp_disabled` — MCP or agent surface is disabled by feature flag.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

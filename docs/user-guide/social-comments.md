@@ -119,4 +119,4 @@ the post detail modal with the comments section.
 
 See [Schedule](./calendar.md) for details on post cards and the post detail modal.
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

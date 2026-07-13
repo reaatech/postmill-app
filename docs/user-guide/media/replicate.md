@@ -120,4 +120,4 @@ The meme editor is a native canvas tool:
 - [Settings](../settings) — configuring the Replicate media provider.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

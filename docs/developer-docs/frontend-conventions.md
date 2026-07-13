@@ -188,4 +188,4 @@ Reuse the `StudioErrorBoundary` pattern for new canvas tools rather than adding 
 - Modals use `useModals()` (in `apps/frontend/src/components/layout/new-modal`).
 - **No `dangerouslySetInnerHTML` without DOMPurify sanitization.**
 
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0

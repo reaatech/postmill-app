@@ -34,4 +34,4 @@ After you click **Generate**, the image is produced synchronously (the adapter p
 - [Settings](../settings) — configuring the Black Forest Labs media provider.
 
 ---
-> Verified against main (post-3.8.10)
+> Verified against v1.0.0
