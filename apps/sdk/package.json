@@ -1,7 +1,7 @@
 {
   "name": "@reaatech/postmill-sdk",
   "version": "1.0.0",
-  "description": "The ultimate social media scheduling tool",
+  "description": "Official Node SDK for Postmill — schedule posts, manage channels, and drive the public API.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "publishConfig": {
@@ -19,12 +19,20 @@
   "keywords": [
     "social media",
     "scheduling tool",
-    "social media scheduling tool"
+    "social media scheduling tool",
+    "postmill",
+    "social media scheduling",
+    "sdk"
   ],
-  "author": "Nevo David",
+  "author": "REAA Technologies",
   "license": "AGPL-3.0",
-  "dependencies": {
-    "@gitroom/nestjs-libraries": "workspace:*"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/reaatech/postmill-app.git"
+  },
+  "homepage": "https://postmill.ai",
+  "bugs": {
+    "url": "https://github.com/reaatech/postmill-app/issues"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

@@ -40,7 +40,7 @@ describe('background message listener', () => {
     } as unknown as typeof chrome;
   }
 
-  async function sendMessage(message: unknown, origin = 'https://app.postiz.com'): Promise<unknown> {
+  async function sendMessage(message: unknown, origin = 'https://app.postmill.ai'): Promise<unknown> {
     const sender: chrome.runtime.MessageSender = { origin, url: origin };
     return new Promise((resolve, reject) => {
       let settled = false;
