@@ -1,75 +1,101 @@
 # Public API
 
-The Postmill Public API provides programmatic access for third-party integrations
-and automation. It consists of two groups: the legacy public routes and the v1
-public API.
+The Public API provides programmatic access for third-party integrations and automation. It is split into two groups:
 
-All endpoints are gated by an **API key** passed in the `Authorization` header
-(no `Bearer` prefix — the raw API key string).
+- **Public API v1** — `/public/v1/*`, authenticated with an API key or OAuth token.
+- **Legacy public routes** — `/public/*` outside `/public/v1`, kept for n8n/Zapier/Make compatibility where noted.
+
+All v1 routes are org-scoped. Mutating routes support idempotency keys, and reads are rate-limited per org.
+
+## Authentication
+
+Pass the credential in the `Authorization` header as a raw string (no `Bearer` prefix):
+
+```http
+Authorization: pm_live_xxxxxxxx...
+```
+
+Two credential types are accepted:
+
+| Type | Prefix | Where to create |
+|------|--------|-----------------|
+| API key | `pm_live_` | Settings → API Keys |
+| OAuth access token | `pos_` | OAuth app authorization flow |
+
+API keys are per-user, per-org. The resolved org and user's role are attached to the request, so RBAC and billing gates still apply. OAuth tokens are constrained to the scopes the user approved (`mcp:read`, `mcp:posts:write`).
+
+On hosted instances with Stripe configured, the org must have an active subscription; otherwise the request returns `401`.
 
 ## Rate limiting
 
-Rate-limited by `API_LIMIT` env var (default 600 requests/hour per org).
-Specific sensitive endpoints have tighter `@Throttle` overrides.
+Public v1 routes are rate-limited by `API_LIMIT` (default **600 requests/hour** per org). Sensitive endpoints carry tighter `@Throttle` overrides, for example:
+
+- `POST /oauth/token` — 20/min
+- `GET /public/v1/analytics/overview` — 60/min
+- `POST /public/agent` — 30/min
+- `POST /public/t` — 60/min
 
 ## Pagination
 
-`GET /public/v1/posts` is bounded. It returns at most **100** posts per call
-(also the default page size) and an offset `cursor` for the next page:
+`GET /public/v1/posts` returns at most **100** posts per call (also the default page size). Use the `cursor` offset for paging:
 
-- `?limit=` — max items to return (1–100; defaults to 100, hard-capped at 100).
-- `?cursor=` — opaque offset returned by the previous page. The response shape is
-  `{ posts: [...], cursor: <next-offset|null> }`; `cursor` is `null` on the last page.
+| Param | Description |
+|-------|-------------|
+| `?limit=` | 1–100; defaults to 100, hard-capped at 100. |
+| `?cursor=` | Opaque offset returned by the previous page. |
 
-Omitting both keeps the previous behaviour, just capped at 100 instead of the
-whole date window.
+If neither `limit` nor `cursor` is sent, the response is `{ posts }` for backward compatibility (still capped at 100). When paging is requested, the response is `{ posts, cursor }`; `cursor` is `null` on the last page.
 
 ## Idempotency
 
-Mutating public endpoints accept an optional **`Idempotency-Key`** request header.
-A repeat carrying the same key within **24 hours** replays the first response
-instead of re-running the mutation (Redis-backed). Keys are scoped per-org, so the
-same key string from a different org is independent. Supported on:
+Mutating v1 endpoints accept an optional **`Idempotency-Key`** header. Repeating the same key within **24 hours** replays the first response instead of re-running the mutation. Keys are scoped per-org, so the same string from a different org is independent. Supported on:
 
 - `POST /public/v1/posts`
-- `POST /public/v1/upload` and `POST /public/v1/upload-from-url`
-- `DELETE /public/v1/posts/:id`, `DELETE /public/v1/posts/group/:group`,
-  `DELETE /public/v1/integrations/:id`
+- `POST /public/v1/upload`
+- `POST /public/v1/upload-from-url`
+- `DELETE /public/v1/posts/:id`
+- `DELETE /public/v1/posts/group/:group`
+- `DELETE /public/v1/integrations/:id`
 
-If Redis is unavailable the header is ignored (requests proceed normally). A
-concurrent in-flight duplicate returns `409`.
-
----
+If Redis is unavailable the header is ignored and the request proceeds normally. A concurrent duplicate returns `409`.
 
 ## Posts
 
-Base: `/public` and `/public/v1`
+Base: `/public/v1`
 
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/public/v1/posts` | Create a post |
-| GET | `/public/v1/posts` | List posts (query: `GetPostsDto`) |
-| DELETE | `/public/v1/posts/:id` | Delete a post (by post ID, resolves group) |
-| DELETE | `/public/v1/posts/group/:group` | Delete a post (by group ID) |
+| GET | `/public/v1/posts` | List posts |
+| DELETE | `/public/v1/posts/:id` | Delete a post by post ID (resolves group) |
+| DELETE | `/public/v1/posts/group/:group` | Delete a post by group ID |
 | PUT | `/public/v1/posts/:id/status` | Change post status |
 | PUT | `/public/v1/posts/:id/release-id` | Update external release ID |
 | GET | `/public/v1/posts/:id/missing` | Get missing content to fill for a post |
 | GET | `/public/v1/find-slot/:id` | Find next free posting time slot |
-| GET | `/public/posts/:id` | Get post preview by ID (recursive thread) — legacy, unauthenticated |
-| GET | `/public/posts/:id/comments` | Get comments for a post — legacy, unauthenticated |
-| POST | `/public/agent` | Create agent post — legacy, gated by `AGENT_API_KEY` env var |
+
+Creating or scheduling a post validates that every referenced channel is connected and does not need reauthentication. Drafts are allowed on disabled channels so they can be reconnected before promotion.
+
+`POST /public/v1/posts` is gated on `api:create` and `posts_per_month:create` billing policies.
 
 ## Media
 
-Base: `/public/v1` and `/public`
+Base: `/public/v1`
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/public/v1/upload` | Upload media file (multipart/form-data) |
-| POST | `/public/v1/upload-from-url` | Upload media from a URL |
+| POST | `/public/v1/upload` | Upload a media file (`multipart/form-data`, field `file`) |
+| POST | `/public/v1/upload-from-url` | Import media from a URL |
 | POST | `/public/v1/generate-video` | Generate AI video |
-| POST | `/public/v1/video/function` | Call a video function by identifier |
-| GET | `/public/stream` | Proxy-stream external video (SSRF-safe via `safeFetch`) — legacy |
+| GET | `/public/v1/generate-video/:id` | Poll an async video generation job |
+| POST | `/public/v1/video/function` | Call a provider tool, currently only `loadVoices` |
+
+`POST /public/v1/generate-video` accepts `type` (`text-to-video`, `image-to-video`, `video-to-video`) and provider params in `customParams`. The response is backward-compatible with the legacy `{ id, status, jobId, path, name, pollUrl }` shape:
+
+- If the artifact is returned synchronously, `status` is `completed` and `path` is the URL.
+- If a job is queued, `status` is `pending` and `pollUrl` points to `GET /public/v1/generate-video/:id`.
+
+A terminal `failed` status sets `pollUrl` to `''` and `error` to the failure reason.
 
 ## Integrations
 
@@ -79,11 +105,18 @@ Base: `/public/v1`
 |--------|------|---------|
 | GET | `/public/v1/integrations` | List connected integrations (filterable by `?group=`) |
 | DELETE | `/public/v1/integrations/:id` | Delete a channel integration |
-| GET | `/public/v1/integration-settings/:id` | Get integration rules/maxLength/settings/tools |
-| GET | `/public/v1/social/:integration` | Get OAuth auth URL for a provider |
-| POST | `/public/v1/integration-trigger/:id` | Trigger a tool on an integration |
+| GET | `/public/v1/integration-settings/:id` | Get integration rules, max length, settings schema, tools |
+| GET | `/public/v1/social/:integration` | Get OAuth authorization URL for a provider |
+| POST | `/public/v1/integration-trigger/:id` | Trigger a dynamic provider tool |
 | GET | `/public/v1/groups` | List customer groups |
-| GET | `/public/v1/is-connected` | Check if org has any active integration |
+| GET | `/public/v1/is-connected` | Check whether the org has any active integration |
+
+`GET /public/v1/social/:integration` supports pinning a provider version:
+
+- Pass `providerId@version` as the path param (e.g. `x@v1`).
+- Or pass `?version=v1` with a bare provider id.
+- A bare id resolves the latest active version.
+- An unknown or retired version returns `404` or `410`.
 
 ## Analytics
 
@@ -91,59 +124,69 @@ Base: `/public/v1` and `/public`
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/public/v1/analytics/:integration` | Single-channel analytics (legacy) |
-| GET | `/public/v1/analytics/post/:postId` | Single-post analytics (legacy) |
-| GET | `/public/v1/analytics/overview` | Overview with optional date range |
-| POST | `/public/t` | Track analytics/behaviour event — legacy, unauthenticated |
+| GET | `/public/v1/analytics/overview` | Org overview with optional date range |
+| GET | `/public/v1/analytics/campaign/:id` | Campaign-scoped analytics |
+| GET | `/public/v1/analytics/anomalies` | Detected anomalies for the org |
+| GET | `/public/v1/analytics/:integration` | Legacy single-channel analytics |
+| GET | `/public/v1/analytics/post/:postId` | Legacy single-post analytics |
 
-> **Legacy analytics routes** live in `public.integrations.controller.ts`. They are
-> kept for n8n/Zapier/Make compatibility. **Never change their response shape.**
+The static routes `/overview`, `/campaign/:id`, and `/anomalies` are registered before the catch-all `/:integration` route so they resolve correctly. The legacy `/analytics/:integration` response shape is preserved for n8n/Zapier/Make compatibility.
+
+`GET /public/v1/analytics/overview` validates `from`/`to`, requires `to >= from`, and caps the window at 400 days.
 
 ## Notifications
 
-Base: `/public/v1` and `/public`
+Base: `/public/v1`
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/public/v1/notifications` | Get paginated notifications |
-| POST | `/public/modify-subscription` | Modify subscription billing via JWT — legacy |
+| GET | `/public/v1/notifications` | Get paginated org notifications |
 
----
+## Legacy public routes
+
+Base: `/public`
+
+| Method | Path | Auth | Purpose |
+|--------|------|------|---------|
+| POST | `/public/agent` | `AGENT_API_KEY` env var | Create an agent post |
+| POST | `/public/t` | None | Track analytics/behaviour event |
+| POST | `/public/modify-subscription` | JWT | Modify subscription billing |
+| GET | `/public/stream` | None | Proxy-stream an external MP4 (SSRF-safe) |
 
 ## Internal integrations API
 
-Base: `/integrations`
-
-Authenticated via cookie session (CSRF-protected on mutating routes).
+These routes sit under `/integrations` and are authenticated via cookie session. Mutating routes require CSRF protection and the appropriate RBAC permission.
 
 ### Integration management
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/integrations/provider/:id/connect` | Save a provider page (after two-step auth) |
-| GET | `/integrations/:identifier/internal-plugs` | Get internal plug definitions for a provider |
-| GET | `/integrations/customers` | List customer groups |
-| PUT | `/integrations/:id/group` | Update integration group assignment |
-| GET | `/integrations/list` | Full integration list with capabilities |
-| POST | `/integrations/:id/settings` | Update provider additional settings |
-| POST | `/integrations/:id/nickname` | Set nickname and/or avatar |
-| GET | `/integrations/:id` | Single integration with order details |
-| GET | `/integrations/social/:integration` | Generate OAuth authorization URL |
-| POST | `/integrations/:id/time` | Configure posting time slots |
-| POST | `/integrations/mentions` | Search @mentions across providers |
-| POST | `/integrations/function` | Call a dynamic provider function |
-| POST | `/integrations/disable` | Disable a channel |
-| POST | `/integrations/enable` | Enable a channel |
-| DELETE | `/integrations/` | Delete a channel (body: `{ id }`) |
+| Method | Path | Permission | Purpose |
+|--------|------|------------|---------|
+| POST | `/integrations/provider/:id/connect` | `channels:create` | Save a provider page after two-step auth |
+| GET | `/integrations/:identifier/internal-plugs` | — | Get internal plug definitions for a provider |
+| GET | `/integrations/customers` | — | List customer groups |
+| PUT | `/integrations/:id/group` | `channels:update` | Update integration group assignment |
+| PUT | `/integrations/:id/customer-name` | `channels:update` | Update integration customer name |
+| GET | `/integrations/list` | — | Full integration list with capabilities |
+| POST | `/integrations/:id/settings` | `channels:update` | Update provider additional settings |
+| POST | `/integrations/:id/nickname` | `channels:update` | Set nickname and/or avatar |
+| GET | `/integrations/social/:integration` | `channels:create` | Generate OAuth authorization URL |
+| POST | `/integrations/:id/time` | `channels:update` | Configure posting time slots |
+| POST | `/integrations/mentions` | `channels:update` | Search @mentions across providers |
+| POST | `/integrations/function` | `channels:update` | Call a dynamic provider function |
+| POST | `/integrations/disable` | `channels:update` | Disable a channel |
+| POST | `/integrations/enable` | `channels:update` | Enable a channel |
+| DELETE | `/integrations/` | `channels:delete` | Delete a channel |
+
+`GET /integrations/social/:integration` accepts `?campaign=<uuid>` to auto-tag a newly connected channel onto that campaign.
 
 ### Plugs
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| GET | `/integrations/plug/list` | List all available plug definitions |
-| GET | `/integrations/:id/plugs` | Get plugs configured for an integration |
-| POST | `/integrations/:id/plugs` | Create or update plug configuration |
-| PUT | `/integrations/plugs/:id/activate` | Toggle plug active/inactive |
+| Method | Path | Permission | Purpose |
+|--------|------|------------|---------|
+| GET | `/integrations/plug/list` | — | List all available plug definitions |
+| GET | `/integrations/:id/plugs` | — | Get plugs configured for an integration |
+| POST | `/integrations/:id/plugs` | `channels:create` | Create or update plug configuration |
+| PUT | `/integrations/plugs/:id/activate` | `channels:update` | Toggle plug active/inactive |
 
 ### Provider-specific
 
@@ -157,8 +200,7 @@ Authenticated via cookie session (CSRF-protected on mutating routes).
 
 Base: `/integrations`
 
-These do not require a cookie session. Used during OAuth callbacks and public
-provider page connection.
+Used during OAuth callbacks and public provider-page connection.
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -167,14 +209,16 @@ provider page connection.
 | POST | `/integrations/public/provider/:id/connect` | Save provider page (public, state-gated) |
 | POST | `/integrations/extension-refresh` | Refresh Chrome extension cookies |
 
-## Authentication
+## Errors
 
-- **Internal API**: Cookie session with CSRF protection on mutating routes.
-- **Public API (v1)**: Raw API key in `Authorization` header (no `Bearer` prefix).
-- **Legacy public routes**: Varies — `/public/agent` uses `AGENT_API_KEY` env
-  var; tracking is unauthenticated; `/public/posts/:id` is unauthenticated
-  (preview).
-- **Rate limiting**: `API_LIMIT` env var (default 600/hr). Individual routes may
-  override with `@Throttle`.
+Common status codes:
 
-> Verified against v3.7.0
+- `400` — Validation error, missing fields, or malformed dates.
+- `401` — Missing or invalid API key/OAuth token, or no active subscription.
+- `403` — Insufficient OAuth scope or RBAC permission.
+- `404` — Unknown resource.
+- `409` — Idempotency conflict.
+- `410` — Requested provider version has been retired.
+- `429` — Rate limit exceeded.
+
+> Verified against main (post-3.8.10)

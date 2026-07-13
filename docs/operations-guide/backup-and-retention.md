@@ -1,27 +1,24 @@
 # Backup & Retention
 
-Postmill uses `prisma db push --accept-data-loss` to apply schema changes. There are **no SQL
-migration files**. This means backups are non-negotiable: a schema push can force destructive
-diffs against the live database, and without a backup there is no rollback path.
+Postmill keeps all application state in PostgreSQL and uploaded media on local disk or object storage. Schema changes are applied through committed Prisma migrations (`pnpm run prisma-migrate-deploy`), which is the path used by CI and the production boot sequence. Backups are still essential: rollback is forward-only, and a failed or destructive migration is only recoverable from a snapshot.
 
 ## What to back up
 
-### 1. PostgreSQL database (application)
+### 1. PostgreSQL database
 
-The primary data store. Contains users, organizations, posts, integrations, tokens, analytics
-snapshots, comments, and all configuration.
+The primary data store. Contains users, organizations, posts, integrations, tokens, analytics snapshots, comments, and all configuration.
 
 ```bash
 # From the Docker host
 docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local > postmill_$(date +%Y%m%d).sql
 
-# Or with connection string
+# Or with a connection string
 pg_dump "$DATABASE_URL" > postmill_$(date +%Y%m%d).sql
 ```
 
 Schedule this daily. Keep at least 7 days of backups.
 
-### 2. Upload directory
+### 2. Upload directory or object storage
 
 All uploaded media (images, videos, audio). If using local storage, back up the volume:
 
@@ -30,66 +27,55 @@ All uploaded media (images, videos, audio). If using local storage, back up the 
 docker run --rm -v postmill-uploads:/data -v $(pwd):/backup alpine tar czf /backup/uploads_$(date +%Y%m%d).tar.gz -C /data .
 ```
 
-If using cloud object storage (R2, S3, B2, IDrive e2), ensure your bucket has versioning and/or
-cross-region replication enabled.
+If using cloud object storage (R2, S3, B2, IDrive e2), enable versioning and/or cross-region replication on the bucket.
 
 ### 3. JWT_SECRET and ENCRYPTION_KEY
 
-These secrets encrypt all OAuth tokens, AI provider credentials, and storage credentials at rest.
-**If you lose them, every encrypted value in the database becomes unrecoverable.** Store them:
+These secrets encrypt OAuth tokens, AI provider credentials, storage credentials, and other secrets at rest. **If you lose them, every encrypted value in the database becomes unrecoverable.** Store them:
 
 - In a password manager or secrets vault
 - In a `.env` file with restricted permissions, outside the backup bundle
-- Never in the database backup alone — if you restore to a fresh instance with a different
-  `JWT_SECRET`, all tokens will fail to decrypt
+- Never in the database backup alone — if you restore to a fresh instance with a different `JWT_SECRET`, all tokens will fail to decrypt
 
 ## What not to back up
 
-- **Redis** — cache only; data is rebuilt on restart. AOF/RDB persistence is useful for avoiding
-  cold-cache latency but is not a backup.
-- **node_modules** or build artifacts
+- **Redis** — cache only; data is rebuilt on restart. AOF/RDB persistence is useful for avoiding cold-cache latency but is not a backup.
+- **node_modules** or build artifacts.
 
 ## Automated data retention
 
-Postmill handles analytics data retention automatically through Inngest scheduled functions. You do
-not need to run manual cleanup queries.
+Postmill prunes and rolls up data through Inngest scheduled functions. You do not need to run manual cleanup queries.
 
-| Data | Retention | Mechanism |
-|------|-----------|-----------|
-| Daily `AnalyticsSnapshot` rows | 548 days (~18 months) by default | Rolled into weekly rows by the analytics collection function |
-| `PostAnalyticsSnapshot` rows | 90 days by default | Pruned by the analytics collection function |
-| Social comments | 90 days by default | Soft-deleted by the comments collection function |
+| Data | Default retention | Mechanism | Env var |
+|------|-------------------|-----------|---------|
+| Daily `AnalyticsSnapshot` rows | 548 days (~18 months) | Rolled into weekly rows by the analytics collection function | `ANALYTICS_DAILY_RETENTION_DAYS` |
+| `PostAnalyticsSnapshot` rows | 90 days | Pruned by the analytics collection function | `ANALYTICS_POST_RETENTION_DAYS` |
+| Social comments | 90 days | Soft-deleted by the comments collection function | `SOCIAL_COMMENT_RETENTION_DAYS` |
+| Email log metadata | 90 days | Pruned by the analytics collection function | `EMAIL_LOG_RETENTION_DAYS` |
+| `Errors` rows | 90 days | Pruned by the retention-purge function | `ERRORS_RETENTION_DAYS` |
+| Notifications | 180 days | Hard-deleted by the retention-purge function | `NOTIFICATIONS_RETENTION_DAYS` |
+| Incomplete multipart uploads | 7 days | Hard-deleted by the retention-purge function | `MULTIPART_UPLOAD_RETENTION_DAYS` |
+| Mastra traces/scorers | 30 days | Hard-deleted by the retention-purge function | `MASTRA_TRACE_RETENTION_DAYS` |
+| Soft-deleted posts/files | 30 days | Hard-purged by the retention-purge function | `SOFT_DELETE_RETENTION_DAYS` |
+| AI Designer chat sessions | 90 days | Hard-deleted by the retention-purge function | `AI_DESIGNER_SESSION_RETENTION_DAYS` |
+| User/Session IP and agent | 90 days | Nulled by the retention-purge function | `IP_RETENTION_DAYS` |
 
-Tune retention with `ANALYTICS_DAILY_RETENTION_DAYS`, `ANALYTICS_POST_RETENTION_DAYS`, and
-`SOCIAL_COMMENT_RETENTION_DAYS`. See [Inngest & Cron](./inngest-and-cron.md) for how the
-functions operate.
+See [Inngest & Cron](./inngest-and-cron.md) for how the functions operate.
 
-## Why backups are critical with `db push --accept-data-loss`
+## Why backups are critical
 
-Postmill's schema management model (`prisma db push --accept-data-loss`) means:
+Postmill's schema is managed with committed Prisma migrations:
 
-- Adding a nullable/defaulted column is safe and does not need a backup.
-- **Renaming or dropping a column is destructive** — Prisma sees the new schema, compares it to
-  the live database, and drops/mutates columns to match. There is no undo.
-- Adding a required column without a default **breaks the push** against a live database (Prisma
-  refuses).
-- Schema changes are applied on container boot (`postinstall` runs `prisma-generate`, but actual
-  `prisma-db-push` is manual or scripted). Always back up before running `prisma-db-push` manually.
+- `pnpm run prisma-migrate-deploy` applies migrations in order and is forward-only.
+- Adding a nullable or defaulted column is safe.
+- Renaming or dropping a column is destructive and should be done as a contract step in an expand/contract plan.
+- The destructive-diff guard (`scripts/schema-destructive-guard.mjs`) rejects `DROP TABLE`/`DROP COLUMN` and `ADD COLUMN … NOT NULL` without a default unless `ALLOW_DESTRUCTIVE_SCHEMA=true`.
 
-The `postmill-migrate.sh` script (`scripts/postmill-migrate.sh`) wraps `prisma db push` with a
-reminder to back up first when using `--accept-data-loss`:
-
-```bash
-# Safe additive sync (refuses data loss)
-./scripts/postmill-migrate.sh
-
-# Destructive — BACK UP FIRST
-./scripts/postmill-migrate.sh --accept-data-loss
-```
+`prisma db push` is for local prototyping only. The `scripts/postmill-migrate.sh` helper wraps `prisma db push` for manual, in-place sync against a running container and warns you to back up before using `--accept-data-loss`. Always back up before any manual schema operation or contract deploy.
 
 ## Restore checklist
 
-1. **Stop the application** — prevent write traffic during restore
+1. **Stop the application** — prevent write traffic during restore.
 2. **Restore Postgres**:
    ```bash
    docker exec -i postmill-postgres psql -U postmill-user postmill-db-local < postmill_20260609.sql
@@ -102,11 +88,11 @@ reminder to back up first when using `--accept-data-loss`:
    - If you changed `JWT_SECRET` since the backup, all encrypted tokens will fail to decrypt.
    - Test by logging in and checking that connected channels still work.
 5. **Start the application** and verify:
-   - Users can log in
-   - Channels are connected (no auth errors)
-   - Uploaded media is accessible
-   - Inngest functions are registered and scheduled runs appear in the dashboard
-6. **Take a fresh post-restore backup**
+   - Users can log in.
+   - Channels are connected (no auth errors).
+   - Uploaded media is accessible.
+   - Inngest functions are registered and scheduled runs appear in the dashboard.
+6. **Take a fresh post-restore backup**.
 
 ## Backup automation example
 
@@ -126,4 +112,4 @@ find "$BACKUP_DIR" -name '*.sql' -mtime +7 -delete
 find "$BACKUP_DIR" -name '*.tar.gz' -mtime +7 -delete
 ```
 
-> Verified against v3.7.0
+> Verified against main (post-3.8.10)

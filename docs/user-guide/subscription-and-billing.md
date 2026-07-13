@@ -1,10 +1,10 @@
-# Billing
+# Subscription and Billing
 
 The billing system at `/billing` manages subscription plans, payment methods, and invoicing when Stripe is configured. Billing is entirely optional — Postmill works with all features available without Stripe.
 
 ## When Stripe is not configured
 
-If no Stripe integration is set up (no `STRIPE_SECRET_KEY` environment variable, or Stripe is otherwise unreachable):
+If no Stripe integration is set up (no `STRIPE_PUBLISHABLE_KEY` environment variable — this is the key the feature gate checks, `permissions.service.ts:58,103` — or Stripe is otherwise unreachable):
 
 - All features are available to all users without restriction.
 - The `/billing` page may redirect or show a "billing not configured" state.
@@ -84,4 +84,4 @@ A list of past invoices with:
 - Payment status (paid, pending, failed).
 - Downloadable PDF receipt.
 
-> Verified against v3.8.10
+> Verified against main (post-3.8.10)

@@ -139,7 +139,7 @@ When reviewing a PR, verify:
 ## Documentation
 
 Keep `docs/` in sync with code. Any new feature, endpoint, env var, schema model, or security
-invariant must be reflected in the relevant page. Bump the "Verified against vX.Y.Z" footer on
+invariant must be reflected in the relevant page. Bump the "Verified against main (post-3.8.10)" footer on
 every page you change.
 
 ---
@@ -149,4 +149,4 @@ every page you change.
 Contributors must sign the Contributor License Agreement before a PR can be merged. The CLA bot
 will prompt you on your first PR.
 
-> Verified against v3.7.0
+> Verified against main (post-3.8.10)

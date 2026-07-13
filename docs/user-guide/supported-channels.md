@@ -1,4 +1,4 @@
-# Provider Capabilities
+# Supported Channels
 
 Each social media provider in Postmill declares its supported feature set through a capability
 matrix. This matrix is the single source of truth for what each provider can do — the composer UI,
@@ -30,7 +30,7 @@ The canonical source is `PROVIDER_CAPABILITIES` in
 | X | true | true | true | true | true | false | false | 4 | true | true | true |
 | LinkedIn | true | true | true | true | true | true | false | 20 | false | true | false |
 | LinkedIn Page | true | true | true | true | true | true | false | 20 | false | true | false |
-| Reddit | false | true | true | false | true | false | false | 1 | false | true | false |
+| Reddit | true | true | true | false | true | false | false | 1 | false | true | false |
 | Instagram | true | true | true | false | true | true | false | 10 | false | true | true |
 | Instagram Standalone | true | true | true | false | true | true | false | 10 | false | true | true |
 | Facebook | true | true | true | false | true | false | false | 10 | false | true | false |
@@ -40,15 +40,15 @@ The canonical source is `PROVIDER_CAPABILITIES` in
 | TikTok | true | true | false | false | true | false | false | 1 | false | true | true |
 | Pinterest | true | false | false | false | true | false | false | 5 | false | true | false |
 | Dribbble | true | false | false | false | false | false | false | 1 | false | true | false |
-| Discord | false | true | true | false | false | false | false | 10 | false | true | false |
+| Discord | true | true | true | false | false | false | false | 10 | false | true | false |
 | Slack | false | true | true | false | false | false | true | 10 | false | false | false |
 | Kick | false | false | true | false | false | false | false | 0 | false | false | false |
 | Twitch | false | false | true | false | false | false | false | 0 | false | true | false |
-| Mastodon | false | true | true | false | true | false | true | 4 | false | false | false |
-| Bluesky | false | true | true | false | true | false | true | 4 | false | false | false |
+| Mastodon | true | true | true | false | true | false | true | 4 | false | false | false |
+| Bluesky | true | true | true | false | true | false | true | 4 | false | false | false |
 | Lemmy | false | false | true | false | false | false | false | 1 | false | false | false |
 | Farcaster | false | false | true | false | false | false | false | 4 | false | false | false |
-| Telegram | false | true | true | false | true | false | false | 10 | false | false | false |
+| Telegram | true | true | true | false | true | false | false | 10 | false | false | false |
 | Nostr | false | false | true | false | false | false | false | 0 | false | false | false |
 | VK | false | false | true | false | true | false | false | 10 | false | false | false |
 | Medium | false | true | false | false | false | false | false | 0 | false | false | false |
@@ -72,13 +72,13 @@ The canonical source is `PROVIDER_CAPABILITIES` in
 
 **altText** — 5 providers support alt text on images: Slack, Mastodon, Bluesky, Tumblr, and Pixelfed.
 
-**analytics** — 12 providers support analytics data collection: X, LinkedIn, LinkedIn Page, Instagram, Instagram Standalone, Facebook, Threads, YouTube, Google My Business, TikTok, Pinterest, and Dribbble.
+**analytics** — 17 providers support analytics data collection: X, LinkedIn, LinkedIn Page, Instagram, Instagram Standalone, Facebook, Threads, YouTube, Google My Business, TikTok, Pinterest, Dribbble, Reddit, Discord, Mastodon, Bluesky, and Telegram.
 
 **watchlist** — 5 providers support competitor account probing: X, Instagram, Instagram Standalone, YouTube, and TikTok.
 
 **linkPreview** — Only X supports link preview / link-card rendering.
 
-**comments** — 21 providers support fetching and replying to platform comments.
+**comments** — 19 providers support fetching and replying to platform comments.
 
 **firstComment** — 24 providers support auto-posting a first comment after publish.
 
@@ -123,4 +123,4 @@ the adapter classes in `libraries/nestjs-libraries/src/short-linking/adapters/`.
 - [Adding a Provider](../developer-docs/adding-a-provider.md) — How to register capability flags when adding a new channel provider.
 - [Short-link Providers](#short-link-providers) — Short-link provider capability matrix (above).
 
-> Verified against v3.8.4
+> Verified against main (post-3.8.10)

@@ -4,7 +4,11 @@ The Postmill AI agent is your natural-language assistant for scheduling posts,
 generating media, checking analytics, managing campaigns, and replying to synced
 social comments. Open it anytime from **Agent** in the sidebar.
 
-> Verified against v3.8.10
+This page covers the conversational agent at `/agents`. For the canvas AI
+Designer assistant in `/media/ai-designer`, see [AI Designer](./media/ai-designer.md);
+for the manual Konva Designer, see [Designer](./media/designer.md).
+
+> Verified against main (post-3.8.10)
 
 ---
 

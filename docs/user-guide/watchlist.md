@@ -1,8 +1,8 @@
 # Watchlist
 
-The Watchlist feature (v3.5.0) lets you track public metrics for competitor or influencer accounts
-across supported platforms. Watched account data integrates with the Analytics dashboard so you
-can compare your own performance against external accounts.
+The Watchlist feature lets you track public metrics for competitor or influencer accounts across
+supported platforms. Watched account data integrates with the Analytics dashboard so you can compare
+your own performance against external accounts.
 
 ## Supported Platforms
 
@@ -84,4 +84,4 @@ You can manage your watched accounts (edit display name, enable/disable, delete)
 watchlist section of the Analytics page or via the watchlist API endpoints under
 `/analytics/v2/watchlist`.
 
-> Verified against v3.7.0
+> Verified against main (post-3.8.10)

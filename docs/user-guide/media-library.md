@@ -1,13 +1,31 @@
 # Media Library
 
-The media library at `/media` is the central hub for all uploaded images, videos, audio, and
-documents. It provides folder organisation, file metadata, and bulk operations so your team can
-manage media assets across campaigns and channels.
+The **Media Library** lives at `/files`. It is the central asset store for every image, video,
+audio clip, and document your organisation uploads or generates. The tools under `/media` (the
+[Media Studios](./media/index.md)) produce new files; `/files` is where those finished assets land,
+where you browse them, and where you pick assets to use in posts or as source material for another
+generation.
+
+## Files vs Media Studios
+
+| Surface | URL | Purpose |
+|---|---|---|
+| **Media Library** | `/files` | Asset library — uploads, generated outputs, folders, tags, trash, and storage backends. |
+| **Media Studios** | `/media/*` | Tools — generative models, stock browsers, transcription, and the Designer canvas. |
+
+A typical workflow moves from `/media` to `/files` and back:
+
+1. Open a studio under `/media` (for example, [Runway](./media/runway.md) or
+   [Stock Photos](./media/stock-photos.md)).
+2. Generate or pick an asset.
+3. The asset is saved into `/files`.
+4. From `/files`, you can **Create Post**, **Open in Designer**, or use the asset as a source
+   image/video/audio in another studio.
 
 ## Folder tree navigation
 
-The left sidebar in the media library displays a hierarchical folder tree backed by the
-`FileFolder` model. Each folder has a `parentId`, enabling an unlimited nesting depth.
+The left sidebar in `/files` displays a hierarchical folder tree backed by the `FileFolder` model.
+Each folder has a `parentId`, enabling unlimited nesting.
 
 - Click any folder to filter the file grid to that folder's contents.
 - Click **All Files** at the top to view files across the entire library (unfiltered by folder).
@@ -49,7 +67,7 @@ Click any file to open the details panel on the right side. This panel provides:
 | **Description** | Multi-line text field. Edits save on blur. |
 | **Tags** | Add tags by typing and pressing Enter, comma, or Tab. Remove tags by clicking the × icon. Tags persist to the file metadata. |
 | **Metadata** | Read-only display of file size (formatted as B/KB/MB), MIME type, and creation date. |
-| **Actions** | **Copy URL**, **Download**, **Create Post** (opens the composer with this file attached), and **Delete** (soft-delete to trash). |
+| **Actions** | **Copy URL**, **Download**, **Create Post** (opens the composer with this file attached), **Open in Designer**, and **Delete** (soft-delete to trash). |
 
 ## Drag to move between folders
 
@@ -64,6 +82,8 @@ When one or more files are selected (checked), a bulk toolbar appears above the 
 - **Move to Folder** — opens a modal listing all folders; select a target and click Move. Choose
   **Root (no folder)** to move files out of any folder.
 - **Delete** — soft-deletes all selected files (they go to the trash).
+- **Open all in Designer** — stashes the selection in `sessionStorage` and opens the
+  [Designer](./media/designer.md) static canvas with every asset loaded.
 - **Clear** — deselects all files.
 
 Selection works by clicking the checkbox on file cards (grid view) or rows (list view).
@@ -93,13 +113,13 @@ Permanent deletion is only available from the trash view.
 
 ## Storage provider mounting
 
-Root folders in the media library map to configured storage providers. Each `StorageProviderConfig`
-record represents a storage backend (S3, R2, B2, IDrive e2, or local disk). When a provider is
-mounted, it appears as a root-level folder. Different folders can route to different storage
-backends — for example, you might keep active campaign assets on fast local storage and archive
-older campaigns to cloud object storage.
+Root folders in `/files` map to configured storage providers. Each `StorageProviderConfig` record
+represents a storage backend (S3, R2, B2, IDrive e2, or local disk). When a provider is mounted, it
+appears as a root-level folder. Different folders can route to different storage backends — for
+example, you might keep active campaign assets on fast local storage and archive older campaigns to
+cloud object storage.
 
-Configure storage providers in Settings → Storage. See
+Configure storage providers in **Settings → Storage**. See
 [Storage Setup](../operations-guide/storage.md) for provider configuration and quota management.
 
-> Verified against v3.7.0
+> Verified against main (post-3.8.10)
