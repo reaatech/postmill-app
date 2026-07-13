@@ -2,42 +2,43 @@
 
 ## Hardware sizing
 
-Postmill is a Node.js application backed by Postgres and Redis. Background jobs are handled by
-Inngest Cloud, so self-hosted deployments no longer need a local workflow engine.
+Postmill is a Node.js monorepo application backed by PostgreSQL and Redis. Background jobs run on
+Inngest, so self-hosted deployments do not need a local workflow engine.
 
-| Tier      | Users  | CPU  | RAM    | Disk   | Notes |
-|-----------|--------|------|--------|--------|-------|
-| Minimum   | 1-5    | 2 vCPU | 4 GB  | 20 GB  | Suitable for single-tenant or small teams |
-| Small     | 5-50   | 4 vCPU | 8 GB  | 50 GB  | Comfortable for most self-hosters |
-| Medium    | 50-200 | 8 vCPU | 16 GB | 100 GB | Add RAM for analytics cache / large orgs |
-| Large     | 200+   | 16 vCPU+ | 32 GB+ | 200 GB+ | Scale Postgres and Redis independently |
+| Tier      | Users  | CPU       | RAM    | Disk    | Notes |
+|-----------|--------|-----------|--------|---------|-------|
+| Minimum   | 1–5    | 2 vCPU    | 4 GB   | 20 GB   | Suitable for single-tenant or small teams |
+| Small     | 5–50   | 4 vCPU    | 8 GB   | 50 GB   | Comfortable for most self-hosters |
+| Medium    | 50–200 | 8 vCPU    | 16 GB  | 100 GB  | Add RAM for analytics cache / large orgs |
+| Large     | 200+   | 16 vCPU+  | 32 GB+ | 200 GB+ | Scale Postgres and Redis independently |
 
 The heavy pieces:
+
 - **PostgreSQL 17** — the application database is typically modest (< 5 GB for small instances),
-  but grows with analytics snapshots and media metadata.
-- **Redis 7** — negligible memory (< 100 MB) unless analytics cache loads dozens of orgs.
-- **Inngest Cloud** — background jobs run in Inngest; no local Temporal/Elasticsearch services are
-  required.
+  but grows with analytics snapshots, media metadata, and campaign data.
+- **Redis 7** — negligible memory (< 100 MB) unless analytics cache loads many orgs.
+- **Inngest Cloud** — background jobs run outside the cluster; no local Temporal/Elasticsearch
+  services are required.
 
 ## Software prerequisites
 
 ### Build toolchain
 
-| Tool      | Required version    | Notes |
-|-----------|---------------------|-------|
-| Node.js   | `>=22.12.0 <23.0.0` | See `engines` in `package.json` |
-| pnpm      | `10.6.1`            | Specified in `packageManager`; other versions may silently break |
-| Docker    | Recent stable       | Only needed for Docker Compose deployment |
-| git       | Any                 | For cloning the repository |
+| Tool      | Required version      | Notes |
+|-----------|-----------------------|-------|
+| Node.js   | `>=22.12.0 <23.0.0`   | See `engines` in `package.json` |
+| pnpm      | `10.6.1`              | Specified in `packageManager`; other versions may silently break |
+| Docker    | Recent stable         | Only needed for Docker Compose deployment |
+| git       | Any                   | For cloning the repository |
 
 ### Runtime dependencies
 
-| Software              | Version     | Role |
-|-----------------------|-------------|------|
-| PostgreSQL            | 17          | Application data |
-| Redis                 | 7.2         | Session cache, throttle store, analytics cache |
-| Inngest Cloud         | —           | Durable background jobs (analytics, comments, publish, token refresh) |
-| Email provider (optional) | —           | 6-provider adapter system (Resend, SendGrid, Mailgun, Postmark, Amazon SES, SMTP). Configure with `EMAIL_PROVIDER` + standardized env vars. See [Configuration](./configuration.md#email-v381). |
+| Software                  | Version | Role |
+|---------------------------|---------|------|
+| PostgreSQL                | 17      | Application data |
+| Redis                     | 7.2     | Session cache, throttle store, analytics cache |
+| Inngest Cloud             | —       | Durable background jobs (analytics, comments, publish, token refresh) |
+| Email provider (optional) | —       | 6-provider adapter system (Resend, SendGrid, Mailgun, Postmark, Amazon SES, SMTP). Configure with `EMAIL_PROVIDER` + standardized env vars. See [Configuration](./configuration.md#email). |
 
 ### Object storage
 
@@ -47,7 +48,7 @@ local storage.
 
 | Provider            | Notes |
 |---------------------|-------|
-| Local disk          | Default; 5 GB quota per org. Simple but not redundant. |
+| Local disk          | Default; quota configurable per org. Simple but not redundant. |
 | Cloudflare R2       | S3-compatible, no egress fees (per-tenant, Settings → Storage) |
 | AWS S3              | S3-native API (per-tenant, Settings → Storage) |
 | Backblaze B2        | S3-compatible, low storage cost (per-tenant, Settings → Storage) |
@@ -60,8 +61,8 @@ variables. See [Storage Setup](./storage.md) and [Configuration](./configuration
 
 - The application must be reachable at the URL you set in `FRONTEND_URL`. OAuth redirects from
   social providers resolve against this URL.
-- The `BACKEND_INTERNAL_URL` must be reachable from within the container for internal API calls.
-  In Docker Compose, this is `http://localhost:3000`; behind a reverse proxy, set it to the internal
+- `BACKEND_INTERNAL_URL` must be reachable from within the container for internal API calls. In
+  Docker Compose this is `http://localhost:3000`; behind a reverse proxy, set it to the internal
   backend address.
 - **Outbound HTTPS** is required — all provider API calls and webhook dispatches go through
   `safeFetch`, which enforces HTTPS and blocks private/internal IPs (unless explicitly allowlisted
@@ -89,8 +90,6 @@ npx nestjs-command run:agent
 
 Run these inside the application container or with the same environment variables as the backend.
 
-> Verified against v3.8.2
-
 ## Native dependency notes
 
 ### macOS-only duplicate-class warning
@@ -104,8 +103,8 @@ Class GNotificationCenterDelegate is implemented in both
 One of the two will be used. Which one is undefined.
 ```
 
-This is a **benign, macOS-only upstream conflict** between the native modules
-`sharp` and `canvas`. Both packages register the same macOS notification-delegate
-class independently; the warning does not affect Linux production images or
-runtime correctness. No operator action is required. The project pins
-`sharp@^0.34.5` and `canvas@^3.2.3` to keep the overlap as small as possible.
+This is a benign, macOS-only conflict between the native modules `sharp` and `canvas`. Both
+packages register the same macOS notification-delegate class independently; the warning does not
+affect Linux production images or runtime correctness. No operator action is required.
+
+> Verified against main (post-3.8.10)

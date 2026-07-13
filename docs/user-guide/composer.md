@@ -1,12 +1,12 @@
 # Composer
 
 The composer is Postmill's post creation and scheduling interface. It supports multi-channel
-publishing with platform-specific editing, media attachment, polls, first comments, and a preflight
-validation panel.
+publishing with platform-specific editing, media attachment, polls, first comments, short links,
+per-channel overrides, and a preflight validation panel.
 
 ## Opening the Composer
 
-Since v3.8.10 the composer lives on dedicated pages instead of a modal:
+The composer lives on dedicated pages:
 
 - **`/posts/post`** — create a new post. From the **Posts** page (`/posts`), the
   **New Post** button navigates here; clicking a calendar slot prefills the slot's date and time
@@ -49,8 +49,8 @@ validates:
 
 - **Max media count per platform**: Ranges from 0 (text-only platforms like Kick, Twitch, Nostr)
   to 20 (LinkedIn).
-- **File format compatibility**: Video support varies by platform — consult the [Provider
-  Capabilities](../reference/provider-capabilities.md) matrix.
+- **File format compatibility**: Video support varies by platform — consult the
+  [Supported Channels](./supported-channels.md) matrix.
 - **File size limits**: Enforced per platform.
 
 Each attached media item shows a preview thumbnail with a remove button.
@@ -60,10 +60,10 @@ Each attached media item shows a preview thumbnail with a remove button.
 ### Date/Time Picker
 
 Select a date and time for publication. The picker uses a calendar widget and time dropdown.
-The time is displayed and edited **in your timezone** and saved as UTC (v3.8.10 made the picker
+The time is displayed and edited **in your timezone** and saved as UTC (the picker is
 timezone-aware end-to-end, including dates prefilled from a calendar slot).
 
-### Brand Picker (v3.8.10)
+### Brand Picker
 
 If your organisation has [brands](./settings.md#brands-tab) configured, a brand picker in the
 composer selects which brand voice AI generation uses for this post. Leaving it unset uses the
@@ -74,6 +74,17 @@ organisation's default brand.
 - **Publish Now**: Sends the post immediately.
 - **Schedule**: Queues the post for the selected date/time.
 - **Save as Draft**: Saves the post without scheduling it.
+
+## Per-Channel Overrides
+
+By default, the composer edits content in **Global** mode: one text and media set is applied to all
+selected channels. Switch a channel to **Internal** mode to write channel-specific content and
+attach channel-specific media. This is useful when a platform needs a different caption, image
+crop, or media count.
+
+- Select a channel from the channel bar to edit its internal version.
+- Deselecting a channel discards its internal customisations.
+- In edit mode, existing per-channel content is loaded into the internal values for that channel.
 
 ## First Comment
 
@@ -86,13 +97,7 @@ published. This is commonly used for:
 
 ### Capability Gating
 
-The first-comment textarea only appears when all selected channels support the feature. 24
-providers support first comments: X, LinkedIn, LinkedIn Page, Reddit, Instagram Business,
-Instagram Standalone, Facebook Page, Threads, Discord, Slack, Kick, Twitch, Mastodon,
-Bluesky, Lemmy, Farcaster, Telegram, Nostr, VK, Moltbook, Whop, Skool, Pixelfed, PeerTube.
-
-Providers that do **not** support first comments: YouTube, Google My Business, TikTok, Pinterest,
-Dribbble, Medium, Dev.to, Hashnode, WordPress, ListMonk, MeWe, Tumblr.
+The first-comment textarea only appears when all selected channels support the feature.
 
 ### Behavior
 
@@ -125,6 +130,20 @@ Validation checks:
 
 If a poll is requested but a selected channel does not support it, the preflight panel shows a
 blocker and the post cannot be published to that channel.
+
+## Short Links
+
+A footer pill controls whether URLs in the post are shortened:
+
+- **No short links** — URLs are published unchanged.
+- **Active provider** — if your org has a configured short-link provider, selecting it shortens
+  links in the published post and activates that provider org-wide. The pill shows the provider
+  name or custom domain.
+- **Connect short-link** — if no provider is configured, the pill is a shortcut to
+  [Settings → Shortlinks](./settings.md#shortlinks-tab).
+
+The short-link choice is applied per post in the composer. No global ASK/YES/NO preference is
+stored in Settings.
 
 ## Preflight Panel
 
@@ -169,13 +188,13 @@ Controls that are not supported by all selected channels are hidden. For example
   panel notes the incompatibility.
 - The first-comment textarea and poll options follow the same capability-gating logic.
 
-For the full capability matrix, see the [Provider Capabilities](../reference/provider-capabilities.md)
-reference.
+For the full capability matrix, see [Supported Channels](./supported-channels.md).
 
 ## Bulk Import
 
 You can import multiple posts at once via CSV. The bulk import flow uses the same preflight
 validation as the composer — each row is validated individually, and per-row successes, warnings,
-and errors are reported. Failed rows do not block successful rows. See [Bulk Import](./bulk-import.md) for details.
+and errors are reported. Failed rows do not block successful rows. See [Bulk Import](./bulk-import.md)
+for details.
 
-> Verified against v3.8.10
+> Verified against main (post-3.8.10)

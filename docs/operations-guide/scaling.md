@@ -4,8 +4,6 @@ This page covers running Postmill's backend in production: the dedicated product
 horizontal scaling, health probes, graceful shutdown, fail-fast configuration, the
 collaboration single-instance constraint, and OpenTelemetry tracing.
 
-> Verified against v3.8.11
-
 ## Production image (one process per container)
 
 Use the multi-stage [`Dockerfile`](https://github.com/reaatech/postmill-app/blob/main/Dockerfile)
@@ -13,7 +11,7 @@ at the repo root for production — **not** `Dockerfile.dev`. The differences ma
 
 | | `Dockerfile.dev` | `Dockerfile` (production) |
 |---|---|---|
-| Dependencies | all (incl. devDependencies) | production only (`pnpm prune --prod`) |
+| Dependencies | all (including devDependencies) | production only (`pnpm prune --prod`) |
 | Process model | `nginx` + PM2 (multiple processes) | a single `node` process |
 | User | root | unprivileged `app` user |
 | Build | in-image, every boot | separate builder stage, artifacts only |
@@ -25,7 +23,7 @@ docker run -p 3000:3000 --env-file .env postmill-backend
 ```
 
 **One process per container.** The production image runs exactly one Node process and does
-**not** use PM2 to fork workers. Horizontal scaling is the orchestrator's responsibility:
+**not** use PM2 to spawn worker processes. Horizontal scaling is the orchestrator's responsibility:
 run N replicas of the container behind a load balancer (Kubernetes `replicas`, ECS desired
 count, Nomad `count`, etc.). This keeps each replica's lifecycle, health, and resource
 limits independently observable.
@@ -104,7 +102,7 @@ for liveness — a transient DB blip would restart an otherwise healthy process.
 
 On `SIGTERM`/`SIGINT` the backend drains in order: it stops accepting new work, runs
 NestJS shutdown hooks (`app.close()`), which disconnects Prisma and quits the Redis
-connection, then exits once. Give the container a sensible termination grace period (e.g.
+connection, then exits once. Give the container a sensible termination grace period (for example,
 Kubernetes `terminationGracePeriodSeconds: 30`) so in-flight requests finish.
 
 ## Fail-fast configuration validation
@@ -120,12 +118,12 @@ broken traffic. Fatal (boot-blocking) issues:
 
 The exit fires when `NODE_ENV=production` (and `NOT_SECURED` is unset), or anywhere
 `CONFIG_CHECK_STRICT` is set. In local development without `CONFIG_CHECK_STRICT`, these are
-warnings and the backend still starts (unchanged DX). All other configuration problems
+warnings and the backend still starts. All other configuration problems
 (deprecated env vars, missing `ENCRYPTION_KEY`, etc.) remain non-fatal warnings.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `CONFIG_CHECK_STRICT` | _(unset)_ | When set, fatal config issues exit the process **everywhere** (incl. dev), not just in production. |
+| `CONFIG_CHECK_STRICT` | _(unset)_ | When set, fatal config issues exit the process **everywhere** (including dev), not just in production. |
 
 ## OpenTelemetry tracing
 
@@ -134,10 +132,12 @@ endpoint is configured — there is no overhead when unset.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP/HTTP traces endpoint, e.g. `http://otel-collector:4318/v1/traces`. Setting it enables tracing. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | _(unset)_ | OTLP/HTTP traces endpoint, for example `http://otel-collector:4318/v1/traces`. Setting it enables tracing. |
 | `OTEL_SERVICE_NAME` | `postmill-backend` | Service name attached to exported spans. |
 | `DEV_DISABLE_OPENTELEMETRY` | _(unset)_ | When set, forces OpenTelemetry off even if an endpoint is configured (local-dev override). |
 
 When enabled, Node auto-instrumentations (HTTP, Express/Nest, Postgres, Redis, undici, …)
 are registered and traces are shut down cleanly on `SIGTERM`/`SIGINT` alongside the
 graceful-shutdown path.
+
+> Verified against main (post-3.8.10)

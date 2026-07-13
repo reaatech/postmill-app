@@ -1,11 +1,10 @@
 # Frontend Conventions
 
-Postmill's frontend runs on **Next.js (App Router) + React** with **Tailwind 3** for styling and
-**SWR** for data fetching. It listens on port `4200`.
+Postmill's frontend runs on **Next.js (App Router) + React** with **Tailwind 3** for styling and **SWR** for data fetching. It listens on port `4200`.
 
 ---
 
-## App Router Structure
+## App Router structure
 
 Source: `apps/frontend/src/app/`
 
@@ -21,14 +20,13 @@ Source: `apps/frontend/src/app/`
 | `(app)/(provider)/` | Provider pages | Provider bridge UI |
 | `(app)/oauth/` | `/oauth/authorize` | OAuth authorization grant page |
 
-### Shared Layout
+### Shared layout
 
-`apps/frontend/src/app/(app)/layout.tsx` wraps the authenticated app shell — sidebar navigation,
-top bar, context providers.
+`apps/frontend/src/app/(app)/layout.tsx` wraps the authenticated app shell — sidebar navigation, top bar, context providers.
 
 ---
 
-## Data Fetching — SWR via `useFetch`
+## Data fetching — SWR via `useFetch`
 
 All API calls use **SWR** through the `useFetch` hook from `libraries/helpers/src/utils/custom.fetch.tsx`.
 
@@ -49,23 +47,20 @@ All API calls use **SWR** through the `useFetch` hook from `libraries/helpers/sr
 
 2. **Never** add `// eslint-disable-next-line` to suppress `react-hooks/rules-of-hooks`.
 
-3. Each hook lives in its component file or a dedicated hooks file in the same directory. There is
-   no centralized hooks barrel file.
+3. Each hook lives in its component file or a dedicated hooks file in the same directory. There is no centralized hooks barrel file.
 
-### `useFetch` Architecture
+### `useFetch` architecture
 
-The `FetchWrapperComponent` at the app root (in `layout.tsx`) provides a fetch instance through
-React context. The `useFetch` hook reads this context. The underlying `customFetch` function
-handles auth headers, automatic token refresh, and error normalization.
+The `FetchWrapperComponent` at the app root (in `layout.tsx`) provides a fetch instance through React context. The `useFetch` hook reads this context. The underlying `customFetch` function handles auth headers, automatic token refresh, and error normalization.
 
 ```tsx
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-
 function useCommunities() {
   const fetch = useFetch();
   return useSWR<CommunitiesResponse>('/communities', fetch);
 }
 ```
+
+`useFetch` is exported from `libraries/helpers/src/utils/custom.fetch.tsx`.
 
 ---
 
@@ -73,39 +68,58 @@ function useCommunities() {
 
 Class-based dark mode. Utility classes only — no inline styles, no CSS modules for new components.
 
-### Design Tokens
+### Design tokens
 
-CSS variables are defined in `apps/frontend/src/app/colors.scss` with their Tailwind mappings in
-`apps/frontend/tailwind.config.cjs`.
+CSS variables are defined in `apps/frontend/src/app/colors.scss` with their Tailwind mappings in `apps/frontend/tailwind.config.cjs`.
 
 **Deprecated — do not use:**
-- `--color-custom*` variables — all are replaced by `--new-*` tokens
+- `--color-custom*` variables — all are replaced by `--new-*` tokens.
 
-**Current tokens use the `--new-*` prefix.** Reference the existing component library to match the
-established design.
+**Current tokens use the `--new-*` prefix.** Reference the existing component library to match the established design. Studio pages use the dedicated `studioBg`/`studioBorder` tokens.
 
-### Global Styles
+### Global styles
 
-`apps/frontend/src/app/global.scss` defines base element styles, scrollbar styling, and
-utility overrides.
+`apps/frontend/src/app/global.scss` defines base element styles, scrollbar styling, and utility overrides.
 
 ---
 
-## Native Components Only
+## Component / design-system policy
 
-**Never install a UI component library from npm.** All components are written natively in the
-repository.
+### Default to shared bespoke primitives
 
-### UI Components
+These are the canonical building blocks — use them rather than re-rolling or pulling a new npm widget:
+
+- **Button** → the shared `Button` primitive in `libraries/react-shared-libraries/src/form`.
+- **Input / form fields** → the shared `Input` primitive in `libraries/react-shared-libraries/src/form`.
+- **Modals** → the bespoke `useModals()` / `ModalManager` in `apps/frontend/src/components/layout/new-modal`.
+
+### Mantine for sanctioned primitives
+
+Mantine is the sanctioned base for the few primitives where bespoke would be wasteful, and stays:
+
+- `@mantine/core` (e.g. `Autocomplete`).
+- `@mantine/dates` (the date picker).
+- `@mantine/hooks` (utility hooks like `useClickOutside`).
+
+Reach for an existing Mantine primitive before hand-rolling one of these; do not rip Mantine out.
+
+### Write bespoke only when nothing shared fits
+
+Match the design tokens (`colors.scss` / `tailwind.config.cjs`); don't introduce a new npm UI kit (shadcn, MUI, Chakra, etc.).
+
+### Deprecate ad-hoc duplicates
+
+Don't add a new one-off button/input/modal that overlaps the canonical ones — consolidate onto them.
+
+### UI components
 
 Reusable low-level UI components live in `apps/frontend/src/components/ui/`. Examples:
 
 - `logo-text.component.tsx`
 - `check.icon.component.tsx`
 - `translated-label.tsx`
-- `is.scroll.hook.tsx`
 
-### Feature Components
+### Feature components
 
 Feature-specific components live in `apps/frontend/src/components/`:
 
@@ -115,35 +129,16 @@ Feature-specific components live in `apps/frontend/src/components/`:
 | `ai/` | AI-related components (CopilotKit runtime, generators) |
 | `launches/` | Calendar, post detail modal, post editor |
 | `layout/` | App shell — sidebar, top menu, user context, modals |
-| `settings/` | Settings tab panels (see below) |
+| `settings/` | Settings tab panels |
 | `new-layout/` | Refactored layout components |
-
-### Settings Components
-
-Location: `apps/frontend/src/components/settings/`
-
-| File | Purpose |
-|---|---|
-| `global.settings.tsx` | Settings page shell with tab routing |
-| `brand-ai.settings.tsx` | AI brand profile configuration |
-| `profile.component.tsx` | User profile editing |
-| `teams.component.tsx` | Team member management |
-| `metric.component.tsx` | Usage metrics/credits |
-| `signatures.component.tsx` | Post signature management |
-| `shortlink-preference.component.tsx` | URL shortlink preferences |
-| `email-notifications.component.tsx` | Notification preferences |
-| `change-password.component.tsx` | Password change form |
-| `github.component.tsx` | GitHub integration settings |
-
-Settings tabs route to: **AI**, **Brand**, **Channels**, **Media Providers**, **Storage**, plus
-individual settings.
+| `media-tools/` | Studio Kit, Designer, HeyGen, Deepgram, stock browsers |
+| `campaigns/` | Campaign hub and Discussion |
 
 ---
 
-## Capability-Aware UI
+## Capability-aware UI
 
-The frontend reads provider capabilities from the `provider-capabilities.ts` source of truth
-(`libraries/nestjs-libraries/src/integrations/social/`). The matrix gates UI controls:
+The frontend reads provider capabilities from `provider-capabilities.ts` (`libraries/nestjs-libraries/src/integrations/social/`). The matrix gates UI controls consistently. The same matrix is exposed to end users in the [Supported Channels](../user-guide/supported-channels.md) user guide and via the `GET /provider-capabilities` API endpoint.
 
 | Capability | Gating effect |
 |---|---|
@@ -159,8 +154,7 @@ The frontend reads provider capabilities from the `provider-capabilities.ts` sou
 | `refreshToken` | Shows refresh-token health indicators |
 | `watchlist` | Enables competitor tracking UI |
 
-**Do not add ad-hoc capability gating** — read the `PROVIDER_CAPABILITIES` map. The capability
-matrix is also exposed via `GET /provider-capabilities` API endpoint for the frontend to consume.
+**Do not add ad-hoc capability gating** — read the `PROVIDER_CAPABILITIES` map.
 
 ---
 
@@ -168,26 +162,30 @@ matrix is also exposed via `GET /provider-capabilities` API endpoint for the fro
 
 `apps/frontend/src/components/layout/top.menu.tsx` defines two menu groups:
 
-**Group 1 — Core features:**
-Schedule (previously Launches/Calendar), Agent, Comments, Analytics, Media, Plugs, Campaigns, Integrations (Third Party)
+**Group 1 — Core features:** Schedule, Agent, Comments, Analytics, Media, Plugs, Campaigns, Integrations
 
-**Group 2 — Account:**
-UGC (AgentMedia), Affiliate, Billing, Profile, Settings
+**Group 2 — Account:** UGC, Affiliate, Billing, Profile, Settings
 
-Menu items are role-gated and billing-gated. The `isGeneral` flag (self-hosted mode) hides billing
-and UGC items.
+Menu items are role-gated and billing-gated. The `isGeneral` flag (self-hosted mode) hides billing and UGC items.
 
 ---
 
-## React Conventions
+## Error boundaries
 
-- All components are functional components with hooks
-- Use `useT()` from `@gitroom/react/translation/get.transation.service.client` for translatable
-  strings
-- Use `useUser()` from `@gitroom/frontend/components/layout/user.context` for the current
-  user/org/role
-- Use `useVariables()` from `@gitroom/react/helpers/variable.context` for feature flags
-- Modals use `useModals()` from `@gitroom/frontend/components/layout/new-modal`
-- **No `dangerouslySetInnerHTML` without DOMPurify sanitization**
+- App Router segment boundaries: each main route group ships `error.tsx` + `not-found.tsx` (`(app)`, `(app)/(site)`, `(app)/(site)/media`, `(provider)`), rendering the shared `RouteError` / `RouteNotFound` (`components/errors/`). `error.tsx` is a `'use client'` component receiving `{ error, reset }`.
+- The `/media/*` canvas studios (Designer, HeyGen, Replicate, Deepgram, and every Studio Kit `StudioShell`) are wrapped at the media layout level in `StudioErrorBoundary` (`components/media-tools/studio-error-boundary.tsx`) so a studio crash shows a themed fallback with a reset instead of a blank screen.
 
-> Verified against v3.7.0
+Reuse the `StudioErrorBoundary` pattern for new canvas tools rather than adding ad-hoc try/catch.
+
+---
+
+## React conventions
+
+- All components are functional components with hooks.
+- Use `useT()` for translatable strings (provided by the React shared libraries).
+- Use `useUser()` for the current user/org/role (in `apps/frontend/src/components/layout/user.context`).
+- Use `useVariables()` for feature flags (provided by the helpers package).
+- Modals use `useModals()` (in `apps/frontend/src/components/layout/new-modal`).
+- **No `dangerouslySetInnerHTML` without DOMPurify sanitization.**
+
+> Verified against main (post-3.8.10)

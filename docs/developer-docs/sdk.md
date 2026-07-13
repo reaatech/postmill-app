@@ -1,8 +1,8 @@
 # SDK
 
-The `@reaatech/postmill-sdk` is the official Node.js SDK for the Postmill Public
-API. It provides typed methods for creating posts, uploading media, listing
-integrations, and more.
+> Verified against main (post-3.8.10)
+
+The `@reaatech/postmill-sdk` is the official Node.js SDK for the Postmill Public API. It provides typed methods for creating posts, uploading media, listing integrations, and more.
 
 ## Installation
 
@@ -10,7 +10,7 @@ integrations, and more.
 npm install @reaatech/postmill-sdk
 ```
 
-Peer dependency: `node-fetch` (^3.3.2).
+The SDK depends on `@gitroom/nestjs-libraries` for DTO types and uses the global `fetch` implementation (Node 18+, or a polyfill in older environments).
 
 ## Quick start
 
@@ -51,9 +51,9 @@ new Postmill(apiKey: string, path?: string)
 ```
 
 | Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `apiKey` | `string` | required | Org API key (sent as `Authorization` header) |
-| `path` | `string` | `https://api.postiz.com` | Custom API base URL for self-hosted instances |
+|---|---|---|---|
+| `apiKey` | `string` | required | Org API key (sent as `Authorization` header). |
+| `path` | `string` | `https://api.postiz.com` | Custom API base URL for self-hosted instances. |
 
 ### Methods
 
@@ -66,7 +66,7 @@ post(posts: CreatePostDto): Promise<any>
 ```
 
 - **Endpoint**: `POST /public/v1/posts`
-- **Body**: `CreatePostDto` (integrations, value, scheduledAt, etc.)
+- **Body**: `CreatePostDto` (`integrations`, `value`, `scheduledAt`, etc.)
 - **Returns**: Created post data
 
 #### `postList(filters)`
@@ -78,7 +78,7 @@ postList(filters: GetPostsDto): Promise<any>
 ```
 
 - **Endpoint**: `GET /public/v1/posts`
-- **Query**: `GetPostsDto` (page, filters, etc.)
+- **Query**: `GetPostsDto` (`page`, `filters`, etc.)
 - **Returns**: Paginated post list
 
 #### `upload(file, extension)`
@@ -86,7 +86,7 @@ postList(filters: GetPostsDto): Promise<any>
 Upload a media file for use in posts.
 
 ```typescript
-upload(file: Buffer, extension: string): Promise<any>
+upload(file: BlobPart | Buffer, extension: string): Promise<any>
 ```
 
 - **Endpoint**: `POST /public/v1/upload`
@@ -118,9 +118,8 @@ deletePost(id: string): Promise<Response>
 
 ## API key setup
 
-1. Go to Settings → Developers in the Postmill app.
-2. Create an OAuth app to get your client credentials, or use your org's API
-   key.
+1. Go to **Settings → Developers** in the Postmill app.
+2. Create an API key or use an existing org key.
 3. Pass the key as the first argument to the `Postmill` constructor.
 
 ## Package details
@@ -128,13 +127,11 @@ deletePost(id: string): Promise<Response>
 - **Package name**: `@reaatech/postmill-sdk`
 - **Version**: 0.1.0
 - **License**: AGPL-3.0
-- **Build**: Uses `tsup` for bundling
-- **Dependencies**: `node-fetch` ^3.3.2
+- **Build**: Uses `tsup` for bundling.
+- **Workspace dependency**: `@gitroom/nestjs-libraries`
 
 ## Analytics access
 
-The SDK does not currently expose analytics methods. For analytics data (overview,
-per-post, per-channel, best-time recommendations), use the [Analytics API v2](./analytics-api.md)
-or the [Public API v1](./public-api.md) analytics endpoints directly via HTTP.
+The SDK does not currently expose analytics methods. For analytics data (overview, per-post, per-channel, best-time recommendations), use the [Analytics API v2](./analytics-api.md) endpoints directly via HTTP.
 
-> Verified against v3.7.0
+See [Public API v1](./public-api.md) for the full REST reference.

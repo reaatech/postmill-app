@@ -2,7 +2,7 @@
 
 The `/dashboard` surface is a thin composition layer over existing domain services. All aggregation lives in `libraries/nestjs-libraries/src/dashboard/`; the backend controller (`apps/backend/src/api/routes/dashboard.controller.ts`) is responsible only for auth, RBAC mapping, and wiring.
 
-> **Verified against v3.9.0+**
+> Verified against main (post-3.8.10)
 
 ## Architecture
 
@@ -24,9 +24,10 @@ Backend controller (apps/backend/src/api/routes/dashboard.controller.ts)
   │   ├─ getSummary(...)            -> Redis-cached per (org, user)
   │   ├─ getSchedule(...)           -> PostsService
   │   ├─ getCampaignSummaries(...)  -> CampaignsService
-  │   ├─ getMediaJobs(...)          -> AISettingsService
+  │   ├─ getMediaJobs(...)          -> AiSettingsService
   │   ├─ getAttention(...)          -> 8 probes, RBAC-filtered, Redis-cached
-  │   └─ ...
+  │   ├─ buildUsage(...)            -> SubscriptionService + domain counters
+  │   └─ buildPlanUsage(...)        -> plan limits snapshot
   │
   ├─ DashboardBriefService
   │   └─ generateBrief / getCachedBrief -> AI + Redis
@@ -40,15 +41,14 @@ No new Prisma models were added; every widget reads existing tables through the 
 
 | Method | Route | Permission | Description |
 |---|---|---|---|
-| `GET` | `/dashboard/summary` | auth | Legacy-ish summary (total posts, team, upcoming posts, flags). Cached 60s per `(orgId, userId)`. |
-| `GET` | `/dashboard/schedule?days=7&timezone=UTC` | `posts:read` | Day-bucketed scheduled counts + gap detection. |
-| `GET` | `/dashboard/campaigns?limit=6` | `posts:read` | Active campaign summaries with post-state counts and goal progress. |
+| `GET` | `/dashboard/summary` | auth | Total posts, scheduled, published next 7 days, connected channels, drafts, upcoming posts, unread comments, provider flags, team size. Cached 60s per `(orgId, userId)`. |
+| `GET` | `/dashboard/schedule?days=7&timezone=UTC` | `posts:read` | Day-bucketed scheduled counts + gap detection. `days` clamped to 1–30. |
+| `GET` | `/dashboard/campaigns?limit=6` | `posts:read` | Active campaign summaries with post-state counts and goal progress. `limit` clamped to 1–50. |
 | `GET` | `/dashboard/media-jobs` | `media:read` | Latest 20 jobs + `{ pending, processing, failed7d }` counts. |
 | `GET` | `/dashboard/usage` | `billing:read` | Plan limits/usage when Stripe is enabled; `{ billingEnabled: false }` otherwise. |
 | `GET` | `/dashboard/attention` | auth | 8 attention probes filtered by effective permissions; cached 60s. |
-| `GET` | `/dashboard/brief` | `analytics:read` + AI `Read` | Returns cached brief or `{ cached: false }`. |
-| `POST` | `/dashboard/brief` | `analytics:read` + AI `Create` | Generates and caches the daily brief. Single-flighted. |
-| `POST` | `/posts/:id/retry` | `posts:update` + `POSTS_PER_MONTH` | Resets an ERROR post to QUEUE and re-queues publish. |
+| `GET` | `/dashboard/brief` | `analytics:read` | Returns cached brief or `{ cached: false }`. |
+| `POST` | `/dashboard/brief` | `analytics:read` | Generates and caches the daily brief. Single-flighted. |
 
 Dismiss anomaly uses the existing analytics endpoint: `POST /analytics/v2/anomalies/:id/dismiss`.
 
@@ -73,13 +73,13 @@ Results are sorted by severity (`critical` > `warning` > `info`) then count desc
 
 - `dashboard:summary:{orgId}:{userId}` — TTL 60s, single-flight miss handling.
 - `dashboard:attention:{orgId}:{userId}` — TTL 60s.
-- `dashboard:brief:{orgId}:{YYYY-MM-DD}` — TTL seconds until local midnight; single-flight on generation.
+- `dashboard:brief:{orgId}:{YYYY-MM-DD}` — TTL seconds until local midnight in the user's timezone; single-flight on generation.
 
 Cache write failures are swallowed so Redis downtime does not break the dashboard.
 
 ## Daily Brief
 
-`DashboardBriefService` builds a prompt from the same probes and plan usage used by the attention feed, plus yesterday's analytics and today's scheduled posts. It is generated only on demand, gated by `BudgetService.checkBudget('utility', orgId)`, and cached per org per calendar day. If the org has no active AI provider, the controller returns `503`.
+`DashboardBriefService` builds a prompt from the attention feed, yesterday's analytics, today's scheduled posts, and plan usage. It is generated only on demand, gated by `BudgetService.checkBudget('utility', orgId)` and `AIModelProvider.resolveConfigForScope('utility', orgId)`. If the org has no active AI provider, the controller returns `503`. The brief is cached per org per calendar day.
 
 ## Frontend RBAC
 
@@ -95,4 +95,3 @@ Section visibility is stored in `localStorage['dashboard_prefs']` as `{ hidden: 
 - `libraries/nestjs-libraries/src/dashboard/dashboard-brief.service.ts`
 - `apps/backend/src/api/routes/dashboard.controller.ts`
 - `apps/frontend/src/components/dashboard/dashboard.component.tsx`
-- `dev/du-improvement-backlog.md`

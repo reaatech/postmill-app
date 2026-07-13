@@ -190,4 +190,4 @@ Existing users can still log in. Create new users through the Teams settings pag
 - [Configuration](./configuration.md) — full env var reference including `IS_GENERAL`, GitHub, and SSO vars
 - [Security](./security.md) — OAuth 2.0 / PKCE hardening, open-redirect allowlisting
 
-> Verified against v3.8.10
+> Verified against main (post-3.8.10)

@@ -61,6 +61,9 @@ channels across social media, chat platforms, blogging platforms, and email:
 |35 | Pixelfed           | `pixelfed`           | OAuth 2.0                 |
 |36 | PeerTube           | `peertube`           | OAuth 2.0                 |
 
+See [Supported Channels](./supported-channels.md) for the full capability matrix (analytics,
+comments, polls, video, carousel, alt text, and more).
+
 ### Browser Extension for Skool
 
 Skool uses cookie-based authentication via the Postmill browser extension. Install the extension
@@ -105,4 +108,4 @@ Postmill is organized into these sections, accessible from the left sidebar:
 - Set up campaigns to organize posts into themed folders: [Campaigns](./campaigns.md).
 - Explore the full composer capabilities: [Composer](./composer.md).
 
-> Verified against v3.8.10
+> Verified against main (post-3.8.10)

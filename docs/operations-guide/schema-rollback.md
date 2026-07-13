@@ -71,3 +71,5 @@ explicitly acknowledged with `ALLOW_DESTRUCTIVE_SCHEMA=true`. CI runs the same g
 > Take a database snapshot immediately before any contract (destructive) deploy. That snapshot is
 > the *only* path back to dropped data — the forward "rollback" migration restores structure, not
 > rows.
+
+> Verified against main (post-3.8.10)

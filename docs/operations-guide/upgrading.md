@@ -6,7 +6,7 @@ The recommended upgrade process follows the immutable-infrastructure model: new 
 same data volumes.
 
 ```
-1. Read CHANGELOG -> 2. Back up -> 3. Bump image tag -> 4. Redeploy -> 5. Set new env vars
+1. Read CHANGELOG → 2. Back up → 3. Bump image tag → 4. Redeploy → 5. Apply migrations → 6. Set new env vars
 ```
 
 ### 1. Read the CHANGELOG
@@ -32,7 +32,7 @@ docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local > pre_u
 # docker-compose.yaml or your deployment config
 services:
   postmill:
-    image: ghcr.io/reaatech/postmill-app:v3.7.0  # pin a specific tag, not :latest
+    image: ghcr.io/reaatech/postmill-app:v3.8.10  # pin a specific tag, not :latest
 ```
 
 Pinning specific tags gives you a known rollback target. Using `:latest` means every restart may
@@ -45,92 +45,54 @@ pull an untested version.
 docker compose pull postmill
 docker compose up -d postmill
 
-# Coolify / Portainer / K8s
+# Coolify / Portainer / Kubernetes
 # Trigger a redeploy of the postmill service with the new image tag
 ```
 
-The container runs `prisma-generate` on boot (via `postinstall`), regenerating the Prisma client
-to match the schema baked into the new image. If the schema has new nullable/defaulted columns,
-they are applied by the next manual `prisma-db-push`.
+### 5. Apply migrations
 
-### 5. Set new env vars
+The container runs `prisma-generate` on boot (via `postinstall`), regenerating the Prisma client to
+match the schema baked into the new image. It does **not** apply committed migrations automatically.
+
+Postmill ships committed Prisma migrations under
+`libraries/nestjs-libraries/src/database/prisma/migrations/`. The canonical apply path is
+`prisma migrate deploy`:
+
+```bash
+# Run inside the running container
+docker exec postmill pnpm dlx prisma@6.5.0 migrate deploy \
+  --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma
+```
+
+For a quick local reset only, you can use `pnpm run prisma-db-push` / `pnpm run prisma-reset`. Never
+use `db push` against a shared or production database.
+
+If a release includes destructive changes (column/table drops, in-place renames), read the
+CHANGELOG carefully, take a backup, and follow the expand-contract path documented in
+[Database](../developer-docs/database.md).
+
+### 6. Set new env vars
 
 Check the CHANGELOG for any new env vars required by the release. Add them to your `.env` file,
 Docker Compose environment, or deployment config, then redeploy if needed.
 
-## Postiz -> Postmill rename migration (v3.7.0)
-
-If you're upgrading from a Postiz-branded deployment, the v3.7.0 rename introduced several
-breaking changes.
-
-### Env var renames
-
-All `POSTIZ_*` variables are now `POSTMILL_*`. The old names are **not** read.
-
-| Old name | New name |
-|----------|----------|
-| `POSTIZ_GENERIC_OAUTH` | `POSTMILL_GENERIC_OAUTH` |
-| `POSTIZ_OAUTH_*` | `POSTMILL_OAUTH_*` |
-| `POSTIZ_API_KEY` | `POSTMILL_API_KEY` |
-| `POSTIZ_CONTAINER` | `POSTMILL_CONTAINER` |
-| `NEXT_PUBLIC_POSTIZ_OAUTH_*` | `NEXT_PUBLIC_POSTMILL_OAUTH_*` |
-
-### Docker identifiers
-
-| Item | Old | New |
-|------|-----|-----|
-| Image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postmill-app` |
-| Container | `postiz` | `postmill` |
-| Postgres role | `postiz-user` | `postmill-user` |
-| Postgres DB | `postiz-db-local` | `postmill-db-local` |
-| Volume (config) | `postiz-config` | `postmill-config` |
-| Volume (uploads) | `postiz-uploads` | `postmill-uploads` |
-
-The Postgres **data** volume (`postgres-volume`) was kept unchanged, so data inside it persists.
-However, if your Postgres volume was already initialized with the old role/database, the new
-compose file will create new ones. You have two options:
-
-**Option A: Keep old names.** Edit the compose file's `DATABASE_URL`, `POSTGRES_USER`, and
-`POSTGRES_DB` back to the old values.
-
-**Option B: Migrate to new names.** Create the new role and database on the existing volume:
-
-```bash
-docker exec postmill-postgres psql -U postmill-user -d postmill-db-local -c "CREATE ROLE \"postmill-user\" WITH LOGIN PASSWORD 'postmill-password';" 2>/dev/null || true
-docker exec postmill-postgres psql -U postmill-user -d postmill-db-local -c "CREATE DATABASE \"postmill-db-local\" OWNER \"postmill-user\";" 2>/dev/null || true
-```
-
-### Migrate uploads
-
-If you were using local storage, the volume was renamed. Migrate the data:
-
-```bash
-# Create the new volume
-docker volume create postmill-uploads
-
-# Copy from old to new
-docker run --rm -v postiz-uploads:/old -v postmill-uploads:/new alpine cp -a /old/. /new/
-```
-
-### Chat memory
-
-The Mastra chat agent ID and memory store were renamed (`postiz` -> `postmill`). This orphans
-persisted chat memory — a one-time reset for existing users. No data loss outside of chat history.
-
 ## Manual schema sync
 
-The container runs `prisma-generate` on boot but does **not** run `prisma-db-push`. If a release
-includes schema changes, you must apply them:
+If you need an in-place schema sync outside the normal migration flow, use the helper script:
 
 ```bash
-# Option 1: Use the helper script
+# Safe additive sync (refuses data loss)
 ./scripts/postmill-migrate.sh
 
-# Option 2: Run directly in the container
-docker exec postmill pnpm dlx prisma@6.5.0 db push --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma
-
-# Option 3: With --accept-data-loss (DESTRUCTIVE — back up first!)
+# Destructive — back up first!
 ./scripts/postmill-migrate.sh --accept-data-loss
+```
+
+Or run directly in the container:
+
+```bash
+docker exec postmill pnpm dlx prisma@6.5.0 db push \
+  --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma
 ```
 
 > **Always back up before `--accept-data-loss`.** See [Backup & Retention](./backup-and-retention.md)
@@ -138,60 +100,36 @@ docker exec postmill pnpm dlx prisma@6.5.0 db push --schema ./libraries/nestjs-l
 
 ### Schema change rules
 
-Releases follow additive-schema-only rules so `prisma db push` against a live database usually
-works without `--accept-data-loss`:
+Releases follow additive-schema-only rules so `migrate deploy` against a live database usually
+works without data loss:
 
 - New tables are always safe
 - New columns are nullable or defaulted — safe
 - Renames/drops are destructive and uncommon — noted prominently in the CHANGELOG when they occur
 
-## Schema changes & rollback
-
-The schema is applied with `prisma db push --accept-data-loss` — there are **no SQL migration
-files and no down-migrations**. The schema file is the only source of truth, so the operational
-discipline below replaces what a migration tool would otherwise give you (a backup, an
-expand-contract path, and a drift check).
-
-### Always back up first
-
-Take a `pg_dump` **immediately before** any `db push`. This is your only rollback path — there is
-no generated down-migration to reverse a push.
-
-```bash
-docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local \
-  > pre_push_$(date +%Y%m%d_%H%M%S).sql
-```
-
-### Adding a column
-
-A new column must be **nullable** or carry a **default**. A required column without a default
-breaks the push because existing rows have no value for it. New tables are always safe.
-
 ### Renames and drops — expand-contract
 
-Under `db push` an in-place rename or drop is a `DROP + CREATE`, which loses data. Never rename or
-drop a column or table in the same release that stops using it. Instead, spread the change across
-releases:
+A destructive migration drops or renames a column/table and loses data. Never rename or drop a
+column or table in the same release that stops using it. Instead, spread the change across releases:
 
 1. **Expand** — add the new nullable column alongside the old one and deploy.
 2. **Backfill** — copy data from the old column to the new one (add a one-time step to
    `BackfillService`, `libraries/nestjs-libraries/src/database/seeds/backfill.service.ts`).
 3. **Switch** — point all reads and writes at the new column and deploy.
 4. **Contract** — only once nothing references the old column (prove it with a grep) drop it in a
-   later release, after taking the pre-push `pg_dump` above.
+   later release, after taking the pre-migration `pg_dump`.
 
 ### Rollback
 
-There is no down-migration. To roll back a destructive push, restore the pre-push `pg_dump`:
+Migrations are forward-only. To roll back a destructive change, restore the pre-upgrade `pg_dump`:
 
 ```bash
 # Stop the app first so nothing writes during the restore
 cat pre_push_YYYYMMDD_HHMMSS.sql | docker exec -i postmill-postgres \
-  psql -U postmill-user postmill-db-local
+  psql -U postmill-user -d postmill-db-local
 ```
 
-Then redeploy the previous image tag (see [Rollback](#rollback) below for the full image rollback
-flow).
+Then redeploy the previous image tag.
 
 ### Drift check
 
@@ -225,76 +163,21 @@ pnpm run build
 
 ## Per-release notes
 
-### v3.8.10 -> v3.9.0
+### v3.8.10 and later
 
-v3.9.0 replaces the Temporal orchestrator with Inngest. The orchestrator app,
-Temporal Server, Temporal PostgreSQL, and Temporal Elasticsearch are removed from
-the stack. Background jobs (post publishing, analytics collection, comment sync,
-email, autopost, token refresh, streaks) now run as Inngest functions served by
-the backend at `/api/inngest`.
+v3.8.10 restructures identity, roles, and the provider-surface settings, and includes a
+**destructive schema push** that drops dead tables and migrated columns.
 
-**No schema migration is required.** This release only removes code,
-infrastructure, and environment variables.
-
-**Removed environment variables:** Remove these from `.env`, `docker-compose.yaml`,
-and any deployment config:
-
-- `TEMPORAL_ADDRESS`
-- `TEMPORAL_TLS`
-- `TEMPORAL_API_KEY`
-- `TEMPORAL_NAMESPACE`
-- `RUN_CRON`
-- `ORCHESTRATOR_PORT`
-- `ENABLE_ES`
-- `ES_SEEDS`
-- `ES_VERSION`
-
-**Added environment variables:**
-
-| Variable | Required? | Notes |
-|----------|-----------|-------|
-| `INNGEST_EVENT_KEY` | Required for Inngest Cloud | Omit when running the local dev server (`INNGEST_DEV=1`) |
-| `INNGEST_SIGNING_KEY` | Required for Inngest Cloud | Omit when running the local dev server |
-| `INNGEST_SIGNING_KEY_FALLBACK` | Optional | Zero-downtime signing-key rotation |
-| `INNGEST_ENV` | Optional | Branch environment name, e.g. `staging` |
-| `INNGEST_DEV` | Local only | Set to `1` when using `npx inngest-cli@latest dev` |
-| `INNGEST_BASE_URL` | Local only | Dev server URL, usually `http://localhost:8288` |
-| `INNGEST_SERVE_ORIGIN` | Optional | Public backend origin if behind a reverse proxy |
-| `INNGEST_SERVE_PATH` | Optional | Defaults to `/api/inngest` |
-| `USE_INNGEST` | Cutover flag | Set to `true` to route background work to Inngest |
-
-**Upgrade steps:**
-
-1. Read the CHANGELOG for any additional v3.9.0 changes.
-2. Back up your database.
-3. Remove Temporal/Elasticsearch containers from `docker-compose.yaml`.
-4. Replace the removed env vars with the Inngest variables above.
-5. Set `USE_INNGEST="true"` after you have stopped the old orchestrator/Temporal
-   stack to avoid double execution.
-6. Bump the image tag and redeploy.
-7. Verify the backend serves `/api/inngest` (HTTP 200) and that functions appear
-   in the Inngest Cloud dashboard (or local dev server).
-
-**Rollback:** If jobs fail after cutover:
-
-1. Unset `USE_INNGEST`.
-2. Redeploy the previous image tag and re-start the orchestrator/Temporal stack.
-3. Cancel any in-flight Inngest runs from the Inngest Cloud dashboard or dev
-   server, then re-dispatch affected posts manually if needed.
-
-### v3.8.9 -> v3.8.10
-
-v3.8.10 restructures identity, roles, and the provider-surface settings, and — unusually for this
-fork — includes a **destructive schema push** that drops dead tables and migrated columns.
-
-**Take a database snapshot before pushing the schema.** This is not optional:
+**Take a database snapshot before applying the migration.** This is not optional:
 
 ```bash
 docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local > pre_3810_$(date +%Y%m%d).sql
-pnpm run prisma-db-push   # applies the schema, including the drops below
+# Then run migrate deploy (or db push in local dev)
+docker exec postmill pnpm dlx prisma@6.5.0 migrate deploy \
+  --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma
 ```
 
-**Dropped tables** (dead upstream marketplace/GitHub-stars subsystems, no reachable entrypoints):
+**Dropped tables** (dead marketplace/GitHub-stars subsystems, no reachable entrypoints):
 `SocialMediaAgency`, `SocialMediaAgencyNiche`, `MessagesGroup`, `Messages`, `Orders`,
 `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`.
 
@@ -332,7 +215,7 @@ storage/short-link account fingerprints, and media provider configs from the old
 - Local uploads are partitioned per tenant under `<UPLOAD_DIRECTORY>/<tenantId>/`; existing files
   remain readable at their recorded paths.
 
-### v3.8.3 -> v3.8.4
+### v3.8.3 → v3.8.4
 
 **No schema changes.** v3.8.4 is a remediation release addressing bugs introduced in v3.8.3.
 
@@ -341,34 +224,36 @@ and bounce/complaint/delivery event processing were fixed in this release.
 
 **No env var or config changes required.** A simple redeploy with the new image tag is sufficient.
 
-### v3.8.2 -> v3.8.3
+### v3.8.2 → v3.8.3
 
 **Destructive schema change:** The `StorageProviderConfig.isDefault` column was dropped
-(`prisma db push --accept-data-loss` required). The `POST /settings/storage/:id/set-default`
+(`prisma migrate deploy` or `db push --accept-data-loss` required). The `POST /settings/storage/:id/set-default`
 API route was deleted. LOCAL is now the implicit always-on base storage; all other providers
 (S3/R2/B2/IDriveE2) mount onto it.
 
 **Required actions:**
-1. Run `pnpm run prisma-db-push` with `--accept-data-loss` to apply the column drop.
+
+1. Apply the migration. If using `db push`, pass `--accept-data-loss` to apply the column drop.
 2. Remove any scripts or tooling that call the deleted `set-default` endpoint.
 3. All other changes (Schedule rename, settings sort, profile in avatar menu) are additive
    — no env var changes needed.
 
 **No env var changes.** Calendar → Schedule routing is a permanent redirect; no config needed.
 
-### v3.8.1 -> v3.8.2
+### v3.8.1 → v3.8.2
 
-**What changed:**
-- Avatars and all app-internal image writes now always use the org's LOCAL storage (not Cloudflare R2
-  via env vars). The global-env `STORAGE_PROVIDER` and `CLOUDFLARE_*` vars are **removed**.
-- Large media uploads stream through `/files/upload-server` (formerly `/media/upload-server`) with a configurable limit
-  (`MEDIA_UPLOAD_MAX_BYTES`, default 1 GB). The presigned multipart Cloudflare R2 path is removed.
-- Cloud providers (S3/R2/B2/IDrive e2) remain configurable per-organization in Settings → Storage,
-  but they are **write-inert** for avatars and app-internal writes. Media-library uploads also go
-  through local storage (see the §4.3 opt-out in the release notes if cloud writes are desired for
-  media-library uploads).
+Avatars and all app-internal image writes now always use the org's LOCAL storage (not Cloudflare R2
+via env vars). The global-env `STORAGE_PROVIDER` and `CLOUDFLARE_*` vars are **removed**.
+Large media uploads stream through `/files/upload-server` (formerly `/media/upload-server`) with a
+configurable limit (`MEDIA_UPLOAD_MAX_BYTES`, default 1 GB). The presigned multipart Cloudflare R2
+path is removed.
+
+Cloud providers (S3/R2/B2/IDrive e2) remain configurable per-organization in Settings → Storage,
+but they are **write-inert** for avatars and app-internal writes. Media-library uploads also go
+through local storage.
 
 **Required actions:**
+
 1. Remove the following env vars from your `.env` and `docker-compose.yaml`:
    - `STORAGE_PROVIDER`
    - `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_ACCESS_KEY`
@@ -382,7 +267,7 @@ API route was deleted. LOCAL is now the implicit always-on base storage; all oth
 `CLOUDFLARE_BUCKET_URL` are left as-is; avatars are re-fetched and stored locally on the next token
 refresh / reconnect.
 
-### v3.8.0 -> v3.8.1
+### v3.8.0 → v3.8.1
 
 Email configuration moves from the old 2-provider env scheme (Resend / nodemailer) to a
 standardized 6-provider system.
@@ -405,7 +290,7 @@ and the corresponding API key are configured.
 
 **No schema migration required.** The new `EmailLog` Prisma model is additive.
 
-### v3.7.1 -> v3.8.0
+### v3.7.1 → v3.8.0
 
 Short-link provider configuration moves from environment variables to per-org in-app settings.
 
@@ -417,10 +302,10 @@ Short-link provider configuration moves from environment variables to per-org in
 
 **No schema migration required.** The three new Prisma models (`OrgShortLinkConfig`, `ShortLink`, `ShortLinkSnapshot`) are additive with nullable/defaulted columns.
 
-### v3.7.0 -> v3.7.1
+### v3.7.0 → v3.7.1
 
 v3.7.1 removes the last `process.env` credential fallbacks and the env-migration services. All
-channel and AI credentials now come **only** from the database (Settings -> Channels, Settings ->
+channel and AI credentials now come **only** from the database (Settings → Channels, Settings →
 AI), encrypted at rest.
 
 **Seed-then-upgrade (if you still rely on channel/AI env vars).** On v3.7.0 the env-migration
@@ -439,33 +324,29 @@ services seed each org's database config from your env vars on every boot. So th
 GMB now resolves only its own `gmb` channel config. If you ran GMB off the YouTube credentials
 (without ever setting `GOOGLE_GMB_CLIENT_ID`), the seed step above won't create a `gmb` row, and GMB
 connect/publish will return a "provider not configured" error after upgrade. Fix: enter Google My
-Business credentials explicitly under Settings -> Channels (you can reuse the same Google Cloud
+Business credentials explicitly under Settings → Channels (you can reuse the same Google Cloud
 OAuth client you used for YouTube).
 
-### Pre-v3.7.0 -> v3.7.0
+### Pre-v3.6.0 → v3.6.0
 
-See the Postiz -> Postmill rename migration section above.
-
-### Pre-v3.6.0 -> v3.6.0
-
-- `OPENAI_API_KEY` is no longer read by the AI layer; configure AI providers in Settings -> AI.
-- Per-provider OAuth env vars (`LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, etc.) deprecated; migrate
-  to Settings -> Channels.
+- `OPENAI_API_KEY` is no longer read by the AI layer; configure AI providers in Settings → AI.
+- Per-provider OAuth env vars (`LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, etc.) are deprecated;
+  migrate to Settings → Channels.
 - Per-tenant storage replaces global `STORAGE_PROVIDER`/`CLOUDFLARE_*` vars; migrate to Settings
-  -> Storage.
+  → Storage.
 
 ## Rollback
 
 If an upgrade causes issues:
 
-1. Set the image tag back to the previous version
-2. Redeploy
+1. Set the image tag back to the previous version.
+2. Redeploy.
 3. Restore the database from the pre-upgrade backup if the upgrade applied destructive schema
-   changes
+   changes.
 
 ## Related
 
 - [Backup & Retention](./backup-and-retention.md) — backup before upgrade
 - [Developer Docs: Database](../developer-docs/database.md) — schema management and safety
 
-> Verified against v3.8.10
+> Verified against main (post-3.8.10)

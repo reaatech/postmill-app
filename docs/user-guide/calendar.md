@@ -1,7 +1,7 @@
-# Posts
+# Calendar & Posts
 
-The Posts page (`/posts`) is your primary workspace for viewing, managing, and scheduling social
-media posts. It provides a visual timeline of all your content across channels.
+The Calendar & Posts page (`/posts`) is your primary workspace for viewing, managing, and scheduling
+social media posts. It provides a visual timeline of all your content across channels.
 
 ## Views
 
@@ -84,8 +84,7 @@ local timezone (12h or 24h format depending on your locale).
 
 Hovering over the card's top strip reveals action icons:
 
-- **Edit** (gear icon): Opens the post edit page at `/posts/post/<post-id>` (v3.8.10 — the
-  composer moved from a modal to dedicated pages)
+- **Edit** (gear icon): Opens the post edit page at `/posts/post/<post-id>`
 - **Copy Debug JSON**: Copies post data for debugging (admin feature)
 - **Duplicate**: Creates a copy of the post
 - **Preview**: Opens a live preview of how the post renders
@@ -131,4 +130,4 @@ indicator (a red line in week/day views) also follows your timezone. Clicking an
 slot opens the create-post page (`/posts/post`) with the slot's date and time prefilled in
 your timezone; the post is saved in UTC.
 
-> Verified against v3.8.10
+> Verified against main (post-3.8.10)

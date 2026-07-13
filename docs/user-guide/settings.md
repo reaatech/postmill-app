@@ -1,44 +1,36 @@
 # Settings
 
-The Settings page at `/settings` is the control centre for your organisation and personal
-account. Each tab manages a distinct aspect of your Postmill instance. Tabs are sorted
-alphabetically with **General** (or **Settings** on some layouts) pinned first.
+The Settings area is the control centre for your organisation and personal account. Reach it from
+the avatar menu → **Settings**. The left rail is grouped into **Workspace**, **Automation**, and
+**Developer** sections.
 
-## Settings tab
+## Subscription tab
 
-The standalone Settings tab was removed in v3.8.8. The auto-shortlink preference (ASK / YES / NO)
-is no longer shown in Settings at all since v3.8.10 — the shorten-links choice is applied in the
-composer flow.
+Shown when billing is enabled for the instance. Manage your organisation's plan, billing cycle,
+and usage:
 
-> **Profile is now accessed from the user avatar menu** in the top navigation bar — not from a
-> settings tab. Click your avatar to find the Profile link alongside Settings and Logout. The
-> settings gear icon was removed from the header; all settings pages are reached through the
-> avatar menu.
+- **Plan selection** — choose between **Starter**, **Pro**, **Team**, and **Agency** tiers, billed
+  monthly or yearly. Each plan lists its channel, video-export, and storage allotments.
+- **Current plan badge** — the plan you are on is marked **Current**.
+- **Usage bars** — visual gauges for channels used, video exports used, and storage used versus the
+  plan limit. Bars turn amber at 80% and red at 100%.
+- **Add-ons** — purchase extra storage packs (25 GB each) and extra video-export packs (50 exports
+  each) without changing tier.
+- **Change plan** — upgrade or downgrade; the change is applied through the billing backend.
+- **Cancel / resume** — cancel the subscription at the end of the current period, or resume a
+  cancelled subscription before it expires.
+- **Payment method & invoices** — view and update the card on file, and download invoice history.
 
-## Your profile (`/user/me`)
+See [Subscription & Billing](./subscription-and-billing.md) for plans, metered caps, and Stripe
+configuration.
 
-The profile page (avatar menu → Profile) has three tabs:
-
-- **Profile** — name, last name, bio, profile picture, and your **timezone** (IANA zone, used to
-  display schedule dates and the composer's time picker). Your avatar resolves in this order:
-  external avatar (your OAuth login provider's picture, or a **Gravatar** generated from your
-  email — refreshed on login) → uploaded profile picture → your initials.
-- **Security** — change your password, and an **Active Sessions** device list (browser, IP, last
-  used). Revoke any session individually, or log out all other sessions at once. Logging out
-  revokes all of your sessions.
-- **Notifications** — per-category notification preferences across email, push, and in-app
-  channels (post published/failed, channels, comments, budget, media, announcements, streak,
-  **Analytics alerts** — anomaly spike/drop notifications from the analytics sweep, email and in-app
-  on by default; see [Analytics → Anomaly alerts](analytics.md#anomaly-alerts) — and
-  **Agent briefs** — the opt-in weekly proactive agent digest, off by default).
-
-## Teams tab
+## Team tab
 
 Available when your subscription tier includes team members. Manage who has access to your
 organisation:
 
 - **Invite members** — send email invitations. Invited users receive a registration link.
-- **Roles (v3.8.10)** — membership is governed by a full role-based access control (RBAC) system.
+- **Roles** — membership is governed by a full role-based access control (RBAC) system.
   Five system roles are seeded for every organisation:
 
   | Role | What it can do |
@@ -59,6 +51,14 @@ organisation:
 - **Datatable** — the team list shows each member's name, email, role, and join date. Role
   changes and member removal are available from the per-row controls to members holding
   `members:manage`; only the owner can change or remove another owner.
+
+See [Team & Roles](./team-and-roles.md) for the full RBAC model.
+
+## Broadcast tab
+
+Visible to members with the `notifications:manage` permission. Send an in-app announcement or
+message to everyone in the organisation. Broadcasts use the `announcements` notification category
+with `override: true`, so they reach recipients even if they have disabled announcements.
 
 ## Channels tab
 
@@ -109,66 +109,16 @@ comment, polls, video, carousel, alt text, link preview, refresh token, and watc
 its **Capabilities** filter dropdown narrows the provider list to those supporting the selected
 features, so you can judge feature availability before configuring a provider.
 
-## Shortlinks tab
+See [Supported Channels](./supported-channels.md) for the full capability matrix.
 
-Configure and manage short-link providers per organisation. Short links are used to shorten URLs
-in published posts.
+### Per-channel VPN egress
 
-- **Provider list (v3.8.10 redesign)** — the tab mirrors the AI settings page: provider cards
-  with real brand icons, configured/active badges, and per-row **Configure / Set Active / Remove**
-  actions. 19 supported providers: Bitly, TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly,
-  Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI.
-- **Multiple accounts per provider (v3.8.10)** — you can add several accounts of the same
-  provider (e.g. two Bitly accounts), each with its own display **name**. Adding the *same*
-  account twice is rejected (accounts are fingerprinted from their credentials).
-- **One active at a time** — only one short-link account can be active per organisation. Switching
-  automatically deactivates the previous one.
-- **Single-step configuration** — OAuth where the provider offers it (e.g. Bitly), otherwise API
-  keys. No second step.
-- **Custom domains** — if your selected provider supports custom (branded) domains, enter the domain
-  in the configuration panel.
-- **Credentials** — API keys or tokens are stored encrypted at rest in `OrgShortLinkConfig` and
-  never sent to the browser.
-- **Test connection** — validate that the configured credentials and domain are working before
-  publishing.
-- **Shortlink preference** — the ASK / YES / NO preference card was removed from Settings in
-  v3.8.10; the shorten-links choice is applied in the composer flow when you post.
-- **Link ledger** — every generated short link is recorded in the `ShortLink` table for analytics
-  tracking and deduplication.
-
-### Per-provider credential fields
-
-| Provider | Auth Type | Credential Fields | Where to get them |
-|----------|-----------|-------------------|-------------------|
-| Bitly | OAuth2 / API Key | Access Token (paste) — or Client ID + Client Secret (OAuth flow) | [bitly.com/a/oauth_apps](https://bitly.com/a/oauth_apps) — register an OAuth app, or generate a Generic Access Token from your Bitly settings |
-| TinyURL | API Key | API Token | [tinyurl.com/app/settings/api](https://tinyurl.com/app/settings/api) |
-| T.LY | API Key | API Token | [t.ly/settings/api](https://t.ly/settings/api) |
-| Short.io | API Key | Secret Key, Short Domain | [short.io/settings/api](https://short.io/settings/api) |
-| Rebrandly | API Key | API Key, Workspace ID (optional) | [rebrandly.com/settings/api](https://rebrandly.com/settings/api) |
-| Dub.co | API Key | API Token (`dub_...`), API Endpoint (optional) | [dub.co/settings/tokens](https://dub.co/settings/tokens) |
-| Cutt.ly | API Key | API Key | [cutt.ly/api](https://cutt.ly/api) |
-| Tiny.cc | API Key | Login / Username, API Key | [tiny.cc/api](https://tiny.cc/api) |
-| is.gd | None | — | No credentials required |
-| v.gd | None | — | No credentials required |
-| BL.INK | API Key | API Key | [bl.ink/settings/api](https://bl.ink/settings/api) |
-| T2M | API Key | API Token | [t2m.io/settings/api](https://t2m.io/settings/api) |
-| Linkly | API Key | API Key, Workspace ID | [linklyhq.com/settings/api](https://linklyhq.com/settings/api) |
-| Replug | API Key | API Key | [replug.link/settings/api](https://replug.link/settings/api) |
-| Switchy | API Key | API Key | [switchy.io/settings/api](https://switchy.io/settings/api) |
-| PixelMe | API Key | API Key | [pixelme.me/settings/api](https://pixelme.me/settings/api) |
-| Sniply | API Key | API Token | [snip.ly/settings/api](https://snip.ly/settings/api) |
-| Ow.ly | API Key | Hootsuite Token | Create/stats not supported via public API — requires Hootsuite dashboard |
-| CleanURI | None | — | No credentials required |
-
-**Bitly OAuth setup (alternative to pasting an access token):**
-1. Register a new OAuth app at [bitly.com/a/oauth_apps](https://bitly.com/a/oauth_apps).
-2. Enter the redirect URI as `<FRONTEND_URL>/settings?tab=shortlinks` (this must also be on the
-   `INTEGRATION_RETURN_URL_ALLOWLIST` env var — see [Configuration](../operations-guide/configuration.md#security)).
-3. Copy the generated Client ID and Client Secret into the Bitly provider panel.
-4. Postmill handles the authorization redirect and token exchange via the built-in OAuth flow.
-
-See [Short-link Providers](../reference/provider-capabilities.md#short-link-providers) for the
-full capability matrix including click analytics and custom domain support.
+Each channel configuration can opt into routing all of its outbound posting requests through a VPN
+region's proxy. The channel's edit dialog shows a **VPN Region** selector populated from the
+organisation's enabled VPN providers and their enabled regions. Only SOCKS5 / HTTP-CONNECT VPN
+providers can be applied per-request; tunnel providers (WireGuard/OpenVPN) are not selectable here.
+Routing is resolved at publish time through a pooled dispatcher and is invalidated automatically
+when the VPN config changes. See [VPN tab](#vpn-tab) for configuring VPN providers.
 
 ## AI tab
 
@@ -182,13 +132,13 @@ Configure AI providers, models, spending, and prompt management.
   (native API integrations) and **Hub Providers** (OpenAI-compatible gateways). Each provider
   card shows its brand icon, name, default model, and status (Active / Configured / unconfigured).
   You can configure as many providers as you like; one is the active default.
-- **Configure (two steps, v3.8.10)** — first enter API credentials (API key, base URL,
+- **Configure (two steps)** — first enter API credentials (API key, base URL,
   organisation ID; encrypted at rest), then pick the provider's model defaults: a **standard
   (default) model** and an optional **reasoning model**. The model picker splits the provider's
   text models into *Standard* and *Reasoning* groups; AI features that request deep reasoning use
   the reasoning model and fall back to the default model when none is set. Image models are no
   longer part of AI provider configuration — image/video/audio generation is configured in the
-  [Media tab](#media-tab).
+  [Content tab](#content-tab).
 - **Set Active** — activate a configured provider. All AI operations for your organisation will
   use this provider.
 - **Model selection** — choose models per scope:
@@ -227,16 +177,16 @@ Manage `AIPromptLibraryItem` records — user-created reusable prompts:
 
 ## Brands tab
 
-Since v3.8.10 an organisation can manage **multiple brands** instead of a single brand profile.
-The tab shows a brand list with create, edit, and delete, plus a **Default** badge:
+An organisation can manage **multiple brands** instead of a single brand profile. The tab shows a
+brand list with create, edit, and delete, plus a **Default** badge:
 
 - **Create / delete brands** — add as many brands as you need, each with a name. Deleting the
   default brand reassigns the default to another brand.
-- **Default brand** — one brand is the default; it behaves exactly like the old single brand
-  profile (applied to all AI generations unless a post selects a different brand).
+- **Default brand** — one brand is the default; it behaves like the old single brand profile
+  (applied to all AI generations unless a post selects a different brand).
 - **Per-post brand selection** — the composer includes a brand picker; the selected brand's voice
   is used when generating content for that post.
-- Brand management requires the `brands: manage` permission (owner/admin by default); all members
+- Brand management requires the `brands:manage` permission (owner/admin by default); all members
   can read brands so the composer picker works.
 
 ### Brand Voice (per brand, per language)
@@ -252,11 +202,6 @@ The tab shows a brand list with create, edit, and delete, plus a **Default** bad
   channel (pick a channel from the dropdown to add one). Channels without an override use the
   language's instructions above.
 
-Stored in `AIBrandProfile.languageProfiles` (`{ [lang]: { instructions, overrides } }`); the active
-language's profile is mirrored into the legacy `instructions`/`platformInstructions` fields for
-generation. (Per-channel overrides are stored but not yet applied at generation time — the generation
-path does not currently pass the channel; the per-language instructions do apply.)
-
 ### Brand Assets (per brand)
 
 Each brand carries a brand kit, surfaced both in Settings → Brands and in the Designer:
@@ -268,13 +213,10 @@ Each brand carries a brand kit, surfaced both in Settings → Brands and in the 
 - **Brand enforcement** — toggle whether the Designer warns when an export uses off-palette colours
   or non-brand fonts.
 
-Assets are saved via `PUT /brands/:id` (fields `palette`, `assets`, `enforcement`). The brand list
-shows a colour-swatch + asset-count preview per brand.
-
 ### Knowledge Base
 
 - **Index content** — trigger indexing of your top-performing posts into the RAG vector store.
-  The system selects the 10 posts with the highest engagement metrics.
+  The system selects the posts with the highest engagement metrics.
 - **Search brand memory** — semantic search across your indexed top-performing content. Use this
   to find past posts that performed well for a given topic.
 - **RAG status** — shows whether the vector store is enabled, which backend is in use, and index
@@ -286,29 +228,112 @@ shows a colour-swatch + asset-count preview per brand.
   - **Pinecone (Remote)** — a Pinecone serverless index (API key, index name, optional host).
 
   The three remote options require connection settings and offer a **Test Connection** button.
-  Secrets (the remote DB connection string, Qdrant/Pinecone API keys) are encrypted at rest in
-  `AISystemSettings.secretSettings` and never returned to the client. When a remote store is
-  unreachable, indexing/search fall back to the built-in pgvector/text path.
+  Secrets are encrypted at rest in `AISystemSettings.secretSettings` and never returned to the
+  client. When a remote store is unreachable, indexing/search fall back to the built-in pgvector/text
+  path.
 - **Manual index** — index custom content items (text, URLs, files) into the RAG store.
 - **Backfill** — trigger a full re-index of all historical content.
 
-## Media tab
+## Shortlinks tab
 
-Rebuilt in v3.8.10 as a pluggable per-organisation media-provider page that mirrors the AI tab:
-provider cards with brand icons, capability chips, configured/enabled badges, and per-row
-**Configure / Test / Remove** actions.
+Configure and manage short-link providers per organisation. Short links are used to shorten URLs
+in published posts.
+
+- **Provider list** — provider cards with real brand icons, configured/active badges, and per-row
+  **Configure / Set Active / Remove** actions. 19 supported providers: Bitly, TinyURL, T.LY, Short.io,
+  Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe,
+  Sniply, Ow.ly, CleanURI.
+- **Multiple accounts per provider** — you can add several accounts of the same provider (e.g. two
+  Bitly accounts), each with its own display **name**. Adding the *same* account twice is rejected
+  (accounts are fingerprinted from their credentials).
+- **One active at a time** — only one short-link account can be active per organisation. Switching
+  automatically deactivates the previous one.
+- **Single-step configuration** — OAuth where the provider offers it (e.g. Bitly), otherwise API
+  keys. No second step.
+- **Custom domains** — if your selected provider supports custom (branded) domains, enter the domain
+  in the configuration panel.
+- **Credentials** — API keys or tokens are stored encrypted at rest in `OrgShortLinkConfig` and
+  never sent to the browser.
+- **Test connection** — validate that the configured credentials and domain are working before
+  publishing.
+- **Shortlink preference** — the ASK / YES / NO preference card was removed from Settings; the
+  shorten-links choice is applied in the composer flow when you post.
+- **Link ledger** — every generated short link is recorded in the `ShortLink` table for analytics
+  tracking and deduplication.
+
+### Per-provider credential fields
+
+| Provider | Auth Type | Credential Fields | Where to get them |
+|----------|-----------|-------------------|-------------------|
+| Bitly | OAuth2 / API Key | Access Token (paste) — or Client ID + Client Secret (OAuth flow) | [bitly.com/a/oauth_apps](https://bitly.com/a/oauth_apps) — register an OAuth app, or generate a Generic Access Token from your Bitly settings |
+| TinyURL | API Key | API Token | [tinyurl.com/app/settings/api](https://tinyurl.com/app/settings/api) |
+| T.LY | API Key | API Token | [t.ly/settings/api](https://t.ly/settings/api) |
+| Short.io | API Key | Secret Key, Short Domain | [short.io/settings/api](https://short.io/settings/api) |
+| Rebrandly | API Key | API Key, Workspace ID (optional) | [rebrandly.com/settings/api](https://rebrandly.com/settings/api) |
+| Dub.co | API Key | API Token (`dub_...`), API Endpoint (optional) | [dub.co/settings/tokens](https://dub.co/settings/tokens) |
+| Cutt.ly | API Key | API Key | [cutt.ly/api](https://cutt.ly/api) |
+| Tiny.cc | API Key | Login / Username, API Key | [tiny.cc/api](https://tiny.cc/api) |
+| is.gd | None | — | No credentials required |
+| v.gd | None | — | No credentials required |
+| BL.INK | API Key | API Key | [bl.ink/settings/api](https://bl.ink/settings/api) |
+| T2M | API Key | API Token | [t2m.io/settings/api](https://t2m.io/settings/api) |
+| Linkly | API Key | API Key, Workspace ID | [linklyhq.com/settings/api](https://linklyhq.com/settings/api) |
+| Replug | API Key | API Key | [replug.link/settings/api](https://replug.link/settings/api) |
+| Switchy | API Key | API Key | [switchy.io/settings/api](https://switchy.io/settings/api) |
+| PixelMe | API Key | API Key | [pixelme.me/settings/api](https://pixelme.me/settings/api) |
+| Sniply | API Key | API Token | [snip.ly/settings/api](https://snip.ly/settings/api) |
+| Ow.ly | API Key | Hootsuite Token | Create/stats not supported via public API — requires Hootsuite dashboard |
+| CleanURI | None | — | No credentials required |
+
+**Bitly OAuth setup (alternative to pasting an access token):**
+1. Register a new OAuth app at [bitly.com/a/oauth_apps](https://bitly.com/a/oauth_apps).
+2. Enter the redirect URI as `<FRONTEND_URL>/settings?tab=shortlinks` (this must also be on the
+   `INTEGRATION_RETURN_URL_ALLOWLIST` env var — see [Configuration](../operations-guide/configuration.md#security)).
+3. Copy the generated Client ID and Client Secret into the Bitly provider panel.
+4. Postmill handles the authorization redirect and token exchange via the built-in OAuth flow.
+
+## Content tab
+
+The **Content** page groups the content-authoring surfaces into one tabbed view:
+
+- **AI Media** — the AI media-generation providers (see [Media sub-tab](#media-sub-tab) below).
+- **Content Packs** — premium stock-media packs.
+- **Sets** and **Signatures** — reusable post templates and signatures (paid tiers only).
+
+### Content Packs sub-tab
+
+A content pack is the stock media library that powers searches for photos, videos, vectors,
+stickers, icons, and audio across the app. Postmill ships with a free default pack; connect a
+premium provider for higher-quality, licensed content.
+
+- **Free default** — `Postmill (Default)` is active when no premium pack is Primary. It covers all
+  capabilities and falls back to the free stock providers.
+- **Premium packs** — provider cards with brand icons, configured/active badges, and **Configure /
+  Make Primary / Remove / Test** actions. Only one pack is enabled at a time; anything it does not
+  declare falls back to the free default.
+- **Supported premium packs** — Magnific, Vecteezy, Adobe Stock, and Envato Elements.
+- **Credentials** — encrypted at rest and never returned to the browser.
+
+See [Media Library → Content Packs](./media-library.md#content-packs) and the individual stock
+browser pages under [Media Studios](./media/index.md) for how packs affect search results.
+
+### AI Media sub-tab
+
+Rebuilt as a pluggable per-organisation media-provider page that mirrors the AI tab: provider cards
+with brand icons, capability chips, configured/enabled badges, and per-row **Configure / Test /
+Remove** actions.
 
 Available providers and their capabilities:
 
 | Provider | Image | Video | Audio | Avatar |
 |----------|:---:|:---:|:---:|:---:|
 | fal.ai | ✓ | ✓ | ✓ | |
-| OpenAI | ✓ | | ✓ | |
+| OpenAI | ✓ | ✓ | ✓ | |
 | ElevenLabs | | | ✓ | |
 | HeyGen | | ✓ | | ✓ |
 | Runway | ✓ | ✓ | | |
 | Black Forest Labs | ✓ | | | |
-| Google Vertex AI | ✓ | ✓ | | |
+| Google Vertex | ✓ | ✓ | | |
 | Replicate | ✓ | ✓ | ✓ | ✓ |
 | Stability AI | ✓ | ✓ | ✓ | |
 | Tavus | | ✓ | | ✓ |
@@ -332,55 +357,67 @@ and the finished artifact is saved into your storage when the provider completes
 **Auto-config:** entering OpenAI or MiniMax credentials in the AI tab also configures them as a
 media provider (and vice versa) — the key is shared, you don't re-enter it.
 
-### C2PA provenance
+#### C2PA provenance
 
 When enabled, generated media files are signed with C2PA Content Authenticity Initiative
 metadata, embedding cryptographically verifiable provenance into output files.
 
+### Sets sub-tab
+
+Available on paid tiers (not FREE). Create named, reusable post templates:
+
+- A **Set** captures a full composer payload — the selected channels, per-channel settings, post
+  content, and any attached media — so you can reload it into the composer in one click.
+- The Sets list shows a rich preview of each set: the channels it targets (as avatars), how many
+  posts it contains, and thumbnails of its media.
+- Edit and delete existing sets.
+
+Managing sets requires the `posts` permission (RBAC).
+
+### Signatures sub-tab
+
+Available on paid tiers (not FREE). Manage reusable, channel-aware signatures:
+
+- **Content** — a reusable text block appended to a post (hashtag blocks, legal disclosures,
+  "Follow us" CTAs).
+- **Logo / sticker** — optionally attach an image (from your Files or the stock library) to a
+  signature. When the signature is applied, the image is added to the post's media.
+- **Channel scope** — apply a signature to all channels, or restrict it to specific channels.
+- **Auto-add** — mark one or more signatures to be appended automatically to new posts (text **and**
+  logo), respecting each signature's channel scope. Several scoped auto-add signatures can coexist.
+- **Usage** — each signature tracks how many times it has been applied.
+- Insert a signature manually from the composer's signature toolbar button (its logo is attached
+  too).
+
 ## VPN tab
 
-Configure VPN provider credentials for your organisation. This is a credential-only settings
-surface in v3.9.0 — it stores the credentials needed to connect to a provider but does not yet
-drive live VPN connections.
+Configure VPN provider credentials for your organisation and enable regions that can then be
+assigned to individual channels in the [Channels tab](#channels-tab).
 
-- **Provider list** — mirrors the AI/Shortlinks pages: provider cards with real brand icons,
-  configured/enabled badges, and a **Configure / Remove** action per row. Supported providers:
-  **NordVPN**, **ExpressVPN**, **Surfshark**, **Proton VPN**, and **Mullvad**.
+- **Provider list** — provider cards with real brand icons, configured/enabled badges, and a
+  **Configure / Remove** action per row. Supported providers include **NordVPN**, **ExpressVPN**,
+  **Surfshark**, **Proton VPN**, **Mullvad**, and others.
 - **Credential fields** — each provider exposes its required manual-setup credentials (for example,
   service credentials, activation code, or account number) and an optional config-file URL.
+- **Region enablement** — providers that expose a static region catalog let you tick which regions
+  are available for channel routing. Dynamic-region providers derive their region from your stored
+  config and do not show a checklist.
 - **Enable toggle** — a configured provider can be enabled or disabled.
-- **Test connection** — validates the stored configuration (currently a no-op placeholder; future
-  releases may probe provider status).
+- **Test connection** — validates that the stored configuration can authenticate.
 - **Credentials** — encrypted at rest in `OrgVpnConfig` and never returned to the browser.
 
-| Provider | Required credential | Optional field |
-|----------|---------------------|----------------|
-| NordVPN | Service credentials (`username:password`) | OpenVPN config URL |
-| ExpressVPN | Activation code | OpenVPN config URL |
-| Surfshark | Service credentials (`username:password`) | OpenVPN config URL |
-| Proton VPN | OpenVPN / IKEv2 credentials (`username:password`) | Config file URL |
-| Mullvad | 16-digit account number | WireGuard config URL |
-| CyberGhost | Service credentials (`username:password`) | OpenVPN config URL |
-| Private Internet Access | Service credentials (`username:password`) | OpenVPN config URL |
-| IPVanish | Service credentials (`username:password`) | OpenVPN config URL |
-| Windscribe | Service credentials (`username:password`) | OpenVPN / WireGuard config URL |
-| TunnelBear | Service credentials (`username:password`) | Config URL |
-| Hotspot Shield | Service credentials (`username:password`) | Hydra / OpenVPN config URL |
-| PureVPN | Service credentials (`username:password`) | OpenVPN config URL |
-| VyprVPN | Service credentials (`username:password`) | OpenVPN / Chameleon config URL |
-| hide.me | Service credentials (`username:password`) | WireGuard / OpenVPN config URL |
-| Mozilla VPN | Subscription / device key | WireGuard config URL |
+Only SOCKS5 / HTTP-CONNECT providers can be used for per-request channel routing. Tunnel providers
+(WireGuard/OpenVPN) are configured here but are not selectable in the per-channel VPN egress picker.
 
-## Storage tab
+## File Storage tab
 
 Configure where uploaded media files are stored. See [Storage Setup](../operations-guide/storage.md)
 for the operations perspective.
 
 ### Providers sub-tab
 
-Redesigned in v3.8.10 to mirror the AI tab: provider cards with real brand icons (AWS S3,
-Cloudflare R2, Backblaze B2, IDrive e2, Local), configured/mounted badges, and quota/usage chips.
-The tab now renders consistently on first load (a first-load render bug was fixed in v3.8.10).
+Provider cards with real brand icons (AWS S3, Cloudflare R2, Backblaze B2, IDrive e2, Local),
+configured/mounted badges, and quota/usage chips.
 
 - **Add provider** — configure a new storage backend: Amazon S3, Cloudflare R2, Backblaze B2,
   IDrive e2, or Local disk. You can add as many storages as you want per provider type, each with
@@ -445,50 +482,15 @@ Available when your subscription tier includes auto-posting. Configure scheduled
 - **AI content** — optionally use AI to rewrite or summarise scraped content before posting.
 - **Schedule** — define how often to check the source and when to publish.
 
-## Content tab
+## Campaigns tab
 
-The **Content** page groups the content-authoring surfaces into one tabbed view:
-
-- **AI Media** — the AI media-generation providers (see the **Media** section above for provider
-  configuration).
-- **Content Packs** — premium stock-media packs (gated on `media-config:manage`).
-- **Sets** and **Signatures** — described below (paid tiers only).
-
-### Sets sub-tab
-
-Available on paid tiers (not FREE). Create named, reusable post templates:
-
-- A **Set** captures a full composer payload — the selected channels, per-channel settings, post
-  content, and any attached media — so you can reload it into the composer in one click.
-- The Sets list shows a rich preview of each set: the channels it targets (as avatars), how many
-  posts it contains, and thumbnails of its media.
-- Edit and delete existing sets.
-
-Managing sets requires the `posts` permission (RBAC). Endpoints: `GET/POST/PUT /sets`,
-`DELETE /sets/:id`.
-
-### Signatures sub-tab
-
-Available on paid tiers (not FREE). Manage reusable, channel-aware signatures:
-
-- **Content** — a reusable text block appended to a post (hashtag blocks, legal disclosures,
-  "Follow us" CTAs).
-- **Logo / sticker** — optionally attach an image (from your Files or the stock library) to a
-  signature. When the signature is applied, the image is added to the post's media.
-- **Channel scope** — apply a signature to all channels, or restrict it to specific channels.
-- **Auto-add** — mark one or more signatures to be appended automatically to new posts (text **and**
-  logo), respecting each signature's channel scope. Several scoped auto-add signatures can coexist.
-- **Usage** — each signature tracks how many times it has been applied.
-- Insert a signature manually from the composer's signature toolbar button (its logo is attached
-  too).
-
-Endpoints: `GET /signatures`, `GET /signatures/auto` (auto-add signatures), `GET /signatures/default`,
-`POST /signatures`, `PUT /signatures/:id`, `POST /signatures/:id/track-usage`,
-`DELETE /signatures/:id`.
+A shortcut to the Campaigns hub at `/campaigns`. Organize posts, channels, files, and planning
+notes into campaigns; use Discussion threads, UTM tagging, goals, and public share reports. See
+[Campaigns](./campaigns.md).
 
 ## Developers tab
 
-Available when `public_api` is enabled for your tier. Manage developer access to your
+Available when the public API is enabled for your tier. Manage developer access to your
 organisation:
 
 ### OAuth Apps
@@ -512,6 +514,11 @@ Manage public API access keys for programmatic use of Postmill endpoints:
 
 See [Public API v1](../developer-docs/public-api.md) for the full API reference.
 
+### MCP
+
+The Developers tab also surfaces the MCP server connection details and available tool scopes. See
+[MCP Server](../developer-docs/mcp.md).
+
 ## Approved Apps tab
 
 Lists all OAuth applications that you have granted access to your account:
@@ -520,14 +527,27 @@ Lists all OAuth applications that you have granted access to your account:
 - **Revoke access** — remove an application's access to your account. After revocation, the
   application's tokens are invalidated and it can no longer act on your behalf.
 
-Endpoints: `GET /user/approved-apps` lists apps; `DELETE /user/approved-apps/:id` revokes access.
+## Profile, sessions, and notifications
+
+These live outside the Settings page, in the avatar menu:
+
+- **Profile** (`/user/me`) — name, last name, bio, profile picture, and timezone (IANA zone, used
+  to display schedule dates and the composer's time picker). Your avatar resolves in this order:
+  external avatar (OAuth login provider's picture, or a Gravatar generated from your email) →
+  uploaded profile picture → your initials.
+- **Security** (`/user/me`) — change your password, and an **Active Sessions** device list (browser,
+  IP, last used). Revoke any session individually, or log out all other sessions at once. Logging
+  out revokes all of your sessions.
+- **Notifications** (`/user/me`) — per-category notification preferences across email, push, and
+  in-app channels (post published/failed, channels, comments, budget, media, announcements, streak).
+  See [Notifications](./notifications.md).
 
 ## Who can see Settings
 
-Settings access is permission-gated (v3.8.10): reading and changing the org-level settings tabs
-requires the `settings` permission, which the seeded **Owner** and **Admin** roles carry. The
-five provider surfaces (AI, Media, Storage, Shortlinks, VPN) and brand management are likewise gated
-on their own permissions. A member whose role lacks the grant receives **HTTP 403**; an org can
-grant these permissions to a custom role.
+Settings access is permission-gated: reading and changing the org-level settings tabs requires the
+`settings` permission, which the seeded **Owner** and **Admin** roles carry. The provider surfaces
+(AI, Media, Storage, Shortlinks, VPN) and brand management are likewise gated on their own
+permissions. A member whose role lacks the grant receives **HTTP 403**; an org can grant these
+permissions to a custom role. Billing management is owner-only.
 
-> Verified against v4.5.0
+> Verified against main (post-3.8.10)
