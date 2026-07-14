@@ -61,12 +61,14 @@ import linkedinpageModules from '@gitroom/provider-linkedin-page';
 import linklyModules from '@gitroom/provider-linkly';
 import linodeModules from '@gitroom/provider-linode';
 import listmonkModules from '@gitroom/provider-listmonk';
+import lnkifyModules from '@gitroom/provider-lnkify';
 import localModules from '@gitroom/provider-local';
 import ltxModules from '@gitroom/provider-ltx';
 import lumaModules from '@gitroom/provider-luma';
 import magnificModules from '@gitroom/provider-magnific';
 import mailgunModules from '@gitroom/provider-mailgun';
 import mastodonModules from '@gitroom/provider-mastodon';
+import medialockerModules from '@gitroom/provider-medialocker';
 import mediumModules from '@gitroom/provider-medium';
 import metallamaModules from '@gitroom/provider-meta-llama';
 import meweModules from '@gitroom/provider-mewe';
@@ -208,12 +210,14 @@ export const providerModules: ProviderModule<any, any>[] = [
   ...linklyModules,
   ...linodeModules,
   ...listmonkModules,
+  ...lnkifyModules,
   ...localModules,
   ...ltxModules,
   ...lumaModules,
   ...magnificModules,
   ...mailgunModules,
   ...mastodonModules,
+  ...medialockerModules,
   ...mediumModules,
   ...metallamaModules,
   ...meweModules,

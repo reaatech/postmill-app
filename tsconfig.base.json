@@ -436,6 +436,12 @@
       "@gitroom/provider-listmonk/*": [
         "libraries/providers/listmonk/src/*"
       ],
+      "@gitroom/provider-lnkify": [
+        "libraries/providers/lnkify/src"
+      ],
+      "@gitroom/provider-lnkify/*": [
+        "libraries/providers/lnkify/src/*"
+      ],
       "@gitroom/provider-local": [
         "libraries/providers/local/src"
       ],
@@ -471,6 +477,12 @@
       ],
       "@gitroom/provider-mastodon/*": [
         "libraries/providers/mastodon/src/*"
+      ],
+      "@gitroom/provider-medialocker": [
+        "libraries/providers/medialocker/src"
+      ],
+      "@gitroom/provider-medialocker/*": [
+        "libraries/providers/medialocker/src/*"
       ],
       "@gitroom/provider-medium": [
         "libraries/providers/medium/src"

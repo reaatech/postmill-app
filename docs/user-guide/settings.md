@@ -240,9 +240,9 @@ Configure and manage short-link providers per organisation. Short links are used
 in published posts.
 
 - **Provider list** — provider cards with real brand icons, configured/active badges, and per-row
-  **Configure / Set Active / Remove** actions. 19 supported providers: Bitly, TinyURL, T.LY, Short.io,
-  Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe,
-  Sniply, Ow.ly, CleanURI.
+  **Configure / Set Active / Remove** actions. 20 supported providers: Bitly, TinyURL, T.LY, Short.io,
+  Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly, Lnkify, Replug, Switchy,
+  PixelMe, Sniply, Ow.ly, CleanURI.
 - **Multiple accounts per provider** — you can add several accounts of the same provider (e.g. two
   Bitly accounts), each with its own display **name**. Adding the *same* account twice is rejected
   (accounts are fingerprinted from their credentials).
@@ -278,6 +278,7 @@ in published posts.
 | BL.INK | API Key | API Key | [bl.ink/settings/api](https://bl.ink/settings/api) |
 | T2M | API Key | API Token | [t2m.io/settings/api](https://t2m.io/settings/api) |
 | Linkly | API Key | API Key, Workspace ID | [linklyhq.com/settings/api](https://linklyhq.com/settings/api) |
+| Lnkify | API Key | API Key (`lf_live_...`), Base URL (optional — self-hosted instances) | [docs.lnkify.io](https://docs.lnkify.io) — hosted default `https://lnkify.io` |
 | Replug | API Key | API Key | [replug.link/settings/api](https://replug.link/settings/api) |
 | Switchy | API Key | API Key | [switchy.io/settings/api](https://switchy.io/settings/api) |
 | PixelMe | API Key | API Key | [pixelme.me/settings/api](https://pixelme.me/settings/api) |
@@ -420,7 +421,7 @@ Provider cards with real brand icons (AWS S3, Cloudflare R2, Backblaze B2, IDriv
 configured/mounted badges, and quota/usage chips.
 
 - **Add provider** — configure a new storage backend: Amazon S3, Cloudflare R2, Backblaze B2,
-  IDrive e2, or Local disk. You can add as many storages as you want per provider type, each with
+  IDrive e2, MediaLocker, or Local disk. You can add as many storages as you want per provider type, each with
   its own name — but **each must be a unique account**: adding the same account twice is rejected
   (accounts are fingerprinted from their credentials).
 - **Provider cards** — each configured provider shows its name, type, mount status, and usage.

@@ -225,8 +225,12 @@ All 8 models have `@@ignore` or are managed by the Mastra framework. They are **
 | `Provider` | `LOCAL`, `GITHUB`, `GOOGLE`, `FARCASTER`, `WALLET`, `GENERIC` |
 | `ShortLinkPreference` | `ASK`, `YES`, `NO` |
 | `CreationMethod` | `UNKNOWN`, `WEB`, `MCP`, `API`, `AUTOPOST`, `CLI` |
-| `StorageProviderType` | `LOCAL`, `S3`, `CLOUDFLARE_R2`, `BACKBLAZE_B2`, `IDRIVE_E2`, `WASABI`, `DIGITALOCEAN_SPACES`, `HETZNER`, `STORJ`, `SCALEWAY`, `VULTR`, `LINODE`, `S3_COMPATIBLE` |
+| `StorageProviderType` | `LOCAL`, `S3`, `CLOUDFLARE_R2`, `BACKBLAZE_B2`, `IDRIVE_E2`, `WASABI`, `DIGITALOCEAN_SPACES`, `HETZNER`, `STORJ`, `SCALEWAY`, `VULTR`, `LINODE`, `S3_COMPATIBLE`, `MEDIALOCKER` |
 | `AnnouncementColor` | `INFO`, `WARNING`, `ERROR` |
+
+`MEDIALOCKER` was added to `StorageProviderType` additively by migration
+`20260714150606_add_medialocker_storage_type` (`ALTER TYPE ... ADD VALUE` — backward-compatible, no
+data rewrite).
 
 ---
 
