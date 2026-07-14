@@ -120,6 +120,40 @@ Catalog entries include `domain`, `providerId`, `version`, `displayName`, `statu
 
 Health entries include `domain`, `providerId`, `version`, `status`, and a `health` object with `successCount`, `errorCount`, `consecutiveErrors`, `lastSuccessAt`, and `lastErrorAt`.
 
+## Featured providers
+
+Super-admins curate a per-domain **featured** set, stored in the `FeaturedProvider` table (unique on `(domain, providerId)`, version-agnostic). Featured entries render first — ordered by `featuredSortOrder` — with a gold "Featured" badge on the provider settings surfaces (Settings → AI, AI-Media, Content Packs, Short-links, VPN, Storage), and the flags ride along on `GET /providers/catalog?domain=` entries.
+
+### Canonical seeded set
+
+`FeaturedProviderSeeder` (`libraries/nestjs-libraries/src/database/seeds/featured-provider.seeder.ts`) exports the canonical `FEATURED_PROVIDERS` set — 12 rows:
+
+| Seed key (`domain/providerId`) | sortOrder | Renders as |
+|---|---|---|
+| `ai/openai` | 1 | OpenAI |
+| `ai/openrouter` | 2 | OpenRouter |
+| `ai/gateway` | 3 | Vercel AI |
+| `media/replicate` | 1 | Replicate |
+| `media/heygen` | 2 | HeyGen |
+| `media/fal` | 3 | Kling |
+| `contentpack/magnific` | 1 | Magnific |
+| `storage/medialocker` | 1 | MediaLocker |
+| `shortlink/lnkify` | 1 | Lnkify |
+| `vpn/hideme` | 1 | hide.me |
+| `vpn/custom` | 2 | Custom VPN / Proxy |
+| `vpn/nordvpn` | 3 | NordVPN |
+
+The seeder is chained into the `RBAC_SEED_ON_INIT` on-init factory in `database.module.ts` (`RbacSeeder` → `BackfillService` → `FeaturedProviderSeeder`) and runs on **every boot, in every environment**, upserting each row idempotently. The featured set is therefore **re-asserted on every boot**: removals or reorders made through the admin API are transient and self-heal on the next deploy/restart.
+
+The seeder writes through `FeaturedProviderRepository`, deliberately bypassing `FeaturedProviderService` validation — the service rejects rows for providers that are not registered, and the seeder races provider registration at boot. Rows are written unconditionally; the catalog only tags *registered* manifests, so a featured row for an unregistered provider is inert.
+
+### Admin API (super-admin)
+
+- `GET /admin/providers/featured` — list current featured rows (optional `?domain=` filter).
+- `POST /admin/providers/featured` — add/upsert a featured entry.
+- `DELETE /admin/providers/featured` — remove an entry; takes a JSON body `{ "domain": "...", "providerId": "..." }` (`FeaturedProviderRemoveDto`), not query params.
+- `PUT /admin/providers/featured/reorder` — bulk-set `featuredSortOrder` within a domain.
+
 ## Lifecycle statuses
 
 | Status | Meaning |

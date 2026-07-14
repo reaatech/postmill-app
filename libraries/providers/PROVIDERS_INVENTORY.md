@@ -6,12 +6,12 @@ kernel vitest alias. One row per **module** (multi-module packages — e.g. `ope
 get multiple rows). The `has-spec?` column reflects whether the **package** contains any
 `*.spec.ts` / `*.int-spec.ts` under `src/**`.
 
-- **Modules:** 161  (== `providerModules.length`)
-- **Packages:** 143  (== real package dirs under `libraries/providers/`, excluding `kernel` and `node_modules`)
-  - Note: `ls -d libraries/providers/*/ | grep -v kernel | wc -l` = **144** on a clean checkout because it also counts the `node_modules/` dir; **143** are real packages. (After a local `--coverage` run a gitignored `coverage/` dir also appears, making the raw count **145** — both `node_modules/` and `coverage/` are non-package artifacts.)
-- **Packages with at least one spec:** 89 / 143  (media adapters + the magnific content pack gained recorded-fixture `*.int-spec.ts` behavioral tests via the shared `kernel/src/testing/media-int-helpers.ts`)
+- **Modules:** 163  (== `providerModules.length`)
+- **Packages:** 145  (== real package dirs under `libraries/providers/`, excluding `kernel` and `node_modules`)
+  - Note: `ls -d libraries/providers/*/ | grep -v kernel | wc -l` = **146** on a clean checkout because it also counts the `node_modules/` dir; **145** are real packages. (After a local `--coverage` run a gitignored `coverage/` dir also appears, making the raw count **147** — both `node_modules/` and `coverage/` are non-package artifacts.)
+- **Packages with at least one spec:** 91 / 145  (media adapters + the magnific content pack gained recorded-fixture `*.int-spec.ts` behavioral tests via the shared `kernel/src/testing/media-int-helpers.ts`)
 
-Modules per domain: ai=25, auth=6, contentpack=4, email=7, media=35, shortlink=19, social=36, storage=13, vpn=16
+Modules per domain: ai=25, auth=6, contentpack=4, email=7, media=35, shortlink=20, social=36, storage=14, vpn=16
 
 | package | domain | providerId | version | status | has-spec? |
 |---|---|---|---|---|---|
@@ -99,6 +99,7 @@ Modules per domain: ai=25, auth=6, contentpack=4, email=7, media=35, shortlink=1
 | dub | shortlink | dub | v1 | active | yes |
 | isgd | shortlink | isgd | v1 | active | yes |
 | linkly | shortlink | linkly | v1 | active | yes |
+| lnkify | shortlink | lnkify | v1 | active | yes |
 | owly | shortlink | owly | v1 | active | yes |
 | pixelme | shortlink | pixelme | v1 | active | yes |
 | rebrandly | shortlink | rebrandly | v1 | active | yes |
@@ -154,6 +155,7 @@ Modules per domain: ai=25, auth=6, contentpack=4, email=7, media=35, shortlink=1
 | idrive-e2 | storage | idrive_e2 | v1 | active | no |
 | linode | storage | linode | v1 | active | no |
 | local | storage | local | v1 | active | yes |
+| medialocker | storage | medialocker | v1 | active | yes |
 | s3 | storage | s3 | v1 | active | no |
 | s3-compatible | storage | s3_compatible | v1 | active | no |
 | scaleway | storage | scaleway | v1 | active | no |

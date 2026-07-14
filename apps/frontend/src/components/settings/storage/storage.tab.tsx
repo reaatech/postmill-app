@@ -110,6 +110,7 @@ const PROVIDER_TYPE_LABELS: Record<string, string> = {
   VULTR: 'Vultr Object Storage',
   LINODE: 'Linode / Akamai',
   S3_COMPATIBLE: 'S3-Compatible',
+  MEDIALOCKER: 'MediaLocker',
 };
 
 type SubTab = 'providers' | 'audit' | 'breakdown';
@@ -127,6 +128,7 @@ const CLOUD_TYPES = [
   'VULTR',
   'LINODE',
   'S3_COMPATIBLE',
+  'MEDIALOCKER',
 ];
 
 export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
@@ -255,6 +257,14 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
 
   const storageTypeToKernelId = (type: string) => type.toLowerCase().replace(/_/g, '');
 
+  // Platform-curated "featured" providers (from the catalog projection), keyed by
+  // providerId → sortOrder. The catalog is already scoped to the storage domain,
+  // so providerId is an unambiguous key (ported from provider-settings-panel.tsx).
+  const featuredById = new Map<string, number>();
+  for (const e of catalog ?? []) {
+    if (e.featured) featuredById.set(e.providerId, e.featuredSortOrder ?? 0);
+  }
+
   // A single inline list: local pinned to the very top, then configured cloud
   // instances (pinned), then one always-present "add another" row per cloud
   // provider type so the same provider can be configured again.
@@ -287,13 +297,37 @@ export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
         enabled: false,
         version: 'v1',
       })),
-  ].map((p) => {
-    const kernelId = storageTypeToKernelId(p.identifier);
-    const catalogEntry = catalog?.find(
-      (e) => e.providerId === kernelId && e.version === p.version
-    );
-    return { ...p, versionStatus: catalogEntry?.status ?? 'active' };
-  });
+  ]
+    .map((p) => {
+      const kernelId = storageTypeToKernelId(p.identifier);
+      const catalogEntry = catalog?.find(
+        (e) => e.providerId === kernelId && e.version === p.version
+      );
+      return {
+        ...p,
+        versionStatus: catalogEntry?.status ?? 'active',
+        featured: featuredById.has(kernelId),
+        featuredSortOrder: featuredById.get(kernelId) ?? 0,
+      };
+    })
+    // Ordering mirrors the shared ProviderSettingsPanel: local pinned top, then
+    // CONFIGURED instances, then unconfigured "add" rows — and featured floats
+    // to the front *within* its tier. A featured but unconfigured template must
+    // NOT leapfrog a provider the org has actually configured. Array#sort is
+    // stable, so ties keep their existing order (instances by name, templates
+    // by label).
+    .sort((a, b) => {
+      if ((a.identifier === 'local') !== (b.identifier === 'local')) {
+        return a.identifier === 'local' ? -1 : 1;
+      }
+      // configured (enabled) rows above unconfigured "add another" rows
+      if (a.enabled !== b.enabled) return a.enabled ? -1 : 1;
+      if (a.featured !== b.featured) return a.featured ? -1 : 1;
+      if (a.featured && b.featured) {
+        return a.featuredSortOrder - b.featuredSortOrder;
+      }
+      return 0;
+    });
 
   const usageBar = (usageBytes: number | null, quotaBytes: number | null) => {
     const percent =

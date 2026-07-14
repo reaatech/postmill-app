@@ -118,7 +118,7 @@ The table below shows each provider's registered domains. A provider that appear
 | Wan | `wan` | media | direct; image-slide, image-to-video, text-to-image, text-to-video |
 | xAI Grok | `xai` | ai, media | hub; low-reasoning, high-reasoning, workflow, vision; image-focal-point, image-slide, image-to-image, text-to-image |
 
-## Short-link (`shortlink`) — 19 providers
+## Short-link (`shortlink`) — 20 providers
 
 | Provider | ID |
 |---|---|
@@ -129,6 +129,7 @@ The table below shows each provider's registered domains. A provider that appear
 | Dub.co | `dub` |
 | is.gd | `isgd` |
 | Linkly | `linkly` |
+| Lnkify | `lnkify` |
 | Ow.ly | `owly` |
 | PixelMe | `pixelme` |
 | Rebrandly | `rebrandly` |
@@ -183,7 +184,7 @@ The table below shows each provider's registered domains. A provider that appear
 | X | `x` |
 | YouTube | `youtube` |
 
-## Storage (`storage`) — 13 providers
+## Storage (`storage`) — 14 providers
 
 | Provider | ID |
 |---|---|
@@ -195,6 +196,7 @@ The table below shows each provider's registered domains. A provider that appear
 | iDrive E2 | `idrive_e2` |
 | Linode | `linode` |
 | Local Filesystem | `local` |
+| MediaLocker | `medialocker` |
 | S3-Compatible | `s3_compatible` |
 | Scaleway | `scaleway` |
 | Storj | `storj` |

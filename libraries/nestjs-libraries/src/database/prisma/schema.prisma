@@ -821,6 +821,7 @@ enum StorageProviderType {
   VULTR
   LINODE
   S3_COMPATIBLE
+  MEDIALOCKER
 }
 
 model StorageProviderConfig {

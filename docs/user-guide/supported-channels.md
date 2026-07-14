@@ -88,7 +88,7 @@ The canonical source is `PROVIDER_CAPABILITIES` in
 
 Postmill also includes a separate capability system for short-link providers. Each short-link
 provider declares support for custom domains and click analytics. The canonical source is
-the adapter classes in `libraries/nestjs-libraries/src/short-linking/adapters/`.
+the adapter classes in `libraries/providers/<id>/src/v1/`.
 
 | Provider | Custom Domain | Click Analytics | Notes |
 |---|---|---|---|
@@ -105,6 +105,7 @@ the adapter classes in `libraries/nestjs-libraries/src/short-linking/adapters/`.
 | BL.INK | ✓ | ✓ | Enterprise analytics |
 | T2M | ✓ | ✓ | Geo-targeting |
 | Linkly | ✓ | ✓ | Retargeting pixels |
+| Lnkify | ✓ | ✓ | Self-hostable (optional instance URL); GraphQL API |
 | Replug | ✓ | — | Retargeting pixels |
 | Switchy | ✓ | — | QR codes |
 | PixelMe | ✓ | — | Conversion pixels |
@@ -112,9 +113,9 @@ the adapter classes in `libraries/nestjs-libraries/src/short-linking/adapters/`.
 | Ow.ly | — | — | Ow.ly requires a Hootsuite token and is not create/stats-capable in this release. |
 | CleanURI | — | — | Link monitoring |
 
-**customDomain** — 13 of 19 providers support branded/custom short domains.
+**customDomain** — 14 of 20 providers support branded/custom short domains.
 
-**clickAnalytics** — 10 of 19 providers expose click-count retrieval for the analytics dashboard: Bitly, BL.INK, Cutt.ly, Dub.co, Linkly, Rebrandly, Short.io, T2M, Tiny.cc, T.LY.
+**clickAnalytics** — 11 of 20 providers expose click-count retrieval for the analytics dashboard: Bitly, BL.INK, Cutt.ly, Dub.co, Linkly, Lnkify, Rebrandly, Short.io, T2M, Tiny.cc, T.LY.
 
 ---
 

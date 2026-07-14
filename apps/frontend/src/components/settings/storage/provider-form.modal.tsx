@@ -25,6 +25,7 @@ const allProviderTypes = [
   { value: 'VULTR', label: 'Vultr Object Storage' },
   { value: 'LINODE', label: 'Linode / Akamai' },
   { value: 'S3_COMPATIBLE', label: 'S3-Compatible' },
+  { value: 'MEDIALOCKER', label: 'MediaLocker' },
 ];
 
 // Field specs rendered through the shared kit `ExtraField` renderer instead of
@@ -37,7 +38,7 @@ const NAME_SPEC: ProviderExtraFieldSpec = {
   placeholder: 'My Storage',
 };
 
-const CREDENTIAL_SPECS: ProviderExtraFieldSpec[] = [
+const DEFAULT_CREDENTIAL_SPECS: ProviderExtraFieldSpec[] = [
   { type: 'text', key: 'accessKeyId', label: 'Access Key ID', placeholder: 'AKIA...' },
   {
     type: 'password',
@@ -47,7 +48,7 @@ const CREDENTIAL_SPECS: ProviderExtraFieldSpec[] = [
   },
 ];
 
-const CONFIG_SPECS: ProviderExtraFieldSpec[] = [
+const DEFAULT_CONFIG_SPECS: ProviderExtraFieldSpec[] = [
   { type: 'text', key: 'region', label: 'Region', placeholder: 'us-east-1' },
   { type: 'text', key: 'bucket', label: 'Bucket', placeholder: 'my-bucket' },
   {
@@ -63,6 +64,45 @@ const CONFIG_SPECS: ProviderExtraFieldSpec[] = [
     placeholder: 'https://cdn.example.com',
   },
 ];
+
+// Per-type field sets; types not listed here fall back to the S3-style defaults.
+// Credential keys ride inside the (encrypted) credentials JSON; config keys are
+// top-level columns on the storage config row.
+const TYPE_FIELD_SPECS: Record<
+  string,
+  { credentials: ProviderExtraFieldSpec[]; config: ProviderExtraFieldSpec[] }
+> = {
+  MEDIALOCKER: {
+    credentials: [
+      {
+        type: 'text',
+        key: 'bucketId',
+        label: 'Bucket ID',
+        placeholder: 'b3f1c2d4-…',
+      },
+      {
+        type: 'password',
+        key: 'apiKey',
+        label: 'Secret Access Key',
+        placeholder: '••••••••',
+      },
+      {
+        type: 'text',
+        key: 'baseUrl',
+        label: 'API Base URL (optional)',
+        placeholder: 'https://api.medialocker.io',
+      },
+    ],
+    config: [
+      {
+        type: 'text',
+        key: 'publicUrl',
+        label: 'Public URL (optional)',
+        placeholder: 'https://cdn.example.com',
+      },
+    ],
+  },
+};
 
 interface ProviderFormModalProps {
   onClose: () => void;
@@ -114,20 +154,41 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
     basePath: '/settings/storage',
   };
 
-  const { accessKeyId, secretAccessKey, region, bucket, endpoint, publicUrl } =
-    state.extra;
+  // Field specs resolve per selected type; unlisted types get the S3 defaults.
+  const { credentials: credentialSpecs, config: configSpecs } =
+    TYPE_FIELD_SPECS[type] ?? {
+      credentials: DEFAULT_CREDENTIAL_SPECS,
+      config: DEFAULT_CONFIG_SPECS,
+    };
+
+  // Pick each credential-spec key's non-empty value out of `state.extra`
+  // (exactly how accessKeyId/secretAccessKey were picked before); the block is
+  // dropped entirely when every credential field is empty.
+  const pickCredentials = (): Record<string, string> | undefined => {
+    const credentials: Record<string, string> = {};
+    for (const spec of credentialSpecs) {
+      const value = state.extra[spec.key];
+      if (value) credentials[spec.key] = value;
+    }
+    return Object.keys(credentials).length > 0 ? credentials : undefined;
+  };
 
   const handleTest = async () => {
     setTesting(true);
     setTestResult(null);
     try {
       const testBody: any = {};
-      if (type !== 'LOCAL' && (accessKeyId || secretAccessKey)) {
-        testBody.credentials = { accessKeyId, secretAccessKey };
+      const credentials = pickCredentials();
+      if (type !== 'LOCAL' && credentials) {
+        testBody.credentials = credentials;
       }
-      if (region) testBody.region = region;
-      if (bucket) testBody.bucket = bucket;
-      if (endpoint) testBody.endpoint = endpoint;
+      // The connection test exercises the storage API, not the CDN, so the
+      // public URL never rides along (same as the S3 flow).
+      for (const spec of configSpecs) {
+        if (spec.key === 'publicUrl') continue;
+        const value = state.extra[spec.key];
+        if (value) testBody[spec.key] = value;
+      }
 
       const res = await fetch('/settings/storage/' + (editProvider?.id || 'temp') + '/test', {
         method: 'POST',
@@ -148,20 +209,18 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const body: any = {
-        name: state.name,
-        region,
-        bucket,
-        endpoint,
-        publicUrl,
-      };
+      const body: any = { name: state.name };
+      for (const spec of configSpecs) {
+        body[spec.key] = state.extra[spec.key];
+      }
 
       if (!editProvider?.id) {
         body.type = type;
       }
 
-      if (type !== 'LOCAL' && (accessKeyId || secretAccessKey)) {
-        body.credentials = { accessKeyId, secretAccessKey };
+      const credentials = pickCredentials();
+      if (type !== 'LOCAL' && credentials) {
+        body.credentials = credentials;
       }
 
       const res = await fetch(
@@ -240,11 +299,11 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
           <ExtraField spec={NAME_SPEC} {...fieldProps} />
 
           {showCredentials &&
-            CREDENTIAL_SPECS.map((spec) => (
+            credentialSpecs.map((spec) => (
               <ExtraField key={spec.key} spec={spec} {...fieldProps} />
             ))}
 
-          {CONFIG_SPECS.map((spec) => (
+          {configSpecs.map((spec) => (
             <ExtraField key={spec.key} spec={spec} {...fieldProps} />
           ))}
 
