@@ -123,6 +123,15 @@ export const UserAvatarMenu = () => {
           )}
           <LanguageMenuRow onOpen={() => setOpen(false)} />
           <a
+            href="https://docs.postmill.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            role="menuitem"
+            className="block px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover"
+          >
+            {t('documentation', 'Documentation')}
+          </a>
+          <a
             href="/logout"
             role="menuitem"
             className="block px-[14px] py-[8px] text-[13px] text-red-500 hover:bg-boxHover"

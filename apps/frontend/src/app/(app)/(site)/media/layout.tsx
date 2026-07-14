@@ -625,13 +625,14 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
   const tabLabel = (tab: (typeof sortedTabs)[number]) =>
     tab.labelKey ? translate(tab.labelKey, tab.label) : tab.label;
 
-  // Provider studios that aren't configured yet stay DISCOVERABLE: the desktop
-  // rail shows them dimmed (click → the studio's own configure/landing screen)
-  // instead of hiding them, while the mobile strip stays lean with enabled ones.
+  // Only show studios the org can actually use: Platform tools and stock
+  // browsers (Content Pack) are always available, while provider studios appear
+  // only once their provider is configured + enabled. Both the desktop rail and
+  // the mobile strip filter to this set (configure providers in Settings).
   const isTabEnabled = (t: (typeof sortedTabs)[number]) =>
     t.section !== 'Providers' || (enabledProviders?.has(providerIdentifier(t.href)) ?? false);
-  const railTabs = sortedTabs;
-  const stripTabs = sortedTabs.filter(isTabEnabled);
+  const railTabs = sortedTabs.filter(isTabEnabled);
+  const stripTabs = railTabs;
 
   if (permissions.isLoaded && !permissions.hasPermission('media', 'read')) {
     return (
@@ -708,7 +709,6 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
         <div className="flex flex-1 min-h-0 flex-col gap-[4px] overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent">
           {railTabs.map((t, i) => {
             const active = pathname.startsWith(t.href);
-            const enabled = isTabEnabled(t);
             // 'Platform' (Designer) is the lone built-in tool — no section header.
             const showHeader =
               t.section !== 'Platform' &&
@@ -732,19 +732,12 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
                 )}
                 <Link
                   href={t.href}
-                  title={
-                    enabled
-                      ? tabLabel(t)
-                      : translate('media_tab_not_configured', '{{label}} — not configured', {
-                          label: tabLabel(t),
-                        })
-                  }
+                  title={tabLabel(t)}
                   aria-current={active ? 'page' : undefined}
                   className={clsx(
                     'group/rail relative flex items-center gap-[10px] rounded-e-[6px] text-[13px] text-textColor transition-colors',
                     collapsed ? 'justify-center px-[8px] py-[10px]' : 'ps-[10px] pe-[12px] py-[8px]',
-                    active ? 'bg-boxHover' : 'hover:bg-boxHover',
-                    !enabled && !active && 'opacity-60 hover:opacity-100'
+                    active ? 'bg-boxHover' : 'hover:bg-boxHover'
                   )}
                 >
                   <span
