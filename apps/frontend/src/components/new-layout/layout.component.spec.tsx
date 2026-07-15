@@ -316,9 +316,9 @@ describe('LayoutComponent header', () => {
     const menu = document.querySelector('[role="menu"]');
     expect(menu).toBeDefined();
 
-    // Profile, Settings, Language, Logout.
+    // Profile, Settings, Language, Documentation, Logout.
     const menuItems = document.querySelectorAll('[role="menuitem"]');
-    expect(menuItems.length).toBe(4);
+    expect(menuItems.length).toBe(5);
   });
 
   it('R5: hides the Settings menu item for members lacking settings:read', () => {
@@ -341,8 +341,8 @@ describe('LayoutComponent header', () => {
       (l) => l.getAttribute('href') === '/settings'
     );
     expect(settingsLink).toBeUndefined();
-    // Profile, Language, Logout (Settings hidden).
-    expect(menuItems.length).toBe(3);
+    // Profile, Language, Documentation, Logout (Settings hidden).
+    expect(menuItems.length).toBe(4);
   });
 
   it('R5: keeps Settings visible while permissions load (no flash)', () => {

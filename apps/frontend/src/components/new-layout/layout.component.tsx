@@ -197,7 +197,10 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                               <Wordmark height={34} className="text-textColor" />
                             </Link>
                           )}
-                          <Title />
+                          {/* The dashboard header already shows the wordmark; the
+                              page Title (which resolves to "Home" for /dashboard)
+                              would be redundant, so it's shown only off-dashboard. */}
+                          {!isDashboard && <Title />}
                         </div>
                         <div className="flex gap-[20px] text-textItemBlur items-center">
                           {/* Secondary utilities collapse into the avatar menu on mobile. */}

@@ -111,6 +111,7 @@ import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder
 import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
 import { DemoSeeder } from '@gitroom/nestjs-libraries/database/seeds/demo-seeder';
 import { FeaturedProviderSeeder } from '@gitroom/nestjs-libraries/database/seeds/featured-provider.seeder';
+import { DesignTemplateSeeder } from '@gitroom/nestjs-libraries/database/seeds/design-template.seeder';
 import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { HealthRepository } from '@gitroom/nestjs-libraries/database/prisma/health/health.repository';
@@ -244,6 +245,7 @@ import { AnalyticsShareService } from '@gitroom/nestjs-libraries/analytics/analy
     RbacSeeder,
     BackfillService,
     FeaturedProviderSeeder,
+    DesignTemplateSeeder,
     DemoSeeder,
     MigrationLedgerRepository,
     InngestRunRepository,
@@ -270,18 +272,24 @@ import { AnalyticsShareService } from '@gitroom/nestjs-libraries/analytics/analy
     ProviderHealthService,
     {
       provide: 'RBAC_SEED_ON_INIT',
-      useFactory: (seeder: RbacSeeder, backfill: BackfillService, featured: FeaturedProviderSeeder) => {
+      useFactory: (
+        seeder: RbacSeeder,
+        backfill: BackfillService,
+        featured: FeaturedProviderSeeder,
+        designTemplates: DesignTemplateSeeder,
+      ) => {
         // Run idempotently on every app bootstrap — safe and cheap.
         seeder.seed()
           .then(() => backfill.backfill())
           .then(() => featured.seed())
+          .then(() => designTemplates.seed())
           .catch((e: unknown) => {
             const msg = e instanceof Error ? e.message : String(e);
-            new Logger('DatabaseModule').error(`RBAC seed/backfill/featured failed: ${msg}`);
+            new Logger('DatabaseModule').error(`RBAC seed/backfill/featured/templates failed: ${msg}`);
           });
         return true;
       },
-      inject: [RbacSeeder, BackfillService, FeaturedProviderSeeder],
+      inject: [RbacSeeder, BackfillService, FeaturedProviderSeeder, DesignTemplateSeeder],
     },
     {
       // Dev-only demo fixtures. Opt-in via DEV_SEED_DEMO=true (and NODE_ENV=

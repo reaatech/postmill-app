@@ -11,7 +11,9 @@ import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/pr
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import { DesignService } from '@gitroom/nestjs-libraries/database/prisma/design/design.service';
 import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
+import { DEMO_DESIGNS, DEMO_DESIGN_PREFIX } from './designer-seed-docs';
 
 const LEDGER_KEY = 'demo:fixtures-v1';
 
@@ -57,6 +59,7 @@ export class DemoSeeder {
     private _organizationService: OrganizationService,
     private _usersService: UsersService,
     private _fileService: FileService,
+    private _designService: DesignService,
     @Optional() private _defaultsSeed?: DefaultsSeedService,
   ) {}
 
@@ -96,6 +99,7 @@ export class DemoSeeder {
     await this._seedPosts(orgId, integrations, campaigns.launchId);
     await this._seedCampaignItemsAndNotes(orgId, userId, campaigns.launchId, integrations[0]?.id);
     await this._seedMedia(orgId);
+    await this._seedDesigns(orgId, userId);
 
     // AI/media default models only resolve when the org has enabled AI providers;
     // with none configured this is a no-op (not an error). Non-fatal either way.
@@ -109,7 +113,7 @@ export class DemoSeeder {
 
     await this._ledger.markApplied(LEDGER_KEY, undefined, `demo fixtures for ${email}`);
     this._logger.log(
-      `DemoSeeder: seeded demo fixtures for "${email}" (${integrations.length} channels, posts across all states, 2 campaigns, media). ` +
+      `DemoSeeder: seeded demo fixtures for "${email}" (${integrations.length} channels, posts across all states, 2 campaigns, media, ${DEMO_DESIGNS.length} designs). ` +
         'NOTE: placeholder channels cannot publish (fake tokens); media paths are placeholders.',
     );
   }
@@ -425,6 +429,18 @@ export class DemoSeeder {
     }
   }
 
+  private async _seedDesigns(orgId: string, userId: string): Promise<void> {
+    // Route through DesignService so each doc is validated + width/height are
+    // derived exactly like a user-created design. Reset clears these by name
+    // prefix first, and the ledger blocks a no-reset re-run.
+    for (const design of DEMO_DESIGNS) {
+      await this._designService.createDesign(orgId, userId, {
+        name: design.name,
+        doc: design.doc,
+      });
+    }
+  }
+
   // ── reset ─────────────────────────────────────────────────────────────────
 
   private async _resetDemoData(orgId: string): Promise<void> {
@@ -457,6 +473,9 @@ export class DemoSeeder {
     }
     await this._prisma.file.deleteMany({
       where: { organizationId: orgId, name: { startsWith: DEMO_MEDIA_PREFIX } },
+    });
+    await this._prisma.design.deleteMany({
+      where: { organizationId: orgId, name: { startsWith: DEMO_DESIGN_PREFIX } },
     });
 
     this._logger.log('DemoSeeder: cleared existing demo fixtures before reseed.');
