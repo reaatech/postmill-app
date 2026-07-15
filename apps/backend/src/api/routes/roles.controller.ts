@@ -157,9 +157,10 @@ export class RolesController {
   @CheckPolicies([AuthorizationActions.Update, Sections.TEAM_MEMBERS])
   async assignRole(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Param('userId') userId: string,
     @Body() body: AssignRoleDto,
   ) {
-    return this._rolesService.assignRoleToMember(org.id, userId, body.roleId);
+    return this._rolesService.assignRoleToMember(org.id, user, userId, body.roleId);
   }
 }

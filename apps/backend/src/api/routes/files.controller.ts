@@ -111,14 +111,29 @@ export class FilesController {
       await this._storageService.assertWithinProviderQuota(adapter, org.id, file?.size || 0, configId);
       const originalName = file?.originalname || '';
       const uploadedFile = await adapter.uploadFile(file);
-      return this._fileService.saveFile(
-        org.id,
-        uploadedFile.originalname,
-        uploadedFile.path,
-        originalName,
-        folderId,
-        file?.size
-      );
+      try {
+        return await this._fileService.saveFile(
+          org.id,
+          uploadedFile.originalname,
+          uploadedFile.path,
+          originalName,
+          folderId,
+          file?.size
+        );
+      } catch (err) {
+        // M4: the object is already stored — on ANY post-write failure (402 quota,
+        // folder-ownership 404, DB error) best-effort delete it so a failed upload
+        // doesn't leak orphan bytes. A cleanup failure is logged, never rethrown —
+        // the original error must surface.
+        try {
+          await adapter.removeFile(uploadedFile.path);
+        } catch (cleanupErr) {
+          this._logger.warn(
+            `Failed to clean up stored object ${uploadedFile.path} after upload failure: ${(cleanupErr as Error).message}`
+          );
+        }
+        throw err;
+      }
     } finally {
       if (file?.path) { try { await fs.promises.unlink(file.path); } catch { /* best-effort */ } }
     }
@@ -149,14 +164,27 @@ export class FilesController {
       return { path };
     }
 
-    return this._fileService.saveFile(
-      org.id,
-      getFile.originalname,
-      getFile.path,
-      originalName,
-      folderId,
-      file?.size
-    );
+    try {
+      return await this._fileService.saveFile(
+        org.id,
+        getFile.originalname,
+        getFile.path,
+        originalName,
+        folderId,
+        file?.size
+      );
+    } catch (err) {
+      // M4: same delete-on-failure as uploadServer — the stored object must not
+      // leak when the post-write save fails. Cleanup failure is logged only.
+      try {
+        await adapter.removeFile(getFile.path);
+      } catch (cleanupErr) {
+        this._logger.warn(
+          `Failed to clean up stored object ${getFile.path} after upload failure: ${(cleanupErr as Error).message}`
+        );
+      }
+      throw err;
+    }
   }
 
   @Post('/save-media')

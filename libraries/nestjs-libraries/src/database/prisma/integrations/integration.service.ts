@@ -13,6 +13,7 @@ import {
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Integration, Organization } from '@prisma/client';
+import { randomUUID } from 'crypto';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import dayjs from 'dayjs';
 import { timer } from '@gitroom/helpers/utils/timer';
@@ -447,6 +448,25 @@ export class IntegrationService {
       entity: 'integration',
       entityId: id,
     });
+
+    // F3: kill any still-sleeping token-refresh loop for this channel.
+    // Non-fatal: a send failure must never break the delete.
+    try {
+      if (isInngestEnabled()) {
+        await inngest.send({
+          name: 'integration/refresh-token/cancel',
+          data: { integrationId: id },
+          id: `refresh_cancel_${id}_${randomUUID()}`,
+        });
+      }
+    } catch (err) {
+      this._logger.warn(
+        `Failed to emit integration/refresh-token/cancel for integration ${id}: ${
+          (err as any)?.message
+        }`
+      );
+    }
+
     return result;
   }
 

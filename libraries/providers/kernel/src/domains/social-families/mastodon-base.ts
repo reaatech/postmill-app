@@ -7,7 +7,7 @@ import {
   SocialProvider,
 } from '../social-provider';
 import { SocialCommentDTO } from '../social';
-import { makeId } from '../social-make-id';
+import { makeId, makeOauthState } from '../social-make-id';
 import { SocialAbstract } from '../social-base';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
@@ -71,7 +71,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     const instanceUrl = clientInformation?.instanceUrl || 'https://mastodon.social';
     const clientId = clientInformation?.client_id || '';
     const url = this.generateUrlDynamic(

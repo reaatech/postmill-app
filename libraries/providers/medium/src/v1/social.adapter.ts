@@ -8,7 +8,7 @@ import {
 import { SocialAbstract } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { MediumSettingsDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
@@ -26,7 +26,7 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl() {
-    const state = makeId(6);
+    const state = makeOauthState();
     return {
       url: state,
       codeVerifier: makeId(10),

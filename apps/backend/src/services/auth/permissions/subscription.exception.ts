@@ -54,6 +54,8 @@ const getErrorMessage = (error: {
     case Sections.VIDEO_EXPORTS:
       return 'You have reached the maximum number of video exports for this billing cycle. Buy an add-on or upgrade your subscription to export more videos.';
     case Sections.STORAGE:
-      return 'You have reached the hosted storage limit for your subscription. Connect your own storage bucket for unlimited storage, buy a storage add-on, or upgrade your plan.';
+      return 'You have reached the hosted storage limit for your subscription. Buy a storage add-on, or upgrade your plan.';
+    case Sections.BYO_STORAGE:
+      return 'Connecting your own storage provider is not included in your plan. Please upgrade your subscription to use external storage.';
   }
 };

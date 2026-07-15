@@ -139,7 +139,7 @@ All scheduled and async work runs on Inngest. The backend serves the handler at 
 |----------|---------|---------|
 | `post/publish` | Event | Sleep until publish date, post, post thread items, first comment, webhooks, plugs. |
 | `autopost/process` | Event | RSS/feed autoposting. |
-| `integration/refresh-token` | Event | Refresh channel OAuth tokens. |
+| `integration/refresh-token` | Event | Refresh channel OAuth tokens. Each cycle reschedules with a unique idempotency id; `integration/refresh-token/cancel` (channel delete / reconnect) stops the chain, which also terminates on a missing expiry, a `refreshNeeded` flag, or 5 failed cycles. |
 | `email/send` | Event | Send transactional email (global 1/sec). |
 | `email/digest` | Event | Daily/weekly digest flush. |
 | `agent/digest` | Event | Per-org agent digest. |
@@ -210,9 +210,9 @@ Full role-based access control replaces the dropped legacy `Role` enum:
 
 A route may carry both; they are independent. `User.isSuperAdmin` (the platform operator flag) bypasses RBAC but not billing.
 
-## Platform `/admin` and login providers
+## Platform administration and login providers
 
-`AuthProviderConfig` stores platform-wide login provider configs (one row per `Provider`, client ID/secret encrypted at rest). Super-admins manage them at `/admin`. Login providers resolve credentials **DB-first**; the `getLoginEnv()` env vars are the bootstrap fallback when no enabled DB row exists. `LOCAL` email/password auth is always available regardless of DB config (subject to `DISABLE_REGISTRATION`). OIDC SSO ships via the `Provider.GENERIC` row.
+`AuthProviderConfig` stores platform-wide login provider configs (one row per `Provider`, client ID/secret encrypted at rest). They are managed by the **separate administration app** (a distinct repository) — this repo ships no `/admin` frontend and no login-provider write API; it only *reads* `AuthProviderConfig`. Login providers resolve credentials **DB-first**; the `getLoginEnv()` env vars are the bootstrap fallback when no enabled DB row exists. `LOCAL` email/password auth is always available regardless of DB config (subject to `DISABLE_REGISTRATION`). OIDC SSO ships via the `Provider.GENERIC` row.
 
 ## Shared provider-surface foundation
 

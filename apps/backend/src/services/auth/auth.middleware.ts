@@ -9,7 +9,9 @@ import { issueCsrfToken } from '@gitroom/backend/services/auth/csrf.middleware';
 export const removeAuth = (res: Response) => {
   res.cookie('auth', '', {
     domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-    ...(!process.env.NOT_SECURED
+    // NOT_SECURED relaxes cookie flags ONLY in development (same re-guard as
+    // auth.controller.ts) — a stray prod NOT_SECURED must not strip Secure/sameSite.
+    ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
       ? {
           secure: true,
           httpOnly: true,
@@ -65,7 +67,8 @@ export class AuthMiddleware implements NestMiddleware {
       const newJwt = AuthService.signJWT(user);
       res.cookie('auth', newJwt, {
         domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
+        // Dev-only NOT_SECURED relaxation, same as removeAuth above.
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
           ? {
               secure: true,
               httpOnly: true,

@@ -44,8 +44,9 @@ export class AuthProviderManager {
    * Compose the public list of enabled login providers.
    *
    * DB-backed provider configs (AuthProviderConfig) take precedence. When no
-   * enabled DB config exists, we fall back to the deployment env keys so a
-   * fresh install still exposes the expected providers.
+   * enabled DB config exists, we fall back to the deployment env keys — but
+   * only for providers whose full env credential set is actually present, so
+   * the login page never advertises a provider whose adapter cannot resolve.
    */
   async getProviders() {
     const dbProviders = await this._authProviderRepo.list();
@@ -74,40 +75,58 @@ export class AuthProviderManager {
       { provider: 'LOCAL', displayName: 'Email', ...this._versionInfo('LOCAL') },
     ];
 
-    if (process.env.IS_GENERAL) {
-      if (process.env.POSTMILL_GENERIC_OAUTH) {
-        providers.push({
-          provider: 'GENERIC',
-          displayName:
-            process.env.NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME || 'OIDC',
-          ...this._versionInfo('GENERIC'),
-        });
-      } else {
-        providers.push({
-          provider: 'GOOGLE',
-          displayName: 'Google',
-          ...this._versionInfo('GOOGLE'),
-        });
-        if (process.env.NEYNAR_CLIENT_ID) {
-          providers.push({
-            provider: 'FARCASTER',
-            displayName: 'Farcaster',
-            ...this._versionInfo('FARCASTER'),
-          });
-        }
-        if (process.env.STRIPE_PUBLISHABLE_KEY) {
-          providers.push({
-            provider: 'WALLET',
-            displayName: 'Wallet',
-            ...this._versionInfo('WALLET'),
-          });
-        }
-      }
-    } else {
+    // Mirror the adapters' env resolution
+    // (libraries/providers/<id>/src/v1/auth.adapter.ts): a provider is offered
+    // only when the complete env credential set its resolver requires is
+    // present. Never key on IS_GENERAL — that flag marks the hosted build, not
+    // whether a provider is configured at the platform level.
+    if (
+      process.env.POSTMILL_GENERIC_OAUTH === 'true' &&
+      process.env.POSTMILL_OAUTH_CLIENT_ID &&
+      process.env.POSTMILL_OAUTH_CLIENT_SECRET &&
+      process.env.POSTMILL_OAUTH_AUTH_URL &&
+      process.env.POSTMILL_OAUTH_TOKEN_URL &&
+      process.env.POSTMILL_OAUTH_USERINFO_URL
+    ) {
+      providers.push({
+        provider: 'GENERIC',
+        displayName:
+          process.env.NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME || 'OIDC',
+        ...this._versionInfo('GENERIC'),
+      });
+    }
+
+    if (process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET) {
+      providers.push({
+        provider: 'GOOGLE',
+        displayName: 'Google',
+        ...this._versionInfo('GOOGLE'),
+      });
+    }
+
+    if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
       providers.push({
         provider: 'GITHUB',
         displayName: 'GitHub',
         ...this._versionInfo('GITHUB'),
+      });
+    }
+
+    if (process.env.NEYNAR_CLIENT_ID) {
+      providers.push({
+        provider: 'FARCASTER',
+        displayName: 'Farcaster',
+        ...this._versionInfo('FARCASTER'),
+      });
+    }
+
+    // NOTE: Wallet's env gate is a billing var, not a wallet-auth config —
+    // known misalignment, out of scope for the phantom-provider fix.
+    if (process.env.STRIPE_PUBLISHABLE_KEY) {
+      providers.push({
+        provider: 'WALLET',
+        displayName: 'Wallet',
+        ...this._versionInfo('WALLET'),
       });
     }
 

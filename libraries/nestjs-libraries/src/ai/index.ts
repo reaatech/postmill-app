@@ -15,7 +15,6 @@ export { BudgetExceeded, GuardrailViolation, CapabilityNotAvailable } from './go
 export { GuardrailService } from './governance/guardrail.service';
 export { TelemetryService } from './governance/telemetry.service';
 export { ProviderHealthService } from './governance/provider-health.service';
-export { AiThrottlerGuard } from './governance/ai-throttler.guard';
 export { IdempotencyFactory } from './governance/idempotency.factory';
 export { AiSettingsManager } from './ai-settings.manager';
 export { BudgetService } from './governance/budget.service';

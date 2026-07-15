@@ -6,7 +6,7 @@ import {
   SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import {
   SocialAbstract,
@@ -179,7 +179,7 @@ export class InstagramStandaloneProvider
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     return {
       url:
         `https://www.instagram.com/oauth/authorize?enable_fb_login=0&client_id=${

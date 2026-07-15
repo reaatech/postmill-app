@@ -1,6 +1,16 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { User } from '@prisma/client';
 import { RolesRepository } from './roles.repository';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
+
+type RolePermissionRow = { permission: { resource: string; action: string } };
+type AssignableRole = {
+  id: string;
+  key: string;
+  name: string;
+  isSystem: boolean;
+  permissions: RolePermissionRow[];
+};
 
 @Injectable()
 export class RolesService {
@@ -121,13 +131,33 @@ export class RolesService {
     return deleted;
   }
 
-  async assignRoleToMember(orgId: string, userId: string, roleId: string) {
-    const role = await this._repository.getRole(orgId, roleId);
-    if (!role) {
+  async assignRoleToMember(
+    orgId: string,
+    actor: User,
+    targetUserId: string,
+    roleId: string
+  ) {
+    const targetRole = await this._repository.getRole(orgId, roleId);
+    if (!targetRole) {
       throw new HttpException('Role not found', HttpStatus.NOT_FOUND);
     }
 
-    const result = await this._repository.assignRoleToMember(orgId, userId, roleId);
+    // Superadmins bypass the privilege ceiling (they already bypass
+    // OrgRbacGuard) — but never the last-owner guard below.
+    if (!actor.isSuperAdmin) {
+      const actorEff = await this.getEffectivePermissions(orgId, actor.id);
+      if (!actorEff) {
+        throw new HttpException(
+          'Not a member of this organization',
+          HttpStatus.FORBIDDEN
+        );
+      }
+      this._assertAssignableRole(targetRole, actorEff);
+    }
+
+    await this._assertNotLastOwnerDemotion(orgId, targetUserId, targetRole);
+
+    const result = await this._repository.assignRoleToMember(orgId, targetUserId, roleId);
     if (!result) {
       throw new HttpException('Member not found in organization', HttpStatus.NOT_FOUND);
     }
@@ -136,11 +166,112 @@ export class RolesService {
       organizationId: orgId,
       action: 'member.role.assign',
       entity: 'member',
-      entityId: userId,
-      entityName: role.name,
-      details: JSON.stringify({ memberUserId: userId, roleId }),
+      entityId: targetUserId,
+      entityName: targetRole.name,
+      details: JSON.stringify({ memberUserId: targetUserId, roleId, actorUserId: actor.id }),
     });
     return result;
+  }
+
+  /**
+   * F1 — the shared role-assignment ceiling for team-user creation, invites
+   * and the legacy role-change route: the actor may only assign a role whose
+   * (manage-expanded) permission set is a subset of their own effective set.
+   * Superadmins bypass. Throws 400 when the role does not resolve in the org.
+   */
+  async assertCanAssignRole(orgId: string, actor: User, roleId: string) {
+    if (actor.isSuperAdmin) {
+      return;
+    }
+    const targetRole = await this._repository.getRole(orgId, roleId);
+    if (!targetRole) {
+      throw new BadRequestException('Role not found in organization');
+    }
+    const actorEff = await this.getEffectivePermissions(orgId, actor.id);
+    if (!actorEff) {
+      throw new HttpException(
+        'Not a member of this organization',
+        HttpStatus.FORBIDDEN
+      );
+    }
+    this._assertAssignableRole(targetRole, actorEff);
+  }
+
+  countOwners(orgId: string) {
+    return this._repository.countOwners(orgId);
+  }
+
+  // Mirrors OrgRbacGuard's wildcard semantics: `resource:manage` implies all
+  // five actions. Both sides of the subset check are expanded so an owner
+  // holding only the 18 seeded `resource:manage` rows can still assign the
+  // lower roles (without expansion an owner could assign nothing).
+  private _expandManage(permissions: string[]): Set<string> {
+    const expanded = new Set<string>();
+    for (const permission of permissions) {
+      expanded.add(permission);
+      if (permission.endsWith(':manage')) {
+        const resource = permission.slice(0, -':manage'.length);
+        for (const action of ['create', 'read', 'update', 'delete', 'manage']) {
+          expanded.add(`${resource}:${action}`);
+        }
+      }
+    }
+    return expanded;
+  }
+
+  private _assertAssignableRole(
+    targetRole: AssignableRole,
+    actorEff: { role: string; permissions: string[] }
+  ) {
+    const actorPerms = this._expandManage(actorEff.permissions);
+    const targetPerms = this._expandManage(
+      targetRole.permissions.map(
+        (rp) => `${rp.permission.resource}:${rp.permission.action}`
+      )
+    );
+    for (const permission of targetPerms) {
+      if (!actorPerms.has(permission)) {
+        throw new HttpException(
+          'Cannot assign a role with permissions beyond your own',
+          HttpStatus.FORBIDDEN
+        );
+      }
+    }
+
+    if (
+      targetRole.isSystem &&
+      targetRole.key === 'owner' &&
+      actorEff.role !== 'owner'
+    ) {
+      throw new HttpException(
+        'Only an owner can assign the owner role',
+        HttpStatus.FORBIDDEN
+      );
+    }
+  }
+
+  // Unconditional (applies even to a superadmin actor): demoting the sole
+  // enabled owner would strand the org, so it is always rejected.
+  private async _assertNotLastOwnerDemotion(
+    orgId: string,
+    targetUserId: string,
+    targetRole: { id: string }
+  ) {
+    const ownerRoleId = await this._repository.getOwnerRoleId();
+    if (!ownerRoleId || targetRole.id === ownerRoleId) {
+      return; // assigning the owner role can never strand the org
+    }
+    const membership = await this._repository.getMemberRoleId(orgId, targetUserId);
+    if (membership?.roleId !== ownerRoleId) {
+      return;
+    }
+    const owners = await this._repository.countOwners(orgId);
+    if (owners <= 1) {
+      throw new HttpException(
+        'Cannot remove the last owner',
+        HttpStatus.FORBIDDEN
+      );
+    }
   }
 
   getPermissions() {

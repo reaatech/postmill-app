@@ -6,7 +6,7 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { PinterestSettingsDto } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
@@ -167,7 +167,7 @@ export class PinterestProvider
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     return {
       url: `https://www.pinterest.com/oauth/?client_id=${
         clientInformation?.client_id || ''

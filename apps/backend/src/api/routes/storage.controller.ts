@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
-import { Organization, User } from '@prisma/client';
+import { Organization, User, StorageProviderType } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
@@ -20,6 +20,13 @@ import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/au
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
+import {
+  AuthorizationActions,
+  Sections,
+  SubscriptionException,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import {
   CreateStorageConfigDto,
   UpdateStorageConfigDto,
@@ -36,8 +43,29 @@ export class StorageController {
   constructor(
     private _storageService: StorageService,
     private _auditService: AuditService,
-    private _fileService: FileService
+    private _fileService: FileService,
+    private _permissionsService: PermissionsService
   ) {}
+
+  // F2: BYO storage is a TEAM/AGENCY capability. The mount endpoint carries the
+  // policy decorator, but create/update need conditional gates (LOCAL configs
+  // stay free; update only bites mounted non-LOCAL configs), so those run the
+  // exact PoliciesGuard ability check in-handler and mirror its 402 outcome.
+  private async _assertByoStorageEntitled(org: Organization) {
+    const ability = await this._permissionsService.check(
+      org.id,
+      org.createdAt,
+      // The role argument is not consulted by the BYO_STORAGE branch.
+      'USER',
+      [[AuthorizationActions.Create, Sections.BYO_STORAGE]]
+    );
+    if (!ability.can(AuthorizationActions.Create, Sections.BYO_STORAGE)) {
+      throw new SubscriptionException({
+        section: Sections.BYO_STORAGE,
+        action: AuthorizationActions.Create,
+      });
+    }
+  }
 
   @Get('/')
   @RequirePermission('storage-config', 'manage')
@@ -52,6 +80,11 @@ export class StorageController {
     @GetUserFromRequest() user: User,
     @Body() body: CreateStorageConfigDto
   ) {
+    // Gate on non-LOCAL type only — LOCAL config rows must stay creatable for
+    // non-entitled orgs (decision B3a).
+    if (body.type !== StorageProviderType.LOCAL) {
+      await this._assertByoStorageEntitled(org);
+    }
     return this._storageService.createAndTestConfig(
       org.id,
       {
@@ -78,6 +111,19 @@ export class StorageController {
     @Param('id') id: string,
     @Body() body: UpdateStorageConfigDto
   ) {
+    // Decision D-F2-update: repointing an already-mounted non-LOCAL config to
+    // new credentials/bucket is a BYO-storage operation — gate it for
+    // non-entitled orgs rather than letting it bypass the create/mount gates.
+    const stored = (await this._storageService.getProviderConfigs(org.id)).find(
+      (c) => c.id === id
+    );
+    if (
+      stored &&
+      stored.mounted &&
+      stored.type !== StorageProviderType.LOCAL
+    ) {
+      await this._assertByoStorageEntitled(org);
+    }
     return this._storageService.updateConfig(
       id,
       org.id,
@@ -118,6 +164,7 @@ export class StorageController {
 
   @Post('/:id/mount')
   @RequirePermission('storage-config', 'manage')
+  @CheckPolicies([AuthorizationActions.Create, Sections.BYO_STORAGE])
   async mountProvider(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string

@@ -5,7 +5,7 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { SocialAbstract } from '@gitroom/provider-kernel';
 import { getPublicKey, Relay, finalizeEvent, SimplePool } from 'nostr-tools';
@@ -70,7 +70,7 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl() {
-    const state = makeId(17);
+    const state = makeOauthState();
     return {
       url: state,
       codeVerifier: makeId(10),

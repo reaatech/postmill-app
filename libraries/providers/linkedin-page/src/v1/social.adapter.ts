@@ -6,7 +6,7 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { LinkedinProvider } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
@@ -124,7 +124,7 @@ export class LinkedinPageProvider
   }
 
   override async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     const codeVerifier = makeId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&prompt=none&client_id=${
       clientInformation?.client_id || ''

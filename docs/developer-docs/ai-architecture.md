@@ -167,9 +167,9 @@ Agent/MCP tool allow/deny lists. Enforces a 256 KB max input size for tool calls
 
 pgvector-based RAG: content chunking, embedding computation via `AIModelProvider.embeddingModel()`, HNSW ANN index, dual vector store (pgvector + Qdrant), reciprocal-rank fusion, Redis index queue, per-org scoped search + admin backfill. Raw SQL is confined to `AiRagRepository`.
 
-### AiThrottlerGuard
+### AI rate limiting
 
-Dynamic rate limits read from `AISystemSettings.rateLimitSettings`. Applied as a NestJS guard.
+Per-org AI rate limiting is enforced at the policy/budget layer (`BudgetService` / `BudgetMiddleware`); no NestJS throttler guard is currently wired.
 
 ### IdempotencyFactory
 

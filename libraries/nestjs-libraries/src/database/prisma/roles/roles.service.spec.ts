@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HttpException } from '@nestjs/common';
+import { BadRequestException, HttpException } from '@nestjs/common';
 import { RolesService } from './roles.service';
 
 interface MockRolesRepository {
@@ -11,7 +11,71 @@ interface MockRolesRepository {
   assignRoleToMember: ReturnType<typeof vi.fn>;
   getPermissions: ReturnType<typeof vi.fn>;
   getMemberEffectivePermissions: ReturnType<typeof vi.fn>;
+  getMemberRoleId: ReturnType<typeof vi.fn>;
+  getOwnerRoleId: ReturnType<typeof vi.fn>;
+  countOwners: ReturnType<typeof vi.fn>;
 }
+
+const perm = (resource: string, action: string) => ({
+  permission: { resource, action },
+});
+
+// Seeder-faithful role fixtures: owner holds ONLY `resource:manage` rows.
+const ownerRole = {
+  id: 'role-owner',
+  key: 'owner',
+  name: 'Owner',
+  isSystem: true,
+  permissions: [perm('posts', 'manage'), perm('billing', 'manage'), perm('organization', 'manage')],
+};
+const adminRole = {
+  id: 'role-admin',
+  key: 'admin',
+  name: 'Admin',
+  isSystem: true,
+  permissions: [perm('posts', 'manage'), perm('posts', 'create'), perm('billing', 'read')],
+};
+const editorRole = {
+  id: 'role-editor',
+  key: 'editor',
+  name: 'Editor',
+  isSystem: true,
+  permissions: [perm('posts', 'create'), perm('posts', 'read')],
+};
+const memberRole = {
+  id: 'role-member',
+  key: 'member',
+  name: 'Member',
+  isSystem: true,
+  permissions: [perm('posts', 'create'), perm('posts', 'read')],
+};
+const viewerRole = {
+  id: 'role-viewer',
+  key: 'viewer',
+  name: 'Viewer',
+  isSystem: true,
+  permissions: [perm('posts', 'read')],
+};
+const customBillingRole = {
+  id: 'role-custom',
+  key: 'billing-admin',
+  name: 'Billing Admin',
+  isSystem: false,
+  permissions: [perm('billing', 'manage')],
+};
+
+const OWNER_EFF = {
+  role: 'owner',
+  permissions: ['posts:manage', 'billing:manage', 'organization:manage'],
+};
+const ADMIN_EFF = {
+  role: 'admin',
+  permissions: ['posts:manage', 'billing:read', 'organization:read'],
+};
+
+const ownerActor = { id: 'u-owner', isSuperAdmin: false } as never;
+const adminActor = { id: 'u-admin', isSuperAdmin: false } as never;
+const superAdminActor = { id: 'u-sa', isSuperAdmin: true } as never;
 
 describe('RolesService', () => {
   let repository: MockRolesRepository;
@@ -27,8 +91,11 @@ describe('RolesService', () => {
       assignRoleToMember: vi.fn(),
       getPermissions: vi.fn(),
       getMemberEffectivePermissions: vi.fn(),
+      getMemberRoleId: vi.fn(),
+      getOwnerRoleId: vi.fn(),
+      countOwners: vi.fn(),
     };
-    service = new RolesService(repository as never);
+    service = new RolesService(repository as never, { create: vi.fn() } as never);
   });
 
   describe('getEffectivePermissions', () => {
@@ -155,28 +222,217 @@ describe('RolesService', () => {
     });
   });
 
+  // The service reads the actor's effective permissions through the membership
+  // row — build the membership shape the repository would return from the flat
+  // { role, permissions } effective set.
+  const membershipFromEff = (
+    eff: { role: string; permissions: string[] } | null
+  ) =>
+    eff === null
+      ? null
+      : {
+          id: 'uo-actor',
+          roleRef: {
+            key: eff.role,
+            permissions: eff.permissions.map((p) => {
+              const [resource, action] = p.split(':');
+              return perm(resource, action);
+            }),
+          },
+        };
+
   describe('assignRoleToMember', () => {
     it('404s for an unknown role', async () => {
       repository.getRole.mockResolvedValue(null);
       await expect(
-        service.assignRoleToMember('o1', 'u1', 'r1')
+        service.assignRoleToMember('o1', ownerActor, 'u1', 'r1')
       ).rejects.toThrow('Role not found');
     });
 
-    it('404s when the member is not part of the org', async () => {
-      repository.getRole.mockResolvedValue({ id: 'r1' });
-      repository.assignRoleToMember.mockResolvedValue(null);
+    it('403s when the actor is not a member of the org', async () => {
+      repository.getRole.mockResolvedValue(memberRole);
+      repository.getMemberEffectivePermissions.mockResolvedValue(null);
       await expect(
-        service.assignRoleToMember('o1', 'u1', 'r1')
-      ).rejects.toThrow('Member not found in organization');
+        service.assignRoleToMember('o1', adminActor, 'u1', 'role-member')
+      ).rejects.toThrow(HttpException);
+      expect(repository.assignRoleToMember).not.toHaveBeenCalled();
     });
 
-    it('assigns the role', async () => {
-      repository.getRole.mockResolvedValue({ id: 'r1' });
+    // A1 regression: owner holds only the 18 `resource:manage` rows, so these
+    // are all RED unless the subset check expands the manage wildcard.
+    it.each([
+      ['admin', adminRole],
+      ['editor', editorRole],
+      ['member', memberRole],
+      ['viewer', viewerRole],
+    ])('lets an owner assign the %s role', async (_key, role) => {
+      repository.getRole.mockResolvedValue(role);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(OWNER_EFF)
+      );
+      repository.getOwnerRoleId.mockResolvedValue('role-owner');
+      repository.getMemberRoleId.mockResolvedValue({ roleId: 'role-viewer' });
       repository.assignRoleToMember.mockResolvedValue({ id: 'uo1' });
-      expect(await service.assignRoleToMember('o1', 'u1', 'r1')).toEqual({
-        id: 'uo1',
-      });
+
+      await expect(
+        service.assignRoleToMember('o1', ownerActor, 'u-target', role.id)
+      ).resolves.toEqual({ id: 'uo1' });
+    });
+
+    it.each([
+      ['editor', editorRole],
+      ['member', memberRole],
+      ['viewer', viewerRole],
+    ])('lets an admin assign the %s role', async (_key, role) => {
+      repository.getRole.mockResolvedValue(role);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(ADMIN_EFF)
+      );
+      repository.getOwnerRoleId.mockResolvedValue('role-owner');
+      repository.getMemberRoleId.mockResolvedValue({ roleId: 'role-viewer' });
+      repository.assignRoleToMember.mockResolvedValue({ id: 'uo1' });
+
+      await expect(
+        service.assignRoleToMember('o1', adminActor, 'u-target', role.id)
+      ).resolves.toEqual({ id: 'uo1' });
+    });
+
+    it('403s when an admin assigns the owner role', async () => {
+      repository.getRole.mockResolvedValue(ownerRole);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(ADMIN_EFF)
+      );
+      await expect(
+        service.assignRoleToMember('o1', adminActor, 'u-target', 'role-owner')
+      ).rejects.toThrow(
+        'Cannot assign a role with permissions beyond your own'
+      );
+      expect(repository.assignRoleToMember).not.toHaveBeenCalled();
+    });
+
+    it('403s when an admin assigns a custom role holding billing:manage', async () => {
+      repository.getRole.mockResolvedValue(customBillingRole);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(ADMIN_EFF)
+      );
+      await expect(
+        service.assignRoleToMember('o1', adminActor, 'u-target', 'role-custom')
+      ).rejects.toThrow(
+        'Cannot assign a role with permissions beyond your own'
+      );
+      expect(repository.assignRoleToMember).not.toHaveBeenCalled();
+    });
+
+    it('lets a superadmin assign any role without an actor permission lookup', async () => {
+      repository.getRole.mockResolvedValue(ownerRole);
+      repository.getOwnerRoleId.mockResolvedValue('role-owner');
+      repository.assignRoleToMember.mockResolvedValue({ id: 'uo1' });
+
+      await expect(
+        service.assignRoleToMember('o1', superAdminActor, 'u-target', 'role-owner')
+      ).resolves.toEqual({ id: 'uo1' });
+      expect(repository.getMemberEffectivePermissions).not.toHaveBeenCalled();
+    });
+
+    it('403s when demoting the sole owner', async () => {
+      repository.getRole.mockResolvedValue(adminRole);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(OWNER_EFF)
+      );
+      repository.getOwnerRoleId.mockResolvedValue('role-owner');
+      repository.getMemberRoleId.mockResolvedValue({ roleId: 'role-owner' });
+      repository.countOwners.mockResolvedValue(1);
+
+      await expect(
+        service.assignRoleToMember('o1', ownerActor, 'u-target', 'role-admin')
+      ).rejects.toThrow('Cannot remove the last owner');
+      expect(repository.assignRoleToMember).not.toHaveBeenCalled();
+    });
+
+    it('applies the last-owner guard even to a superadmin', async () => {
+      repository.getRole.mockResolvedValue(adminRole);
+      repository.getOwnerRoleId.mockResolvedValue('role-owner');
+      repository.getMemberRoleId.mockResolvedValue({ roleId: 'role-owner' });
+      repository.countOwners.mockResolvedValue(1);
+
+      await expect(
+        service.assignRoleToMember('o1', superAdminActor, 'u-target', 'role-admin')
+      ).rejects.toThrow('Cannot remove the last owner');
+      expect(repository.assignRoleToMember).not.toHaveBeenCalled();
+    });
+
+    it('allows demoting an owner when another owner remains', async () => {
+      repository.getRole.mockResolvedValue(adminRole);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(OWNER_EFF)
+      );
+      repository.getOwnerRoleId.mockResolvedValue('role-owner');
+      repository.getMemberRoleId.mockResolvedValue({ roleId: 'role-owner' });
+      repository.countOwners.mockResolvedValue(2);
+      repository.assignRoleToMember.mockResolvedValue({ id: 'uo1' });
+
+      await expect(
+        service.assignRoleToMember('o1', ownerActor, 'u-target', 'role-admin')
+      ).resolves.toEqual({ id: 'uo1' });
+    });
+
+    it('404s when the member is not part of the org', async () => {
+      repository.getRole.mockResolvedValue(memberRole);
+      repository.getOwnerRoleId.mockResolvedValue('role-owner');
+      repository.getMemberRoleId.mockResolvedValue({ roleId: 'role-viewer' });
+      repository.assignRoleToMember.mockResolvedValue(null);
+      await expect(
+        service.assignRoleToMember('o1', superAdminActor, 'u1', 'role-member')
+      ).rejects.toThrow('Member not found in organization');
+    });
+  });
+
+  describe('assertCanAssignRole', () => {
+    it('returns immediately for a superadmin without resolving the role', async () => {
+      await expect(
+        service.assertCanAssignRole('o1', superAdminActor, 'any-role')
+      ).resolves.toBeUndefined();
+      expect(repository.getRole).not.toHaveBeenCalled();
+    });
+
+    it('400s when the role does not resolve in the org scope', async () => {
+      repository.getRole.mockResolvedValue(null);
+      await expect(
+        service.assertCanAssignRole('o1', adminActor, 'foreign-role')
+      ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.assertCanAssignRole('o1', adminActor, 'foreign-role')
+      ).rejects.toThrow('Role not found in organization');
+    });
+
+    it('403s when an admin tries to assign the owner role', async () => {
+      repository.getRole.mockResolvedValue(ownerRole);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(ADMIN_EFF)
+      );
+      await expect(
+        service.assertCanAssignRole('o1', adminActor, 'role-owner')
+      ).rejects.toThrow(
+        'Cannot assign a role with permissions beyond your own'
+      );
+    });
+
+    it('resolves when the role is within the actor ceiling', async () => {
+      repository.getRole.mockResolvedValue(editorRole);
+      repository.getMemberEffectivePermissions.mockResolvedValue(
+        membershipFromEff(OWNER_EFF)
+      );
+      await expect(
+        service.assertCanAssignRole('o1', ownerActor, 'role-editor')
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('countOwners', () => {
+    it('passes through to the repository', async () => {
+      repository.countOwners.mockResolvedValue(2);
+      expect(await service.countOwners('o1')).toBe(2);
+      expect(repository.countOwners).toHaveBeenCalledWith('o1');
     });
   });
 });

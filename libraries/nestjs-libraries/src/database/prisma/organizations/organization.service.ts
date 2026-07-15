@@ -2,17 +2,20 @@ import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org
 import {
   BadRequestException,
   forwardRef,
+  HttpException,
+  HttpStatus,
   Inject,
   Injectable,
 } from '@nestjs/common';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
+import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.team.member.dto';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { Organization, ShortLinkPreference } from '@prisma/client';
+import { Organization, ShortLinkPreference, User } from '@prisma/client';
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 
 // The org attached to the request carries the caller's membership row
@@ -27,7 +30,8 @@ export class OrganizationService {
     private _organizationRepository: OrganizationRepository,
     private _notificationsService: NotificationService,
     @Inject(forwardRef(() => OrgAiSettingsService))
-    private _orgAiSettingsService: OrgAiSettingsService
+    private _orgAiSettingsService: OrgAiSettingsService,
+    private _rolesService: RolesService
   ) {}
   async createOrgAndUser(
     body: Omit<CreateOrgUserDto, 'providerToken'> & { providerId?: string },
@@ -84,7 +88,11 @@ export class OrganizationService {
     return this._organizationRepository.getMemberProfile(orgId, userId);
   }
 
-  async createTeamUser(orgId: string, email: string, password: string, userRole: string, roleId?: string) {
+  async createTeamUser(orgId: string, actor: User, email: string, password: string, userRole: string, roleId?: string) {
+    if (roleId) {
+      // F1: the creator may only assign a role within their own permissions.
+      await this._rolesService.assertCanAssignRole(orgId, actor, roleId);
+    }
     const roleKey = userRole === 'ADMIN' ? 'admin' : 'member';
     return this._organizationRepository.createTeamUser(orgId, email, password, roleKey, roleId);
   }
@@ -97,7 +105,12 @@ export class OrganizationService {
     return this._organizationRepository.getOrgByCustomerId(customerId);
   }
 
-  async inviteTeamMember(orgId: string, body: AddTeamMemberDto) {
+  async inviteTeamMember(orgId: string, actor: User, body: AddTeamMemberDto) {
+    if (body.roleId) {
+      // F1: the roleId rides the signed invite JWT unchanged into addUserToOrg,
+      // so the inviter's ceiling is enforced here, at signing time.
+      await this._rolesService.assertCanAssignRole(orgId, actor, body.roleId);
+    }
     const timeLimit = dayjs().add(1, 'hour').format('YYYY-MM-DD HH:mm:ss');
     const id = makeId(5);
     const url =
@@ -131,11 +144,24 @@ export class OrganizationService {
       throw new Error('You do not have permission to delete this user');
     }
 
+    // F1: removing the last enabled owner strands the org — rejected
+    // unconditionally, even for a superadmin caller.
+    if (isOwner(userRole)) {
+      const owners = await this._rolesService.countOwners(org.id);
+      if (owners <= 1) {
+        throw new HttpException(
+          'Cannot remove the last owner',
+          HttpStatus.FORBIDDEN
+        );
+      }
+    }
+
     return this._organizationRepository.deleteTeamMember(org.id, userId);
   }
 
   async changeTeamMemberRole(
     org: Organization,
+    actor: User,
     userId: string,
     role: 'USER' | 'ADMIN',
     roleId?: string,
@@ -150,13 +176,37 @@ export class OrganizationService {
     const userRole = findOrg.users?.[0]?.roleId;
     const ownerRole = await this._organizationRepository.getOwnerRoleId();
     const isOwner = (id: string | null | undefined) => id === ownerRole;
-    const myLevel = isOwner(myRole) ? 2 : myRole ? 1 : 0;
-    const userLevel = isOwner(userRole) ? 2 : userRole ? 1 : 0;
 
-    // Only act on members strictly below you, and never promote above your own level.
-    const targetLevel = role === 'ADMIN' ? 1 : 0;
-    if (myLevel <= userLevel || myLevel <= targetLevel) {
-      throw new Error('You do not have permission to change this user role');
+    if (roleId) {
+      // F1: an explicit roleId goes through the permission-subset ceiling —
+      // the legacy level math below never sees it (it derived the target level
+      // from the 'USER'/'ADMIN' string only, so role:'USER' + roleId:<owner>
+      // used to sail through).
+      await this._rolesService.assertCanAssignRole(org.id, actor, roleId);
+    } else {
+      // Pure legacy role-string path: keep the level guard, with the target
+      // level derived from the resolved role key, not the raw string.
+      const myLevel = isOwner(myRole) ? 2 : myRole ? 1 : 0;
+      const userLevel = isOwner(userRole) ? 2 : userRole ? 1 : 0;
+      const targetKey = role === 'ADMIN' ? 'admin' : 'member';
+      const targetLevel = targetKey === 'admin' ? 1 : 0;
+
+      // Only act on members strictly below you, and never promote above your own level.
+      if (myLevel <= userLevel || myLevel <= targetLevel) {
+        throw new Error('You do not have permission to change this user role');
+      }
+    }
+
+    // F1: demoting the last enabled owner strands the org — unconditional.
+    const newRoleIsOwner = roleId ? roleId === ownerRole : false;
+    if (isOwner(userRole) && !newRoleIsOwner) {
+      const owners = await this._rolesService.countOwners(org.id);
+      if (owners <= 1) {
+        throw new HttpException(
+          'Cannot remove the last owner',
+          HttpStatus.FORBIDDEN
+        );
+      }
     }
 
     return this._organizationRepository.changeTeamMemberRole(

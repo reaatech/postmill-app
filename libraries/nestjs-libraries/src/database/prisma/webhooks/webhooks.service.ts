@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { WebhooksRepository } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.repository';
+import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { WebhooksDto } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
@@ -16,7 +17,12 @@ export type WebhookEventType = (typeof SUPPORTED_EVENT_TYPES)[number];
 export class WebhooksService {
   private readonly _logger = new Logger(WebhooksService.name);
 
-  constructor(private _webhooksRepository: WebhooksRepository) {}
+  constructor(
+    private _webhooksRepository: WebhooksRepository,
+    // layering: sanctioned leaf-read of IntegrationRepository (ownership check needs
+    // only the org's integration ids — getIntegrationIds is id-only, no token decrypt)
+    private _integrationRepository: IntegrationRepository,
+  ) {}
 
   getSupportedEventTypes(): string[] {
     return [...SUPPORTED_EVENT_TYPES];
@@ -30,7 +36,14 @@ export class WebhooksService {
     return this._webhooksRepository.getWebhooks(orgId);
   }
 
-  createWebhook(orgId: string, body: WebhooksDto) {
+  // Single insertion point for both POST /webhooks and PUT /webhooks (the controller
+  // method named updateWebhook routes here too) — reject foreign-org integrations
+  // before any write reaches the repository. Empty integrations (unscoped) is valid.
+  async createWebhook(orgId: string, body: WebhooksDto) {
+    const owned = new Set(await this._integrationRepository.getIntegrationIds(orgId));
+    if (body.integrations.some((i) => !owned.has(i.id))) {
+      throw new BadRequestException('Unknown integration');
+    }
     return this._webhooksRepository.createWebhook(orgId, body);
   }
 

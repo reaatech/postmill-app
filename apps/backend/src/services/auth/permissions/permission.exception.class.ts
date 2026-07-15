@@ -14,6 +14,7 @@ export enum Sections {
   MEDIA = 'media',
   VIDEO_EXPORTS = 'video_exports',
   STORAGE = 'storage',
+  BYO_STORAGE = 'byo_storage',
 }
 
 export enum AuthorizationActions {

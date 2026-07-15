@@ -7,7 +7,7 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeOauthState } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { SocialAbstract } from '@gitroom/provider-kernel';
 import { WhopDto } from '@gitroom/provider-kernel';
@@ -102,10 +102,10 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     const codeVerifier = randomBytes(32).toString('base64url');
     const codeChallenge = this.generateCodeChallenge(codeVerifier);
-    const nonce = makeId(16);
+    const nonce = makeOauthState();
 
     return {
       url:

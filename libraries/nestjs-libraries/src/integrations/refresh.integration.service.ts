@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { Integration } from '@prisma/client';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -104,10 +105,21 @@ export class RefreshIntegrationService {
       return false;
     }
 
+    // F3: a reconnect upserts the same integration row, so cancel any
+    // still-sleeping refresh loop BEFORE starting a new one — otherwise the
+    // stale loop keeps running (or its later cancel could kill the fresh chain).
+    await inngest.send({
+      name: 'integration/refresh-token/cancel',
+      data: { integrationId: id },
+      id: `refresh_cancel_${id}_${randomUUID()}`,
+    });
+
     return inngest.send({
       name: 'integration/refresh-token',
       data: { integrationId: id, organizationId: orgId },
-      id: `refresh_${id}`,
+      // F3: unique per start — a constant id is dropped by Inngest's 24h dedup
+      // window, leaving a reconnected channel with no refresh chain at all.
+      id: `refresh_start_${id}_${randomUUID()}`,
     });
   }
 

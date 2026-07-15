@@ -19,10 +19,12 @@ export class CsrfMiddleware implements NestMiddleware {
     // Determine auth source: only enforce when auth came from cookie
     const authFromCookie = !!req.cookies?.auth;
     const authFromHeader = !!req.headers?.auth;
-    const hasBodyJwt = req.body?.jwt || req.body?.params;
 
-    // Exempt: header/API-key auth, body-JWT (extension), or no auth
-    if (!authFromCookie || authFromHeader || hasBodyJwt) {
+    // Exempt: header/API-key auth, or no cookie auth. Body fields are NOT an auth
+    // source — no CSRF-covered route authenticates via body (auth.middleware reads
+    // only headers.auth || cookies.auth; the sole body-`jwt` consumer is a no-auth
+    // route), and the frontend always attaches `x-csrf-token`.
+    if (!authFromCookie || authFromHeader) {
       next();
       return;
     }
@@ -51,7 +53,9 @@ export function issueCsrfToken(res: Response) {
   const token = require('crypto').randomBytes(32).toString('hex');
   res.cookie(CSRF_COOKIE, token, {
     domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-    ...(!process.env.NOT_SECURED
+    // NOT_SECURED relaxes cookie flags ONLY in development (same re-guard as
+    // auth.controller.ts) — a stray prod NOT_SECURED must not strip Secure/sameSite.
+    ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
       ? {
           secure: true,
           sameSite: 'none',

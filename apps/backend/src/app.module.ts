@@ -63,7 +63,8 @@ const scheduleModule = featureFlags.isEnabled('cron')
           // 15-30 /api calls per page navigation, so the old default of 90/hr tripped
           // during normal interactive use and made the app look dead (blank renders on
           // 429). Sensitive routes have their own tight per-minute @Throttle() decorators
-          // (auth 5/min, public 20-60/min, AI 10-30/min); this global limit only needs to
+          // (login 10/min, register 5/min, public 20-60/min, AI 10-30/min);
+          // this global limit only needs to
           // catch scraping/abuse. Raised 90 -> 600 default; override via API_LIMIT env.
           limit: process.env.API_LIMIT ? Number(process.env.API_LIMIT) : 600,
         },

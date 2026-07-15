@@ -68,7 +68,9 @@ export class PublicController {
     if (!req.cookies.track) {
       res.cookie('track', uniqueId, {
         domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
+        // Dev-only NOT_SECURED relaxation (same re-guard as auth.controller.ts) — a
+        // stray prod NOT_SECURED must not strip Secure/httpOnly from tracking cookies.
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
           ? {
               secure: true,
               httpOnly: true,
@@ -82,7 +84,9 @@ export class PublicController {
     if (body.fbclid && !req.cookies.fbclid) {
       res.cookie('fbclid', body.fbclid, {
         domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
+        // Dev-only NOT_SECURED relaxation (same re-guard as auth.controller.ts) — a
+        // stray prod NOT_SECURED must not strip Secure/httpOnly from tracking cookies.
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
           ? {
               secure: true,
               httpOnly: true,

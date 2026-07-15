@@ -136,6 +136,33 @@ export class RolesRepository {
     });
   }
 
+  getMemberRoleId(orgId: string, userId: string) {
+    return this._userOrganization.model.userOrganization.findFirst({
+      where: { userId, organizationId: orgId, disabled: false },
+      select: { roleId: true },
+    });
+  }
+
+  async getOwnerRoleId(): Promise<string | null> {
+    const role = await this._appRole.model.appRole.findFirst({
+      where: { organizationId: null, key: 'owner', isSystem: true },
+      select: { id: true },
+    });
+    return role?.id ?? null;
+  }
+
+  // Enabled members holding the system owner role — the input to the
+  // last-owner guard (a zero-owner org is never valid).
+  async countOwners(orgId: string): Promise<number> {
+    const ownerRoleId = await this.getOwnerRoleId();
+    if (!ownerRoleId) {
+      return 0;
+    }
+    return this._userOrganization.model.userOrganization.count({
+      where: { organizationId: orgId, roleId: ownerRoleId, disabled: false },
+    });
+  }
+
   async assignRoleToMember(orgId: string, userId: string, roleId: string) {
     const membership = await this._userOrganization.model.userOrganization.findFirst({
       where: { userId, organizationId: orgId },

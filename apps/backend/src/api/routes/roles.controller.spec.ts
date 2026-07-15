@@ -155,13 +155,17 @@ describe('RolesController', () => {
       expect(await controller.delete(org, 'r2')).toEqual({ success: true });
     });
 
-    it('assigns a role to a member', async () => {
+    it('assigns a role to a member, passing the acting user through', async () => {
+      const user = { id: 'user-1', isSuperAdmin: false } as never;
       service.assignRoleToMember.mockResolvedValue({ id: 'uo1' });
       expect(
-        await controller.assignRole(org, 'user-2', { roleId: 'r1' } as never)
+        await controller.assignRole(org, user, 'user-2', {
+          roleId: 'r1',
+        } as never)
       ).toEqual({ id: 'uo1' });
       expect(service.assignRoleToMember).toHaveBeenCalledWith(
         'org-1',
+        user,
         'user-2',
         'r1'
       );
