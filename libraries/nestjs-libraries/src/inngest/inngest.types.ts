@@ -40,6 +40,9 @@ export type InngestEvents = {
     data: {
       integrationId: string;
       organizationId: string;
+      // F3: consecutive failed refresh cycles so far — the chain terminates
+      // once this hits the function's retry cap.
+      retries?: number;
     };
   };
   'integration/refresh-token/cancel': {

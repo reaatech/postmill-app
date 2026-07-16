@@ -29,7 +29,8 @@ export class StripeEventRepository {
     });
   }
 
-  async setGracePeriod(customerId: string, until: Date): Promise<void> {
+  // `until: null` clears the marker (dunning recovery) — the column is nullable.
+  async setGracePeriod(customerId: string, until: Date | null): Promise<void> {
     await this._subscription.model.subscription.updateMany({
       where: { organization: { paymentId: customerId } },
       data: { gracePeriodEnd: until },

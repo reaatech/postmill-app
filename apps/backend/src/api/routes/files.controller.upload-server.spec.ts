@@ -3,6 +3,7 @@ import { Organization } from '@prisma/client';
 
 const storageMock = {
   uploadFile: vi.fn(),
+  removeFile: vi.fn(),
 };
 
 const storageSvcMock = {
@@ -105,6 +106,8 @@ describe('FilesController — uploadServer temp file cleanup', () => {
 
     await expect(controller.uploadServer(org, file, {})).rejects.toThrow('Save failed');
     expect(unlinkSpy).toHaveBeenCalledWith('/tmp/postmill-uploads/test123.png');
+    // M4: the stored object is best-effort deleted so failed uploads don't leak orphans.
+    expect(storageMock.removeFile).toHaveBeenCalledWith('http://localhost/uploads/abc123.png');
 
     unlinkSpy.mockRestore();
   });

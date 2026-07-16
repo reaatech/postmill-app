@@ -7,7 +7,7 @@ import {
   SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { google, youtube_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library/build/src/auth/oauth2client';
 import { Readable } from 'node:stream';
@@ -322,7 +322,7 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(7);
+    const state = makeOauthState();
     const { client } = clientAndYoutube(
       clientInformation?.client_id,
       clientInformation?.client_secret

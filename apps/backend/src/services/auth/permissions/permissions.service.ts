@@ -15,6 +15,7 @@ import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/w
 import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { StorageProviderType } from '@prisma/client';
+import { AiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.repository';
 import { AuthorizationActions, Sections } from './permission.exception.class';
 
 export type AppAbility = Ability<[AuthorizationActions, Sections]>;
@@ -46,23 +47,36 @@ export class PermissionsService {
     private _brandsRepository: BrandsRepository,
     private _watchlistRepository: WatchlistRepository,
     private _fileRepository: FileRepository,
-    private _storageService: StorageService
+    private _storageService: StorageService,
+    // layering: sanctioned leaf-read — the F4 video-export gate counts in-flight
+    // AIMediaJob rows. AiSettingsRepository takes only PrismaRepository delegates
+    // (no service back-edge), so there is no DI cycle; routing through a service
+    // would add a hop with no behavior of its own.
+    private _aiSettingsRepository: AiSettingsRepository
   ) {}
 
   async getPackageOptions(orgId: string) {
     const subscription =
       await this._subscriptionService.getSubscriptionByOrganizationId(orgId);
 
+    // Dunning grace (F5): a grace window that has lapsed downgrades the org to
+    // baseline. Recovery clears the marker first (stripe.service.ts), so a stale
+    // timestamp from a since-recovered subscription can never wrongly downgrade.
+    const graceLapsed =
+      !!subscription?.gracePeriodEnd &&
+      dayjs(subscription.gracePeriodEnd).isBefore(dayjs());
+    const effectiveSubscription = graceLapsed ? null : subscription;
+
     const tier =
-      subscription?.subscriptionTier ||
+      effectiveSubscription?.subscriptionTier ||
       (!process.env.STRIPE_PUBLISHABLE_KEY ? SELF_HOST_PLAN : 'STARTER');
 
     const { channel, ...all } = pricing[tier] ?? pricing['STARTER'];
     return {
-      subscription,
+      subscription: effectiveSubscription,
       options: {
         ...all,
-        channel: subscription ? -10 : channel,
+        channel: effectiveSubscription ? -10 : channel,
       },
     };
   }
@@ -217,6 +231,11 @@ export class PermissionsService {
         continue;
       }
 
+      if (section === Sections.BYO_STORAGE && options.byo_storage) {
+        can(action, section);
+        continue;
+      }
+
       if (section === Sections.COMPETITORS) {
         const totalCompetitors =
           await this._watchlistRepository.countByOrg(orgId);
@@ -234,14 +253,24 @@ export class PermissionsService {
           checkFrom,
           'video_export'
         );
-        if (used < options.video_exports) {
+        // F4 TOCTOU: the credit is recorded only after the async render
+        // completes, so jobs still in flight must count toward the cap —
+        // otherwise concurrent renders at the cap all read a stale count.
+        const inFlight =
+          await this._aiSettingsRepository.countInFlightVideoExports(
+            orgId,
+            checkFrom.toDate()
+          );
+        if (used + inFlight < options.video_exports) {
           can(action, section);
           continue;
         }
       }
 
       if (section === Sections.STORAGE) {
-        if (byoStorageActive) {
+        // F2: the BYO mount waives the hosted meter only when the plan entitles
+        // the org to bring its own storage — otherwise fall through to bytes.
+        if (byoStorageActive && options.byo_storage) {
           can(action, section);
           continue;
         }

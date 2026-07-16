@@ -18,7 +18,7 @@
 | `AppRole` | RBAC role. Org-scoped when `organizationId` is set; NULL org = seeded system role (`owner`/`admin`/`editor`/`member`/`viewer`, `isSystem: true`) | FK → `Organization` (nullable); has many `AppRolePermission`, `UserOrganization` |
 | `Permission` | Fine-grained `(resource, action)` capability — 16 resources × 5 actions seeded | Unique on `(resource, action)`; has many `AppRolePermission` |
 | `AppRolePermission` | Join table linking roles to permissions | Composite PK `(roleId, permissionId)`; cascade on both |
-| `AuthProviderConfig` | Platform-wide login provider config (super-admin managed in `/admin`) — client ID/secret encrypted, OIDC endpoints, enabled flag. Env vars remain the bootstrap fallback. | Unique on `(provider, version)` |
+| `AuthProviderConfig` | Platform-wide login provider config (managed by the separate administration app — this repo ships no `/admin` frontend and reads it DB-first) — client ID/secret encrypted, OIDC endpoints, enabled flag. Env vars remain the bootstrap fallback. | Unique on `(provider, version)` |
 
 ---
 

@@ -98,6 +98,17 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`refresh:${body.state}`);
     }
 
+    // F11: the OAuth state is a single-use capability key — consume it so a
+    // second POST with the same state is rejected for every provider
+    // (customFields providers have no `login:` key to consume). Two-step
+    // (`isBetweenSteps`) providers still need `organization:${state}` for the
+    // follow-up page-selection save (`saveProviderPage` re-reads it with the
+    // same state); their replay is already blocked by the consumed `login:`
+    // key above. On refresh no page-selection step runs, so delete there too.
+    if (!integrationProvider.isBetweenSteps || refresh) {
+      await ioRedis.del(`organization:${body.state}`);
+    }
+
     const onboarding = await ioRedis.get(`onboarding:${body.state}`);
     if (onboarding) {
       await ioRedis.del(`onboarding:${body.state}`);

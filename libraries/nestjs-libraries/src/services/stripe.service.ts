@@ -180,8 +180,37 @@ export class StripeService {
   }
   // Dunning (C2): a past-due subscription enters a grace window + notifies the org
   // instead of tearing down channels. The terminal `subscription.deleted` still downgrades.
-  private async _enterGracePeriod(customerId: string) {
+  private async _enterGracePeriod(customerId: string, subscriptionId?: string) {
     if (!customerId) {
+      return { ok: true };
+    }
+
+    // Webhook-ordering guard (F5/I2): Stripe events are unordered snapshots — a
+    // delayed past_due `subscription.updated` processed AFTER the recovery
+    // payment would otherwise open a fresh 7-day window (the cleared marker
+    // fails the re-entry guard below) and downgrade a fully-paid customer when
+    // it lapses. Enter grace only when the LIVE subscription is genuinely
+    // past_due. Events without a subscription id (one-off invoices) can't be
+    // verified, so they open no window.
+    if (!subscriptionId) {
+      this._logger.warn(
+        `Skipping grace window for customer ${customerId}: no subscription id to verify live status`
+      );
+      return { ok: true };
+    }
+    try {
+      const live = await stripe.subscriptions.retrieve(subscriptionId);
+      if (live.status !== 'past_due') {
+        return { ok: true };
+      }
+    } catch (err) {
+      // Unverifiable — skip rather than risk a wrongful window; Stripe's
+      // redelivery will retry the transition.
+      this._logger.warn(
+        `Could not verify live status of subscription ${subscriptionId}: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
       return { ok: true };
     }
 
@@ -220,13 +249,21 @@ export class StripeService {
   }
 
   async paymentFailed(event: Stripe.InvoicePaymentFailedEvent) {
-    return this._enterGracePeriod(event.data.object.customer as string);
+    const subscriptionId =
+      event.data.object.parent?.subscription_details?.subscription;
+    return this._enterGracePeriod(
+      event.data.object.customer as string,
+      typeof subscriptionId === 'string' ? subscriptionId : subscriptionId?.id
+    );
   }
 
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
     // Past-due: grant grace + notify rather than re-running the tier transition/teardown.
     if (event.data.object.status === 'past_due') {
-      return this._enterGracePeriod(event.data.object.customer as string);
+      return this._enterGracePeriod(
+        event.data.object.customer as string,
+        event.data.object.id
+      );
     }
 
     const {
@@ -242,6 +279,22 @@ export class StripeService {
     const check = await this.checkValidCard(event);
     if (!check) {
       return { ok: false };
+    }
+
+    // Dunning recovery (F5/I1): clear the grace marker ONLY when the
+    // subscription genuinely recovered. This branch catches every non-past_due
+    // status — clearing on `unpaid`/`canceled` would null the marker on a
+    // dunning-exhausted sub and the entitlement gate would then never lapse it
+    // (permanent paid access). Placed after checkValidCard: an invalid card
+    // cancels the sub and must not clear anything.
+    if (
+      event.data.object.status === 'active' ||
+      event.data.object.status === 'trialing'
+    ) {
+      await this._stripeEventRepository.setGracePeriod(
+        event.data.object.customer as string,
+        null
+      );
     }
 
     await this._auditSubscriptionChanged(
@@ -1218,6 +1271,19 @@ export class StripeService {
 
     // Add-on invoices have no purchase attribution and no pending tier.
     if (!subscription.metadata?.addon) {
+      // Dunning recovery (F5): a paid plan-invoice means the subscription
+      // recovered — clear the grace marker, but only when the live status
+      // confirms it (never on unpaid/canceled).
+      if (
+        subscription.status === 'active' ||
+        subscription.status === 'trialing'
+      ) {
+        await this._stripeEventRepository.setGracePeriod(
+          subscription.customer as string,
+          null
+        );
+      }
+
       const { userId, ud } = subscription.metadata;
       const user = await this._userService.getUserById(userId);
       if (user && user.ip && user.agent) {

@@ -8,7 +8,7 @@ import {
   SocialProvider,
 } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
-import { randomUUID } from 'crypto';
+import { makeOauthState } from '@gitroom/provider-kernel';
 import {
   BadBody,
   SocialAbstract,
@@ -375,7 +375,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = randomUUID();
+    const state = makeOauthState();
 
     return {
       url:

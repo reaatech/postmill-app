@@ -73,6 +73,7 @@ describe('AiSettingsRepository', () => {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       findMany: vi.fn().mockResolvedValue([]),
       findUnique: vi.fn().mockResolvedValue(null),
+      count: vi.fn().mockResolvedValue(0),
     };
     mockPromptLibraryItem = {
       findMany: vi.fn().mockResolvedValue([]),
@@ -718,6 +719,31 @@ describe('AiSettingsRepository', () => {
         orderBy: { createdAt: 'desc' },
         take: 10,
       });
+    });
+  });
+
+  describe('countInFlightVideoExports (F4)', () => {
+    it('counts non-terminal video_export jobs in the window, excluding stale processing rows', async () => {
+      mockMediaJob.count.mockResolvedValue(3);
+      const from = new Date('2026-07-01T00:00:00.000Z');
+
+      const result = await repository.countInFlightVideoExports('org-1', from);
+
+      expect(result).toBe(3);
+      const where = mockMediaJob.count.mock.calls[0][0].where;
+      expect(where.organizationId).toBe('org-1');
+      expect(where.creditType).toBe('video_export');
+      expect(where.createdAt).toEqual({ gte: from });
+      // Non-terminal rows (pending/landing/…) count in full...
+      expect(where.OR).toHaveLength(2);
+      expect(where.OR[0]).toEqual({
+        status: { notIn: ['completed', 'failed', 'processing'] },
+      });
+      // ...but a `processing` row only counts while it is fresh — a row stale
+      // past the job timeout was stranded by a crash and must not hold a slot.
+      expect(where.OR[1].status).toBe('processing');
+      expect(where.OR[1].updatedAt.gte).toBeInstanceOf(Date);
+      expect(where.OR[1].updatedAt.gte.getTime()).toBeLessThanOrEqual(Date.now());
     });
   });
 

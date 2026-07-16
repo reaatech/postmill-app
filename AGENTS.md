@@ -162,8 +162,10 @@ Controller → Manager → Service → Repository   (when a manager is involved)
 - **Sanctioned exception — cross-domain leaf-reads:** a service may read another domain's
   **repository** directly where the owning service depends back on the caller, so routing "up" through
   the service would create a Nest DI cycle. Behaviour-neutral leaf-reads — keep them, do **not** "fix"
-  them into a service call: `PostsService` → `AnalyticsRepository` / `CampaignsRepository`, and
-  `OrgMediaProviderSettingsService` → `@Optional() OrgAiSettingsRepository`. Each carries a
+  them into a service call: `PostsService` → `AnalyticsRepository` / `CampaignsRepository`,
+  `OrgMediaProviderSettingsService` → `@Optional() OrgAiSettingsRepository`,
+  `PermissionsService` → `AiSettingsRepository`, and
+  `WebhooksService` → `IntegrationRepository`. Each carries a
   `// layering: sanctioned leaf-read` comment.
 
 See `docs/developer-docs/backend-conventions.md`.
@@ -346,7 +348,9 @@ Condensed "don't break this" set. Detail in `docs/operations-guide/security.md`.
   refresh rotates `tokenHash`, reuse of a rotated hash revokes, logout sets `revokedAt`).
   `/user/sessions` lists active devices. Access token is HS256 with sliding renewal.
 - **Platform admin & auth providers:** `AuthProviderConfig` stores platform-wide login-provider configs
-  (encrypted at rest), managed in `/admin` (super-admin only). `LOCAL` auth is always available unless
+  (encrypted at rest), managed by the **separate administration app** (a distinct repo). This repo only
+  *reads* `AuthProviderConfig` (DB-first, env-bootstrap fallback) and ships no `/admin` frontend or
+  login-provider write API. `LOCAL` auth is always available unless
   `DISABLE_REGISTRATION` is set; OIDC SSO via `Provider.GENERIC`.
 
 See `docs/user-guide/team-and-roles.md` and `docs/user-guide/sessions.md`.

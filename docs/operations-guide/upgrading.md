@@ -207,8 +207,9 @@ storage/short-link account fingerprints, and media provider configs from the old
 
 **Behaviour changes to verify after upgrading:**
 
-- Login providers are now managed in `/admin` (super-admin) — env vars remain the bootstrap
-  fallback, so existing env-configured logins keep working.
+- Login providers are now managed by the **separate administration app** (a distinct repo); this
+  repo reads `AuthProviderConfig` DB-first and ships no `/admin` frontend — env vars remain the
+  bootstrap fallback, so existing env-configured logins keep working.
 - Login now issues a refresh token backed by the `Session` table; users get a device list with
   per-session revoke under Profile → Security. Existing JWTs keep verifying (no forced re-auth).
 - The post composer moved to `/schedule/post` and `/schedule/post/<id>` (was a modal).

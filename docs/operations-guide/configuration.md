@@ -46,6 +46,7 @@ Pluggable provider system with 6 adapters: Resend, SendGrid, Mailgun, Postmark, 
 | `EMAIL_SMTP_PASS` | — | SMTP authentication password |
 | `EMAIL_LOG_RETENTION_DAYS` | `90` | Days to keep email log metadata before pruning |
 | `DISABLE_REGISTRATION` | `false` | Set to `true` to disable self-registration. The first user of an empty instance can still register, and `GENERIC` OIDC sign-ins still provision |
+| `DISALLOW_PLUS` | `false` | Set to `true` to reject email/password (`LOCAL`) registrations whose address contains a `+` |
 
 The webhook endpoint is at `POST /webhooks/email`, signature-verified, and registered outside CSRF (same as Stripe). SES uses SNS topic verification; `EMAIL_WEBHOOK_SECRET` can optionally hold the expected SNS TopicArn.
 
@@ -59,6 +60,20 @@ The webhook endpoint is at `POST /webhooks/email`, signature-verified, and regis
 | **Postmark** | Create a server API token at postmarkapp.com | Generated when creating a webhook in the server settings |
 | **Amazon SES** | IAM credentials, or fall back to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` | SES uses SNS. Subscribe `POST /webhooks/email` to the SNS topic; `EMAIL_WEBHOOK_SECRET` can pin the TopicArn |
 | **SMTP** | No API key — set host/port/secure/user/pass | Webhooks are not supported |
+
+## Newsletter signups
+
+New registrants can be subscribed to a marketing newsletter list. Beehiiv is used when `BEEHIIVE_API_KEY` is set, otherwise Listmonk when `LISTMONK_API_KEY` is set; with neither set, no signup is sent.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `BEEHIIVE_API_KEY` | — | Beehiiv API key |
+| `BEEHIIVE_PUBLICATION_ID` | — | Beehiiv publication ID the subscriber is added to |
+| `LISTMONK_API_KEY` | — | Listmonk API key (HTTP Basic password, paired with `LISTMONK_USER`) |
+| `LISTMONK_USER` | — | Listmonk API username (HTTP Basic user) |
+| `LISTMONK_DOMAIN` | — | Base URL of the Listmonk instance. A self-hosted Listmonk on a private network must be allowlisted via `SSRF_ALLOWED_PRIVATE_CIDRS` |
+| `LISTMONK_LIST_ID` | — | Numeric list ID to subscribe new registrants to |
+| `LISTMONK_WELCOME_TEMPLATE_ID` | — | Numeric transactional template ID for the welcome email |
 
 ## Campaign Hub
 
@@ -113,14 +128,18 @@ Model defaults re-point AI model resolution from the legacy scope/model chain to
 | `API_LIMIT` | `600` | Public API rate limit per hour |
 | `AGENT_API_KEY` | — | API key for legacy `/public/agent` endpoint |
 | `OPENAI_APP_CHALLENGE` | — | Challenge string for OpenAI apps, served at `/.well-known/openai-apps-challenge` |
+| `MOBILE_APP_SCHEME` | `postiz://auth/callback` | Deep-link scheme the mobile OAuth callback (`GET /auth/oauth-mobile-callback`) redirects to |
+| `NEXT_PUBLIC_OVERRIDE_BACKEND_URL` | — | Overrides the token endpoint advertised in the MCP OAuth discovery document (`/.well-known/oauth-authorization-server`); falls back to the backend URL |
+| `AGENT_MEDIA_SSO_KEY` | — | JWT signing key for the optional agent-media.ai SSO integration. Unset = `GET /user/agent-media-sso` returns `{ url: null }` |
 
 ## Security
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `ENCRYPTION_KEY` | (derived from `JWT_SECRET`) | 32-byte base64 or hex key for AES-256-GCM encryption at rest. Falls back to SHA-256 of `JWT_SECRET` if unset. See [Security](./security.md) |
+| `ENCRYPTION_KEY` | (derived from `JWT_SECRET`) | 32-byte base64 or hex key for AES-256-GCM encryption at rest. Falls back to SHA-256 of `JWT_SECRET` if unset. See [Security](./security.md). **Warning:** introducing `ENCRYPTION_KEY` on a deployment that previously derived the key from `JWT_SECRET` makes all existing `v2:`-prefixed secrets undecryptable (single-key model) — set it from the first deploy, or plan a re-encryption of stored secrets |
 | `INTEGRATION_RETURN_URL_ALLOWLIST` | — | Comma-separated allowed partner origins for integration/enterprise return URLs |
 | `SSRF_ALLOWED_PRIVATE_CIDRS` | — | Comma-separated private CIDRs to allow for self-hosted provider instances (opt-in SSRF exception) |
+| `RESTRICT_UPLOAD_DOMAINS` | — | When set, media attached to a post must contain this domain in its path; saving a post with externally-hosted media is rejected (HTTP 400). Use the domain of your own upload endpoint |
 | `NOT_SECURED` | — | Dev-only toggle. Skips Helmet, HSTS, CSRF enforcement, and CopilotKit policy gating. Never set in production |
 
 ## Payments (Stripe)
@@ -130,6 +149,7 @@ Model defaults re-point AI model resolution from the legacy scope/model chain to
 | `STRIPE_PUBLISHABLE_KEY` | — | Stripe publishable key |
 | `STRIPE_SECRET_KEY` | — | Stripe secret key |
 | `STRIPE_SIGNING_KEY` | — | Stripe webhook signing secret |
+| `STRIPE_DISCOUNT_ID` | — | Stripe coupon ID. When set, eligible existing paying customers on a monthly plan (no yearly plan, no existing discount) can have the coupon applied to their subscription |
 | `ADDON_STORAGE_GB_PER_PACK` | `25` | Gigabytes added by one storage add-on pack |
 | `ADDON_VIDEO_EXPORTS_PER_PACK` | `50` | Video exports added by one video-exports add-on pack |
 | `NEXT_PUBLIC_ADDON_STORAGE_GB_PER_PACK` | `25` | Browser-visible mirror of `ADDON_STORAGE_GB_PER_PACK` |
@@ -139,7 +159,7 @@ Plan and add-on prices are created dynamically from `pricing.ts`; no `STRIPE_PRI
 
 ## SSO / OIDC login
 
-Since v3.8.10, login providers are managed in-app by a super-admin at `/admin` and stored encrypted in `AuthProviderConfig`. The variables below remain supported as the bootstrap fallback when no enabled DB config exists for that provider. Email/password (`LOCAL`) login is always available regardless of provider config.
+Since v3.8.10, login providers are managed by the **separate administration app** (a distinct repository) and stored encrypted in `AuthProviderConfig`. This repo reads that config DB-first and ships no `/admin` frontend or login-provider write API. The variables below remain supported as the bootstrap fallback when no enabled DB config exists for that provider. Email/password (`LOCAL`) login is always available regardless of provider config.
 
 See [OAuth / SSO](./oauth-sso.md) for a complete setup walkthrough.
 
@@ -197,6 +217,14 @@ Setting a provider's platform OAuth app credentials here gives every organizatio
 
 Custom OAuth channels reuse `POSTMILL_OAUTH_CLIENT_ID` / `POSTMILL_OAUTH_CLIENT_SECRET`.
 
+## X channel behaviour
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DISABLE_X_ANALYTICS` | — | Set to skip X (Twitter) analytics collection |
+| `X_ANALYTICS_MAX_PAGE_DEPTH` | `10` | Maximum timeline pages fetched per X analytics sync |
+| `STRIP_LINKS_FROM_X_POSTS` | — | Set to strip links from X posts before publishing |
+
 ## Browser extension
 
 | Variable | Default | Purpose |
@@ -209,6 +237,9 @@ Custom OAuth channels reuse `POSTMILL_OAUTH_CLIENT_ID` / `POSTMILL_OAUTH_CLIENT_
 |----------|---------|---------|
 | `NEXT_PUBLIC_SENTRY_DSN` | — | Sentry DSN for error tracking (frontend) |
 | `SENTRY_SPOTLIGHT` | — | Set to `1` to enable Spotlight debug proxy |
+| `DATAFAST_API_KEY` | — | Datafast API key. Posts a `register` goal to datafa.st when a new user signs up carrying a `datafast_visitor_id` |
+| `FACEBOOK_PIXEL_ACCESS_TOKEN` | — | Meta Conversions API access token for server-side pixel events |
+| `NEXT_PUBLIC_FACEBOOK_PIXEL` | — | Meta pixel ID (browser-visible). Server-side pixel events fire only when both this and `FACEBOOK_PIXEL_ACCESS_TOKEN` are set |
 
 ## AI Designer chatbot
 
@@ -221,7 +252,12 @@ Custom OAuth channels reuse `POSTMILL_OAUTH_CLIENT_ID` / `POSTMILL_OAUTH_CLIENT_
 | `AI_DESIGNER_AGENT_TIMEOUT_MS` | `120000` | Per-agent LLM dispatch deadline |
 | `AI_DESIGNER_ASSET_TIMEOUT_MS` | `90000` | Asset (image generation/stock) step deadline |
 | `AI_DESIGNER_STUCK_SESSION_MINUTES` | `15` | Planning/executing sessions untouched longer than this roll back to awaiting_plan |
-| `TRUST_PROXY_HOPS` | `1` | Use the Nth-from-right `x-forwarded-for` entry for the `/ai-designer` rate bucket |
+| `TRUST_PROXY_HOPS` | (disabled) | Number of XFF-appending reverse proxies in front of the backend. Unset/invalid = key on the socket peer address (safe default, not spoofable). When set, per-IP rate buckets key on the Nth-from-right `x-forwarded-for` entry. Applies to the `/ai-designer` connect-rate bucket **and** the HTTP throttler's per-IP buckets (login/register/enterprise/public-report) and the MCP rate limits. Operators behind a proxy **must** set it to the exact number of appending proxies — overestimating lands in attacker-controlled left-most XFF entries and makes the limits spoofable |
+| `SESSION_TTL_MINUTES` | — | agent-mesh package env var — no Postmill effect (see caveat below) |
+| `ENABLE_CIRCUIT_BREAKER` | — | agent-mesh package env var — forced off (see caveat below) |
+| `MCP_MAX_RETRIES` | — | agent-mesh package env var — no Postmill effect (see caveat below) |
+
+`SESSION_TTL_MINUTES`, `ENABLE_CIRCUIT_BREAKER`, and `MCP_MAX_RETRIES` belong to the bundled `@reaatech/agent-mesh` package's env schema, not to Postmill itself. `agent-mesh-env.stash.ts` reads, neutralizes, and restores them around the package's import-time env parse: out-of-range values are stashed aside so they cannot crash the boot, and `ENABLE_CIRCUIT_BREAKER` is forced off because the package's global breaker is keyed by agent id only — Postmill uses the conductor's per-`(org, agent)` breaker instead. Setting these vars does not configure Postmill behaviour.
 
 ## Local development feature flags
 
@@ -241,6 +277,7 @@ Set any of these to `true` or `1` to disable the corresponding subsystem during 
 | `DEV_DISABLE_OPENTELEMETRY` | Skip OpenTelemetry exporter setup |
 | `AGENT_SUPERVISOR_ENABLED` | `true` (default) uses the supervisor + specialists agent model |
 | `CONTENT_PIPELINE_TOTAL_TIMEOUT_MS` | `300000` | Wall-clock deadline for a `runContentPipeline` run |
+| `CONTENT_PIPELINE_AGENT_TIMEOUT_MS` | `120000` | Per-agent LLM dispatch deadline inside a `runContentPipeline` run |
 | `BACKEND_URL` | Server-side backend URL used by the MCP surface. Falls back to `NEXT_PUBLIC_BACKEND_URL` |
 | `MEDIA_MCP_AUDIT_LOG_PATH` | `/tmp/media-mcp-audit.log` | File path for the media-MCP audit logger |
 | `SENTRY_PROFILING` | Set to `1` to enable browser profiling in dev |
@@ -255,6 +292,7 @@ Set any of these to `true` or `1` to disable the corresponding subsystem during 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `CONFIG_CHECK_STRICT` | — | Fail fast on fatal-missing secrets even in dev |
+| `BACKEND_LISTEN_HOST` | (Node default) | Explicit bind host for the backend HTTP server (e.g. `0.0.0.0` to force IPv4 in CI/containers). Unset = Node's default bind address |
 | `COLLAB_SINGLE_INSTANCE` | `true` | Collaboration websocket keeps Yjs state in memory; must be `true` unless `COLLAB_REDIS_ADAPTER` is set |
 | `COLLAB_REDIS_ADAPTER` | — | Reserved for the future Yjs-over-Redis adapter |
 | `OUTBOUND_HTTP_TIMEOUT_MS` | `30000` | Bound provider and webhook calls |
@@ -294,6 +332,13 @@ Premium stock sources are configured per-organization in-app via **Settings → 
 
 See [Video Rendering](./video-rendering.md) for the full list of `VIDEO_RENDER_*` variables.
 
+## Headless Chromium (Puppeteer)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PUPPETEER_EXECUTABLE_PATH` | (bundled Chromium) | Path to a system/distro Chromium binary for design frame capture (used by the render-worker container). Unset = Puppeteer's bundled Chromium |
+| `PUPPETEER_DISABLE_SANDBOX` | `false` | Set to `true` to launch the campaign-report PDF Chromium with `--no-sandbox` (for CI/containers without user namespaces; also disabled automatically when `CI=true`). Production defaults to sandboxed mode |
+
 ## Variables no longer read
 
 The following patterns are no longer supported as environment variables. Configure them in-app instead:
@@ -307,6 +352,6 @@ The following patterns are no longer supported as environment variables. Configu
 - `TRANSLOADIT_AUTH` / `TRANSLOADIT_SECRET` (legacy video assembly deleted)
 - `ELEVENLABS_API_KEY` / `ELEVENLABS_*` (legacy direct ElevenLabs calls deleted; configure ElevenLabs as an AI Media provider instead)
 
-The **login** provider env vars (`GITHUB_CLIENT_*`, `YOUTUBE_CLIENT_*`, `POSTMILL_OAUTH_*`) remain readable as the bootstrap fallback for `/admin`-managed auth providers and must never be used for channel or AI credentials.
+The **login** provider env vars (`GITHUB_CLIENT_*`, `YOUTUBE_CLIENT_*`, `POSTMILL_OAUTH_*`) remain readable as the bootstrap fallback for auth providers managed by the separate administration app and must never be used for channel or AI credentials.
 
 > Verified against v1.0.0

@@ -229,6 +229,9 @@ describe('MediaJobsActivity — video export metering', () => {
       const watchlistRepository = { countByOrg: vi.fn() };
       const fileRepository = { getStorageBytes: vi.fn() };
       const storageService = { getMountedConfigs: vi.fn().mockResolvedValue([]) };
+      const aiSettingsRepository = {
+        countInFlightVideoExports: vi.fn().mockResolvedValue(0),
+      };
 
       return {
         service: new PermissionsService(
@@ -240,7 +243,8 @@ describe('MediaJobsActivity — video export metering', () => {
           brandsRepository as any,
           watchlistRepository as any,
           fileRepository as any,
-          storageService as any
+          storageService as any,
+          aiSettingsRepository as any
         ),
         subscriptionService,
       };

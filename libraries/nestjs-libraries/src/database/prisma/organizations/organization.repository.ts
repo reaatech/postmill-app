@@ -1,6 +1,6 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { ShortLinkPreference, SubscriptionTier, Provider, StorageProviderType } from '@prisma/client';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -249,7 +249,7 @@ export class OrganizationRepository {
     }
 
     const appRole = roleId
-      ? await this._appRole.model.appRole.findUnique({ where: { id: roleId } })
+      ? await this._resolveOrgRole(orgId, roleId)
       : await this._appRole.model.appRole.findFirst({
           where: { organizationId: null, key: role === 'ADMIN' ? 'admin' : 'member', isSystem: true },
         });
@@ -364,6 +364,14 @@ export class OrganizationRepository {
   }
 
   async createTeamUser(orgId: string, email: string, password: string, roleKey: string, roleId?: string) {
+    // Resolve the role before creating the user so a rejected roleId does not
+    // leave an orphaned user row behind.
+    const appRole = roleId
+      ? await this._resolveOrgRole(orgId, roleId)
+      : await this._appRole.model.appRole.findFirst({
+          where: { organizationId: null, key: roleKey, isSystem: true },
+        });
+
     const user = await this._user.model.user.create({
       data: {
         email,
@@ -372,12 +380,6 @@ export class OrganizationRepository {
         activated: true,
       },
     });
-
-    const appRole = roleId
-      ? await this._appRole.model.appRole.findUnique({ where: { id: roleId } })
-      : await this._appRole.model.appRole.findFirst({
-          where: { organizationId: null, key: roleKey, isSystem: true },
-        });
 
     await this._userOrg.model.userOrganization.create({
       data: {
@@ -495,7 +497,7 @@ export class OrganizationRepository {
     roleId?: string,
   ) {
     const appRole = roleId
-      ? await this._appRole.model.appRole.findUnique({ where: { id: roleId } })
+      ? await this._resolveOrgRole(orgId, roleId)
       : await this._appRole.model.appRole.findFirst({
           where: { organizationId: null, key: role === 'ADMIN' ? 'admin' : 'member', isSystem: true },
         });
@@ -508,6 +510,25 @@ export class OrganizationRepository {
       },
       data: { roleId: appRole?.id },
     });
+  }
+
+  // F1: a caller-supplied roleId must resolve inside the org scope — a system
+  // template role or a role owned by this org. An arbitrary cross-org (or
+  // nonexistent) role id is rejected instead of silently trusted.
+  private async _resolveOrgRole(orgId: string, roleId: string) {
+    const role = await this._appRole.model.appRole.findFirst({
+      where: {
+        id: roleId,
+        OR: [
+          { organizationId: null, isSystem: true },
+          { organizationId: orgId },
+        ],
+      },
+    });
+    if (!role) {
+      throw new BadRequestException('Role not found in organization');
+    }
+    return role;
   }
 
   async getOwnerRoleId() {

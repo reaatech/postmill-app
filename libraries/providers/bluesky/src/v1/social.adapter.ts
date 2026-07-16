@@ -7,7 +7,7 @@ import {
   SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import {
   BadBody,
   RefreshToken,
@@ -284,7 +284,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl() {
-    const state = makeId(6);
+    const state = makeOauthState();
     return {
       url: state,
       codeVerifier: makeId(10),

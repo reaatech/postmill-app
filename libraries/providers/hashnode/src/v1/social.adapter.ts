@@ -11,7 +11,7 @@ import { jsonToGraphQLQuery } from 'json-to-graphql-query';
 import { HashnodeSettingsDto } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
 import { metadata as providerMetadata } from './metadata';
@@ -28,7 +28,7 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
   dto = HashnodeSettingsDto;
 
   async generateAuthUrl() {
-    const state = makeId(6);
+    const state = makeOauthState();
     return {
       url: state,
       codeVerifier: makeId(10),

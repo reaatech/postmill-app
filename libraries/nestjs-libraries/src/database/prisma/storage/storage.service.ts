@@ -450,16 +450,22 @@ export class StorageService {
       return;
     }
 
-    // BYO bucket (any mounted non-LOCAL provider) waives the hosted storage meter.
-    const mounted = await this.getMountedConfigs(orgId);
-    if (mounted.some((c) => c.type !== StorageProviderType.LOCAL)) {
-      return;
-    }
-
     const subscription =
       await this._subscriptionRepository.getSubscriptionByOrganizationId(orgId);
     const tier = subscription?.subscriptionTier || 'STARTER';
     const plan = pricing[tier] ?? pricing['STARTER'];
+
+    // F2: a mounted BYO bucket waives the hosted storage meter only when the
+    // plan entitles the org to BYO storage — otherwise a STARTER/PRO org could
+    // mount its own bucket and stop being metered at all.
+    const mounted = await this.getMountedConfigs(orgId);
+    if (
+      plan.byo_storage &&
+      mounted.some((c) => c.type !== StorageProviderType.LOCAL)
+    ) {
+      return;
+    }
+
     const capBytes =
       (plan.storage_gb + (subscription?.extraStorageGb ?? 0)) *
       1024 *
@@ -469,7 +475,7 @@ export class StorageService {
 
     if (used + incomingBytes > capBytes) {
       throw new HttpException(
-        'Hosted storage limit reached. Connect your own storage bucket for unlimited storage, buy a storage add-on, or upgrade your plan.',
+        'Hosted storage limit reached. Buy a storage add-on or upgrade your plan.',
         402
       );
     }

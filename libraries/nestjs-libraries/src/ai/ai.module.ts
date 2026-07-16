@@ -6,7 +6,6 @@ import { RagService } from './governance/rag.service';
 import { BudgetService } from './governance/budget.service';
 import { BudgetMiddleware } from './governance/budget.middleware';
 import { GuardrailService } from './governance/guardrail.service';
-import { AiThrottlerGuard } from './governance/ai-throttler.guard';
 import { AiMediaService } from './governance/media.service';
 import { SemanticCacheService } from './governance/semantic-cache.service';
 import { ModelRouterService } from './governance/model-router.service';
@@ -33,7 +32,6 @@ import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.
     BudgetService,
     BudgetMiddleware,
     GuardrailService,
-    AiThrottlerGuard,
     AiMediaService,
     RagService,
     SemanticCacheService,
@@ -58,7 +56,6 @@ import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.
     ProviderHealthService,
     BudgetService,
     GuardrailService,
-    AiThrottlerGuard,
     AiMediaService,
     RagService,
     SemanticCacheService,

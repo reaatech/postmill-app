@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
-import { Organization } from '@prisma/client';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
+import { Organization, User } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
@@ -29,9 +30,10 @@ export class SettingsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   async inviteTeamMember(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Body() body: AddTeamMemberDto
   ) {
-    return this._organizationService.inviteTeamMember(org.id, body);
+    return this._organizationService.inviteTeamMember(org.id, user, body);
   }
 
   @Put('/team/:id/role')
@@ -39,12 +41,14 @@ export class SettingsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   changeTeamMemberRole(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Param('id') id: string,
     @Body('role') role: 'USER' | 'ADMIN',
     @Body('roleId') roleId?: string,
   ) {
     return this._organizationService.changeTeamMemberRole(
       org,
+      user,
       id,
       role === 'ADMIN' ? 'ADMIN' : 'USER',
       roleId,
@@ -56,10 +60,12 @@ export class SettingsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS])
   async createTeamUser(
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
     @Body() body: CreateTeamUserDto
   ) {
     return this._organizationService.createTeamUser(
       org.id,
+      user,
       body.email,
       body.password,
       body.role,

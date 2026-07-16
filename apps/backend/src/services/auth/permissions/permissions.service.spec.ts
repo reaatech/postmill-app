@@ -64,6 +64,10 @@ function buildService(overrides: Record<string, unknown> = {}) {
     getMountedConfigs: vi.fn().mockResolvedValue([]),
     ...((overrides.storageService as any) || {}),
   };
+  const aiSettingsRepository = {
+    countInFlightVideoExports: vi.fn().mockResolvedValue(0),
+    ...((overrides.aiSettingsRepository as any) || {}),
+  };
 
   const service = new PermissionsService(
     subscriptionService as any,
@@ -74,7 +78,8 @@ function buildService(overrides: Record<string, unknown> = {}) {
     brandsRepository as any,
     watchlistRepository as any,
     fileRepository as any,
-    storageService as any
+    storageService as any,
+    aiSettingsRepository as any
   );
 
   return {
@@ -88,6 +93,7 @@ function buildService(overrides: Record<string, unknown> = {}) {
     watchlistRepository,
     fileRepository,
     storageService,
+    aiSettingsRepository,
   };
 }
 
@@ -345,6 +351,26 @@ describe('PermissionsService — subscription matrix', () => {
     });
   });
 
+  describe('BYO_STORAGE (F2)', () => {
+    beforeEach(() => {
+      process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+    });
+
+    it.each([
+      { tier: 'STARTER', entitled: false },
+      { tier: 'PRO', entitled: false },
+      { tier: 'TEAM', entitled: true },
+      { tier: 'AGENCY', entitled: true },
+    ] as const)('$tier byo_storage gate = $entitled', async ({ tier, entitled }) => {
+      const { service, subscriptionService } = buildService();
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
+        subscriptionFixture(tier)
+      );
+
+      expect(await can(service, Sections.BYO_STORAGE)).toBe(entitled);
+    });
+  });
+
   describe('COMPETITORS', () => {
     beforeEach(() => {
       process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
@@ -403,6 +429,37 @@ describe('PermissionsService — subscription matrix', () => {
 
       subscriptionService.getCreditsFrom.mockResolvedValue(25);
       expect(await can(service, Sections.VIDEO_EXPORTS)).toBe(false);
+    });
+
+    it('counts in-flight renders toward the cap (F4 TOCTOU)', async () => {
+      const { service, subscriptionService, aiSettingsRepository } =
+        buildService();
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
+        subscriptionFixture('STARTER', { extraVideoExports: 0 })
+      );
+      // STARTER cap is 15: one slot left by recorded credits, but one render
+      // is still in flight — concurrent calls must not both pass the gate.
+      subscriptionService.getCreditsFrom.mockResolvedValue(14);
+      aiSettingsRepository.countInFlightVideoExports.mockResolvedValue(1);
+
+      expect(await can(service, Sections.VIDEO_EXPORTS)).toBe(false);
+      expect(
+        aiSettingsRepository.countInFlightVideoExports
+      ).toHaveBeenCalledWith(orgId, expect.any(Date));
+    });
+
+    it('admits the next render once the in-flight job reaches a terminal state', async () => {
+      const { service, subscriptionService, aiSettingsRepository } =
+        buildService();
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
+        subscriptionFixture('STARTER', { extraVideoExports: 0 })
+      );
+      subscriptionService.getCreditsFrom.mockResolvedValue(14);
+      // The pending job from the previous test just flipped to `failed` — it no
+      // longer counts as in-flight, so the slot is free again.
+      aiSettingsRepository.countInFlightVideoExports.mockResolvedValue(0);
+
+      expect(await can(service, Sections.VIDEO_EXPORTS)).toBe(true);
     });
   });
 
@@ -499,16 +556,35 @@ describe('PermissionsService — subscription matrix', () => {
       expect(await can(service, Sections.STORAGE)).toBe(false);
     });
 
-    it('waives the cap when a non-LOCAL provider is mounted', async () => {
+    it('waives the cap for a BYO-entitled tier when a non-LOCAL provider is mounted', async () => {
       const { service, subscriptionService, storageService } = buildService();
       subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
-        subscriptionFixture('STARTER')
+        subscriptionFixture('TEAM')
       );
       storageService.getMountedConfigs.mockResolvedValue([
         { type: StorageProviderType.S3 },
       ]);
 
       expect(await can(service, Sections.STORAGE)).toBe(true);
+    });
+
+    it('meters a non-entitled tier even when a non-LOCAL provider is mounted (F2)', async () => {
+      const { service, subscriptionService, storageService, fileRepository } =
+        buildService();
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
+        subscriptionFixture('STARTER', { extraStorageGb: 0 })
+      );
+      storageService.getMountedConfigs.mockResolvedValue([
+        { type: StorageProviderType.S3 },
+      ]);
+
+      // STARTER cap is 1GB — the mount no longer waives the meter.
+      const gb = 1024 * 1024 * 1024;
+      fileRepository.getStorageBytes.mockResolvedValue(gb - 1);
+      expect(await can(service, Sections.STORAGE)).toBe(true);
+
+      fileRepository.getStorageBytes.mockResolvedValue(gb);
+      expect(await can(service, Sections.STORAGE)).toBe(false);
     });
 
     it('adds extraStorageGb to the cap', async () => {
@@ -523,6 +599,60 @@ describe('PermissionsService — subscription matrix', () => {
 
       fileRepository.getStorageBytes.mockResolvedValue(5 * gb + 1 * gb);
       expect(await can(service, Sections.STORAGE)).toBe(false);
+    });
+  });
+
+  describe('dunning grace (F5)', () => {
+    beforeEach(() => {
+      process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+    });
+
+    it('lapses to STARTER limits when gracePeriodEnd is in the past', async () => {
+      const { service, subscriptionService } = buildService();
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
+        subscriptionFixture('TEAM', {
+          gracePeriodEnd: new Date(Date.now() - 60 * 1000),
+        })
+      );
+
+      const { subscription, options } = await service.getPackageOptions(orgId);
+
+      // The lapsed subscription is treated as absent: baseline tier, no
+      // unlimited channel, no add-on reads downstream.
+      expect(subscription).toBeNull();
+      expect(options.team_members).toBe(pricing.STARTER.team_members);
+      expect(options.byo_storage).toBe(pricing.STARTER.byo_storage);
+      expect(options.channel).toBe(pricing.STARTER.channel);
+    });
+
+    it('keeps the paid tier while the grace window is still open', async () => {
+      const { service, subscriptionService } = buildService();
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
+        subscriptionFixture('TEAM', {
+          gracePeriodEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        })
+      );
+
+      const { subscription, options } = await service.getPackageOptions(orgId);
+
+      expect(subscription).not.toBeNull();
+      expect(options.team_members).toBe(pricing.TEAM.team_members);
+      expect(options.channel).toBe(-10);
+    });
+
+    it('keeps the paid tier after recovery cleared the marker (regression F5 prevents)', async () => {
+      const { service, subscriptionService } = buildService();
+      // Post-recovery state: the stripe webhook cleared gracePeriodEnd, so a
+      // window that has since passed cannot wrongly downgrade a paid customer.
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue(
+        subscriptionFixture('TEAM', { gracePeriodEnd: null })
+      );
+
+      const { subscription, options } = await service.getPackageOptions(orgId);
+
+      expect(subscription).not.toBeNull();
+      expect(options.team_members).toBe(pricing.TEAM.team_members);
+      expect(options.byo_storage).toBe(pricing.TEAM.byo_storage);
     });
   });
 });

@@ -2,7 +2,7 @@ import {
   AuthTokenDetails, PostDetails, PostResponse, SocialProvider,
 } from '@gitroom/provider-kernel';
 import { SocialAbstract, ValidityMedia } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { Integration } from '@prisma/client';
 import dayjs from 'dayjs';
@@ -50,7 +50,7 @@ export class PixelfedProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl() {
-    const state = makeId(6);
+    const state = makeOauthState();
     return { url: state, codeVerifier: makeId(10), state };
   }
 

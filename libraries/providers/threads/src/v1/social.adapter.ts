@@ -7,7 +7,7 @@ import {
   SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { Logger } from '@nestjs/common';
 import dayjs from 'dayjs';
@@ -165,7 +165,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     return {
       url:
         'https://www.threads.net/oauth/authorize' +

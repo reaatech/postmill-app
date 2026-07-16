@@ -164,7 +164,7 @@ A dev-only environment variable that disables security hardening: skips Helmet, 
 An RBAC role assigned to an org membership (v3.8.10). Five system roles are seeded — `owner`, `admin`, `editor`, `member`, `viewer` — and organizations can define custom roles. A role carries fine-grained `(resource, action)` permissions; routes gate on them with `@RequirePermission` (HTTP 403 on failure).
 
 **Super-admin**
-The platform operator flag (`User.isSuperAdmin`) — a different axis from the org `owner` role. Grants access to platform surfaces (`/admin`, AI admin settings, impersonation) and bypasses RBAC, but not billing gates.
+The platform operator flag (`User.isSuperAdmin`) — a different axis from the org `owner` role. Grants access to the super-admin `/admin/*` backend APIs (consumed by the separate administration app — this repo ships no `/admin` UI), AI admin settings, and impersonation, and bypasses RBAC, but not billing gates.
 
 **Session**
 A login session backing refresh-token rotation (v3.8.10). Stores only the SHA-256 hash of the refresh token; rotated on every refresh, revoked on logout or token reuse. Backs the per-user device list.

@@ -324,6 +324,32 @@ export class AiSettingsRepository {
     });
   }
 
+  // F4: count video-export jobs still in flight within the billing window so the
+  // VIDEO_EXPORTS entitlement gate can't be raced by concurrent renders (the
+  // credit is only recorded after the async render completes). Stale `processing`
+  // rows are excluded: a crash between the `processing` claim and the terminal
+  // update strands a local job (the 24h reaper — JOB_TIMEOUT_MS in
+  // media-job-lifecycle.service.ts — only covers the external-provider path), and
+  // without the cutoff such a row would hold an in-flight slot until it ages out
+  // of the billing month (G2 mitigation).
+  countInFlightVideoExports(organizationId: string, from: Date) {
+    const staleProcessingCutoff = dayjs.utc().subtract(24, 'hour').toDate();
+    return this._aiMediaJob.model.aIMediaJob.count({
+      where: {
+        organizationId,
+        creditType: 'video_export',
+        createdAt: { gte: from },
+        OR: [
+          { status: { notIn: ['completed', 'failed', 'processing'] } },
+          {
+            status: 'processing',
+            updatedAt: { gte: staleProcessingCutoff },
+          },
+        ],
+      },
+    });
+  }
+
   getMediaJobById(organizationId: string, id: string) {
     return this._aiMediaJob.model.aIMediaJob.findUnique({
       where: { id, organizationId },

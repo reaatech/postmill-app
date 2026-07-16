@@ -6,7 +6,7 @@ import {
   SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { SocialAbstract } from '@gitroom/provider-kernel';
 //@ts-ignore
@@ -49,7 +49,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl() {
-    const state = makeId(17);
+    const state = makeOauthState();
     return {
       url: state,
       codeVerifier: makeId(10),

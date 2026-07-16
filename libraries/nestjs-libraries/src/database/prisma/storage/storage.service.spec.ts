@@ -164,6 +164,50 @@ describe('StorageService — quota enforcement (#57)', () => {
 
     await expect(service.assertWithinQuota('org-1', 10)).resolves.toBeUndefined();
   });
+
+  // F2: a mounted non-LOCAL provider only waives the hosted meter when the
+  // plan entitles the org to BYO storage (TEAM/AGENCY) — a STARTER mount is metered.
+  it('meters a STARTER org even when a non-LOCAL provider is mounted', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_123';
+    const repo = makeRepo({
+      findMountedByOrg: vi
+        .fn()
+        .mockResolvedValue([{ type: StorageProviderType.S3 }]),
+    });
+    mockSubscriptionService.getSubscriptionByOrganizationId.mockResolvedValue({
+      subscriptionTier: 'STARTER',
+      extraStorageGb: 0,
+    });
+    mockFileRepository.getStorageBytes.mockResolvedValue(2 * 1024 * 1024 * 1024);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = makeStorageService(repo, auditService);
+
+    await expect(service.assertWithinQuota('org-1', 100)).rejects.toMatchObject({
+      status: 402,
+    });
+    expect(mockFileRepository.getStorageBytes).toHaveBeenCalled();
+  });
+
+  it('waives the hosted meter for a TEAM org with a non-LOCAL provider mounted', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test_123';
+    const repo = makeRepo({
+      findMountedByOrg: vi
+        .fn()
+        .mockResolvedValue([{ type: StorageProviderType.S3 }]),
+    });
+    mockSubscriptionService.getSubscriptionByOrganizationId.mockResolvedValue({
+      subscriptionTier: 'TEAM',
+      extraStorageGb: 0,
+    });
+    mockFileRepository.getStorageBytes.mockResolvedValue(200 * 1024 * 1024 * 1024);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = makeStorageService(repo, auditService);
+
+    await expect(
+      service.assertWithinQuota('org-1', 1024 * 1024 * 1024)
+    ).resolves.toBeUndefined();
+    expect(mockFileRepository.getStorageBytes).not.toHaveBeenCalled();
+  });
 });
 
 describe('StorageService — migration verify-before-delete (#48/#51)', () => {

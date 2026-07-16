@@ -111,8 +111,28 @@ describe('Storage quota — aggregate, BYO waiver, add-on GB', () => {
       );
     });
 
-    it('is waived when a non-LOCAL provider is mounted', async () => {
+    it('meters a non-entitled (STARTER) org even with a non-LOCAL provider mounted (F2)', async () => {
       const { service, storageRepository, fileRepository } = buildStorageService();
+      storageRepository.findMountedByOrg.mockResolvedValue([
+        { type: StorageProviderType.S3 },
+      ]);
+      const gb = 1024 * 1024 * 1024;
+      fileRepository.getStorageBytes.mockResolvedValue(100 * gb);
+
+      // STARTER has byo_storage:false — the mount no longer waives the meter.
+      await expect(service.assertWithinQuota('org-1', gb)).rejects.toThrow(
+        HttpException
+      );
+      expect(fileRepository.getStorageBytes).toHaveBeenCalled();
+    });
+
+    it('is waived for a BYO-entitled (TEAM) org with a non-LOCAL provider mounted', async () => {
+      const { service, subscriptionService, storageRepository, fileRepository } =
+        buildStorageService();
+      subscriptionService.getSubscriptionByOrganizationId.mockResolvedValue({
+        subscriptionTier: 'TEAM',
+        extraStorageGb: 0,
+      });
       storageRepository.findMountedByOrg.mockResolvedValue([
         { type: StorageProviderType.S3 },
       ]);

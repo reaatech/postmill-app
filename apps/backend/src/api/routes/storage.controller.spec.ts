@@ -1,5 +1,7 @@
+import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StorageProviderType, Organization, User } from '@prisma/client';
+import { Ability, AbilityBuilder, AbilityClass } from '@casl/ability';
 
 const serviceMock = {
   getProviderConfigs: vi.fn(),
@@ -25,6 +27,10 @@ const fileMock = {
   getFiles: vi.fn(),
 };
 
+const permissionsMock = {
+  check: vi.fn(),
+};
+
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
     getProviderConfigs = serviceMock.getProviderConfigs;
@@ -48,15 +54,37 @@ import { HttpException } from '@nestjs/common';
 import type { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import type { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import type { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import {
+  AppAbility,
+  PermissionsService,
+} from '@gitroom/backend/services/auth/permissions/permissions.service';
+import { CHECK_POLICIES_KEY } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import {
+  AuthorizationActions,
+  Sections,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
-const org: Organization = { id: 'org-1' } as any;
+const org: Organization = { id: 'org-1', createdAt: new Date() } as any;
 const user: User = { id: 'user-1' } as any;
 
-function makeController() {
+// Mirror of the PoliciesGuard ability for [Create, BYO_STORAGE].
+function byoAbility(entitled: boolean) {
+  const { can, build } = new AbilityBuilder<
+    Ability<[AuthorizationActions, Sections]>
+  >(Ability as AbilityClass<AppAbility>);
+  if (entitled) {
+    can(AuthorizationActions.Create, Sections.BYO_STORAGE);
+  }
+  return build();
+}
+
+function makeController(entitled = true) {
+  permissionsMock.check.mockResolvedValue(byoAbility(entitled));
   return new StorageController(
     serviceMock as unknown as StorageService,
     auditMock as unknown as AuditService,
-    fileMock as unknown as FileService
+    fileMock as unknown as FileService,
+    permissionsMock as unknown as PermissionsService
   );
 }
 
@@ -138,6 +166,9 @@ describe('StorageController', () => {
 
   describe('updateProvider', () => {
     it('updates provider configuration', async () => {
+      serviceMock.getProviderConfigs.mockResolvedValue([
+        { id: 's3-1', name: 'My S3', type: 'S3', mounted: false },
+      ]);
       serviceMock.updateConfig.mockResolvedValue({
         id: 's3-1',
         name: 'Updated S3',
@@ -363,6 +394,119 @@ describe('StorageController', () => {
       expect(
         Object.getOwnPropertyNames(Object.getPrototypeOf(controller))
       ).not.toContain('setDefaultProvider');
+    });
+  });
+
+  // F2 — BYO storage is a paid capability (TEAM/AGENCY). Mount is gated by the
+  // PoliciesGuard decorator; create/update need conditional gates (LOCAL stays
+  // free; update only bites mounted non-LOCAL configs), so those run the same
+  // ability check in-handler and mirror the guard's 402 outcome.
+  describe('BYO storage paywall (F2)', () => {
+    describe('createProvider', () => {
+      it('402s a non-entitled (STARTER) org creating a non-LOCAL config', async () => {
+        const controller = makeController(false);
+
+        await expect(
+          controller.createProvider(org, user, {
+            type: StorageProviderType.S3,
+            name: 'My S3',
+          } as any)
+        ).rejects.toMatchObject({ status: 402 });
+        expect(serviceMock.createAndTestConfig).not.toHaveBeenCalled();
+      });
+
+      it('allows a non-entitled org creating a LOCAL config', async () => {
+        serviceMock.createAndTestConfig.mockResolvedValue({ id: 'local-1' });
+        const controller = makeController(false);
+
+        await expect(
+          controller.createProvider(org, user, {
+            type: StorageProviderType.LOCAL,
+            name: 'Local Storage',
+          } as any)
+        ).resolves.toEqual({ id: 'local-1' });
+        expect(serviceMock.createAndTestConfig).toHaveBeenCalledTimes(1);
+        expect(permissionsMock.check).not.toHaveBeenCalled();
+      });
+
+      it('allows an entitled (TEAM) org creating a non-LOCAL config', async () => {
+        serviceMock.createAndTestConfig.mockResolvedValue({ id: 's3-1' });
+        const controller = makeController(true);
+
+        await expect(
+          controller.createProvider(org, user, {
+            type: StorageProviderType.S3,
+            name: 'My S3',
+          } as any)
+        ).resolves.toEqual({ id: 's3-1' });
+      });
+    });
+
+    describe('mountProvider', () => {
+      it('carries the BYO_STORAGE policy decorator', () => {
+        const metadata = Reflect.getMetadata(
+          CHECK_POLICIES_KEY,
+          StorageController.prototype.mountProvider
+        );
+        expect(metadata).toEqual([
+          [AuthorizationActions.Create, Sections.BYO_STORAGE],
+        ]);
+      });
+    });
+
+    describe('updateProvider', () => {
+      const mountedS3 = {
+        id: 's3-1',
+        name: 'My S3',
+        type: 'S3',
+        mounted: true,
+      };
+
+      it('402s a non-entitled org updating a mounted non-LOCAL config', async () => {
+        serviceMock.getProviderConfigs.mockResolvedValue([mountedS3]);
+        const controller = makeController(false);
+
+        await expect(
+          controller.updateProvider(org, user, 's3-1', { name: 'renamed' } as any)
+        ).rejects.toMatchObject({ status: 402 });
+        expect(serviceMock.updateConfig).not.toHaveBeenCalled();
+      });
+
+      it('allows a non-entitled org updating an unmounted non-LOCAL config', async () => {
+        serviceMock.getProviderConfigs.mockResolvedValue([
+          { ...mountedS3, mounted: false },
+        ]);
+        serviceMock.updateConfig.mockResolvedValue({ id: 's3-1' });
+        const controller = makeController(false);
+
+        await expect(
+          controller.updateProvider(org, user, 's3-1', { name: 'renamed' } as any)
+        ).resolves.toEqual({ id: 's3-1' });
+        expect(serviceMock.updateConfig).toHaveBeenCalledTimes(1);
+      });
+
+      it('allows a non-entitled org updating a mounted LOCAL config', async () => {
+        serviceMock.getProviderConfigs.mockResolvedValue([
+          { id: 'local-1', name: 'Local', type: 'LOCAL', mounted: true },
+        ]);
+        serviceMock.updateConfig.mockResolvedValue({ id: 'local-1' });
+        const controller = makeController(false);
+
+        await expect(
+          controller.updateProvider(org, user, 'local-1', { name: 'renamed' } as any)
+        ).resolves.toEqual({ id: 'local-1' });
+        expect(serviceMock.updateConfig).toHaveBeenCalledTimes(1);
+      });
+
+      it('allows an entitled org updating a mounted non-LOCAL config', async () => {
+        serviceMock.getProviderConfigs.mockResolvedValue([mountedS3]);
+        serviceMock.updateConfig.mockResolvedValue({ id: 's3-1' });
+        const controller = makeController(true);
+
+        await expect(
+          controller.updateProvider(org, user, 's3-1', { name: 'renamed' } as any)
+        ).resolves.toEqual({ id: 's3-1' });
+      });
     });
   });
 });

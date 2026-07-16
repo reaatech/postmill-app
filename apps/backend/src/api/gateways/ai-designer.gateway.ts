@@ -32,6 +32,7 @@ import {
 } from '@gitroom/nestjs-libraries/dtos/ai-designer/start-ai-designer-session.dto';
 import { AiDesignerConductorService } from '@gitroom/nestjs-libraries/ai-designer/conductor/ai-designer-conductor.service';
 import { AiDesignerInputPolicyService } from '@gitroom/nestjs-libraries/ai-designer';
+import { resolveClientIp } from '@gitroom/nestjs-libraries/utils/client-ip';
 
 interface SocketContext {
   userId: string;
@@ -894,27 +895,12 @@ export class AiDesignerGateway
   }
 
   private _clientIpForConnectRateLimit(client: Socket): string {
-    const rawHops = Number(process.env.TRUST_PROXY_HOPS);
-    const hops =
-      Number.isInteger(rawHops) && rawHops >= 1 ? rawHops : undefined;
-    if (!hops) {
-      return client.handshake.address;
-    }
-
-    const xff = client.handshake.headers['x-forwarded-for'];
-    if (typeof xff !== 'string') {
-      return client.handshake.address;
-    }
-
-    const parts = xff
-      .split(',')
-      .map((p) => p.trim())
-      .filter(Boolean);
-    if (parts.length < hops) {
-      return client.handshake.address;
-    }
-
-    return parts[parts.length - hops] ?? client.handshake.address;
+    // Shared TRUST_PROXY_HOPS (Nth-from-right XFF) resolution — identical to
+    // the HTTP throttler and the MCP rate limits. See utils/client-ip.ts.
+    return resolveClientIp(
+      client.handshake.headers['x-forwarded-for'],
+      client.handshake.address
+    );
   }
 
   private _rateLimit(userId: string, event: string): boolean {

@@ -7,7 +7,7 @@ import {
   SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { RedditSettingsDto } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
@@ -105,7 +105,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     const codeVerifier = makeId(30);
     const url = `https://www.reddit.com/api/v1/authorize?client_id=${
       clientInformation?.client_id || ''

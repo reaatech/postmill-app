@@ -5,7 +5,7 @@ import {
   PostResponse,
   SocialProvider,
 } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import {
   SocialAbstract,
@@ -69,7 +69,7 @@ export class FarcasterProvider
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(17);
+    const state = makeOauthState();
     return {
       url: `${clientInformation?.client_id || ''}||${state}`,
       codeVerifier: makeId(10),

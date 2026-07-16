@@ -41,18 +41,20 @@ describe('SettingsController', () => {
     expect(CreateTeamUserDto).toBeDefined();
   });
 
-  it('createTeamUser delegates to the service with DTO fields', async () => {
+  it('createTeamUser delegates to the service with the acting user and DTO fields', async () => {
     mockCreateTeamUser.mockResolvedValue({ id: 'u-1' });
+    const user = { id: 'user-1', isSuperAdmin: false } as any;
     const body: CreateTeamUserDto = {
       email: 'new@example.com',
       password: 'secret123',
       role: 'USER',
     };
 
-    const result = await controller.createTeamUser(org, body);
+    const result = await controller.createTeamUser(org, user, body);
 
     expect(mockCreateTeamUser).toHaveBeenCalledWith(
       'org-1',
+      user,
       'new@example.com',
       'secret123',
       'USER',

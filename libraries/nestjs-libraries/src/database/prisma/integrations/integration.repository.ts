@@ -512,6 +512,19 @@ export class IntegrationRepository {
     }).then((integrations) => integrations.map(decryptIntegrationTokens));
   }
 
+  // Id-only list for ownership checks — unlike getIntegrationsList this does
+  // not decrypt tokens just to build an id set.
+  async getIntegrationIds(org: string): Promise<string[]> {
+    const rows = await this._integration.model.integration.findMany({
+      where: {
+        organizationId: org,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
+  }
+
   getIntegrationsHealth(org: string) {
     return this._integration.model.integration.findMany({
       where: {

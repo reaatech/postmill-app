@@ -12,6 +12,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { IdempotencyFactory } from '@gitroom/nestjs-libraries/ai/governance/idempotency.factory';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { resolveClientIp } from '@gitroom/nestjs-libraries/utils/client-ip';
 import { runWithContext } from './async.storage';
 import { createOAuthMiddleware } from './oauth-middleware';
 import type { AuthStrategy, AuthResult, AuthContext } from '@reaatech/a2a-reference-auth';
@@ -128,6 +129,13 @@ async function checkRateLimit(key: string): Promise<boolean> {
   record.count++;
   return true;
 }
+
+// F9/D4: key MCP rate limits on the real client IP, resolved exactly like the
+// HTTP throttler and the WS gateway (TRUST_PROXY_HOPS, Nth-from-right XFF;
+// unset/invalid → socket peer). Bare req.ip behind a proxy is the proxy's
+// address — one shared bucket for every MCP client. Exported for unit tests.
+export const mcpRateLimitKey = (prefix: string, req: Request): string =>
+  `${prefix}:${resolveClientIp(req.headers['x-forwarded-for'], req.ip ?? 'unknown')}`;
 
 // ── In-memory idempotency cache (24h TTL) — fallback when IdempotencyFactory is unavailable ──
 const idempotencyCache = new Map<string, { expiresAt: number }>();
@@ -455,7 +463,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const rateLimitKey = `mcp-oauth:${req.ip}`;
+    const rateLimitKey = mcpRateLimitKey('mcp-oauth', req);
     if (!(await checkRateLimit(rateLimitKey))) {
       res.status(429).json({ error: 'too_many_requests', error_description: 'Rate limit exceeded' });
       return;
@@ -584,7 +592,7 @@ export const startMcp = async (app: INestApplication) => {
       }
     }
 
-    const rateLimitKey = `mcp:${req.ip}`;
+    const rateLimitKey = mcpRateLimitKey('mcp', req);
     if (!(await checkRateLimit(rateLimitKey))) {
       res.status(429).json({ error: 'too_many_requests', error_description: 'Rate limit exceeded' });
       return;

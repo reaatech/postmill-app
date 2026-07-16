@@ -2,7 +2,7 @@ import {
   AuthTokenDetails, ClientInformation, PostDetails, PostResponse, SocialProvider,
 } from '@gitroom/provider-kernel';
 import { SocialAbstract } from '@gitroom/provider-kernel';
-import { makeId } from '@gitroom/provider-kernel';
+import { makeId, makeOauthState } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 
 import { metadata as providerMetadata } from './metadata';
@@ -26,7 +26,7 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     const clientId = clientInformation?.client_id || '';
     const url =
       `https://www.tumblr.com/oauth2/authorize?client_id=${clientId}` +

@@ -23,7 +23,13 @@ const ROLE_PERMISSIONS: Record<string, { resource: string; action: string }[]> =
   admin: RESOURCES.flatMap(r =>
     ACTIONS
       .filter(a => !(r === 'billing' && a === 'manage'))
-      .filter(a => !(r === 'organization' && a === 'delete'))
+      // Exclude the `organization:manage` WILDCARD too, not just `:delete` — the
+      // guard treats `resource:manage` as implying every action (incl. delete),
+      // so granting `organization:manage` silently hands admin org-deletion,
+      // contradicting the role ("except … organization deletion"). Mirrors the
+      // billing exclusion above (which drops the `manage` wildcard). Admin keeps
+      // organization create/read/update.
+      .filter(a => !(r === 'organization' && (a === 'delete' || a === 'manage')))
       .map(a => ({ resource: r, action: a }))
   ),
   editor: [
@@ -77,13 +83,23 @@ export class RbacSeeder {
         }));
 
       const perms = ROLE_PERMISSIONS[key];
-      const data = perms.map(p => ({
-        roleId: role.id,
-        permissionId: permissionIds.get(`${p.resource}:${p.action}`)!,
-      }));
+      const desiredIds = perms.map(
+        p => permissionIds.get(`${p.resource}:${p.action}`)!
+      );
+
+      // Reconcile, don't just append: system-template roles are canonical
+      // (`isSystem`, non-editable by operators), so remove any grant that's no
+      // longer in the role's definition before adding the missing ones. Without
+      // this, a previously-seeded stale grant (e.g. the legacy
+      // admin→`organization:manage`) would persist on existing deployments even
+      // after the definition above is corrected. Scoped to this null-org template
+      // role only — per-org custom roles (`isSystem:false`) are never touched.
+      await this.prisma.appRolePermission.deleteMany({
+        where: { roleId: role.id, permissionId: { notIn: desiredIds } },
+      });
 
       await this.prisma.appRolePermission.createMany({
-        data,
+        data: desiredIds.map(permissionId => ({ roleId: role.id, permissionId })),
         skipDuplicates: true,
       });
     }

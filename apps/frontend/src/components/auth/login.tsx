@@ -11,18 +11,26 @@ import { LoginUserDto } from '@gitroom/nestjs-libraries/dtos/auth/login.user.dto
 import { GithubProvider } from '@gitroom/frontend/components/auth/providers/github.provider';
 import { OauthProvider } from '@gitroom/frontend/components/auth/providers/oauth.provider';
 import { GoogleProvider } from '@gitroom/frontend/components/auth/providers/google.provider';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { FarcasterProvider } from '@gitroom/frontend/components/auth/providers/farcaster.provider';
-import WalletProvider from '@gitroom/frontend/components/auth/providers/wallet.provider';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import useSWR from 'swr';
+import dynamic from 'next/dynamic';
+import { WalletUiProvider } from '@gitroom/frontend/components/auth/providers/placeholder/wallet.ui.provider';
 
-interface AuthProvider {
+const WalletProvider = dynamic(
+  () => import('@gitroom/frontend/components/auth/providers/wallet.provider'),
+  {
+    ssr: false,
+    loading: () => <WalletUiProvider />,
+  }
+);
+
+export interface AuthProvider {
   provider: string;
   displayName: string;
 }
 
-const useAuthProviders = () => {
+export const useAuthProviders = () => {
   const fetch = useFetch();
   return useSWR<{ providers: AuthProvider[] }>('auth-providers', async () => {
     const res = await fetch('/auth/providers');
@@ -31,7 +39,7 @@ const useAuthProviders = () => {
   });
 };
 
-const providerComponents: Record<string, React.ComponentType> = {
+export const providerComponents: Record<string, React.ComponentType> = {
   LOCAL: () => null,
   GITHUB: GithubProvider,
   GOOGLE: GoogleProvider,
@@ -50,8 +58,6 @@ export function Login() {
   const t = useT();
   const [loading, setLoading] = useState(false);
   const [notActivated, setNotActivated] = useState(false);
-  const { isGeneral, neynarClientId, billingEnabled, genericOauth } =
-    useVariables();
   const { data: providersData, error: providersError } = useAuthProviders();
   const resolver = useMemo(() => {
     return classValidatorResolver(LoginUserDto);
@@ -114,19 +120,9 @@ export function Login() {
       );
     }
 
-    if (isGeneral && genericOauth) {
-      return <OauthProvider />;
-    }
-    if (!isGeneral) {
-      return <GithubProvider />;
-    }
-    return (
-      <div className="gap-[8px] flex">
-        <GoogleProvider />
-        {!!neynarClientId && <FarcasterProvider />}
-        {billingEnabled && <WalletProvider />}
-      </div>
-    );
+    // No configured OAuth providers (LOCAL maps to no social button) — the
+    // email/password form below is the only login method.
+    return null;
   };
 
   return (

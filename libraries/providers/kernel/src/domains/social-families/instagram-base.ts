@@ -7,7 +7,7 @@ import {
   SocialProvider,
 } from '../social-provider';
 import { SocialCommentDTO } from '../social';
-import { makeId } from '../social-make-id';
+import { makeId, makeOauthState } from '../social-make-id';
 import { timer } from '@gitroom/helpers/utils/timer';
 import dayjs from 'dayjs';
 import {
@@ -412,7 +412,7 @@ export class InstagramProvider
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     return {
       url:
         'https://www.facebook.com/v20.0/dialog/oauth' +

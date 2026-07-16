@@ -7,7 +7,7 @@ import {
   SocialProvider,
 } from '../social-provider';
 import { SocialCommentDTO } from '../social';
-import { makeId } from '../social-make-id';
+import { makeId, makeOauthState } from '../social-make-id';
 import sharp from 'sharp';
 import { lookup } from 'mime-types';
 import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
@@ -152,7 +152,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl(clientInformation?: ClientInformation) {
-    const state = makeId(6);
+    const state = makeOauthState();
     const codeVerifier = makeId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${
       clientInformation?.client_id || ''

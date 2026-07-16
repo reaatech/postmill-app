@@ -65,7 +65,7 @@ Without this, the analytics dashboard, comment inbox, media render queue, and wa
 | `comments-sync-org` | `comments/sync-org` | Per-org comment sync, webhook dispatch, pruning, notifications |
 | `post-publish-<queue>` | `post/publish` | Publish a post to one or more channels, including first comment, plugs, repeats, and webhooks. One function is generated per provider task queue |
 | `autopost-process` | `autopost/process` | Recurring autopost schedules; re-enqueues itself every hour |
-| `refresh-token` | `integration/refresh-token` | Refresh OAuth tokens before expiry; re-enqueues itself |
+| `refresh-token` | `integration/refresh-token` | Refresh OAuth tokens before expiry; re-enqueues itself with a **unique** idempotency id per cycle (`refresh_<integrationId>_<uuid>`; a constant id would be dedup-dropped for 24h and black-hole the chain). Cancelled by `integration/refresh-token/cancel` (emitted on channel delete and before every (re)start). A chain terminates on channel deletion, when the integration is flagged `refreshNeeded`, or after 5 consecutive failed refresh cycles (5-minute sleep floor between retries) — bounding failure notifications per dead chain |
 | `streak-tracker` | `streak/start` | Update posting-streak gamification and send reminders |
 | `analytics-backfill` | `analytics/backfill` | On-demand historical backfill for one integration |
 | `send-email` | `email/send` | Transactional email delivery (global 1/sec rate limit) |

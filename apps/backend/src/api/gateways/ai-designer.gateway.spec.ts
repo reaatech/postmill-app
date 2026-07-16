@@ -197,6 +197,34 @@ describe('AiDesignerGateway rate limiting', () => {
     ).toBe(true);
   });
 
+  it('ignores padded left-most XFF entries when hops matches the real chain (D3)', () => {
+    vi.stubEnv('TRUST_PROXY_HOPS', '1');
+    const gw = makeGateway() as any;
+
+    // Attacker-controlled left-most padding must not mint fresh buckets: with
+    // TRUST_PROXY_HOPS equal to the real proxy count, only the rightmost
+    // entry is consulted, so all padded variants share one bucket.
+    const proxy = '10.0.0.9';
+    for (let i = 0; i < 120; i++) {
+      expect(
+        gw._connectRateLimit(
+          fakeClient(proxy, {
+            headers: {
+              'x-forwarded-for': `evil-${i}, 192.168.1.12`,
+            },
+          })
+        )
+      ).toBe(true);
+    }
+    expect(
+      gw._connectRateLimit(
+        fakeClient(proxy, {
+          headers: { 'x-forwarded-for': 'evil-final, 192.168.1.12' },
+        })
+      )
+    ).toBe(false);
+  });
+
   it('falls back to handshake.address when XFF has fewer entries than TRUST_PROXY_HOPS', () => {
     vi.stubEnv('TRUST_PROXY_HOPS', '2');
     const gw = makeGateway() as any;

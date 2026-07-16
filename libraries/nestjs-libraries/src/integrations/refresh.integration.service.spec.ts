@@ -132,14 +132,35 @@ describe('RefreshIntegrationService', () => {
   });
 
   describe('startRefreshWorkflow', () => {
-    it('sends integration/refresh-token event when refreshCron is true', async () => {
+    it('cancels any stale loop first, then starts a new chain with unique ids', async () => {
       const result = await service.startRefreshWorkflow('org-1', 'integration-1', mockIntegrationManager.getSocialIntegration());
-      expect(inngest.send).toHaveBeenCalledWith({
+      expect(inngest.send).toHaveBeenCalledTimes(2);
+
+      const events = vi.mocked(inngest.send).mock.calls.map(([event]) => event as any);
+      // F3: the cancel goes out BEFORE the start so a reconnect supersedes any
+      // still-sleeping loop (a reconnect upserts the same integration row).
+      expect(events[0]).toEqual({
+        name: 'integration/refresh-token/cancel',
+        data: { integrationId: 'integration-1' },
+        id: expect.stringMatching(/^refresh_cancel_integration-1_[0-9a-f-]{36}$/),
+      });
+      expect(events[1]).toEqual({
         name: 'integration/refresh-token',
         data: { integrationId: 'integration-1', organizationId: 'org-1' },
-        id: 'refresh_integration-1',
+        id: expect.stringMatching(/^refresh_start_integration-1_[0-9a-f-]{36}$/),
       });
       expect(result).toBeUndefined();
+    });
+
+    it('never reuses an id across successive starts (24h dedup window)', async () => {
+      const provider = mockIntegrationManager.getSocialIntegration();
+      await service.startRefreshWorkflow('org-1', 'integration-1', provider);
+      await service.startRefreshWorkflow('org-1', 'integration-1', provider);
+
+      const ids = vi.mocked(inngest.send).mock.calls.map(([event]) => (event as any).id);
+      expect(new Set(ids).size).toBe(4);
+      expect(ids[1]).toMatch(/^refresh_start_integration-1_[0-9a-f-]{36}$/);
+      expect(ids[3]).toMatch(/^refresh_start_integration-1_[0-9a-f-]{36}$/);
     });
 
     it('returns false when refreshCron is false', async () => {

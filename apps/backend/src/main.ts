@@ -124,7 +124,12 @@ async function start() {
   app.use(cookieParser());
   app.use(compression());
 
-  if (!isDev() && !process.env.NOT_SECURED) {
+  // NOT_SECURED is the universal dev toggle — relax helmet ONLY in development. A stray
+  // prod NOT_SECURED must not strip CSP/HSTS/frameguard/noSniff wholesale (same re-guard
+  // as the auth cookies in auth.controller.ts). Noted quirk (not changed): isDev() is
+  // also true when NODE_ENV is unset, so an unset-NODE_ENV deploy still gets no helmet.
+  const notSecuredDev = process.env.NOT_SECURED && process.env.NODE_ENV === 'development';
+  if (!isDev() && !notSecuredDev) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const helmet = require('helmet');
     app.use(helmet({
