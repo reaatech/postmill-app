@@ -1,5 +1,5 @@
 {
-  "name": "@reaatech/postmill-sdk",
+  "name": "@postmill-ai/postmill-sdk",
   "version": "1.0.0",
   "description": "Official Node SDK for Postmill — schedule posts, manage channels, and drive the public API.",
   "main": "dist/index.js",

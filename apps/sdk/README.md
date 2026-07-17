@@ -5,13 +5,13 @@ This is the NodeJS SDK for [Postmill](https://postmill.ai).
 You can start by installing the package:
 
 ```bash
-npm install @reaatech/postmill-sdk
+npm install @postmill-ai/postmill-sdk
 ```
 
 ## Usage
 
 ```typescript
-import Postmill from '@reaatech/postmill-sdk';
+import Postmill from '@postmill-ai/postmill-sdk';
 
 const postmill = new Postmill('your api key', 'your self-hosted instance (optional)');
 ```

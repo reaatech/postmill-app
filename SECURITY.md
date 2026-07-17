@@ -11,7 +11,7 @@ We, at Postmill (reaatech), cover the following scopes for vulnerability disclos
 - The core repository for `postmill-app` (github.com/reaatech/postmill-app)
 - All `reaatech` repositories that are official components, tooling, or integrations of Postmill
 - Official Postmill container images published under `reaatech` on GHCR
-- Official Postmill CLI tools and NPM packages (NPM org: @reaatech)
+- Official Postmill CLI tools and NPM packages (NPM orgs: @postmill-ai and @reaatech)
 - Postmill-Cloud related infrastructure & services. (API, Frontend, Configurations etc.)
 - Plugins for Postmill maintained within the `reaatech` organization
 

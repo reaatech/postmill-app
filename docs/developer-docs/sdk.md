@@ -2,12 +2,12 @@
 
 > Verified against v1.0.0
 
-The `@reaatech/postmill-sdk` is the official Node.js SDK for the Postmill Public API. It provides typed methods for creating posts, uploading media, listing integrations, and more.
+The `@postmill-ai/postmill-sdk` is the official Node.js SDK for the Postmill Public API. It provides typed methods for creating posts, uploading media, listing integrations, and more.
 
 ## Installation
 
 ```bash
-npm install @reaatech/postmill-sdk
+npm install @postmill-ai/postmill-sdk
 ```
 
 The SDK depends on `@gitroom/nestjs-libraries` for DTO types and uses the global `fetch` implementation (Node 18+, or a polyfill in older environments).
@@ -15,7 +15,7 @@ The SDK depends on `@gitroom/nestjs-libraries` for DTO types and uses the global
 ## Quick start
 
 ```typescript
-import Postmill from '@reaatech/postmill-sdk';
+import Postmill from '@postmill-ai/postmill-sdk';
 
 const client = new Postmill('your-api-key');
 
@@ -124,8 +124,8 @@ deletePost(id: string): Promise<Response>
 
 ## Package details
 
-- **Package name**: `@reaatech/postmill-sdk`
-- **Version**: 0.1.0
+- **Package name**: `@postmill-ai/postmill-sdk`
+- **Version**: 1.0.0
 - **License**: AGPL-3.0
 - **Build**: Uses `tsup` for bundling.
 - **Workspace dependency**: `@gitroom/nestjs-libraries`
