@@ -30,7 +30,7 @@ postmill-app/
 | `frontend` | Next.js App Router, React, Tailwind 3 | User-facing web app on port `4200`. |
 | `extension` | Browser extension | Chrome extension for cross-platform posting. |
 | `commands` | CLI | Command-line operations. |
-| `sdk` | Node.js (published) | `@reaatech/postmill-sdk` for third-party integrations. |
+| `sdk` | Node.js (published) | `@postmill-ai/postmill-sdk` for third-party integrations. |
 
 ### Libraries
 

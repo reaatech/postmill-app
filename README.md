@@ -25,7 +25,7 @@
 
 Self-hosted, bring-your-own-key AI across 25+ providers, 36+ channels, and 46 built-in media tools — an open-source alternative to Buffer, Hootsuite, and Sprout Social. Postmill is built for agencies, teams, and multi-brand operators who want to schedule everywhere, generate on-brand content with their own AI keys, and own their entire stack.
 
-**[Website](https://postmill.ai)** · **[Docs](https://docs.postmill.ai)** · **[Quick Start](#-quick-start)** · **[Node SDK (`@reaatech/postmill-sdk`)](https://www.npmjs.com/package/@reaatech/postmill-sdk)** · **[Public API](https://docs.postmill.ai)**
+**[Website](https://postmill.ai)** · **[Docs](https://docs.postmill.ai)** · **[Quick Start](#-quick-start)** · **[Node SDK (`@postmill-ai/postmill-sdk`)](https://www.npmjs.com/package/@postmill-ai/postmill-sdk)** · **[Public API](https://docs.postmill.ai)**
 
 ---
 
@@ -90,7 +90,7 @@ The frontend runs on port `4200`. For the full setup, configuration reference, a
 
 ## 🔗 Automation & integrations
 
-Postmill exposes a full **Public API** for programmatic scheduling, analytics, and channel management, an **MCP** surface for AI agents, and an official Node SDK — [`@reaatech/postmill-sdk`](https://www.npmjs.com/package/@reaatech/postmill-sdk). The Public API is compatible with low-code automation platforms such as n8n, Make, and Zapier, so you can wire Postmill into your existing workflows. See the [API docs](https://docs.postmill.ai) to get started.
+Postmill exposes a full **Public API** for programmatic scheduling, analytics, and channel management, an **MCP** surface for AI agents, and an official Node SDK — [`@postmill-ai/postmill-sdk`](https://www.npmjs.com/package/@postmill-ai/postmill-sdk). The Public API is compatible with low-code automation platforms such as n8n, Make, and Zapier, so you can wire Postmill into your existing workflows. See the [API docs](https://docs.postmill.ai) to get started.
 
 ## 🛠️ Tech stack
 

@@ -1,5 +1,5 @@
 {
-  "name": "@reaatech/postmill-sdk",
+  "name": "@postmill-ai/postmill-sdk",
   "version": "1.0.0",
   "description": "Official Node SDK for Postmill — schedule posts, manage channels, and drive the public API.",
   "main": "dist/index.js",
@@ -28,11 +28,11 @@
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/reaatech/postmill-app.git"
+    "url": "git+https://github.com/postmill-ai/postmill-app.git"
   },
   "homepage": "https://postmill.ai",
   "bugs": {
-    "url": "https://github.com/reaatech/postmill-app/issues"
+    "url": "https://github.com/postmill-ai/postmill-app/issues"
   },
   "devDependencies": {
     "@types/node": "^22.13.0",

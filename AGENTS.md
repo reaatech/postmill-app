@@ -32,7 +32,7 @@ Apps (`apps/`):
 - `frontend` — **Next.js (App Router) + React**. Runs on port `4200`. Tailwind 3, Sentry-instrumented.
 - `extension` — browser extension.
 - `commands` — CLI commands.
-- `sdk` — published SDK (`@reaatech/postmill-sdk`).
+- `sdk` — published SDK (`@postmill-ai/postmill-sdk`).
 
 Libraries (`libraries/`):
 - `nestjs-libraries` — the bulk of shared server logic, Prisma schema, and repositories. **Most
@@ -276,7 +276,7 @@ The deep per-subsystem detail lives in `docs/`. Follow the pointer rather than d
 | Analytics | Persisted daily snapshots, rollup/retention, best-time, recommendations | `docs/developer-docs/analytics-api.md` |
 | Data model / schema | Prisma models, migrations | `docs/developer-docs/data-model.md`, `docs/developer-docs/database.md` |
 | Webhooks | Event dispatch (SSRF-safe) | `docs/developer-docs/webhooks.md` |
-| Public API / SDK | REST public API + `@reaatech/postmill-sdk` | `docs/developer-docs/public-api.md`, `docs/developer-docs/sdk.md` |
+| Public API / SDK | REST public API + `@postmill-ai/postmill-sdk` | `docs/developer-docs/public-api.md`, `docs/developer-docs/sdk.md` |
 | Media studios / Designer | 46 media tools — Designer (Konva) + AI Designer + 38 provider studios + 6 stock browsers | `docs/user-guide/media/index.md`, `docs/developer-docs/designer.md` |
 | Campaigns | Campaign Hub — tagged items, UTM, approvals, goals, share reports, discussion | `docs/user-guide/campaigns.md` |
 | RBAC / team | Roles, permission catalog, sessions | `docs/user-guide/team-and-roles.md` |
