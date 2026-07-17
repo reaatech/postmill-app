@@ -850,6 +850,13 @@ html[dir='rtl'] [dir='ltr'] {
   border-radius: 6px !important;
   cursor: pointer;
 }
+/* The wrapped buttons carry their own pill label (`iconBreak:hidden` — visible
+   only on wide viewports). Inside a menu row the MenuItem overlay label is the
+   one that counts, so the pill label must stay hidden at every width or the two
+   print on top of each other. */
+.tb-menu-item [class*='iconBreak:hidden'] {
+  display: none !important;
+}
 
 .btnSub:disabled .arrow-change {
   display: none !important;
