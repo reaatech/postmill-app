@@ -538,7 +538,7 @@ export const MultiFileComponent: FC<{
               )}
             </div>
           )}
-          {!mediaNotAvailable && (
+          {!mediaNotAvailable && (!!toolBar || !!information) && (
             <div className="text-newColColor h-full flex items-center">
               <VerticalDividerIcon />
             </div>

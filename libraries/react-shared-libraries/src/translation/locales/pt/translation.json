@@ -561,7 +561,7 @@
   "select_channels": "Selecionar canais",
   "start_a_new_chat": "Iniciar um novo chat",
   "your_assistant": "Seu Assistente",
-  "agent_welcome_message": "Olá, sou seu agente Postmill 🙌🏻.\n\nPosso agendar uma publicação ou várias publicações para múltiplos canais e gerar imagens e vídeos.\n\nVocê pode selecionar os canais que deseja usar no menu à esquerda.\n\nVocê pode ver suas conversas anteriores no menu à direita.\n\nVocê também pode me usar como um Servidor MCP, confira Configurações >> API Pública",
+  "agent_welcome_message": "Olá, sou seu agente Postmill 🙌🏻.\n\nPosso agendar publicações nos seus canais, gerar imagens e vídeos, analisar seu desempenho, gerenciar campanhas e responder a comentários.\n\nEscolha os canais com os quais deseja trabalhar no seletor de canais da barra superior. Suas conversas anteriores estão no menu à esquerda (abra-o com o botão da barra).\n\nVocê também pode me usar como um Servidor MCP — confira Configurações >> API Pública.",
   "last_github_trending": "Últimas tendências do Github",
   "next_predicted_github_trending": "Próxima tendência prevista do GitHub",
   "repository": "Repositório",

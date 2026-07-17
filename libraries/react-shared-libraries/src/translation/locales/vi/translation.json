@@ -561,7 +561,7 @@
   "select_channels": "Chọn kênh",
   "start_a_new_chat": "Bắt đầu cuộc trò chuyện mới",
   "your_assistant": "Trợ lý của bạn",
-  "agent_welcome_message": "Xin chào, tôi là trợ lý Postmill của bạn 🙌🏻.\n\nTôi có thể lên lịch đăng một hoặc nhiều bài lên nhiều kênh khác nhau và tạo hình ảnh, video.\n\nBạn có thể chọn các kênh muốn sử dụng từ menu bên trái.\n\nBạn có thể xem các cuộc trò chuyện trước đó từ menu bên phải.\n\nBạn cũng có thể sử dụng tôi như một MCP Server, kiểm tra Cài đặt >> Public API",
+  "agent_welcome_message": "Xin chào, tôi là trợ lý Postmill của bạn 🙌🏻.\n\nTôi có thể lên lịch đăng bài lên các kênh của bạn, tạo hình ảnh và video, phân tích hiệu suất, quản lý chiến dịch và trả lời bình luận.\n\nChọn các kênh bạn muốn làm việc từ bộ chọn kênh trên thanh công cụ phía trên. Các cuộc trò chuyện trước đó nằm trong menu bên trái (mở bằng nút trên thanh công cụ).\n\nBạn cũng có thể sử dụng tôi như một MCP Server — xem Cài đặt >> Public API.",
   "last_github_trending": "Xu hướng Github gần đây",
   "next_predicted_github_trending": "Dự đoán xu hướng Github tiếp theo",
   "repository": "Kho lưu trữ",

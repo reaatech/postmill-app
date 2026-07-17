@@ -122,14 +122,12 @@ export const AgentChat: FC = () => {
               labels={{
                 title: t('your_assistant', 'Your Assistant'),
                 initial: t('agent_welcome_message', `Hello, I am your Postmill agent 🙌🏻.
-              
-I can schedule a post or multiple posts to multiple channels and generate pictures and videos.
 
-You can select the channels you want to use from the channel selector in the top toolbar.
+I can schedule posts to your channels, generate images and videos, analyze your performance, manage campaigns, and reply to comments.
 
-You can see your previous conversations in the menu on the left (use the toolbar button to open it).
+Pick the channels to work with from the channel selector in the top toolbar. Your previous conversations live in the menu on the left (open it with the toolbar button).
 
-You can also use me as an MCP Server, check Settings >> Public API
+You can also use me as an MCP Server — see Settings >> Public API.
 `),
               }}
               UserMessage={Message}
